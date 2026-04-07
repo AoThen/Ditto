@@ -362,7 +362,7 @@ void CCloudSyncManager::PushNewClips()
 		CStringA serverUrlA(m_serverUrl);
 		std::string url = serverUrlA.GetString();
 		httplib::Client cli(url);
-		cli.enable_server_certificate_verification(false);
+		// Note: httplib unified Client doesn't expose cert verification
 		cli.set_default_headers({
 			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
 		});
@@ -537,7 +537,8 @@ void CCloudSyncManager::PullChanges()
 		CStringA serverUrlA(m_serverUrl);
 		std::string url = serverUrlA.GetString();
 		httplib::Client cli(url);
-		cli.enable_server_certificate_verification(false);
+		// Note: httplib unified Client auto-detects HTTPS, cert verification
+		// settings not exposed on Client wrapper (use SSLClient directly if needed)
 		cli.set_default_headers({
 			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
 		});

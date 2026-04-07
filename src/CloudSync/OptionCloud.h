@@ -1,5 +1,5 @@
 #pragma once
-#include <afxprop.h>  // CPropertyPage
+#include <afxdlgs.h>  // CPropertyPage
 
 // TODO: Define this resource ID in resource.h when wiring up the dialog resource
 // Suggested: #define IDD_OPTIONS_CLOUD  2200

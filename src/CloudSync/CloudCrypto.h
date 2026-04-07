@@ -35,6 +35,27 @@ public:
 	// Base64 decode
 	static std::vector<BYTE> Base64Decode(const CStringA& base64);
 
+	// Base64 decode (CString overload)
+	static std::vector<BYTE> Base64Decode(const CString& base64);
+
+	// SHA-256 hash (needed by CloudKeyExport)
+	static std::vector<BYTE> Sha256(const std::vector<BYTE>& data);
+
+	// AES-256-GCM encrypt/decrypt (needed by CloudKeyExport)
+	static std::vector<BYTE> AesGcmEncrypt(
+		const std::vector<BYTE>& key,
+		const std::vector<BYTE>& iv,
+		const std::vector<BYTE>& plaintext,
+		std::vector<BYTE>& outTag
+	);
+
+	static std::vector<BYTE> AesGcmDecrypt(
+		const std::vector<BYTE>& key,
+		const std::vector<BYTE>& iv,
+		const std::vector<BYTE>& ciphertext,
+		const std::vector<BYTE>& tag
+	);
+
 private:
 	// AES-256-GCM key (stored after Initialize)
 	static std::vector<BYTE> m_aesKey;

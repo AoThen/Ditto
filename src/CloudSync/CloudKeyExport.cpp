@@ -166,7 +166,7 @@ BOOL CCloudKeyExport::ImportKey(
 		outKeyData.checksum = StdStringToCString(keyJson["checksum"].get<std::string>());
 
 		// Decrypt the key
-		std::vector<BYTE> encryptedPayload = CCloudCrypto::Base64Decode(outKeyData.encryptedKey);
+		std::vector<BYTE> encryptedPayload = CCloudCrypto::Base64Decode(CStringA(outKeyData.encryptedKey));
 		if (encryptedPayload.size() < 12 + 16)
 		{
 			OutputDebugStringA("[KeyExport] Encrypted key too short.\n");
@@ -179,7 +179,7 @@ BOOL CCloudKeyExport::ImportKey(
 		std::vector<BYTE> ciphertext(encryptedPayload.begin() + 12, encryptedPayload.end() - 16);
 
 		// Derive decryption key from password + salt
-		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(outKeyData.salt);
+		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(CStringA(outKeyData.salt));
 		std::vector<BYTE> exportKey = CCloudCrypto::DeriveKey(
 			CStringA(password), saltBytes, 100000);
 
@@ -193,7 +193,7 @@ BOOL CCloudKeyExport::ImportKey(
 		}
 
 		// Verify checksum
-		std::vector<BYTE> expectedChecksum = CCloudCrypto::Base64Decode(outKeyData.checksum);
+		std::vector<BYTE> expectedChecksum = CCloudCrypto::Base64Decode(CStringA(outKeyData.checksum));
 		std::vector<BYTE> actualChecksum = CCloudCrypto::Sha256(decryptedKey);
 		if (expectedChecksum != actualChecksum)
 		{
@@ -203,8 +203,8 @@ BOOL CCloudKeyExport::ImportKey(
 
 		// Store decrypted key
 		CStringA keyBase64 = CCloudCrypto::Base64Encode(decryptedKey);
-		CGetSetOptions::SetCloudEncryptionKey(keyBase64);
-		CGetSetOptions::SetCloudEncryptionSalt(outKeyData.salt);
+		CGetSetOptions::SetCloudEncryptionKey(CString(keyBase64));
+		CGetSetOptions::SetCloudEncryptionSalt(CString(outKeyData.salt));
 		CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
 
 		// Initialize crypto

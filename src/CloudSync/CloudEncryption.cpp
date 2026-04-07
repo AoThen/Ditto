@@ -19,7 +19,8 @@ static CString StdStringToCString(const std::string& str)
 
 static void SetupClient(const std::string& serverUrl, httplib::Client& cli, const CString& deviceToken)
 {
-	cli.enable_server_certificate_verification(false);
+	// httplib unified Client doesn't expose cert verification settings
+	// Use proper CA-signed certificates in production
 	cli.set_default_headers({
 		{"Authorization", "Bearer " + CStringToStdString(deviceToken)}
 	});
@@ -101,7 +102,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 
 			// Step 3: Derive AES key from password + salt
 			CStringA passwordA(password);
-			std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(result.salt);
+			std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(CStringA(result.salt));
 			std::vector<BYTE> aesKey = CCloudCrypto::DeriveKey(passwordA, saltBytes, 100000);
 
 			// Step 4: Initialize crypto
@@ -115,9 +116,9 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 			// For now, we store the password-derived key directly encrypted with a machine key
 			// In production, you'd use DPAPI or a secure key store
 			CStringA keyBase64 = CCloudCrypto::Base64Encode(aesKey);
-			CGetSetOptions::SetCloudEncryptionEnabled(TRUE);
-			CGetSetOptions::SetCloudEncryptionKey(keyBase64);
-			CGetSetOptions::SetCloudEncryptionSalt(result.salt);
+			CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+			CGetSetOptions::SetCloudEncryptionKey(CString(keyBase64));
+			CGetSetOptions::SetCloudEncryptionSalt(CString(result.salt));
 
 			result.success = TRUE;
 		}

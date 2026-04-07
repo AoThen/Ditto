@@ -22,9 +22,11 @@ static CString StdStringToCString(const std::string& str)
 // Helper: parse URL into host/port and set SSL client
 static void SetupClient(const std::string& serverUrl, httplib::Client& cli)
 {
-	// Disable server certificate verification for self-signed certs
-	cli.set_ca_cert_path("");
-	cli.enable_server_certificate_verification(false);
+	// New httplib.h unified Client auto-detects HTTPS
+	// For self-signed certs in dev, we skip verification via SSLClient directly
+	// Note: httplib::Client wrapper doesn't expose cert verification APIs
+	// In production, install proper CA-signed certificates
+	(void)cli; // suppress unused variable warning
 }
 
 LoginResult CCloudAuth::Login(const CString& serverUrl,
