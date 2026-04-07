@@ -244,7 +244,6 @@ void COptionCloud::OnBtnEnableEncryption()
 		// 1. Get salt from server
 		std::string url = CT2A(m_csServerUrl, CP_UTF8).m_psz;
 		httplib::Client cli(url);
-		cli.enable_server_certificate_verification(false);
 
 		auto res = cli.Get("/api/v1/encryption/salt");
 		if (!res || res->status != 200)

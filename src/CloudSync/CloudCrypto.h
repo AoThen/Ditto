@@ -61,21 +61,6 @@ private:
 	static std::vector<BYTE> m_aesKey;
 	static BOOL m_initialized;
 
-	// AES-256-GCM encrypt/decrypt using Windows CNG API
-	static std::vector<BYTE> AesGcmEncrypt(
-		const std::vector<BYTE>& key,
-		const std::vector<BYTE>& iv,
-		const std::vector<BYTE>& plaintext,
-		std::vector<BYTE>& outTag
-	);
-
-	static std::vector<BYTE> AesGcmDecrypt(
-		const std::vector<BYTE>& key,
-		const std::vector<BYTE>& iv,
-		const std::vector<BYTE>& ciphertext,
-		const std::vector<BYTE>& tag
-	);
-
 	// PBKDF2-HMAC-SHA256 using Windows CNG API
 	static std::vector<BYTE> PBKDF2(
 		const std::vector<BYTE>& password,
@@ -88,10 +73,5 @@ private:
 	static std::vector<BYTE> HmacSha256(
 		const std::vector<BYTE>& key,
 		const std::vector<BYTE>& message
-	);
-
-	// SHA-256 hash helper
-	static std::vector<BYTE> Sha256(
-		const std::vector<BYTE>& data
 	);
 };

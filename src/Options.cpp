@@ -1644,7 +1644,7 @@ CStringA CGetSetOptions::GetCloudDeviceToken()
 
 void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
 {
-	CA2T wide(lpszValue, CP_UTF8);
+	CString wide(lpszValue);
 	SetProfileString("CloudDeviceToken", wide);
 }
 
