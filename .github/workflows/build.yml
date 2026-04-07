@@ -1,11 +1,7 @@
 name: MSBuild
 
 on:
-  push:
-    branches:
-      - master
-    paths-ignore:
-      - '**/*.md'
+  workflow_dispatch:  # 允许手动触发
 
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
