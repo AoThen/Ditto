@@ -1,3 +1,20 @@
+# C++ client third-party headers (tracked, not ignored)
+# /src/httplib.h
+# /src/json.hpp
+
+# Web frontend build artifacts
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Go backend build artifacts
+server/vendor/
+server/*.exe
+server/server
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
 # Prerequisites
 *.d
 
@@ -68,8 +85,10 @@ Debug/portable
 /Win32/Debug
 /Debug
 /Addins/DittoUtil/x64
-/EncryptDecrypt
+# /EncryptDecrypt - Now using trusted Shared/Encryption.h implementation
 /focusdll/x64
 /FocusHighlight
 /focusdll
 /x64
+QWEN.md
+# docs/PROJECT_PLAN.md 不再忽略，需要跟踪

@@ -9,7 +9,7 @@ CRecieveSocket::CRecieveSocket(SOCKET sock)
 {
 	m_pDataReturnedFromDecrypt = NULL;
 	m_Sock = sock;
-	m_pEncryptor = new CEncryption; //CreateEncryptionInterface("encryptdecrypt.dll");
+	m_pEncryptor = new CEncryption;
 	m_pProgress = NULL;
 }
 

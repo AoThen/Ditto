@@ -155,7 +155,19 @@
 		<Item English_Text = "Multiple Images Vertically" ID = "32978">竖直显示多图</Item>
 		<Item English_Text = "Ascii Text Only" ID = "32979">仅Ascii字符</Item>
 		<Item English_Text = "Replace Top Sticky Clip" ID = "32938">替换固定到顶部</Item>
-		<Item English_Text = "Set Drag File Name" ID = "32970">设置拖拽文件名</Item>
+		<Item English_Text = "Set Drag File Name" ID = "32970">設定拖曳檔案名稱</Item>
+		
+		//Added 9/4/25 for description window right click menu
+		<Item English_Text = "Remember window position" ID = "32882">記住視窗位置</Item>
+		<Item English_Text = "Size window to content" ID = "32883">視窗大小適應內容</Item>
+		<Item English_Text = "Scale images to fit window" ID = "32884">縮放圖片以適應視窗</Item>
+		<Item English_Text = "Hide description window on mouse clip selection" ID = "32926">滑鼠選擇剪貼項時隱藏描述視窗</Item>
+		<Item English_Text = "Wrap Text" ID = "32928">自動換行</Item>
+		<Item English_Text = "Always on top" ID = "32942">總在最前</Item>
+		<Item English_Text = "View as Text" ID = "32972">以文字檢視</Item>
+		<Item English_Text = "View as RTF" ID = "32973">以RTF檢視</Item>
+		<Item English_Text = "View as HTML" ID = "32974">以HTML檢視</Item>
+		<Item English_Text = "View as Image" ID = "32975">以圖片檢視</Item>
 		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>

@@ -279,6 +279,24 @@ public:
 	static void		SetNetworkPassword(CString csPassword);
 	static CStringA	GetNetworkPassword();
 
+	// Cloud sync settings
+	static CString  GetCloudServerUrl();
+	static void     SetCloudServerUrl(LPCTSTR lpszValue);
+	static CStringA GetCloudDeviceToken();
+	static void     SetCloudDeviceToken(LPCSTR lpszValue);
+	static BOOL     GetCloudSyncEnabled();
+	static void     SetCloudSyncEnabled(BOOL bValue);
+	static BOOL     GetCloudAutoSync();
+	static void     SetCloudAutoSync(BOOL bValue);
+	static CString  GetCloudDeviceName();
+	static void     SetCloudDeviceName(LPCTSTR lpszValue);
+	static CString  GetCloudEncryptionKey();
+	static void     SetCloudEncryptionKey(LPCTSTR lpszValue);
+	static CString  GetCloudEncryptionSalt();
+	static void     SetCloudEncryptionSalt(LPCTSTR lpszValue);
+	static BOOL     GetCloudSyncEncryptionEnabled();
+	static void     SetCloudSyncEncryptionEnabled(BOOL bValue);
+
 	static BOOL		m_bDrawRTF;
 	static void		SetDrawRTF(long bDraw);
 	static BOOL		GetDrawRTF();

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Winsock2.h"
-#include "..\EncryptDecrypt\Encryption.h"
+#include "..\Shared\Encryption.h"
 #include "ServerDefines.h"
 #include "FileTransferProgressDlg.h"
 

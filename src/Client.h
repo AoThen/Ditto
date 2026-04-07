@@ -10,7 +10,7 @@
 #endif // _MSC_VER > 1000
 
 #include "Server.h"
-#include "..\EncryptDecrypt\Encryption.h"
+#include "..\Shared\Encryption.h"
 #include "SendSocket.h"
 #include "Popup.h"
 

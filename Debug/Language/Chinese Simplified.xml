@@ -157,6 +157,18 @@
 		<Item English_Text = "Replace Top Sticky Clip" ID = "32938">替换固定到顶部</Item>
 		<Item English_Text = "Set Drag File Name" ID = "32970">设置拖拽文件名</Item>
 		
+		//Added 9/4/25 for description window right click menu
+		<Item English_Text = "Remember window position" ID = "32882">记住窗口位置</Item>
+		<Item English_Text = "Size window to content" ID = "32883">窗口大小适应内容</Item>
+		<Item English_Text = "Scale images to fit window" ID = "32884">缩放图片以适应窗口</Item>
+		<Item English_Text = "Hide description window on mouse clip selection" ID = "32926">鼠标选择剪贴项时隐藏描述窗口</Item>
+		<Item English_Text = "Wrap Text" ID = "32928">自动换行</Item>
+		<Item English_Text = "Always on top" ID = "32942">总在最前</Item>
+		<Item English_Text = "View as Text" ID = "32972">以文本查看</Item>
+		<Item English_Text = "View as RTF" ID = "32973">以RTF查看</Item>
+		<Item English_Text = "View as HTML" ID = "32974">以HTML查看</Item>
+		<Item English_Text = "View as Image" ID = "32975">以图片查看</Item>
+		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
 		<Item English_Text = "Hot Key" ID = "2039">热键</Item>

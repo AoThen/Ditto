@@ -1623,6 +1623,91 @@ CStringA CGetSetOptions::GetNetworkPassword()
 	return csReturn;
 }
 
+// Cloud sync settings
+
+CString CGetSetOptions::GetCloudServerUrl()
+{
+	return GetProfileString("CloudServerUrl", _T(""));
+}
+
+void CGetSetOptions::SetCloudServerUrl(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudServerUrl", lpszValue);
+}
+
+CStringA CGetSetOptions::GetCloudDeviceToken()
+{
+	CString cs = GetProfileString("CloudDeviceToken", _T(""));
+	CT2A utf8(cs, CP_UTF8);
+	return CStringA(utf8);
+}
+
+void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
+{
+	CA2T wide(lpszValue, CP_UTF8);
+	SetProfileString("CloudDeviceToken", wide);
+}
+
+BOOL CGetSetOptions::GetCloudSyncEnabled()
+{
+	return GetProfileLong("CloudSyncEnabled", FALSE);
+}
+
+void CGetSetOptions::SetCloudSyncEnabled(BOOL bValue)
+{
+	SetProfileLong("CloudSyncEnabled", bValue);
+}
+
+BOOL CGetSetOptions::GetCloudAutoSync()
+{
+	return GetProfileLong("CloudAutoSync", TRUE);
+}
+
+void CGetSetOptions::SetCloudAutoSync(BOOL bValue)
+{
+	SetProfileLong("CloudAutoSync", bValue);
+}
+
+CString CGetSetOptions::GetCloudDeviceName()
+{
+	return GetProfileString("CloudDeviceName", _T(""));
+}
+
+void CGetSetOptions::SetCloudDeviceName(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudDeviceName", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudEncryptionKey()
+{
+	return GetProfileString("CloudEncryptionKey", _T(""));
+}
+
+void CGetSetOptions::SetCloudEncryptionKey(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudEncryptionKey", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudEncryptionSalt()
+{
+	return GetProfileString("CloudEncryptionSalt", "");
+}
+
+void CGetSetOptions::SetCloudEncryptionSalt(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudEncryptionSalt", lpszValue);
+}
+
+BOOL CGetSetOptions::GetCloudSyncEncryptionEnabled()
+{
+	return GetProfileInt("CloudSyncEncryptionEnabled", 0);
+}
+
+void CGetSetOptions::SetCloudSyncEncryptionEnabled(BOOL bValue)
+{
+	SetProfileInt("CloudSyncEncryptionEnabled", bValue);
+}
+
 void CGetSetOptions::SetDrawRTF(long bDraw)
 {
 	SetProfileLong("DrawRTF", bDraw); 

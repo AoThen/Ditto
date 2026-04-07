@@ -198,7 +198,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;$(Configuration)\EncryptDecrypt.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>release\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -258,7 +258,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;$(Configuration)64\EncryptDecrypt.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>release64\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -316,7 +316,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;$(Platform)\$(Configuration)\EncryptDecrypt.lib;Shlwapi.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;zlib\zlibstat.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(Platform)\$(Configuration)\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -372,7 +372,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;$(Configuration)\EncryptDecrypt.lib;Shlwapi.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>debug\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -431,7 +431,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;$(Configuration)64\\EncryptDecrypt.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>debug64\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -489,7 +489,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;$(Platform)\$(Configuration)\EncryptDecrypt.lib;Shlwapi.lib;zlib\zlibstat.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;zlib\zlibstat.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(Platform)\$(Configuration)\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -540,6 +540,12 @@
     <ClCompile Include="src\ChaiScriptOnCopy.cpp" />
     <ClCompile Include="src\ChaiScriptXml.cpp" />
     <ClCompile Include="src\Client.cpp" />
+    <ClCompile Include="src\CloudSync\CloudAuth.cpp" />
+    <ClCompile Include="src\CloudSync\CloudCrypto.cpp" />
+    <ClCompile Include="src\CloudSync\CloudEncryption.cpp" />
+    <ClCompile Include="src\CloudSync\CloudKeyExport.cpp" />
+    <ClCompile Include="src\CloudSync\CloudSyncManager.cpp" />
+    <ClCompile Include="src\CloudSync\OptionCloud.cpp" />
     <ClCompile Include="src\Clip.cpp" />
     <ClCompile Include="src\ClipboardSaveRestore.cpp" />
     <ClCompile Include="src\ClipboardViewer.cpp" />
@@ -808,6 +814,12 @@
     <ClInclude Include="src\ChaiScriptOnCopy.h" />
     <ClInclude Include="src\ChaiScriptXml.h" />
     <ClInclude Include="src\Client.h" />
+    <ClInclude Include="src\CloudSync\CloudAuth.h" />
+    <ClInclude Include="src\CloudSync\CloudCrypto.h" />
+    <ClInclude Include="src\CloudSync\CloudEncryption.h" />
+    <ClInclude Include="src\CloudSync\CloudKeyExport.h" />
+    <ClInclude Include="src\CloudSync\CloudSyncManager.h" />
+    <ClInclude Include="src\CloudSync\OptionCloud.h" />
     <ClInclude Include="src\Clip.h" />
     <ClInclude Include="src\ClipboardSaveRestore.h" />
     <ClInclude Include="src\ClipboardViewer.h" />
@@ -867,6 +879,7 @@
     <ClInclude Include="src\ICU_String.h" />
     <ClInclude Include="src\ImageFormatAggregator.h" />
     <ClInclude Include="src\ImageHelper.h" />
+    <ClInclude Include="src\json.hpp" />
     <ClInclude Include="src\ImageViewer.h" />
     <ClInclude Include="src\MagneticWnd.h" />
     <ClInclude Include="src\MainFrm.h" />
