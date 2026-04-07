@@ -1700,12 +1700,12 @@ void CGetSetOptions::SetCloudEncryptionSalt(LPCTSTR lpszValue)
 
 BOOL CGetSetOptions::GetCloudSyncEncryptionEnabled()
 {
-	return GetProfileInt("CloudSyncEncryptionEnabled", 0);
+	return GetProfileLong("CloudSyncEncryptionEnabled", 0);
 }
 
 void CGetSetOptions::SetCloudSyncEncryptionEnabled(BOOL bValue)
 {
-	SetProfileInt("CloudSyncEncryptionEnabled", bValue);
+	SetProfileLong("CloudSyncEncryptionEnabled", bValue);
 }
 
 void CGetSetOptions::SetDrawRTF(long bDraw)

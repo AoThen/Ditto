@@ -10,10 +10,6 @@
 #include <wincrypt.h>
 #include <string>
 
-#ifdef _UNICODE
-#include "TextConvert.h"
-#endif
-
 #pragma comment(lib, "advapi32.lib")
 
 class CEncryption
@@ -28,21 +24,13 @@ public:
 
     // Encrypt data with password
     // Returns encrypted data in pOutput, caller must call FreeBuffer() when done
-    BOOL Encrypt(UCHAR* pData, int nLenIn, CString csPassword, 
+    BOOL Encrypt(UCHAR* pData, int nLenIn, CStringA csPassword,
                  UCHAR*& pOutput, int& nLenOut)
     {
         if (pData == NULL || nLenIn <= 0)
             return FALSE;
 
-        // Convert password to UTF-8 for consistent key derivation
-        CStringA csPasswordA;
-#ifdef _UNICODE
-        csPasswordA = CTextConvert::UnicodeToUTF8(csPassword);
-#else
-        csPasswordA = csPassword;
-#endif
-
-        if (!Initialize(csPasswordA))
+        if (!Initialize(csPassword))
             return FALSE;
 
         // Allocate buffer for encrypted data + IV prefix + padding
@@ -106,21 +94,13 @@ public:
 
     // Decrypt data with password
     // Returns decrypted data in pOutput, caller must call FreeBuffer() when done
-    BOOL Decrypt(UCHAR* pData, int nLenIn, CString csPassword,
+    BOOL Decrypt(UCHAR* pData, int nLenIn, CStringA csPassword,
                  UCHAR*& pOutput, int& nLenOut)
     {
         if (pData == NULL || nLenIn <= 16) // Minimum: IV (16 bytes)
             return FALSE;
 
-        // Convert password to UTF-8 for consistent key derivation
-        CStringA csPasswordA;
-#ifdef _UNICODE
-        csPasswordA = CTextConvert::UnicodeToUTF8(csPassword);
-#else
-        csPasswordA = csPassword;
-#endif
-
-        if (!Initialize(csPasswordA))
+        if (!Initialize(csPassword))
             return FALSE;
 
         // Extract IV from first 16 bytes
