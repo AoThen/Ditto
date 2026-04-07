@@ -37,23 +37,19 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v1
-        with:
-          nuget-version: '6.x'
-
-      - name: Restore NuGet packages
-        run: nuget restore ${{env.SOLUTION_FILE_PATH}}
-
       - name: Build ${{matrix.configuration}} ${{matrix.platform}}
         run: |
+          # Skip NuGet restore - CloudSync module doesn't depend on NuGet packages
+          # (libpng/zlib are for image handling, CloudSync uses Windows CNG API only)
           msbuild ${{env.SOLUTION_FILE_PATH}} `
             /p:Configuration=${{matrix.configuration}} `
             /p:Platform=${{matrix.platform}} `
             /p:BuildInParallel=true `
+            /p:RestorePackagesConfig=false `
             /m `
             /verbosity:minimal `
-            /nologo
+            /nologo `
+            /t:CP_Main
 
       - name: Check CloudSync object files
         if: success() || failure()
