@@ -85,8 +85,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CloudCryptoTest.cpp" />
+    <ClCompile Include="CloudEncryptionTest.cpp" />
     <ClCompile Include="CloudKeyExportTest.cpp" />
     <ClCompile Include="CloudSync_Test.cpp" />
+    <ClCompile Include="CloudSyncManagerTest.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -98,10 +100,15 @@
     <ClCompile Include="..\src\CloudSync\CloudKeyExport.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\src\CloudSync\CloudEncryption.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\CloudSync\CloudCrypto.h" />
+    <ClInclude Include="..\src\CloudSync\CloudEncryption.h" />
     <ClInclude Include="..\src\CloudSync\CloudKeyExport.h" />
+    <ClInclude Include="..\src\CloudSync\CloudSyncManager.h" />
     <ClInclude Include="GetSetOptionsMock.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>

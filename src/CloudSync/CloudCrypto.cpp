@@ -13,6 +13,15 @@ std::vector<BYTE> CCloudCrypto::m_aesKey;
 BOOL CCloudCrypto::m_initialized = FALSE;
 
 // ---------------------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------------------
+void CCloudCrypto::Reset()
+{
+	m_aesKey.clear();
+	m_initialized = FALSE;
+}
+
+// ---------------------------------------------------------------------------
 // Initialize
 // ---------------------------------------------------------------------------
 BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)

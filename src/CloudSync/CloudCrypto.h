@@ -12,6 +12,9 @@ public:
 	// The key is derived from user password via PBKDF2 (done externally)
 	static BOOL Initialize(const std::vector<BYTE>& aesKey);
 
+	// Reset crypto state (for testing)
+	static void Reset();
+
 	// Encrypt plaintext -> returns base64(gcm_ciphertext + iv + tag)
 	static CStringA Encrypt(const CStringA& plaintext);
 
