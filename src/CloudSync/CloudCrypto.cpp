@@ -243,7 +243,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 	// Set chaining mode to GCM
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
 		reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
-		sizeof(BCRYPT_CHAIN_MODE_GCM), 0);
+		(static_cast<ULONG>(wcslen(BCRYPT_CHAIN_MODE_GCM)) + 1) * sizeof(wchar_t), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
 		BCryptCloseAlgorithmProvider(hAlg, 0);
@@ -333,7 +333,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
 		reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
-		sizeof(BCRYPT_CHAIN_MODE_GCM), 0);
+		(static_cast<ULONG>(wcslen(BCRYPT_CHAIN_MODE_GCM)) + 1) * sizeof(wchar_t), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
 		BCryptCloseAlgorithmProvider(hAlg, 0);
@@ -364,6 +364,10 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		&authInfo, nullptr, 0, nullptr, 0, &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		// GCM authentication failed or other error
+		char msg[128];
+		sprintf_s(msg, "[CloudCrypto] BCryptDecrypt (size query) failed: status=0x%08X\n", status);
+		OutputDebugStringA(msg);
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
@@ -376,6 +380,9 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		plaintext.data(), static_cast<ULONG>(plaintext.size()), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		char msg[128];
+		sprintf_s(msg, "[CloudCrypto] BCryptDecrypt (actual) failed: status=0x%08X\n", status);
+		OutputDebugStringA(msg);
 		plaintext.clear();
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
