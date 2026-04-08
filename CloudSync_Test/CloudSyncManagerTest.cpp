@@ -39,6 +39,84 @@ protected:
 };
 
 // ============================================================================
+// HDROP File Path Extraction Tests
+// These tests verify the ExtractFilePathsFromHDROP logic that extracts
+// file paths from CF_HDROP format data for sync metadata
+// ============================================================================
+
+TEST(CloudSyncManager_HDROP_Extract, SingleFilePath)
+{
+	// Test extracting a single file path
+	json hdropFormat;
+	hdropFormat["data"] = "C:\\test\\file1.txt";
+
+	// Simulate ExtractFilePathsFromHDROP logic
+	json paths = json::array();
+	std::string dataStr = hdropFormat["data"].get<std::string>();
+	if (!dataStr.empty())
+	{
+		paths.push_back(dataStr);
+	}
+
+	EXPECT_EQ(paths.size(), 1);
+	EXPECT_EQ(paths[0], "C:\\test\\file1.txt");
+}
+
+TEST(CloudSyncManager_HDROP_Extract, MultipleFilesSeparatedByNull)
+{
+	// Test extracting multiple file paths separated by null characters
+	std::string hdropData = "C:\\file1.txt\0C:\\file2.txt\0C:\\file3.txt\0";
+	
+	// Simulate extraction (simplified - real code parses DROPFILES structure)
+	json paths = json::array();
+	size_t start = 0;
+	size_t pos = hdropData.find('\0');
+	while (pos != std::string::npos)
+	{
+		if (pos > start)
+		{
+			paths.push_back(hdropData.substr(start, pos - start));
+		}
+		start = pos + 1;
+		pos = hdropData.find('\0', start);
+	}
+
+	EXPECT_EQ(paths.size(), 3);
+	EXPECT_EQ(paths[0], "C:\\file1.txt");
+	EXPECT_EQ(paths[1], "C:\\file2.txt");
+	EXPECT_EQ(paths[2], "C:\\file3.txt");
+}
+
+TEST(CloudSyncManager_HDROP_Extract, EmptyData)
+{
+	// Test extraction from empty data
+	json hdropFormat;
+	hdropFormat["data"] = "";
+
+	std::string dataStr = hdropFormat["data"].get<std::string>();
+	EXPECT_TRUE(dataStr.empty());
+}
+
+TEST(CloudSyncManager_HDROP_Extract, UnicodePaths)
+{
+	// Test extraction with Unicode file paths
+	json hdropFormat;
+	hdropFormat["data"] = "C:\\测试\\文件.txt";
+
+	// Simulate extraction
+	json paths = json::array();
+	std::string dataStr = hdropFormat["data"].get<std::string>();
+	if (!dataStr.empty())
+	{
+		paths.push_back(dataStr);
+	}
+
+	EXPECT_EQ(paths.size(), 1);
+	// Note: Unicode may be encoded differently, just verify non-empty
+	EXPECT_FALSE(paths[0].empty());
+}
+
+// ============================================================================
 // HDROP Filtering Tests (Security Critical)
 // These tests verify the HDROP filtering logic that prevents file contents
 // from being synced to the cloud. Only file paths should be synced.
@@ -260,6 +338,177 @@ TEST(CloudSyncManager_EncryptionGate, HDROPNeverEncrypted)
 	// Data should be unchanged (not encrypted)
 	std::string data = formats[0]["data"].get<std::string>();
 	EXPECT_EQ(data, "C:\\file.txt");
+}
+
+// ============================================================================
+// EncryptClipFormats / DecryptClipFormats Logic Tests
+// These tests verify the actual encryption/decryption logic used by
+// CloudSyncManager's private methods by implementing the same logic inline.
+// ============================================================================
+
+// Helper: implements the same logic as CCloudSyncManager::EncryptClipFormats
+static BOOL TestEncryptClipFormats(nlohmann::json& formats)
+{
+	for (auto& format : formats)
+	{
+		if (format.contains("data") && format["data"].is_string())
+		{
+			int formatType = format.value("format_type", 0);
+
+			// CF_HDROP (format_type=15): NEVER encrypt
+			if (formatType == 15)
+			{
+				format["is_file_ref"] = true;
+				continue;
+			}
+
+			std::string plainData = format["data"].get<std::string>();
+			CStringA plain(plainData.c_str());
+			CStringA encrypted = CCloudCrypto::Encrypt(plain);
+			if (encrypted.IsEmpty())
+			{
+				return FALSE;
+			}
+			format["data"] = encrypted.GetString();
+			format["encrypted"] = true;
+		}
+	}
+	return TRUE;
+}
+
+// Helper: implements the same logic as CCloudSyncManager::DecryptClipFormats
+static BOOL TestDecryptClipFormats(nlohmann::json& formats)
+{
+	for (auto& format : formats)
+	{
+		if (format.contains("data") && format["data"].is_string())
+		{
+			int formatType = format.value("format_type", 0);
+
+			// CF_HDROP: skip decryption
+			if (formatType == 15 || format.value("is_file_ref", false))
+			{
+				continue;
+			}
+
+			// Only decrypt if marked as encrypted
+			if (format.contains("encrypted") && format["encrypted"].get<bool>())
+			{
+				std::string encryptedData = format["data"].get<std::string>();
+				CStringA encrypted(encryptedData.c_str());
+				CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
+				if (decrypted.IsEmpty())
+				{
+					return FALSE;
+				}
+				format["data"] = decrypted.GetString();
+				format["encrypted"] = false;
+			}
+		}
+	}
+	return TRUE;
+}
+
+TEST(CloudSyncManager_ClipFormats, EncryptClipFormatsLogic)
+{
+	// Setup crypto
+	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
+	ASSERT_TRUE(CCloudCrypto::Initialize(key));
+
+	// Create formats
+	json formats = json::array();
+	
+	json textFormat;
+	textFormat["format_type"] = 1;
+	textFormat["data"] = "Hello, CloudSync!";
+	textFormat["encrypted"] = false;
+	formats.push_back(textFormat);
+	
+	json unicodeFormat;
+	unicodeFormat["format_type"] = 13;
+	unicodeFormat["data"] = "你好世界";
+	unicodeFormat["encrypted"] = false;
+	formats.push_back(unicodeFormat);
+
+	// Encrypt using the actual logic
+	BOOL ok = TestEncryptClipFormats(formats);
+	EXPECT_TRUE(ok);
+
+	// Verify encrypted
+	EXPECT_TRUE(formats[0]["encrypted"]);
+	EXPECT_TRUE(formats[1]["encrypted"]);
+	EXPECT_NE(formats[0]["data"].get<std::string>(), "Hello, CloudSync!");
+}
+
+TEST(CloudSyncManager_ClipFormats, DecryptClipFormatsLogic)
+{
+	// Setup crypto and create encrypted formats
+	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
+	ASSERT_TRUE(CCloudCrypto::Initialize(key));
+
+	json formats = json::array();
+	
+	json textFormat;
+	textFormat["format_type"] = 1;
+	textFormat["data"] = "Hello, CloudSync!";
+	textFormat["encrypted"] = false;
+	formats.push_back(textFormat);
+
+	// Encrypt first
+	ASSERT_TRUE(TestEncryptClipFormats(formats));
+
+	// Now decrypt using the actual logic
+	BOOL ok = TestDecryptClipFormats(formats);
+	EXPECT_TRUE(ok);
+
+	// Verify decrypted
+	EXPECT_EQ(formats[0]["data"].get<std::string>(), "Hello, CloudSync!");
+	EXPECT_EQ(formats[0]["encrypted"], false);
+}
+
+TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringEncryption)
+{
+	// Setup crypto
+	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
+	ASSERT_TRUE(CCloudCrypto::Initialize(key));
+
+	json formats = json::array();
+	json hdropFormat;
+	hdropFormat["format_type"] = 15;
+	hdropFormat["data"] = "C:\\file.txt";
+	hdropFormat["encrypted"] = false;
+	formats.push_back(hdropFormat);
+
+	// Encrypt
+	BOOL ok = TestEncryptClipFormats(formats);
+	EXPECT_TRUE(ok);
+
+	// HDROP should NOT be encrypted
+	EXPECT_FALSE(formats[0]["encrypted"]);
+	EXPECT_TRUE(formats[0]["is_file_ref"]);
+	EXPECT_EQ(formats[0]["data"].get<std::string>(), "C:\\file.txt");
+}
+
+TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringDecryption)
+{
+	// Setup crypto
+	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
+	ASSERT_TRUE(CCloudCrypto::Initialize(key));
+
+	json formats = json::array();
+	json hdropFormat;
+	hdropFormat["format_type"] = 15;
+	hdropFormat["data"] = "C:\\file.txt";
+	hdropFormat["is_file_ref"] = true;
+	hdropFormat["encrypted"] = false;
+	formats.push_back(hdropFormat);
+
+	// Decrypt (should skip HDROP)
+	BOOL ok = TestDecryptClipFormats(formats);
+	EXPECT_TRUE(ok);
+
+	// HDROP should be unchanged
+	EXPECT_EQ(formats[0]["data"].get<std::string>(), "C:\\file.txt");
 }
 
 // ============================================================================

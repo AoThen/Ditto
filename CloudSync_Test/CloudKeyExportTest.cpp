@@ -1,8 +1,8 @@
 // CloudKeyExportTest.cpp - Unit tests for CloudKeyExport (.dittokey) module
 // Tests: Export, Import, Validate, Roundtrip
 //
-// Note: CGetSetOptions requires a running MFC app instance, so we test the
-// crypto core of Export/Import directly rather than through the full API.
+// NOTE: These tests call the ACTUAL CCloudKeyExport::ExportKey() and 
+// CCloudKeyExport::ImportKey() methods to ensure real code is tested.
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
@@ -33,158 +33,46 @@ static CString GetTempFilePath(const char* prefix = "dittokey_test_")
 }
 
 // ============================================================================
-// Helper: test key storage (bypasses CGetSetOptions registry calls)
+// Test Fixture: Setup/Teardown for CloudKeyExport tests
 // ============================================================================
-static std::vector<BYTE> g_testKey;
-static std::vector<BYTE> g_testSalt;
-static CStringA g_testKeyB64;
-static CStringA g_testSaltB64;
 
-static void SetupTestKey()
+class CloudKeyExportTest : public ::testing::Test
 {
-	g_testKey = CCloudCrypto::RandomBytes(32);
-	g_testSalt = CCloudCrypto::RandomBytes(32);
-	g_testKeyB64 = CCloudCrypto::Base64Encode(g_testKey);
-	g_testSaltB64 = CCloudCrypto::Base64Encode(g_testSalt);
-	CCloudCrypto::Initialize(g_testKey);
-}
-
-// ============================================================================
-// Helper: Create a .dittokey file using the same logic as CloudKeyExport::ExportKey
-// but without CGetSetOptions dependency
-// ============================================================================
-static BOOL CreateTestKeyFile(const CString& filePath,
-                              const CString& username,
-                              const CString& password)
-{
-	// Compute checksum (SHA-256 of original key)
-	std::vector<BYTE> checksum = CCloudCrypto::Sha256(g_testKey);
-	CStringA checksumB64 = CCloudCrypto::Base64Encode(checksum);
-
-	// Derive a key from password + salt for encrypting the exported key
-	std::vector<BYTE> exportKey = CCloudCrypto::DeriveKey(
-		CStringA(password), g_testSalt, 100000);
-
-	// Encrypt the AES key with the password-derived key
-	std::vector<BYTE> iv = CCloudCrypto::RandomBytes(12);
-	std::vector<BYTE> tag;
-	std::vector<BYTE> encryptedKey = CCloudCrypto::AesGcmEncrypt(
-		exportKey, iv, g_testKey, tag);
-
-	// Assemble IV + encrypted key + tag
-	std::vector<BYTE> encryptedPayload;
-	encryptedPayload.reserve(iv.size() + encryptedKey.size() + tag.size());
-	encryptedPayload.insert(encryptedPayload.end(), iv.begin(), iv.end());
-	encryptedPayload.insert(encryptedPayload.end(), encryptedKey.begin(), encryptedKey.end());
-	encryptedPayload.insert(encryptedPayload.end(), tag.begin(), tag.end());
-
-	CStringA encryptedPayloadB64 = CCloudCrypto::Base64Encode(encryptedPayload);
-
-	// Get current timestamp
-	CTime now = CTime::GetCurrentTime();
-	CString timestamp = now.Format(_T("%Y-%m-%dT%H:%M:%SZ"));
-
-	// Build JSON
-	json keyJson;
-	keyJson["version"] = 1;
-	keyJson["username"] = CT2A(username, CP_UTF8).m_psz;
-	keyJson["created_at"] = CT2A(timestamp, CP_UTF8).m_psz;
-	keyJson["salt"] = g_testSaltB64.GetString();
-	keyJson["encrypted_key"] = encryptedPayloadB64.GetString();
-	keyJson["checksum"] = checksumB64.GetString();
-
-	std::string keyStr = keyJson.dump(2);
-
-	// Write to file
-	CStringA keyStrA(keyStr.c_str());
-	CFile file;
-	if (!file.Open(filePath, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary))
-		return FALSE;
-
-	file.Write(keyStrA.GetString(), keyStrA.GetLength());
-	file.Close();
-	return TRUE;
-}
-
-// ============================================================================
-// Helper: Import and decrypt a .dittokey file (bypasses CGetSetOptions)
-// Returns the decrypted key if successful
-// ============================================================================
-static BOOL ImportTestKey(const CString& filePath,
-                          const CString& password,
-                          std::vector<BYTE>& outKey,
-                          DittoKeyData& outKeyData)
-{
-	try
+protected:
+	void SetUp() override
 	{
-		// Read file
-		CFile file;
-		if (!file.Open(filePath, CFile::modeRead | CFile::typeBinary))
-			return FALSE;
+		// Reset mock options before each test
+		CGetSetOptions::Reset();
+		CCloudCrypto::Reset();
 
-		ULONGLONG fileSize = file.GetLength();
-		if (fileSize > 64 * 1024)
-		{
-			file.Close();
-			return FALSE;
-		}
+		// Generate and store a test encryption key
+		std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
+		std::vector<BYTE> salt = CCloudCrypto::RandomBytes(32);
+		CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+		CStringA saltB64 = CCloudCrypto::Base64Encode(salt);
 
-		CStringA fileContent;
-		LPSTR buf = fileContent.GetBuffer(static_cast<int>(fileSize) + 1);
-		UINT bytesRead = file.Read(buf, static_cast<UINT>(fileSize));
-		fileContent.ReleaseBuffer(bytesRead);
-		file.Close();
+		CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
+		CGetSetOptions::SetCloudEncryptionSalt(CString(saltB64));
+		CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
 
-		// Parse JSON
-		json keyJson = json::parse(fileContent.GetString());
-
-		if (!keyJson.contains("version") || keyJson["version"].get<int>() != 1)
-			return FALSE;
-
-		outKeyData.version = keyJson["version"].get<int>();
-
-		auto strField = [&](const char* name) -> CString {
-			if (keyJson.contains(name) && !keyJson[name].is_null())
-				return CString(keyJson[name].get<std::string>().c_str());
-			return _T("");
-		};
-
-		outKeyData.username = strField("username");
-		outKeyData.createdAt = strField("created_at");
-		outKeyData.salt = strField("salt");
-		outKeyData.encryptedKey = strField("encrypted_key");
-		outKeyData.checksum = strField("checksum");
-
-		// Decrypt the key
-		std::vector<BYTE> encryptedPayload = CCloudCrypto::Base64Decode(CStringA(outKeyData.encryptedKey));
-		if (encryptedPayload.size() < 12 + 16)
-			return FALSE;
-
-		std::vector<BYTE> iv(encryptedPayload.begin(), encryptedPayload.begin() + 12);
-		std::vector<BYTE> tag(encryptedPayload.end() - 16, encryptedPayload.end());
-		std::vector<BYTE> ciphertext(encryptedPayload.begin() + 12, encryptedPayload.end() - 16);
-
-		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(CStringA(outKeyData.salt));
-		std::vector<BYTE> exportKey = CCloudCrypto::DeriveKey(
-			CStringA(password), saltBytes, 100000);
-
-		outKey = CCloudCrypto::AesGcmDecrypt(exportKey, iv, ciphertext, tag);
-		if (outKey.empty())
-			return FALSE;
-
-		// Verify checksum
-		std::vector<BYTE> expectedChecksum = CCloudCrypto::Base64Decode(CStringA(outKeyData.checksum));
-		std::vector<BYTE> actualChecksum = CCloudCrypto::Sha256(outKey);
-		if (expectedChecksum != actualChecksum)
-			return FALSE;
-
-		return TRUE;
+		// Initialize crypto
+		CCloudCrypto::Initialize(key);
 	}
-	catch (...)
+
+	void TearDown() override
 	{
-		return FALSE;
+		// Clean up
+		CCloudCrypto::Reset();
+		CGetSetOptions::Reset();
 	}
-}
+
+	// Helper to get stored key
+	std::vector<BYTE> GetStoredKey()
+	{
+		CStringA keyB64 = CGetSetOptions::GetCloudEncryptionKey();
+		return CCloudCrypto::Base64Decode(keyB64);
+	}
+};
 
 // ============================================================================
 // IsValidKeyFile tests
@@ -192,10 +80,16 @@ static BOOL ImportTestKey(const CString& filePath,
 
 TEST(CloudKeyExport_IsValidKeyFile, ValidFile)
 {
-	SetupTestKey();
+	// Create a valid key file using ExportKey
 	CString filePath = GetTempFilePath("valid_");
-	ASSERT_TRUE(CreateTestKeyFile(filePath, _T("testuser"), _T("TestPass123!")));
+	CString username = _T("testuser");
+	CString password = _T("TestPass123!");
 
+	// Export creates the file
+	BOOL exportOk = CCloudKeyExport::ExportKey(filePath, username, password);
+	EXPECT_TRUE(exportOk) << "ExportKey should succeed";
+
+	// Validate
 	EXPECT_TRUE(CCloudKeyExport::IsValidKeyFile(filePath));
 
 	DeleteFile(filePath);
@@ -261,11 +155,14 @@ TEST(CloudKeyExport_IsValidKeyFile, UnsupportedVersion)
 
 TEST(CloudKeyExport_GetKeyFileInfo, ReadMetadata)
 {
-	SetupTestKey();
+	// Export a key file first
 	CString filePath = GetTempFilePath("meta_");
 	CString username = _T("metadata_test_user");
-	ASSERT_TRUE(CreateTestKeyFile(filePath, username, _T("Pass123!")));
+	CString password = _T("Pass123!");
 
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
+
+	// Read metadata
 	DittoKeyData info;
 	BOOL ok = CCloudKeyExport::GetKeyFileInfo(filePath, info);
 	EXPECT_TRUE(ok);
@@ -278,40 +175,42 @@ TEST(CloudKeyExport_GetKeyFileInfo, ReadMetadata)
 }
 
 // ============================================================================
-// Full Export/Import Roundtrip
+// Full Export/Import Roundtrip - Using ACTUAL ExportKey/ImportKey methods
 // ============================================================================
 
 TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 {
-	SetupTestKey();
 	CString filePath = GetTempFilePath("roundtrip_");
 	CString username = _T("roundtrip_test@example.com");
 	CString password = _T("SecurePassword123!");
 
-	// Create export file
-	ASSERT_TRUE(CreateTestKeyFile(filePath, username, password));
+	// Get original key before export
+	std::vector<BYTE> originalKey = GetStoredKey();
+
+	// Export using ACTUAL CCloudKeyExport::ExportKey
+	BOOL exportOk = CCloudKeyExport::ExportKey(filePath, username, password);
+	EXPECT_TRUE(exportOk) << "ExportKey should succeed";
 
 	// Validate
 	EXPECT_TRUE(CCloudKeyExport::IsValidKeyFile(filePath));
 
-	// Import
-	std::vector<BYTE> importedKey;
+	// Import using ACTUAL CCloudKeyExport::ImportKey
 	DittoKeyData keyData;
-	BOOL ok = ImportTestKey(filePath, password, importedKey, keyData);
-	EXPECT_TRUE(ok) << "Import failed with correct password";
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+	EXPECT_TRUE(importOk) << "ImportKey should succeed with correct password";
 
-	if (ok)
+	if (importOk)
 	{
 		// Verify metadata
 		EXPECT_EQ(1, keyData.version);
 		EXPECT_STREQ(username, keyData.username);
 
-		// Verify key matches original
-		EXPECT_EQ(g_testKey.size(), importedKey.size());
-		EXPECT_EQ(0, memcmp(g_testKey.data(), importedKey.data(), g_testKey.size()));
+		// Verify key was restored correctly
+		std::vector<BYTE> restoredKey = GetStoredKey();
+		EXPECT_EQ(originalKey.size(), restoredKey.size());
+		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
-		// Verify crypto works with imported key
-		CCloudCrypto::Initialize(importedKey);
+		// Verify crypto works with restored key
 		CStringA testPlain = "Roundtrip test data - Hello World!";
 		CStringA encrypted = CCloudCrypto::Encrypt(testPlain);
 		EXPECT_FALSE(encrypted.IsEmpty());
@@ -325,26 +224,30 @@ TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 
 TEST(CloudKeyExport_Roundtrip, WrongPassword)
 {
-	SetupTestKey();
 	CString filePath = GetTempFilePath("wrongpass_");
-	ASSERT_TRUE(CreateTestKeyFile(filePath, _T("user"), _T("CorrectPassword")));
+	CString username = _T("user");
+	CString correctPassword = _T("CorrectPassword");
+	CString wrongPassword = _T("WrongPassword");
 
-	// Import with wrong password
-	std::vector<BYTE> importedKey;
+	// Export with correct password
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, correctPassword));
+
+	// Import with wrong password should fail
 	DittoKeyData keyData;
-	BOOL ok = ImportTestKey(filePath, _T("WrongPassword"), importedKey, keyData);
-	EXPECT_FALSE(ok) << "Import should have failed with wrong password";
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, wrongPassword, keyData);
+	EXPECT_FALSE(importOk) << "ImportKey should fail with wrong password";
 
 	DeleteFile(filePath);
 }
 
 TEST(CloudKeyExport_Roundtrip, CorruptedFile)
 {
-	SetupTestKey();
 	CString filePath = GetTempFilePath("corrupt_");
+	CString username = _T("user");
+	CString password = _T("Pass");
 
-	// Create valid file first
-	ASSERT_TRUE(CreateTestKeyFile(filePath, _T("user"), _T("Pass")));
+	// Export valid file first
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
 
 	// Now corrupt the encrypted_key field
 	CFile file;
@@ -366,33 +269,38 @@ TEST(CloudKeyExport_Roundtrip, CorruptedFile)
 	file.Close();
 
 	// Import should fail
-	std::vector<BYTE> importedKey;
 	DittoKeyData keyData;
-	BOOL ok = ImportTestKey(filePath, _T("Pass"), importedKey, keyData);
-	EXPECT_FALSE(ok) << "Import should fail with corrupted data";
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+	EXPECT_FALSE(importOk) << "ImportKey should fail with corrupted data";
 
 	DeleteFile(filePath);
 }
 
 TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 {
-	SetupTestKey();
 	CString filePath = GetTempFilePath("unicode_");
 	CString username = _T("用户测试@example.com");  // Chinese characters
 	CString password = _T("密码测试123!");
 
-	ASSERT_TRUE(CreateTestKeyFile(filePath, username, password));
+	// Get original key
+	std::vector<BYTE> originalKey = GetStoredKey();
 
-	std::vector<BYTE> importedKey;
+	// Export
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
+
+	// Import
 	DittoKeyData keyData;
-	BOOL ok = ImportTestKey(filePath, password, importedKey, keyData);
-	EXPECT_TRUE(ok);
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+	EXPECT_TRUE(importOk);
 
-	if (ok)
+	if (importOk)
 	{
 		EXPECT_STREQ(username, keyData.username);
-		EXPECT_EQ(g_testKey.size(), importedKey.size());
-		EXPECT_EQ(0, memcmp(g_testKey.data(), importedKey.data(), g_testKey.size()));
+		
+		// Verify key matches original
+		std::vector<BYTE> restoredKey = GetStoredKey();
+		EXPECT_EQ(originalKey.size(), restoredKey.size());
+		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 	}
 
 	DeleteFile(filePath);
@@ -404,27 +312,31 @@ TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 
 TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 {
-	SetupTestKey();
 	CString password = _T("MultiCycleTest!");
 	CString username = _T("multi_cycle_user");
 
 	for (int i = 0; i < 5; i++)
 	{
 		CString filePath = GetTempFilePath("cycle_");
-		ASSERT_TRUE(CreateTestKeyFile(filePath, username, password));
+		
+		// Get current key
+		std::vector<BYTE> originalKey = GetStoredKey();
 
-		std::vector<BYTE> importedKey;
+		// Export
+		ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
+
+		// Import
 		DittoKeyData keyData;
-		BOOL ok = ImportTestKey(filePath, password, importedKey, keyData);
-		EXPECT_TRUE(ok) << "Cycle " << i << " import failed";
+		BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+		EXPECT_TRUE(importOk) << "Cycle " << i << " import failed";
 
-		if (ok)
+		if (importOk)
 		{
 			// Verify key matches
-			EXPECT_EQ(0, memcmp(g_testKey.data(), importedKey.data(), g_testKey.size()));
+			std::vector<BYTE> restoredKey = GetStoredKey();
+			EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
 			// Verify crypto works
-			CCloudCrypto::Initialize(importedKey);
 			CStringA testPlain = "Cycle test data";
 			CStringA encrypted = CCloudCrypto::Encrypt(testPlain);
 			CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
@@ -441,20 +353,71 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 
 TEST(CloudKeyExport_Roundtrip, EmptyPassword)
 {
-	SetupTestKey();
 	CString filePath = GetTempFilePath("emptypass_");
-
-	// Export with empty password (should still work, just less secure)
 	CString username = _T("empty_pass_user");
 	CString password = _T("");
 
-	ASSERT_TRUE(CreateTestKeyFile(filePath, username, password));
+	// Get original key
+	std::vector<BYTE> originalKey = GetStoredKey();
+
+	// Export with empty password (should still work, just less secure)
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
 
 	// Import with same empty password
-	std::vector<BYTE> importedKey;
 	DittoKeyData keyData;
-	BOOL ok = ImportTestKey(filePath, password, importedKey, keyData);
-	EXPECT_TRUE(ok) << "Import should work with empty password";
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+	EXPECT_TRUE(importOk) << "ImportKey should work with empty password";
+
+	if (importOk)
+	{
+		// Verify key matches
+		std::vector<BYTE> restoredKey = GetStoredKey();
+		EXPECT_EQ(originalKey.size(), restoredKey.size());
+		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
+	}
 
 	DeleteFile(filePath);
+}
+
+// ============================================================================
+// InitializeFromImportedKey tests
+// ============================================================================
+
+TEST(CloudKeyExport_InitializeFromImportedKey, AfterImport)
+{
+	CString filePath = GetTempFilePath("init_");
+	CString username = _T("init_test_user");
+	CString password = _T("InitTest123!");
+
+	// Export
+	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
+
+	// Import (this should store the key and initialize crypto)
+	DittoKeyData keyData;
+	BOOL importOk = CCloudKeyExport::ImportKey(filePath, password, keyData);
+	ASSERT_TRUE(importOk);
+
+	// Now call InitializeFromImportedKey (should work since key is stored)
+	BOOL initOk = CCloudKeyExport::InitializeFromImportedKey(keyData);
+	EXPECT_TRUE(initOk) << "InitializeFromImportedKey should succeed after import";
+
+	DeleteFile(filePath);
+}
+
+TEST(CloudKeyExport_InitializeFromImportedKey, WithoutImport)
+{
+	// Reset state
+	CGetSetOptions::Reset();
+	CCloudCrypto::Reset();
+
+	// Try to initialize without importing
+	DittoKeyData keyData;
+	keyData.version = 1;
+	keyData.username = _T("test");
+	keyData.salt = _T("abc");
+	keyData.encryptedKey = _T("xyz");
+	keyData.checksum = _T("chk");
+
+	BOOL initOk = CCloudKeyExport::InitializeFromImportedKey(keyData);
+	EXPECT_FALSE(initOk) << "InitializeFromImportedKey should fail without prior import";
 }
