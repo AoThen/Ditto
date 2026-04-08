@@ -169,6 +169,60 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 	}, nil
 }
 
+// DownloadClipFormat retrieves raw binary data for a specific format of a clip
+type DownloadResult struct {
+	Data        []byte
+	FormatType  int
+	ContentType string
+	FileName    string
+}
+
+func (s *ClipService) DownloadClipFormat(userID uint, clipID string, formatType int) (*DownloadResult, error) {
+	var clip model.Clip
+	if err := database.DB.Where("id = ? AND user_id = ?", clipID, userID).First(&clip).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("剪贴板不存在")
+		}
+		return nil, err
+	}
+
+	var format model.ClipFormat
+	if err := database.DB.Where("clip_id = ? AND format_type = ?", clipID, formatType).First(&format).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("指定格式不存在")
+		}
+		return nil, err
+	}
+
+	// Determine content type and file extension
+	contentType, fileName := getContentTypeForFormat(formatType)
+
+	return &DownloadResult{
+		Data:        format.Data,
+		FormatType:  format.FormatType,
+		ContentType: contentType,
+		FileName:    fileName,
+	}, nil
+}
+
+// getContentTypeForFormat returns appropriate Content-Type and suggested filename
+func getContentTypeForFormat(formatType int) (string, string) {
+	switch formatType {
+	case 1, 7: // CF_TEXT, CF_OEMTEXT
+		return "text/plain", "clip.txt"
+	case 13: // CF_UNICODETEXT
+		return "text/plain; charset=utf-16", "clip.txt"
+	case 49: // HTML
+		return "text/html", "clip.html"
+	case 8, 17, 50: // CF_DIB, CF_DIBV5, custom image
+		return "image/png", "clip.png"
+	case 15: // CF_HDROP (file paths)
+		return "text/plain", "file_paths.txt"
+	default:
+		return "application/octet-stream", "clip_data.bin"
+	}
+}
+
 // DeleteClip removes a clip and its formats
 func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 	return database.DB.Transaction(func(tx *gorm.DB) error {

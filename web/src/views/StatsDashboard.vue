@@ -112,7 +112,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getStatsOverview } from '@/api/stats'
 import { listClips } from '@/api/clips'
 import { ElMessage } from 'element-plus'
@@ -186,9 +186,20 @@ async function fetchRecentClips() {
   }
 }
 
+// Auto-refresh when new clip arrives via WebSocket
+function handleWsClipAdded() {
+  fetchStats()
+  fetchRecentClips()
+}
+
 onMounted(() => {
   fetchStats()
   fetchRecentClips()
+  window.addEventListener('ws-clip-added', handleWsClipAdded)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('ws-clip-added', handleWsClipAdded)
 })
 </script>
 

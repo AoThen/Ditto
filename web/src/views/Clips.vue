@@ -74,12 +74,17 @@
               :label="getFormatLabel(fmt.format_type)"
               :name="idx"
             >
-              <div class="format-preview">
+              <div class="format-header-row">
                 <div class="format-info">
                   <span class="format-name">{{ getFormatName(fmt.format_type) }}</span>
                   <span class="format-size">({{ fmt.data_size }} 字节)</span>
                 </div>
+                <el-button size="small" type="primary" @click="handleDownloadFormat(currentClip.id, fmt.format_type)">
+                  <el-icon><Download /></el-icon> 下载原始数据
+                </el-button>
+              </div>
 
+              <div class="format-preview">
                 <!-- Text Preview -->
                 <div v-if="isTextFormat(fmt.format_type)" class="text-preview">
                   <pre class="text-content">{{ decodeTextData(fmt) }}</pre>
@@ -135,9 +140,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { listClips, getClip, deleteClip, batchDeleteClips } from '@/api/clips'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 
 const ws = useWebSocket()
+const userStore = useUserStore()
 
 // Listen for WS clip notifications
 function onWsClipAdded(event) {
@@ -323,6 +331,25 @@ function handleSelectionChange(selection) {
   selectedRows.value = selection
 }
 
+// Download raw format data via backend endpoint
+function handleDownloadFormat(clipId, formatType) {
+  const token = userStore.token
+  if (!token) {
+    ElMessage.error('未登录')
+    return
+  }
+  const url = `/api/v1/clips/${clipId}/download?format_type=${formatType}&token=${encodeURIComponent(token)}`
+  // Open in hidden iframe to trigger download without leaving page
+  const iframe = document.createElement('iframe')
+  iframe.style.display = 'none'
+  iframe.src = url
+  iframe.onload = () => {
+    setTimeout(() => iframe.remove(), 1000)
+  }
+  document.body.appendChild(iframe)
+  ElMessage.success('开始下载')
+}
+
 function handleRowClick(row) {
   openClipDetail(row.id)
 }
@@ -433,6 +460,13 @@ onUnmounted(() => {
 }
 
 .format-preview {
+  padding: 12px 0;
+}
+
+.format-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 12px 0;
 }
 

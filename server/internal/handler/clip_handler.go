@@ -102,6 +102,35 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// DownloadClip handles GET /api/v1/clips/:id/download
+// Returns raw binary data for a specific format (default: CF_UNICODETEXT=13)
+func (h *ClipHandler) DownloadClip(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	clipID := c.Param("id")
+
+	formatType, _ := strconv.Atoi(c.DefaultQuery("format_type", "13"))
+
+	result, err := h.service.DownloadClipFormat(userID, clipID, formatType)
+	if err != nil {
+		if err.Error() == "剪贴板不存在" {
+			response.Error(c, http.StatusNotFound, 40400, err.Error())
+			return
+		}
+		if err.Error() == "指定格式不存在" {
+			response.Error(c, http.StatusNotFound, 40401, err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, 50000, "下载失败: "+err.Error())
+		return
+	}
+
+	// Set headers for file download
+	c.Header("Content-Disposition", "attachment; filename="+result.FileName)
+	c.Header("Content-Type", result.ContentType)
+	c.Header("Content-Length", strconv.Itoa(len(result.Data)))
+	c.Data(http.StatusOK, result.ContentType, result.Data)
+}
+
 // GetChanges handles GET /api/v1/clips/changes (incremental sync)
 func (h *ClipHandler) GetChanges(c *gin.Context) {
 	userID := middleware.GetUserID(c)
