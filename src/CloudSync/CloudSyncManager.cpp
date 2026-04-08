@@ -55,6 +55,16 @@ BOOL CCloudSyncManager::Initialize()
 	m_deviceToken = CGetSetOptions::GetCloudDeviceToken();
 	m_deviceId = CGetSetOptions::GetCloudDeviceId();
 
+	// Restore lastSyncTime from registry (persisted across restarts)
+	m_lastSyncTime = (time_t)CGetSetOptions::GetCloudLastSyncTime();
+	if (m_lastSyncTime > 0)
+	{
+		CString msg;
+		CTime lastSync(m_lastSyncTime);
+		msg.Format(_T("Restored lastSyncTime from registry: %s"), lastSync.Format(_T("%Y-%m-%d %H:%M:%S")));
+		LogMessage(msg);
+	}
+
 	// If no device ID is stored, generate one (will be overwritten on login)
 	if (m_deviceId.IsEmpty())
 	{
@@ -422,8 +432,9 @@ void CCloudSyncManager::PushNewClips()
 				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (duplicates)"), syncedCount, skippedCount);
 				LogMessage(msg);
 
-				// Update last sync time
+				// Update last sync time and persist to registry
 				m_lastSyncTime = time(nullptr);
+				CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
 			}
 			catch (const json::parse_error& e)
 			{
@@ -676,8 +687,9 @@ void CCloudSyncManager::PullChanges()
 			msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"), newClips.size(), mergedCount);
 			LogMessage(msg);
 
-			// Update last sync time
+			// Update last sync time and persist to registry
 			m_lastSyncTime = time(nullptr);
+			CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
 		}
 		catch (const json::parse_error& e)
 		{
@@ -850,15 +862,6 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 
 			if (cData != nullptr && nDataLen > 0)
 			{
-				// Encode binary data as base64
-				// For simplicity, we'll use a basic base64 encoding
-				// In production, use a proper base64 library
-				CStringA dataB64;
-				
-				// Simple approach: store as binary-safe string
-				// The server will handle this as base64
-				std::string dataStr(reinterpret_cast<const char*>(cData), nDataLen);
-				
 				// For text formats, store as plain text
 				if (cfType == CF_TEXT || cfType == CF_UNICODETEXT)
 				{
@@ -876,20 +879,14 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 				}
 				else
 				{
-					// For binary formats, use base64-like encoding
-					// Use hex encoding for safety
-					std::string hexData;
-					hexData.reserve(nDataLen * 2);
-					const char hex[] = "0123456789ABCDEF";
-					for (int i = 0; i < nDataLen; i++)
-					{
-						hexData += hex[(cData[i] >> 4) & 0x0F];
-						hexData += hex[cData[i] & 0x0F];
-					}
-					formatJson["data"] = hexData;
-					formatJson["encoding"] = "hex";
+					// For binary formats (images, files, etc.), use base64 encoding
+					// This ensures Web frontend can correctly decode and display images (CF_DIB)
+					std::vector<BYTE> binaryData(cData, cData + nDataLen);
+					CStringA base64Data = CCloudCrypto::Base64Encode(binaryData);
+					formatJson["data"] = std::string(base64Data.GetString());
+					formatJson["encoding"] = "base64";
 				}
-				
+
 				formatJson["data_size"] = nDataLen;
 			}
 			else
@@ -1000,7 +997,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 
 				// Decode data based on encoding
 				HGLOBAL hGlobal = nullptr;
-				
+
 				if (encoding == "hex")
 				{
 					// Decode hex to binary
@@ -1018,6 +1015,22 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 							pData[i] = (high << 4) | low;
 						}
 						GlobalUnlock(hGlobal);
+					}
+				}
+				else if (encoding == "base64")
+				{
+					// Decode base64 to binary (for images and other binary formats)
+					CStringA b64Str(dataStr.c_str());
+					std::vector<BYTE> decoded = CCloudCrypto::Base64Decode(b64Str);
+					if (!decoded.empty())
+					{
+						hGlobal = GlobalAlloc(GMEM_MOVEABLE, decoded.size());
+						if (hGlobal)
+						{
+							BYTE* pData = (BYTE*)GlobalLock(hGlobal);
+							memcpy(pData, decoded.data(), decoded.size());
+							GlobalUnlock(hGlobal);
+						}
 					}
 				}
 				else

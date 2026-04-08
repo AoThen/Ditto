@@ -20,6 +20,11 @@
 #define IDC_CLOUD_ENCRYPTION_PASSWORD    2211
 #define IDC_CLOUD_ENCRYPTION_STATUS      2212
 
+// Key export/import control IDs
+#define IDC_CLOUD_BTN_EXPORT_KEY       2213
+#define IDC_CLOUD_BTN_IMPORT_KEY       2214
+#define IDC_CLOUD_KEY_FILE_PATH        2215
+
 class COptionCloud : public CPropertyPage
 {
 	DECLARE_DYNCREATE(COptionCloud)
@@ -40,6 +45,7 @@ public:
 	CString m_csEncryptionPassword;
 	CString m_csEncryptionStatus;
 	BOOL    m_bEncryptionEnabled;
+	CString m_csKeyFilePath;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
@@ -52,4 +58,6 @@ protected:
 	afx_msg void OnBtnRegister();
 	afx_msg void OnBtnEnableEncryption();
 	afx_msg void OnBtnTestEncryption();
+	afx_msg void OnBtnExportKey();
+	afx_msg void OnBtnImportKey();
 };

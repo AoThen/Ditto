@@ -2,6 +2,7 @@
 #include "OptionCloud.h"
 #include "CloudAuth.h"
 #include "CloudCrypto.h"
+#include "CloudKeyExport.h"
 #include "../httplib.h"
 #include "../json.hpp"
 #include "../Options.h"
@@ -49,6 +50,8 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_REGISTER, &COptionCloud::OnBtnRegister)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_ENABLE_ENCRYPTION, &COptionCloud::OnBtnEnableEncryption)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_TEST_ENCRYPTION, &COptionCloud::OnBtnTestEncryption)
+	ON_BN_CLICKED(IDC_CLOUD_BTN_EXPORT_KEY, &COptionCloud::OnBtnExportKey)
+	ON_BN_CLICKED(IDC_CLOUD_BTN_IMPORT_KEY, &COptionCloud::OnBtnImportKey)
 END_MESSAGE_MAP()
 
 BOOL COptionCloud::OnInitDialog()
@@ -356,6 +359,196 @@ void COptionCloud::OnBtnTestEncryption()
 		m_csEncryptionStatus = _T("加密测试失败: unknown error.");
 		MessageBox(_T("An unknown error occurred during encryption test."),
 		           _T("Test Encryption"), MB_ICONERROR);
+	}
+
+	UpdateData(FALSE);
+}
+
+// ---------------------------------------------------------------------------
+// CInputBox - simple input dialog helper (inline)
+// ---------------------------------------------------------------------------
+class CInputBox : public CDialog
+{
+public:
+	CString m_csTitle;
+	CString m_csPrompt;
+	CString m_csInput;
+
+	CInputBox() : CDialog((LPCTSTR)nullptr) {}
+
+protected:
+	virtual BOOL OnInitDialog()
+	{
+		CDialog::OnInitDialog();
+		SetWindowText(m_csTitle);
+
+		CRect rcClient;
+		GetClientRect(&rcClient);
+
+		int yPos = 20;
+		CStatic* pLabel = new CStatic();
+		pLabel->Create(m_csPrompt, WS_CHILD | WS_VISIBLE | SS_LEFT,
+			CRect(15, yPos, rcClient.right - 15, yPos + 40), this, 1001);
+		yPos += 45;
+
+		CEdit* pEdit = new CEdit();
+		pEdit->Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+			CRect(15, yPos, rcClient.right - 15, yPos + 22), this, 1002);
+		pEdit->SetWindowText(m_csInput);
+		yPos += 30;
+
+		CButton* pOk = new CButton();
+		pOk->Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+			CRect(rcClient.right / 2 - 80, yPos, rcClient.right / 2 - 10, yPos + 25), this, IDOK);
+
+		CButton* pCancel = new CButton();
+		pCancel->Create(_T("取消"), WS_CHILD | WS_VISIBLE,
+			CRect(rcClient.right / 2 + 10, yPos, rcClient.right / 2 + 70, yPos + 25), this, IDCANCEL);
+
+		return TRUE;
+	}
+
+	virtual void OnOK()
+	{
+		CEdit* pEdit = (CEdit*)GetDlgItem(1002);
+		if (pEdit)
+		{
+			pEdit->GetWindowText(m_csInput);
+		}
+		if (m_csInput.IsEmpty())
+		{
+			MessageBox(_T("请输入内容。"), _T("提示"), MB_ICONWARNING);
+			return;
+		}
+		CDialog::OnOK();
+	}
+};
+
+// ---------------------------------------------------------------------------
+// OnBtnExportKey: export encryption key to .dittokey file
+// ---------------------------------------------------------------------------
+void COptionCloud::OnBtnExportKey()
+{
+	// Verify encryption key exists
+	CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
+	if (csKeyB64.IsEmpty())
+	{
+		MessageBox(_T("请先启用加密（设置端到端加密密码），然后再导出密钥文件。"),
+		           _T("导出密钥"), MB_ICONWARNING);
+		return;
+	}
+
+	// Prompt for password to encrypt the exported key
+	CInputBox dlg;
+	dlg.m_csTitle = _T("导出密钥文件");
+	dlg.m_csPrompt = _T("请输入密码以保护密钥文件：\n（忘记此密码将无法导入）");
+	dlg.m_csInput = _T("");
+	if (dlg.DoModal() != IDOK || dlg.m_csInput.IsEmpty())
+		return;
+
+	CString exportPassword = dlg.m_csInput;
+
+	// Choose save location
+	CFileDialog dlgFile(FALSE, _T("dittokey"), _T("ditto-cloud.dittokey"),
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+		_T("Ditto Key Files (*.dittokey)|*.dittokey|All Files (*.*)|*.*||"), this);
+
+	if (dlgFile.DoModal() != IDOK)
+		return;
+
+	CString filePath = dlgFile.GetPathName();
+
+	// Get username
+	CString username = m_csUsername;
+	if (username.IsEmpty())
+	{
+		TCHAR szComputerName[MAX_COMPUTERNAME_LENGTH + 1];
+		DWORD dwSize = ARRAYSIZE(szComputerName);
+		if (GetComputerName(szComputerName, &dwSize))
+			username = szComputerName;
+		else
+			username = _T("unknown");
+	}
+
+	if (CCloudKeyExport::ExportKey(filePath, username, exportPassword))
+	{
+		CString msg;
+		msg.Format(_T("密钥文件已成功导出到：\n%s\n\n请妥善保管此文件，切勿与其他人共享。"), filePath);
+		MessageBox(msg, _T("导出密钥"), MB_ICONINFORMATION);
+		m_csKeyFilePath = filePath;
+	}
+	else
+	{
+		MessageBox(_T("导出密钥文件失败。请检查文件路径和权限。"),
+		           _T("导出密钥"), MB_ICONERROR);
+	}
+
+	UpdateData(FALSE);
+}
+
+// ---------------------------------------------------------------------------
+// OnBtnImportKey: import encryption key from .dittokey file
+// ---------------------------------------------------------------------------
+void COptionCloud::OnBtnImportKey()
+{
+	// Choose key file
+	CFileDialog dlgFile(TRUE, _T("dittokey"), nullptr,
+		OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
+		_T("Ditto Key Files (*.dittokey)|*.dittokey|All Files (*.*)|*.*||"), this);
+
+	if (dlgFile.DoModal() != IDOK)
+		return;
+
+	CString filePath = dlgFile.GetPathName();
+
+	// Validate key file
+	if (!CCloudKeyExport::IsValidKeyFile(filePath))
+	{
+		MessageBox(_T("无效的密钥文件格式。"), _T("导入密钥"), MB_ICONERROR);
+		return;
+	}
+
+	// Get key file info
+	DittoKeyData keyInfo;
+	if (!CCloudKeyExport::GetKeyFileInfo(filePath, keyInfo))
+	{
+		MessageBox(_T("无法读取密钥文件信息。"), _T("导入密钥"), MB_ICONERROR);
+		return;
+	}
+
+	// Show key file info
+	CString info;
+	info.Format(_T("密钥文件信息：\n  用户名：%s\n  创建时间：%s\n  版本：%d\n\n请输入密码以解密密钥："),
+		keyInfo.username, keyInfo.createdAt, keyInfo.version);
+	MessageBox(info, _T("导入密钥"), MB_ICONINFORMATION);
+
+	// Prompt for password
+	CInputBox dlg;
+	dlg.m_csTitle = _T("导入密钥文件");
+	dlg.m_csPrompt = _T("请输入导出密钥文件时使用的密码：");
+	dlg.m_csInput = _T("");
+	if (dlg.DoModal() != IDOK || dlg.m_csInput.IsEmpty())
+		return;
+
+	CString importPassword = dlg.m_csInput;
+
+	// Import
+	DittoKeyData importedKey;
+	if (CCloudKeyExport::ImportKey(filePath, importPassword, importedKey))
+	{
+		CString msg;
+		msg.Format(_T("密钥文件导入成功！\n用户名：%s\n创建时间：%s\n\n加密已自动启用。"),
+			importedKey.username, importedKey.createdAt);
+		MessageBox(msg, _T("导入密钥"), MB_ICONINFORMATION);
+
+		m_bEncryptionEnabled = TRUE;
+		m_csEncryptionStatus = _T("Encryption enabled (imported from key file).");
+		m_csKeyFilePath = filePath;
+	}
+	else
+	{
+		MessageBox(_T("导入密钥文件失败。密码可能不正确。"),
+		           _T("导入密钥"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);

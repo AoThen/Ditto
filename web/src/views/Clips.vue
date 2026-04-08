@@ -17,6 +17,9 @@
         </template>
       </el-input>
       <el-button type="primary" @click="handleRefresh">刷新</el-button>
+      <el-button type="warning" @click="showConflictDialog">
+        冲突剪贴板 ({{ conflictCount }})
+      </el-button>
       <el-button type="danger" :disabled="!selectedRows.length" @click="handleBatchDelete">
         删除选中 ({{ selectedRows.length }})
       </el-button>
@@ -133,12 +136,39 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- Conflict Clips Dialog -->
+    <el-dialog v-model="conflictDialogVisible" title="冲突剪贴板" width="800px" @opened="fetchConflictClips">
+      <el-alert
+        title="以下剪贴板在同步时因内容冲突被保留（较旧版本），您可以选择接受（覆盖现有剪贴板）或丢弃（删除冲突副本）。"
+        type="warning"
+        :closable="false"
+        style="margin-bottom: 16px"
+      />
+      <el-table :data="conflictClips" v-loading="conflictLoading" style="width: 100%">
+        <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column prop="crc" label="CRC" width="120" />
+        <el-table-column prop="updated_at" label="冲突时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.updated_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180">
+          <template #default="{ row }">
+            <el-button size="small" type="primary" @click="handleResolveConflict(row, 'accept')">接受</el-button>
+            <el-button size="small" type="danger" @click="handleResolveConflict(row, 'discard')">丢弃</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="conflictClips.length === 0" description="暂无冲突剪贴板" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { listClips, getClip, deleteClip, batchDeleteClips } from '@/api/clips'
+import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -163,6 +193,12 @@ const selectedRows = ref([])
 const detailVisible = ref(false)
 const currentClip = ref(null)
 const activeFormatTab = ref(0)
+
+// Conflict clips state
+const conflictClips = ref([])
+const conflictLoading = ref(false)
+const conflictDialogVisible = ref(false)
+const conflictCount = ref(0)
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -405,6 +441,52 @@ async function handleBatchDelete() {
     if (err !== 'cancel') {
       console.error('Failed to batch delete clips:', err)
       ElMessage.error('批量删除剪贴板失败')
+    }
+  }
+}
+
+// Conflict clip functions
+async function showConflictDialog() {
+  conflictDialogVisible.value = true
+}
+
+async function fetchConflictClips() {
+  conflictLoading.value = true
+  try {
+    const res = await listConflictClips()
+    if (res.code === 0) {
+      conflictClips.value = res.data || []
+      conflictCount.value = conflictClips.value.length
+    }
+  } catch (err) {
+    ElMessage.error('获取冲突剪贴板失败: ' + err.message)
+  } finally {
+    conflictLoading.value = false
+  }
+}
+
+async function handleResolveConflict(clip, action) {
+  const actionLabel = action === 'accept' ? '接受' : '丢弃'
+  try {
+    await ElMessageBox.confirm(
+      action === 'accept'
+        ? `确定接受此冲突剪贴板吗？这将覆盖现有剪贴板的内容。`
+        : `确定丢弃此冲突剪贴板吗？冲突副本将被删除。`,
+      `确认${actionLabel}`,
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    const res = await resolveConflictClip(clip.id, action)
+    if (res.code === 0) {
+      ElMessage.success(`${actionLabel}成功`)
+      await fetchConflictClips()
+      // Refresh main clip list if accepted
+      if (action === 'accept') {
+        await fetchClips()
+      }
+    }
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error(`${actionLabel}失败: ` + err.message)
     }
   }
 }

@@ -1,4 +1,4 @@
-name: CloudSync Compilation Check
+name: CloudSync Compilation & Test
 
 on:
   push:
@@ -6,17 +6,22 @@ on:
       - master
     paths:
       - 'src/CloudSync/**'
+      - 'CloudSync_Test/**'
       - 'CP_Main.vcxproj'
       - 'CP_Main_10.sln'
+      - 'packages.config'
       - '.github/workflows/cloudsync-check.yml'
   pull_request:
     branches:
       - master
     paths:
       - 'src/CloudSync/**'
+      - 'CloudSync_Test/**'
       - 'CP_Main.vcxproj'
       - 'CP_Main_10.sln'
-  workflow_dispatch:  # 允许手动触发
+      - 'packages.config'
+      - '.github/workflows/cloudsync-check.yml'
+  workflow_dispatch:
 
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
@@ -28,7 +33,7 @@ jobs:
       matrix:
         configuration: [Release, Debug]
         platform: [x64, Win32]
-      fail-fast: false  # 一个失败不阻断其他组合
+      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -59,22 +64,21 @@ jobs:
                        elseif ('${{matrix.configuration}}' -eq 'Release') { "Release" }
                        elseif ('${{matrix.configuration}}' -eq 'Debug' -and $platformDir) { "Debug64" }
                        else { "Debug" }
-          
+
           Write-Host "Checking build output in: $configDir"
           if (Test-Path $configDir) {
-            Get-ChildItem -Path $configDir -Recurse -Filter "*.obj" | 
-              Where-Object { $_.Name -like "*Cloud*" } | 
+            Get-ChildItem -Path $configDir -Recurse -Filter "*.obj" |
+              Where-Object { $_.Name -like "*Cloud*" } |
               ForEach-Object { Write-Host "Found: $($_.Name)" }
           }
-          
-          # Check if main executable was built
-          $exePath = if ($platformDir) { "${configDir}\Ditto.exe" } else { "${configDir}\Ditto.exe" }
+
+          $exePath = "${configDir}\Ditto.exe"
           if (Test-Path $exePath) {
             $exeSize = (Get-Item $exePath).Length
             Write-Host "SUCCESS: Built ${exePath} (${exeSize} bytes)"
           } else {
             Write-Host "WARNING: Executable not found at $exePath"
-            Get-ChildItem -Path $configDir -Filter "*.exe" -ErrorAction SilentlyContinue | 
+            Get-ChildItem -Path $configDir -Filter "*.exe" -ErrorAction SilentlyContinue |
               ForEach-Object { Write-Host "Found exe: $($_.FullName)" }
           }
 
@@ -95,18 +99,83 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  cloudsync-unit-tests:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        configuration: [Release, Debug]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+      - name: Build CloudSync_Test ${{matrix.configuration}} x64
+        run: |
+          msbuild ${{env.SOLUTION_FILE_PATH}} `
+            /p:Configuration=${{matrix.configuration}} `
+            /p:Platform=x64 `
+            /verbosity:minimal `
+            /nologo `
+            /t:CloudSync_Test
+
+      - name: Run CloudSync unit tests
+        run: |
+          $testExe = if ('${{matrix.configuration}}' -eq 'Release') {
+            "CloudSync_Test\x64\Release\CloudSync_Test.exe"
+          } else {
+            "CloudSync_Test\x64\Debug\CloudSync_Test.exe"
+          }
+
+          if (Test-Path $testExe) {
+            Write-Host "Running: $testExe"
+            & $testExe --gtest_output=xml:test-results.xml
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              Write-Host "All tests passed!"
+            } else {
+              Write-Host "Tests failed with exit code: $exitCode"
+              exit $exitCode
+            }
+          } else {
+            Write-Host "Test executable not found: $testExe"
+            exit 1
+          }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudsync-test-results-${{matrix.configuration}}
+          path: test-results.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
   summary:
-    needs: cloudsync-compile-check
+    needs: [cloudsync-compile-check, cloudsync-unit-tests]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check build status
         run: |
           if [ "${{ needs.cloudsync-compile-check.result }}" = "success" ]; then
-            echo "✅ CloudSync compilation check PASSED"
-            echo "All configuration builds succeeded"
+            echo "CloudSync compilation check PASSED"
           else
-            echo "❌ CloudSync compilation check FAILED"
-            echo "Check the job logs for detailed error messages"
+            echo "CloudSync compilation check FAILED"
+            exit 1
+          fi
+
+      - name: Check test status
+        run: |
+          if [ "${{ needs.cloudsync-unit-tests.result }}" = "success" ]; then
+            echo "CloudSync unit tests PASSED"
+          else
+            echo "CloudSync unit tests FAILED"
             exit 1
           fi

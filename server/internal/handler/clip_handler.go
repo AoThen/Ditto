@@ -178,3 +178,46 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 		DeletedIDs: []string{},
 	})
 }
+
+// ListConflictClips handles GET /api/v1/clips/conflicts
+func (h *ClipHandler) ListConflictClips(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	clips, err := h.service.ListConflictClips(userID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, 50000, "获取冲突剪贴板失败: "+err.Error())
+		return
+	}
+
+	response.Success(c, clips)
+}
+
+// ResolveConflictClip handles POST /api/v1/clips/conflicts/:id/resolve
+func (h *ClipHandler) ResolveConflictClip(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	conflictClipID := c.Param("id")
+
+	var req struct {
+		Action string `json:"action" binding:"required"` // "accept" or "discard"
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		return
+	}
+
+	if req.Action != "accept" && req.Action != "discard" {
+		response.Error(c, http.StatusBadRequest, 40000, "无效的操作类型，必须是 accept 或 discard")
+		return
+	}
+
+	if err := h.service.ResolveConflictClip(userID, conflictClipID, req.Action); err != nil {
+		if err.Error() == "冲突剪贴板不存在" {
+			response.Error(c, http.StatusNotFound, 40400, err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, 50000, "处理冲突失败: "+err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "冲突已处理", nil)
+}

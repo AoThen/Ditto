@@ -3,6 +3,8 @@ package service
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"ditto-cloud-server/internal/database"
@@ -379,8 +381,44 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 						pushedClipIDs = append(pushedClipIDs, existing.ID)
 					} else {
-						// Existing clip is newer or same: skip (LWW)
+						// Existing clip is newer or same: save as conflict copy for review
 						skippedCount++
+
+						// Only create conflict copy if the incoming clip has different content
+						if existing.CRC != pc.CRC {
+							conflictClip := model.Clip{
+								ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
+								UserID:         userID,
+								DeviceID:       req.DeviceID,
+								Description:    pc.Description,
+								CRC:            pc.CRC,
+								CreatedAt:      pc.UpdatedAt,
+								UpdatedAt:      pc.UpdatedAt,
+								GroupID:        pc.GroupID,
+								ShortCut:       pc.ShortCut,
+								PasteCount:     0,
+								IsConflictCopy: true, // Mark as conflict copy
+							}
+							if err := tx.Create(&conflictClip).Error; err != nil {
+								// Log but don't fail the sync
+								log.Printf("[Sync] Failed to create conflict copy for clip %s: %v", pc.ID, err)
+							} else {
+								// Copy formats to conflict clip
+								for _, pf := range pc.Formats {
+									data, err := base64.StdEncoding.DecodeString(pf.Data)
+									if err != nil {
+										continue
+									}
+									format := model.ClipFormat{
+										ClipID:     conflictClip.ID,
+										FormatType: pf.FormatType,
+										Data:       data,
+										CreatedAt:  pc.UpdatedAt,
+									}
+									tx.Create(&format)
+								}
+							}
+						}
 						continue
 					}
 				}
@@ -467,4 +505,55 @@ func LogSyncOperation(userID uint, deviceID, action string, clipCount int, statu
 		SyncedAt:  time.Now(),
 	}
 	database.DB.Create(&log)
+}
+
+// ListConflictClips returns all conflict clips for a user
+func (s *ClipService) ListConflictClips(userID uint) ([]model.Clip, error) {
+	var clips []model.Clip
+	if err := database.DB.Where("user_id = ? AND is_conflict_copy = ?", userID, true).
+		Order("updated_at DESC").
+		Find(&clips).Error; err != nil {
+		return nil, err
+	}
+	return clips, nil
+}
+
+// ResolveConflictClip resolves a conflict clip by either accepting it (replacing the winning clip) or discarding it
+func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, action string) error {
+	var conflictClip model.Clip
+	if err := database.DB.Where("id = ? AND user_id = ? AND is_conflict_copy = ?", conflictClipID, userID, true).
+		First(&conflictClip).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("冲突剪贴板不存在")
+		}
+		return err
+	}
+
+	if action == "accept" {
+		// Find the winning clip by CRC match
+		var winningClip model.Clip
+		if err := database.DB.Where("user_id = ? AND crc = ? AND is_conflict_copy = ? AND id != ?",
+			userID, conflictClip.CRC, false, conflictClipID).
+			Order("updated_at DESC").First(&winningClip).Error; err == nil {
+			// Replace winning clip's content with conflict clip's content
+			if err := database.DB.Model(&winningClip).Updates(map[string]interface{}{
+				"description": conflictClip.Description,
+				"updated_at":  conflictClip.UpdatedAt,
+			}).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	// Delete the conflict clip and its formats
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("clip_id = ?", conflictClipID).Delete(&model.ClipFormat{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&conflictClip).Error
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }

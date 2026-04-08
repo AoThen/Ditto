@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FocusHighlight", "FocusHigh
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ICU_Loader", "ICU_Loader\ICU_Loader.vcxproj", "{1FA87564-F5EC-42F8-978C-E827AAB54CB1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CloudSync_Test", "CloudSync_Test\CloudSync_Test.vcxproj", "{B2C4D6E8-1357-2468-ABCD-0123456789AB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -83,6 +85,10 @@ Global
 		{1FA87564-F5EC-42F8-978C-E827AAB54CB1}.Release|Win32.Build.0 = Release|Win32
 		{1FA87564-F5EC-42F8-978C-E827AAB54CB1}.Release|x64.ActiveCfg = Release|x64
 		{1FA87564-F5EC-42F8-978C-E827AAB54CB1}.Release|x64.Build.0 = Release|x64
+		{B2C4D6E8-1357-2468-ABCD-0123456789AB}.Debug|x64.ActiveCfg = Debug|x64
+		{B2C4D6E8-1357-2468-ABCD-0123456789AB}.Debug|x64.Build.0 = Debug|x64
+		{B2C4D6E8-1357-2468-ABCD-0123456789AB}.Release|x64.ActiveCfg = Release|x64
+		{B2C4D6E8-1357-2468-ABCD-0123456789AB}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

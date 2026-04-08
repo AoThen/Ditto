@@ -120,10 +120,12 @@ func main() {
 		{
 			clips.GET("", clipHandler.ListClips)
 			clips.GET("/changes", clipHandler.GetChanges)
+			clips.GET("/conflicts", clipHandler.ListConflictClips)
 			clips.GET("/:id", clipHandler.GetClip)
 			clips.GET("/:id/download", clipHandler.DownloadClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
 		}
 

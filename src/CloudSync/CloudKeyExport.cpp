@@ -226,13 +226,20 @@ BOOL CCloudKeyExport::ImportKey(
 
 // ---------------------------------------------------------------------------
 // InitializeFromImportedKey: initialize crypto from already-imported key data
+// Reads the stored key from registry (set by ImportKey) and initializes crypto
 // ---------------------------------------------------------------------------
 BOOL CCloudKeyExport::InitializeFromImportedKey(const DittoKeyData& keyData)
 {
+	// After ImportKey succeeds, the key is already stored in registry
+	// Just read it back and initialize
 	try
 	{
-		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(
-			CStringA(keyData.encryptedKey));
+		CStringA keyBase64 = CGetSetOptions::GetCloudEncryptionKey();
+		if (keyBase64.IsEmpty())
+		{
+			return FALSE;
+		}
+		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(keyBase64);
 		if (keyBytes.size() != 32)
 		{
 			return FALSE;

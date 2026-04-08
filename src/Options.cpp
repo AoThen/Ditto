@@ -1721,6 +1721,19 @@ void CGetSetOptions::SetCloudSyncEncryptionEnabled(BOOL bValue)
 	SetProfileLong("CloudSyncEncryptionEnabled", bValue);
 }
 
+__int64 CGetSetOptions::GetCloudLastSyncTime()
+{
+	CString csValue = GetProfileString("CloudLastSyncTime", _T("0"));
+	return _ttoi64(csValue);
+}
+
+void CGetSetOptions::SetCloudLastSyncTime(__int64 value)
+{
+	CString csValue;
+	csValue.Format(_T("%lld"), value);
+	SetProfileString("CloudLastSyncTime", csValue);
+}
+
 void CGetSetOptions::SetDrawRTF(long bDraw)
 {
 	SetProfileLong("DrawRTF", bDraw); 
