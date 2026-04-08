@@ -46,3 +46,11 @@ export function setupEncryption(data) {
     data
   })
 }
+
+// Disable encryption
+export function disableEncryption() {
+  return request({
+    url: '/api/v1/encryption/disable',
+    method: 'post'
+  })
+}

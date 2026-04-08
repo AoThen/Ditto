@@ -10,6 +10,7 @@
         clearable
         style="width: 300px"
         @clear="handleSearch"
+        @input="handleSearchDebounced"
         @keyup.enter="handleSearch"
       >
         <template #append>
@@ -20,7 +21,7 @@
       <el-button type="warning" @click="showConflictDialog">
         冲突剪贴板 ({{ conflictCount }})
       </el-button>
-      <el-button type="danger" :disabled="!selectedRows.length" @click="handleBatchDelete">
+      <el-button type="danger" :disabled="!selectedRows.length || batchDeleting" :loading="batchDeleting" @click="handleBatchDelete">
         删除选中 ({{ selectedRows.length }})
       </el-button>
     </div>
@@ -40,16 +41,22 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100">
+      <el-table-column label="操作" width="120">
         <template #default="{ row }">
-          <el-button type="danger" size="small" @click.stop="handleDelete(row.id)">
+          <el-button
+            type="danger"
+            size="small"
+            :loading="deletingId === row.id"
+            :disabled="deletingId !== null || batchDeleting"
+            @click.stop="handleDelete(row.id)"
+          >
             删除
           </el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-empty v-if="clipList.length === 0 && !loading" description="暂无剪贴板数据" />
+    <el-empty v-if="clipList.length === 0 && !loading" description="暂无剪贴板记录，复制内容后将在此处显示" />
 
     <el-pagination
       v-model:current-page="currentPage"
@@ -210,6 +217,8 @@ const selectedRows = ref([])
 const detailVisible = ref(false)
 const currentClip = ref(null)
 const activeFormatTab = ref(0)
+const deletingId = ref(null)
+const batchDeleting = ref(false)
 
 // Conflict clips state
 const conflictClips = ref([])
@@ -217,6 +226,9 @@ const conflictLoading = ref(false)
 const conflictDialogVisible = ref(false)
 const conflictCount = computed(() => conflictClips.value.length)
 const resolvingId = ref(null)
+
+// Search debounce timer
+let searchTimer = null
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -368,6 +380,13 @@ function handleSearch() {
   fetchClips()
 }
 
+function handleSearchDebounced() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    handleSearch()
+  }, 300)
+}
+
 function handleRefresh() {
   fetchClips()
 }
@@ -423,14 +442,19 @@ async function handleDelete(id) {
       cancelButtonText: '取消',
       type: 'warning',
     })
+    deletingId.value = id
     await deleteClip(id)
     ElMessage.success('删除成功')
-    fetchClips()
+    // Use loose comparison to handle string vs number ID mismatch
+    clipList.value = clipList.filter((c) => c.id != id)
+    total.value = Math.max(0, total.value - 1)
   } catch (err) {
     if (err !== 'cancel') {
       console.error('Failed to delete clip:', err)
       ElMessage.error('删除剪贴板失败')
     }
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -446,9 +470,25 @@ async function handleBatchDelete() {
         type: 'warning',
       }
     )
+    batchDeleting.value = true
     const ids = selectedRows.value.map(row => row.id)
-    await batchDeleteClips(ids)
-    ElMessage.success('批量删除成功')
+    // Delete sequentially to avoid overwhelming the server
+    let successCount = 0
+    let failCount = 0
+    for (const id of ids) {
+      try {
+        await deleteClip(id)
+        successCount++
+      } catch (err) {
+        console.error(`Failed to delete clip ${id}:`, err)
+        failCount++
+      }
+    }
+    if (successCount > 0) {
+      ElMessage.success(`成功删除 ${successCount} 个剪贴板${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+    } else {
+      ElMessage.error('批量删除失败')
+    }
     selectedRows.value = []
     fetchClips()
   } catch (err) {
@@ -456,6 +496,8 @@ async function handleBatchDelete() {
       console.error('Failed to batch delete clips:', err)
       ElMessage.error('批量删除剪贴板失败')
     }
+  } finally {
+    batchDeleting.value = false
   }
 }
 

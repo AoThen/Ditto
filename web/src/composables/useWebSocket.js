@@ -50,12 +50,15 @@ export function useWebSocket() {
         isConnected.value = false
         stopPingTimer()
         ws.value = null
-        scheduleReconnect()
+        // Don't reconnect if user explicitly disconnected (code 1000)
+        if (event.code !== 1000 || event.reason === 'Client disconnect') {
+          scheduleReconnect()
+        }
       }
 
       ws.value.onerror = (err) => {
         console.error('[WS] Error:', err)
-        ElMessage.error('WebSocket 连接错误')
+        ElMessage.error('WebSocket 连接错误，请检查网络')
       }
     } catch (e) {
       console.error('[WS] Failed to create WebSocket:', e)
@@ -94,7 +97,7 @@ export function useWebSocket() {
         disconnect()
         break
       default:
-        console.log('[WS] Unknown message type:', msg.type)
+        console.warn('[WS] Unknown message type:', msg.type)
     }
   }
 
@@ -118,8 +121,11 @@ export function useWebSocket() {
     if (reconnectTimer) return
 
     reconnectAttempts++
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY)
-    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`)
+    // Exponential backoff with jitter to prevent thundering herd
+    const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY)
+    const jitter = Math.random() * 1000 // Up to 1 second jitter
+    const delay = baseDelay + jitter
+    console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts})`)
 
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null
@@ -130,6 +136,11 @@ export function useWebSocket() {
   function isConnectedToServer() {
     return isConnected.value && ws.value && ws.value.readyState === WebSocket.OPEN
   }
+
+  // Auto-cleanup when component unmounts
+  onUnmounted(() => {
+    disconnect()
+  })
 
   return {
     connect,
