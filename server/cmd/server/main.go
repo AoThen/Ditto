@@ -96,6 +96,16 @@ func main() {
 		}
 	}
 
+	// Semi-protected routes (need valid token but not device-specific)
+	semiProtected := v1.Group("")
+	semiProtected.Use(middleware.Auth(cfg))
+	{
+		auth := semiProtected.Group("/auth")
+		{
+			auth.POST("/refresh", authHandler.Refresh)
+		}
+	}
+
 	// Protected routes
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
@@ -109,6 +119,7 @@ func main() {
 		clips := protected.Group("/clips")
 		{
 			clips.GET("", clipHandler.ListClips)
+			clips.GET("/changes", clipHandler.GetChanges)
 			clips.GET("/:id", clipHandler.GetClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)

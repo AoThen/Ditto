@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"ditto-cloud-server/internal/middleware"
 	"ditto-cloud-server/internal/response"
@@ -99,4 +100,52 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 	service.LogSyncOperation(userID, req.DeviceID, "push", result.UpdatedCount, "success", "")
 
 	response.Success(c, result)
+}
+
+// GetChanges handles GET /api/v1/clips/changes (incremental sync)
+func (h *ClipHandler) GetChanges(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
+
+	sinceStr := c.Query("since")
+	if sinceStr == "" {
+		// Default to epoch if not specified
+		sinceStr = "1970-01-01T00:00:00Z"
+	}
+	since, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, 40000, "无效的 since 参数: "+err.Error())
+		return
+	}
+
+	// Reuse Sync service for pull-only: empty push_clips
+	req := &service.SyncRequest{
+		Since:     since,
+		DeviceID:  deviceID,
+		PushClips: []service.PushClipItem{}, // No push, just pull
+	}
+
+	result, err := h.service.Sync(userID, req, deviceID)
+	if err != nil {
+		service.LogSyncOperation(userID, deviceID, "pull", 0, "failed", err.Error())
+		response.Error(c, http.StatusInternalServerError, 50000, "增量同步失败: "+err.Error())
+		return
+	}
+
+	service.LogSyncOperation(userID, deviceID, "pull", len(result.NewClips), "success", "")
+
+	// Build lightweight response for pull-only
+	type ChangesResponse struct {
+		Clips       []service.ClipDetail `json:"clips"`
+		ServerTime  string               `json:"server_time"`
+		HasMore     bool                 `json:"has_more"`
+		DeletedIDs  []string             `json:"deleted_ids"`
+	}
+
+	response.Success(c, ChangesResponse{
+		Clips:      result.NewClips,
+		ServerTime: result.SyncTime,
+		HasMore:    false,
+		DeletedIDs: []string{},
+	})
 }

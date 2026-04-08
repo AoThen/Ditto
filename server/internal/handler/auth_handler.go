@@ -76,3 +76,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	response.Success(c, resp)
 }
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
+	oldToken := middleware.GetRawToken(c)
+
+	newToken, err := h.service.RefreshDeviceToken(deviceID, oldToken)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, 40101, "Token 刷新失败: "+err.Error())
+		return
+	}
+
+	_ = userID // userID extracted from JWT, used for logging if needed
+	response.Success(c, gin.H{"device_token": newToken})
+}

@@ -123,6 +123,46 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 	}, nil
 }
 
+func (s *AuthService) RefreshDeviceToken(deviceID string, oldToken string) (string, error) {
+	// Verify the old token is valid first (middleware already does this)
+	// Parse the old token to extract user_id
+	token, _, err := new(jwt.Parser).ParseUnverified(oldToken, jwt.MapClaims{})
+	if err != nil {
+		return "", errors.New("无效的 Token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.New("无效的 Token 声明")
+	}
+
+	userIDFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		return "", errors.New("无效的 Token: 缺少 user_id")
+	}
+	userID := uint(userIDFloat)
+
+	// Verify device_id matches
+	tokenDeviceID, ok := claims["device_id"].(string)
+	if !ok || tokenDeviceID != deviceID {
+		return "", errors.New("设备不匹配")
+	}
+
+	// Verify user still exists and is active
+	var user model.User
+	if err := database.DB.Where("id = ? AND status = ?", userID, 1).First(&user).Error; err != nil {
+		return "", errors.New("用户不存在或已禁用")
+	}
+
+	// Generate new token
+	newToken, err := s.generateToken(userID, deviceID)
+	if err != nil {
+		return "", err
+	}
+
+	return newToken, nil
+}
+
 func (s *AuthService) generateToken(userID uint, deviceID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":   userID,

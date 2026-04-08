@@ -70,3 +70,9 @@ func GetDeviceID(c *gin.Context) string {
 	}
 	return v.(string)
 }
+
+// GetRawToken returns the raw JWT token string that was used for authentication
+func GetRawToken(c *gin.Context) string {
+	authHeader := c.GetHeader("Authorization")
+	return strings.TrimPrefix(authHeader, "Bearer ")
+}
