@@ -1,4 +1,33 @@
-# Docker 部署指南
+# Docker Deployment Guide | Docker 部署指南
+
+**[English](#table-of-contents)** | **[中文](#目录中文版)**
+
+---
+
+# 目录中文版
+
+本指南介绍如何使用 Docker 部署带云端同步和 Web 管理面板的 Ditto。
+
+## 架构概览
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│  Ditto 客户端    │  HTTPS  │   Go 云端服务     │  HTTPS  │   Web 管理面板   │
+│  C++ / Windows  │◄───────►│   (REST + WS)    │◄───────►│   Vue 3 SPA     │
+│  (多个设备)      │         │                  │         │   (浏览器)       │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+                                     │
+                            ┌────────┴────────┐
+                            │   SQLite 数据库  │
+                            │   (或 PostgreSQL)│
+                            └─────────────────┘
+```
+
+**组件说明:**
+- **后端**: 基于 Go 的 REST API + WebSocket 服务器，用于实时同步
+- **前端**: Vue 3 Web 应用程序，用于剪贴板管理
+- **数据库**: SQLite（默认）或 PostgreSQL（多用户场景）
+- **反向代理**: Nginx 用于 SSL 终止和静态文件服务
 
 ## 快速开始
 
@@ -11,7 +40,7 @@ docker-compose up -d
 # 查看日志
 docker-compose logs -f
 
-# 访问
+# 访问服务
 # 前端: http://localhost
 # 后端: http://localhost:8080
 # 健康检查: http://localhost:8080/health
@@ -19,211 +48,183 @@ docker-compose logs -f
 
 ### 2. 生产环境（HTTPS）
 
-#### 生成自签名证书
+#### 生成 SSL 证书
 
 ```bash
-# 生成证书（替换为你的域名）
+# Generate self-signed certificates (replace with your domain)
 chmod +x generate-certs.sh
 ./generate-certs.sh "ditto.local"
 
-# 或生成公网域名证书
+# Or generate certificates for public domain
 ./generate-certs.sh "your-domain.com"
 ```
 
-#### 配置 JWT 密钥
+#### Configure JWT Secret
 
 ```bash
-# 生成安全的 JWT 密钥
+# Generate secure JWT secret
 openssl rand -base64 32
 
-# 创建 .env 文件
+# Create .env file
 cat > .env << EOF
 JWT_SECRET=$(openssl rand -base64 32)
 EOF
 ```
 
-#### 启动生产环境
+#### Start Production Environment
 
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 
-# 访问
-# 前端: https://localhost (或 https://your-domain)
-# 后端: https://localhost:8443
+# Access
+# Frontend: https://localhost (or https://your-domain)
+# Backend: https://localhost:8443
 ```
 
-## 配置说明
+## Configuration Reference
 
-### 环境变量
+### Environment Variables
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PORT` | 后端端口 | `8080` |
-| `DATABASE_PATH` | 数据库路径 | `/app/data/ditto_cloud.db` |
-| `JWT_SECRET` | JWT 密钥 | `change-me-in-production` |
-| `TLS_CERT` | TLS 证书路径 | 无 |
-| `TLS_KEY` | TLS 私钥路径 | 无 |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Backend server port | `8080` |
+| `DATABASE_PATH` | SQLite database path | `/app/data/ditto_cloud.db` |
+| `JWT_SECRET` | JWT signing secret key | `change-me-in-production` |
+| `TLS_CERT` | TLS certificate file path | None |
+| `TLS_KEY` | TLS private key file path | None |
+| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
+| `MAX_CLIP_SIZE` | Maximum clip size in bytes | `10485760` (10MB) |
+| `SYNC_INTERVAL` | Background sync interval (seconds) | `30` |
 
-### 数据持久化
+### Docker Compose Files
 
-数据库存储在 Docker 卷 `ditto-data` 中：
+**docker-compose.yml** - Development environment with HTTP
+- No TLS, suitable for local development
+- Ports: 80 (frontend), 8080 (backend)
+- Hot-reload enabled for development
+
+**docker-compose.prod.yml** - Production environment with HTTPS
+- TLS/SSL enabled with certificate mounting
+- Ports: 443 (frontend), 8443 (backend)
+- Optimized for production use
+
+### Docker Volumes
+
+| Volume | Purpose | Backup Strategy |
+|--------|---------|----------------|
+| `ditto-data` | Database storage | Regular tar.gz backups |
+| `certs` (bind mount) | SSL certificates | Copy to secure storage |
+
+---
+
+## Data Persistence & Backup
+
+### Database Storage
+
+All clipboard data is stored in the `ditto-data` Docker volume by default:
 
 ```bash
-# 查看数据卷
+# Inspect the data volume
 docker volume inspect ditto_ditto-data
 
-# 备份数据库
-docker run --rm -v ditto_ditto-data:/data -v $(pwd):/backup alpine tar czf /backup/ditto-data.tar.gz -C /data .
-
-# 恢复数据库
-docker run --rm -v ditto_ditto-data:/data -v $(pwd):/backup alpine tar xzf /backup/ditto-data.tar.gz -C /data
+# View database file
+docker exec ditto-backend ls -la /app/data/
 ```
 
-## 证书信任
+### Backup Procedures
 
-### Windows 客户端信任自签名证书
+```bash
+# Backup database
+docker run --rm -v ditto_ditto-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/ditto-data-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
 
-1. 将 `certs/ca.crt` 复制到 Windows 机器
-2. 双击证书
-3. 点击"安装证书"
-4. 选择"本地计算机"
-5. 选择"将所有证书放入以下存储"
-6. 浏览选择"受信任的根证书颁发机构"
-7. 完成安装
+# Backup certificates (production)
+cp -r certs/ certs-backup-$(date +%Y%m%d)/
 
-### Linux 客户端信任
+# Automated backup script (add to cron)
+#!/bin/bash
+BACKUP_DIR="/path/to/backups"
+DATE=$(date +%Y%m%d-%H%M%S)
+docker run --rm -v ditto_ditto-data:/data -v $BACKUP_DIR:/backup alpine \
+  tar czf /backup/ditto-$DATE.tar.gz -C /data .
+# Keep only last 7 days
+find $BACKUP_DIR -name "ditto-*.tar.gz" -mtime +7 -delete
+```
+
+### Restore from Backup
+
+```bash
+# Stop services
+docker-compose down
+
+# Restore database
+docker run --rm -v ditto_ditto-data:/data -v $(pwd):/backup alpine \
+  tar xzf /backup/ditto-data-20231201.tar.gz -C /data .
+
+# Restart services
+docker-compose up -d
+```
+
+### Database Migration
+
+For multi-user scenarios, consider migrating to PostgreSQL:
+
+```bash
+# Set PostgreSQL connection in .env
+DATABASE_URL=postgresql://user:pass@postgres-host:5432/ditto
+
+# Run migration
+docker-compose -f docker-compose.prod.yml up -d postgres
+```
+
+---
+
+## SSL/TLS Certificate Management
+
+### Self-Signed Certificates (Development)
+
+```bash
+./generate-certs.sh "ditto.local"
+```
+
+### Let's Encrypt Certificates (Production)
+
+```bash
+# Install Certbot
+sudo apt-get install certbot
+
+# Obtain certificate
+sudo certbot certonly --standalone -d your-domain.com
+
+# Copy certificates
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem certs/server.crt
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem certs/server.key
+```
+
+### Certificate Auto-Renewal
+
+```bash
+# Add to crontab (renew 30 days before expiry)
+0 3 * * * certbot renew --quiet --deploy-hook "cp /etc/letsencrypt/live/your-domain.com/fullchain.pem /path/to/certs/server.crt && cp /etc/letsencrypt/live/your-domain.com/privkey.pem /path/to/certs/server.key && docker restart ditto-frontend"
+```
+
+### Client Certificate Trust
+
+#### Windows Clients
+
+1. Copy `certs/ca.crt` to Windows machine
+2. Double-click the certificate file
+3. Click "Install Certificate"
+4. Select "Local Machine"
+5. Choose "Place all certificates in the following store"
+6. Browse and select "Trusted Root Certification Authorities"
+7. Complete installation
+
+#### Linux Clients
 
 ```bash
 sudo cp certs/ca.crt /usr/local/share/ca-certificates/
 sudo update-ca-certificates
 ```
 
-## C++ 客户端配置
-
-在 Ditto 设置中配置服务器地址：
-
-- **开发环境**: `http://localhost:8080`
-- **生产环境**: `https://your-domain:8443`
-
-### 注册表配置
-
-```
-HKCU\Software\Ditto\CloudSync
-  ServerUrl = "https://your-domain:8443"
-  DeviceToken = "<从 Web 面板获取>"
-  SyncEnabled = 1
-```
-
-### 便携版 INI 配置
-
-```ini
-[CloudSync]
-ServerUrl=https://your-domain:8443
-DeviceToken=<从 Web 面板获取>
-SyncEnabled=1
-```
-
-## 维护
-
-### 查看日志
-
-```bash
-# 所有服务
-docker-compose logs -f
-
-# 仅后端
-docker-compose logs -f backend
-
-# 仅前端
-docker-compose logs -f frontend
-```
-
-### 更新服务
-
-```bash
-# 拉取最新代码
-git pull
-
-# 重新构建并启动
-docker-compose up -d --build
-
-# 生产环境
-docker-compose -f docker-compose.prod.yml up -d --build
-```
-
-### 备份
-
-```bash
-# 备份数据库
-docker run --rm -v ditto_ditto-data:/data -v $(pwd):/backup alpine \
-  tar czf /backup/ditto-backup-$(date +%Y%m%d).tar.gz -C /data .
-
-# 备份证书（生产环境）
-cp -r certs/ certs-backup-$(date +%Y%m%d)/
-```
-
-### 清理
-
-```bash
-# 停止服务
-docker-compose down
-
-# 停止并删除数据卷（⚠️ 会丢失数据）
-docker-compose down -v
-```
-
-## 故障排查
-
-### 后端启动失败
-
-```bash
-# 检查日志
-docker logs ditto-backend
-
-# 检查数据库文件权限
-docker exec ditto-backend ls -la /app/data/
-```
-
-### WebSocket 连接失败
-
-确保 nginx 配置包含 WebSocket 代理设置：
-
-```nginx
-proxy_set_header Upgrade $http_upgrade;
-proxy_set_header Connection "upgrade";
-proxy_read_timeout 86400s;
-```
-
-### 证书错误
-
-```bash
-# 检查证书有效期
-openssl x509 -in certs/server.crt -noout -dates
-
-# 检查证书域名
-openssl x509 -in certs/server.crt -noout -text | grep "Subject:"
-```
-
-## 性能优化
-
-### 数据库 WAL 模式
-
-已在代码中自动启用，无需额外配置。
-
-### nginx 缓存
-
-静态资源已配置 1 年缓存，无需修改。
-
-### 内存限制
-
-可在 `docker-compose.yml` 中添加资源限制：
-
-```yaml
-services:
-  backend:
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
-```
+---
