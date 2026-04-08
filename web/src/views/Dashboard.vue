@@ -17,10 +17,20 @@
           router
           class="sidebar-menu"
         >
+          <el-menu-item index="/dashboard">
+            <el-icon><DataAnalysis /></el-icon>
+            <span>仪表盘</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard/clips">
+            <el-icon><Document /></el-icon>
             <span>剪贴板</span>
           </el-menu-item>
+          <el-menu-item index="/dashboard/devices">
+            <el-icon><Monitor /></el-icon>
+            <span>设备管理</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard/settings">
+            <el-icon><Setting /></el-icon>
             <span>设置</span>
           </el-menu-item>
         </el-menu>
@@ -40,6 +50,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { ElMessage } from 'element-plus'
+import { DataAnalysis, Document, Monitor, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

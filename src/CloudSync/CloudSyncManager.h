@@ -32,6 +32,7 @@ private:
 	HANDLE    m_hStopEvent;
 	CWinThread* m_pSyncThread;
 	BOOL      m_cryptoInitialized;
+	time_t    m_lastSyncTime;  // Track last successful sync time
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);
@@ -56,4 +57,13 @@ private:
 
 	// Filter out CF_HDROP formats that contain actual file data (sync paths only)
 	static BOOL FilterHDROPForSync(nlohmann::json& formats);
+
+	// Enumerate local clips modified since lastSyncTime
+	BOOL GetLocalClipsSince(time_t sinceTime, nlohmann::json& clipsArray);
+
+	// Load formats for a specific clip
+	BOOL LoadClipFormats(int clipId, nlohmann::json& formatsArray);
+
+	// Merge a remote clip into local database (returns new/updated clip ID)
+	int MergeRemoteClipToLocal(const nlohmann::json& remoteClip);
 };

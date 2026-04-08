@@ -60,6 +60,7 @@ func main() {
 	clipHandler := handler.NewClipHandler(clipSvc)
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
+	statsHandler := handler.NewStatsHandler()
 
 	// Setup Gin
 	gin.SetMode(gin.ReleaseMode)
@@ -115,6 +116,12 @@ func main() {
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+		}
+
+		stats := protected.Group("/stats")
+		{
+			stats.GET("/overview", statsHandler.GetOverview)
+			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
 
 		// WebSocket route (uses query param auth since headers can't be set during WS upgrade)

@@ -56,20 +56,76 @@
     />
 
     <!-- Clip Detail Dialog -->
-    <el-dialog v-model="detailVisible" title="剪贴板详情" width="600px">
+    <el-dialog v-model="detailVisible" title="剪贴板详情" width="800px" top="5vh">
       <div v-if="currentClip" class="clip-detail">
-        <p><strong>描述:</strong> {{ currentClip.description || '(无)' }}</p>
-        <p><strong>创建时间:</strong> {{ formatDate(currentClip.created_at) }}</p>
-        <p><strong>粘贴次数:</strong> {{ currentClip.paste_count }}</p>
-        <div v-if="currentClip.formats && currentClip.formats.length">
-          <strong>格式:</strong>
-          <div v-for="(fmt, idx) in currentClip.formats" :key="idx" class="format-item">
-            <span class="format-icon">{{ getFormatIcon(fmt.format_type) }}</span>
-            <span class="format-name">{{ getFormatName(fmt.format_type) }}</span>
-            <span class="format-size">({{ fmt.data_size }} 字节)</span>
-          </div>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="描述">{{ currentClip.description || '(无)' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDate(currentClip.created_at) }}</el-descriptions-item>
+          <el-descriptions-item label="粘贴次数">{{ currentClip.paste_count }}</el-descriptions-item>
+          <el-descriptions-item label="来源设备">{{ currentClip.source_device || currentClip.device_name || '(未知)' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="formats-section" style="margin-top: 20px;">
+          <h4>格式数据 ({{ currentClip.formats?.length || 0 }})</h4>
+          <el-tabs v-model="activeFormatTab" type="card">
+            <el-tab-pane
+              v-for="(fmt, idx) in currentClip.formats"
+              :key="idx"
+              :label="getFormatLabel(fmt.format_type)"
+              :name="idx"
+            >
+              <div class="format-preview">
+                <div class="format-info">
+                  <span class="format-name">{{ getFormatName(fmt.format_type) }}</span>
+                  <span class="format-size">({{ fmt.data_size }} 字节)</span>
+                </div>
+
+                <!-- Text Preview -->
+                <div v-if="isTextFormat(fmt.format_type)" class="text-preview">
+                  <pre class="text-content">{{ decodeTextData(fmt) }}</pre>
+                </div>
+
+                <!-- HTML Preview -->
+                <div v-else-if="isHTMLFormat(fmt.format_type)" class="html-preview">
+                  <iframe
+                    :srcdoc="decodeHTMLData(fmt)"
+                    sandbox="allow-same-origin"
+                    style="width: 100%; height: 400px; border: 1px solid #dcdfe6; border-radius: 4px;"
+                  ></iframe>
+                </div>
+
+                <!-- Image Preview -->
+                <div v-else-if="isImageFormat(fmt.format_type)" class="image-preview">
+                  <el-image
+                    v-if="fmt.data_base64"
+                    :src="'data:image/png;base64,' + fmt.data_base64"
+                    fit="contain"
+                    style="max-height: 400px;"
+                    :preview-src-list="['data:image/png;base64,' + fmt.data_base64]"
+                  />
+                  <el-alert v-else title="图片数据不可预览（需要 base64 编码）" type="info" :closable="false" />
+                </div>
+
+                <!-- File Path Preview -->
+                <div v-else-if="isFileFormat(fmt.format_type)" class="file-preview">
+                  <ul>
+                    <li v-for="(path, pidx) in decodeFilePaths(fmt)" :key="pidx">{{ path }}</li>
+                  </ul>
+                </div>
+
+                <!-- Raw Binary Preview (hex) -->
+                <div v-else class="raw-preview">
+                  <el-alert
+                    :title="`二进制数据 (${fmt.data_size} 字节，${fmt.encoding || 'base64'} 编码)`"
+                    type="info"
+                    :closable="false"
+                  />
+                  <pre class="hex-content" v-if="fmt.data">{{ fmt.data.substring(0, 200) }}{{ fmt.data.length > 200 ? '...' : '' }}</pre>
+                </div>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
         </div>
-        <el-alert v-else title="无格式数据" type="info" />
       </div>
     </el-dialog>
   </div>
@@ -98,28 +154,127 @@ const total = ref(0)
 const selectedRows = ref([])
 const detailVisible = ref(false)
 const currentClip = ref(null)
+const activeFormatTab = ref(0)
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-function getFormatIcon(formatType) {
-  const iconMap = {
-    'text': '\u{1F4DD}',
-    'unicode': '\u{1F310}',
-    'file': '\u{1F4C1}',
-  }
-  return iconMap[formatType] || '\u{1F4DD}'
+// Format type detection
+function isTextFormat(formatType) {
+  const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
+  return type === 'text' || type === 'unicode' || type === 1 || type === 13 ||
+         type === 'CF_TEXT' || type === 'CF_UNICODETEXT'
+}
+
+function isHTMLFormat(formatType) {
+  const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
+  return type === 'html' || type === 'CF_HTML' || type === 'CF_HTMLFORMAT' ||
+         type?.includes('html')
+}
+
+function isImageFormat(formatType) {
+  const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
+  return type === 'image' || type === 'dib' || type === 'CF_DIB' || type === 'CF_BITMAP' ||
+         type === 'CF_TIFF' || type?.includes('image')
+}
+
+function isFileFormat(formatType) {
+  const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
+  return type === 'file' || type === 'files' || type === 'hdop' || type === 'CF_HDROP' ||
+         type?.includes('file')
+}
+
+function getFormatLabel(formatType) {
+  const type = typeof formatType === 'string' ? formatType : String(formatType)
+  if (isTextFormat(formatType)) return '文本'
+  if (isHTMLFormat(formatType)) return 'HTML'
+  if (isImageFormat(formatType)) return '图片'
+  if (isFileFormat(formatType)) return '文件'
+  return `格式 ${type}`
 }
 
 function getFormatName(formatType) {
+  const type = typeof formatType === 'string' ? formatType : String(formatType)
   const nameMap = {
+    '1': 'CF_TEXT',
+    '13': 'CF_UNICODETEXT',
     'text': '文本',
-    'unicode': 'Unicode',
+    'unicode': 'Unicode 文本',
+    'html': 'HTML',
+    'image': '图片',
+    'dib': 'DIB 图片',
     'file': '文件路径',
+    'hdop': '文件 (HDROP)',
   }
-  return nameMap[formatType] || formatType
+  return nameMap[type] || type
+}
+
+// Data decoding helpers
+function decodeTextData(fmt) {
+  if (!fmt || !fmt.data) return '(无数据)'
+  // If data is hex-encoded, decode it
+  if (fmt.encoding === 'hex') {
+    try {
+      return hexToString(fmt.data)
+    } catch (e) {
+      return '(文本解码失败)'
+    }
+  }
+  // Otherwise assume plain text
+  return fmt.data
+}
+
+function decodeHTMLData(fmt) {
+  if (!fmt || !fmt.data) return '<html><body></body></html>'
+  if (fmt.encoding === 'hex') {
+    try {
+      return hexToString(fmt.data)
+    } catch (e) {
+      return '<html><body><p>HTML 解码失败</p></body></html>'
+    }
+  }
+  return fmt.data
+}
+
+function decodeFilePaths(fmt) {
+  if (!fmt || !fmt.data) return []
+  try {
+    // File paths might be stored as JSON array or newline-separated
+    if (fmt.data.startsWith('[')) {
+      return JSON.parse(fmt.data)
+    }
+    return fmt.data.split(/\r?\n/).filter(p => p.trim())
+  } catch (e) {
+    return [fmt.data]
+  }
+}
+
+function hexToString(hex) {
+  const str = hex.replace(/\s+/g, '')
+  let result = ''
+  for (let i = 0; i < str.length; i += 2) {
+    const hexChar = str.substr(i, 2)
+    const charCode = parseInt(hexChar, 16)
+    result += String.fromCharCode(charCode)
+  }
+  // Try to detect UTF-8/16 and decode properly
+  try {
+    // For UTF-16 (Windows wide chars), every second char is null
+    const hasNulls = result.includes('\0')
+    if (hasNulls) {
+      // Extract every other char for UTF-16LE
+      let utf16Str = ''
+      for (let i = 0; i < result.length; i += 2) {
+        utf16Str += result[i]
+      }
+      return utf16Str
+    }
+    return result
+  } catch (e) {
+    return result
+  }
 }
 
 async function fetchClips() {
@@ -176,6 +331,7 @@ async function openClipDetail(id) {
   try {
     const res = await getClip(id)
     currentClip.value = res.data || res
+    activeFormatTab.value = 0
     detailVisible.value = true
   } catch (err) {
     console.error('Failed to fetch clip detail:', err)
@@ -266,27 +422,104 @@ onUnmounted(() => {
   background: #fef0f0;
 }
 
-.clip-detail p {
-  margin: 8px 0;
+.clip-detail {
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
-.format-item {
+.formats-section h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+}
+
+.format-preview {
+  padding: 12px 0;
+}
+
+.format-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.format-icon {
-  font-size: 16px;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .format-name {
-  font-weight: 500;
+  font-weight: 600;
+  color: #303133;
 }
 
 .format-size {
   color: #909399;
   font-size: 12px;
+}
+
+/* Text Preview */
+.text-preview {
+  background: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 12px;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.text-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* HTML Preview */
+.html-preview {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Image Preview */
+.image-preview {
+  text-align: center;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+/* File Preview */
+.file-preview ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-preview li {
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: #f5f7fa;
+  border-left: 3px solid #409eff;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* Raw/Hex Preview */
+.raw-preview {
+  max-height: 300px;
+  overflow: auto;
+}
+
+.hex-content {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 0;
 }
 </style>
