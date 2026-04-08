@@ -25,6 +25,10 @@
             <el-icon><Document /></el-icon>
             <span>剪贴板</span>
           </el-menu-item>
+          <el-menu-item index="/dashboard/groups">
+            <el-icon><FolderOpened /></el-icon>
+            <span>分组管理</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard/devices">
             <el-icon><Monitor /></el-icon>
             <span>设备管理</span>
@@ -50,7 +54,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { ElMessage } from 'element-plus'
-import { DataAnalysis, Document, Monitor, Setting } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Monitor, Setting, FolderOpened } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

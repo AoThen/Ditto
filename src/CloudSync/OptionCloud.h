@@ -1,11 +1,10 @@
 #pragma once
 #include <afxdlgs.h>  // CPropertyPage
 
-// TODO: Define this resource ID in resource.h when wiring up the dialog resource
-// Suggested: #define IDD_OPTIONS_CLOUD  2200
+// Cloud sync options dialog resource ID
 #define IDD_OPTIONS_CLOUD  2200
 
-// TODO: Define these control IDs in resource.h when wiring up controls
+// Control IDs for cloud sync dialog
 #define IDC_CLOUD_ENABLE        2201
 #define IDC_CLOUD_AUTO_SYNC     2202
 #define IDC_CLOUD_SERVER_URL    2203

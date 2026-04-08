@@ -47,6 +47,7 @@ func main() {
 	deviceSvc := service.NewDeviceService()
 	clipSvc := service.NewClipService(h)
 	encryptionSvc := service.NewEncryptionService()
+	groupSvc := service.NewGroupService()
 	rateLimiter := middleware.NewRateLimiter()
 	cleanupSvc := service.NewCleanupService(cfg)
 
@@ -59,6 +60,7 @@ func main() {
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 	clipHandler := handler.NewClipHandler(clipSvc)
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
+	groupHandler := handler.NewGroupHandler(groupSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
 	statsHandler := handler.NewStatsHandler()
 
@@ -110,6 +112,17 @@ func main() {
 			clips.GET("/:id", clipHandler.GetClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+		}
+
+		groups := protected.Group("/groups")
+		{
+			groups.GET("", groupHandler.ListGroups)
+			groups.GET("/:id", groupHandler.GetGroup)
+			groups.POST("", groupHandler.CreateGroup)
+			groups.PUT("/:id", groupHandler.UpdateGroup)
+			groups.DELETE("/:id", groupHandler.DeleteGroup)
+			groups.POST("/:id/move-clips", groupHandler.MoveClipsToGroup)
 		}
 
 		encryption := protected.Group("/encryption")

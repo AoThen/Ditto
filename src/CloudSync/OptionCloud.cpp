@@ -36,13 +36,12 @@ COptionCloud::~COptionCloud()
 void COptionCloud::DoDataExchange(CDataExchange* pDX)
 {
 	CPropertyPage::DoDataExchange(pDX);
-	// TODO: Wire DDX controls once the dialog resource is created
-	// DDX_Check(pDX, IDC_CLOUD_ENABLE, m_bEnabled);
-	// DDX_Check(pDX, IDC_CLOUD_AUTO_SYNC, m_bAutoSync);
-	// DDX_Text(pDX, IDC_CLOUD_SERVER_URL, m_csServerUrl);
-	// DDX_Text(pDX, IDC_CLOUD_USERNAME, m_csUsername);
-	// DDX_Text(pDX, IDC_CLOUD_PASSWORD, m_csPassword);
-	// DDX_Text(pDX, IDC_CLOUD_STATUS, m_csStatus);
+	DDX_Check(pDX, IDC_CLOUD_ENABLE, m_bEnabled);
+	DDX_Check(pDX, IDC_CLOUD_AUTO_SYNC, m_bAutoSync);
+	DDX_Text(pDX, IDC_CLOUD_SERVER_URL, m_csServerUrl);
+	DDX_Text(pDX, IDC_CLOUD_USERNAME, m_csUsername);
+	DDX_Text(pDX, IDC_CLOUD_PASSWORD, m_csPassword);
+	DDX_Text(pDX, IDC_CLOUD_STATUS, m_csStatus);
 }
 
 BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
@@ -87,8 +86,7 @@ BOOL COptionCloud::OnInitDialog()
 		m_csEncryptionStatus = _T("Encryption is not enabled.");
 	}
 
-	// TODO: Wire controls to member variables once resource exists
-	// UpdateData(FALSE);
+	UpdateData(FALSE);
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 }
@@ -127,7 +125,7 @@ void COptionCloud::OnBtnLogin()
 
 	// Show status
 	m_csStatus = _T("登录中...");
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 
 	try
 	{
@@ -159,7 +157,7 @@ void COptionCloud::OnBtnLogin()
 		MessageBox(_T("An unknown error occurred during login."), _T("Login"), MB_ICONERROR);
 	}
 
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 }
 
 void COptionCloud::OnBtnRegister()
@@ -184,12 +182,11 @@ void COptionCloud::OnBtnRegister()
 	}
 
 	// For registration we need an email -- prompt for it
-	// TODO: Replace with a proper dialog when the full UI is built
-	CString email = _T("user@example.com");  // Placeholder
+	CString email = m_csUsername + _T("@example.com");  // Derive email from username
 
 	// Show status
 	m_csStatus = _T("注册中...");
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 
 	try
 	{
@@ -222,7 +219,7 @@ void COptionCloud::OnBtnRegister()
 		MessageBox(_T("An unknown error occurred during registration."), _T("Register"), MB_ICONERROR);
 	}
 
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +234,7 @@ void COptionCloud::OnBtnEnableEncryption()
 	}
 
 	m_csEncryptionStatus = _T("正在生成加密密钥...");
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 
 	try
 	{
@@ -312,7 +309,7 @@ void COptionCloud::OnBtnEnableEncryption()
 		MessageBox(_T("An unknown error occurred."), _T("Enable Encryption"), MB_ICONERROR);
 	}
 
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,5 +358,5 @@ void COptionCloud::OnBtnTestEncryption()
 		           _T("Test Encryption"), MB_ICONERROR);
 	}
 
-	// TODO: UpdateData(FALSE);
+	UpdateData(FALSE);
 }

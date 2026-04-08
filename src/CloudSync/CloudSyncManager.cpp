@@ -53,6 +53,26 @@ BOOL CCloudSyncManager::Initialize()
 		m_serverUrl = _T("https://localhost:8080");
 	}
 	m_deviceToken = CGetSetOptions::GetCloudDeviceToken();
+	m_deviceId = CGetSetOptions::GetCloudDeviceId();
+
+	// If no device ID is stored, generate one (will be overwritten on login)
+	if (m_deviceId.IsEmpty())
+	{
+		// Generate a temporary device ID from computer name
+		TCHAR szComputerName[MAX_COMPUTERNAME_LENGTH + 1];
+		DWORD dwSize = ARRAYSIZE(szComputerName);
+		if (GetComputerName(szComputerName, &dwSize))
+		{
+			CStringA tempId;
+			CT2A computerNameA(szComputerName, CP_UTF8);
+			tempId.Format("device-%s", (LPCSTR)computerNameA);
+			m_deviceId = tempId;
+		}
+		else
+		{
+			m_deviceId = "device-unknown";
+		}
+	}
 
 	if (!CCloudAuth::IsLoggedIn())
 	{
@@ -363,24 +383,15 @@ void CCloudSyncManager::PushNewClips()
 
 		// Build sync request JSON
 		json syncReq;
-		syncReq["since"] = (m_lastSyncTime > 0) ? 
+		syncReq["since"] = (m_lastSyncTime > 0) ?
 			std::string(ctime(&m_lastSyncTime)) : "1970-01-01T00:00:00Z";
-		
+
 		// Remove trailing newline from ctime
 		std::string& sinceStr = syncReq["since"].get_ref<std::string&>();
 		if (!sinceStr.empty() && sinceStr.back() == '\n')
 			sinceStr.pop_back();
 
-		// Get device name from settings
-		CString deviceName = CGetSetOptions::GetCloudDeviceName();
-		if (deviceName.IsEmpty())
-		{
-			TCHAR buffer[MAX_COMPUTERNAME_LENGTH + 1];
-			DWORD size = MAX_COMPUTERNAME_LENGTH + 1;
-			GetComputerName(buffer, &size);
-			deviceName = buffer;
-		}
-		syncReq["device_id"] = CStringToStdString(deviceName);
+		syncReq["device_id"] = std::string(m_deviceId);
 		syncReq["push_clips"] = clipsArray;
 
 		// Send to server
@@ -571,8 +582,21 @@ void CCloudSyncManager::PullChanges()
 
 		// Build sync request to pull changes
 		json syncReq;
-		syncReq["since"] = "1970-01-01T00:00:00Z"; // TODO: use actual last sync time
-		syncReq["device_id"] = "device-1";           // TODO: use actual device ID
+		// Use tracked last sync time (falls back to epoch if never synced)
+		if (m_lastSyncTime > 0)
+		{
+			CTime sinceTime((time_t)m_lastSyncTime);
+			CStringA sinceStr;
+			sinceStr.Format("%04d-%02d-%02dT%02d:%02d:%02dZ",
+				sinceTime.GetYear(), sinceTime.GetMonth(), sinceTime.GetDay(),
+				sinceTime.GetHour(), sinceTime.GetMinute(), sinceTime.GetSecond());
+			syncReq["since"] = sinceStr.GetString();
+		}
+		else
+		{
+			syncReq["since"] = "1970-01-01T00:00:00Z";
+		}
+		syncReq["device_id"] = std::string(m_deviceId);
 		syncReq["push_clips"] = json::array();       // Empty push for pull-only
 
 		CStringA serverUrlA(m_serverUrl);

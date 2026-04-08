@@ -113,6 +113,9 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 				if (data.contains("device_id"))
 				{
 					result.deviceId = StdStringToCString(data["device_id"].get<std::string>());
+					// Persist device_id
+					CT2A deviceIdA(result.deviceId, CP_UTF8);
+					CGetSetOptions::SetCloudDeviceId(deviceIdA);
 				}
 				result.success = TRUE;
 
@@ -231,6 +234,8 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 				if (data.contains("device_id"))
 				{
 					result.deviceId = StdStringToCString(data["device_id"].get<std::string>());
+					CT2A deviceIdA(result.deviceId, CP_UTF8);
+					CGetSetOptions::SetCloudDeviceId(deviceIdA);
 				}
 				CT2A tokenA(result.deviceToken, CP_UTF8);
 				CGetSetOptions::SetCloudDeviceToken(tokenA);

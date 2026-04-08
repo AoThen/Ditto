@@ -400,3 +400,17 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		SyncTime:     syncTime.UTC().Format(time.RFC3339),
 	}, nil
 }
+
+// LogSyncOperation records a sync operation to the sync_logs table
+func LogSyncOperation(userID uint, deviceID, action string, clipCount int, status string, errMsg string) {
+	log := model.SyncLog{
+		UserID:    userID,
+		DeviceID:  deviceID,
+		Action:    action,
+		ClipCount: clipCount,
+		Status:    status,
+		Error:     errMsg,
+		SyncedAt:  time.Now(),
+	}
+	database.DB.Create(&log)
+}

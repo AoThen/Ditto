@@ -90,9 +90,13 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 
 	result, err := h.service.Sync(userID, &req, deviceID)
 	if err != nil {
+		service.LogSyncOperation(userID, req.DeviceID, "push", 0, "failed", err.Error())
 		response.Error(c, http.StatusInternalServerError, 50000, "同步失败: "+err.Error())
 		return
 	}
+
+	// Log successful sync
+	service.LogSyncOperation(userID, req.DeviceID, "push", result.UpdatedCount, "success", "")
 
 	response.Success(c, result)
 }

@@ -1,0 +1,330 @@
+package service
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"ditto-cloud-server/internal/database"
+	"ditto-cloud-server/internal/model"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type GroupService struct{}
+
+func NewGroupService() *GroupService {
+	return &GroupService{}
+}
+
+// GroupListItem represents a group for list responses
+type GroupListItem struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ParentID    string `json:"parent_id"`
+	ClipOrder   float64 `json:"clip_order"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+	ClipCount   int64  `json:"clip_count"`
+}
+
+// GroupDetail represents a group with child groups
+type GroupDetail struct {
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	ParentID    string          `json:"parent_id"`
+	ClipOrder   float64         `json:"clip_order"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
+	ClipCount   int64           `json:"clip_count"`
+	Children    []GroupListItem `json:"children"`
+}
+
+// ListGroups retrieves all groups for a user with clip counts
+func (s *GroupService) ListGroups(userID uint) ([]GroupListItem, error) {
+	var groups []model.Group
+	if err := database.DB.Where("user_id = ?", userID).Order("clip_order ASC, created_at ASC").Find(&groups).Error; err != nil {
+		return nil, err
+	}
+
+	items := make([]GroupListItem, 0, len(groups))
+	for _, g := range groups {
+		var clipCount int64
+		database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, g.ID).Count(&clipCount)
+
+		parentID := ""
+		if g.ParentID != nil {
+			parentID = *g.ParentID
+		}
+
+		items = append(items, GroupListItem{
+			ID:          g.ID,
+			Name:        g.Name,
+			Description: g.Description,
+			ParentID:    parentID,
+			ClipOrder:   g.ClipOrder,
+			CreatedAt:   g.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:   g.UpdatedAt.UTC().Format(time.RFC3339),
+			ClipCount:   clipCount,
+		})
+	}
+
+	return items, nil
+}
+
+// GetGroup retrieves a group with children
+func (s *GroupService) GetGroup(userID uint, groupID string) (*GroupDetail, error) {
+	var group model.Group
+	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("分组不存在")
+		}
+		return nil, err
+	}
+
+	var clipCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, group.ID).Count(&clipCount)
+
+	var children []model.Group
+	if err := database.DB.Where("user_id = ? AND parent_id = ?", userID, group.ID).Order("clip_order ASC").Find(&children).Error; err != nil {
+		return nil, err
+	}
+
+	childItems := make([]GroupListItem, 0, len(children))
+	for _, c := range children {
+		var childClipCount int64
+		database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, c.ID).Count(&childClipCount)
+
+		childParentID := ""
+		if c.ParentID != nil {
+			childParentID = *c.ParentID
+		}
+
+		childItems = append(childItems, GroupListItem{
+			ID:          c.ID,
+			Name:        c.Name,
+			Description: c.Description,
+			ParentID:    childParentID,
+			ClipOrder:   c.ClipOrder,
+			CreatedAt:   c.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:   c.UpdatedAt.UTC().Format(time.RFC3339),
+			ClipCount:   childClipCount,
+		})
+	}
+
+	parentID := ""
+	if group.ParentID != nil {
+		parentID = *group.ParentID
+	}
+
+	return &GroupDetail{
+		ID:          group.ID,
+		Name:        group.Name,
+		Description: group.Description,
+		ParentID:    parentID,
+		ClipOrder:   group.ClipOrder,
+		CreatedAt:   group.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   group.UpdatedAt.UTC().Format(time.RFC3339),
+		ClipCount:   clipCount,
+		Children:    childItems,
+	}, nil
+}
+
+// CreateGroupRequest represents the create group request
+type CreateGroupRequest struct {
+	Name        string  `json:"name" binding:"required"`
+	Description string  `json:"description"`
+	ParentID    *string `json:"parent_id"`
+	ClipOrder   float64 `json:"clip_order"`
+}
+
+// CreateGroup creates a new group
+func (s *GroupService) CreateGroup(userID uint, req *CreateGroupRequest) (*GroupListItem, error) {
+	// Validate parent exists if provided
+	if req.ParentID != nil && *req.ParentID != "" {
+		var parent model.Group
+		if err := database.DB.Where("id = ? AND user_id = ?", *req.ParentID, userID).First(&parent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("父分组不存在")
+			}
+			return nil, err
+		}
+	}
+
+	id := fmt.Sprintf("grp-%s", uuid.New().String()[:8])
+
+	group := model.Group{
+		ID:          id,
+		UserID:      userID,
+		Name:        req.Name,
+		Description: req.Description,
+		ParentID:    req.ParentID,
+		ClipOrder:   req.ClipOrder,
+	}
+
+	if err := database.DB.Create(&group).Error; err != nil {
+		return nil, err
+	}
+
+	parentID := ""
+	if group.ParentID != nil {
+		parentID = *group.ParentID
+	}
+
+	return &GroupListItem{
+		ID:          group.ID,
+		Name:        group.Name,
+		Description: group.Description,
+		ParentID:    parentID,
+		ClipOrder:   group.ClipOrder,
+		CreatedAt:   group.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   group.UpdatedAt.UTC().Format(time.RFC3339),
+		ClipCount:   0,
+	}, nil
+}
+
+// UpdateGroupRequest represents the update group request
+type UpdateGroupRequest struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	ParentID    *string `json:"parent_id"`
+	ClipOrder   float64 `json:"clip_order"`
+}
+
+// UpdateGroup updates a group and returns the updated group
+func (s *GroupService) UpdateGroup(userID uint, groupID string, req *UpdateGroupRequest) (*GroupListItem, error) {
+	var group model.Group
+	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("分组不存在")
+		}
+		return nil, err
+	}
+
+	// Validate parent exists and isn't self
+	if req.ParentID != nil && *req.ParentID != "" {
+		if *req.ParentID == groupID {
+			return nil, errors.New("不能将分组设为自身")
+		}
+		var parent model.Group
+		if err := database.DB.Where("id = ? AND user_id = ?", *req.ParentID, userID).First(&parent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("父分组不存在")
+			}
+			return nil, err
+		}
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	updates["description"] = req.Description
+	if req.ParentID != nil {
+		updates["parent_id"] = req.ParentID
+	}
+	updates["clip_order"] = req.ClipOrder
+	updates["updated_at"] = time.Now()
+
+	if err := database.DB.Model(&group).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+
+	// Reload
+	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
+		return nil, err
+	}
+
+	var clipCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, group.ID).Count(&clipCount)
+
+	parentID := ""
+	if group.ParentID != nil {
+		parentID = *group.ParentID
+	}
+
+	return &GroupListItem{
+		ID:          group.ID,
+		Name:        group.Name,
+		Description: group.Description,
+		ParentID:    parentID,
+		ClipOrder:   group.ClipOrder,
+		CreatedAt:   group.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:   group.UpdatedAt.UTC().Format(time.RFC3339),
+		ClipCount:   clipCount,
+	}, nil
+}
+
+// DeleteGroup deletes a group (does NOT delete clips in it)
+func (s *GroupService) DeleteGroup(userID uint, groupID string) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		var group model.Group
+		if err := tx.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("分组不存在")
+			}
+			return err
+		}
+
+		// Unset group_id from clips in this group (don't delete clips)
+		tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "")
+
+		// Delete child groups recursively
+		var children []model.Group
+		if err := tx.Where("user_id = ? AND parent_id = ?", userID, group.ID).Find(&children).Error; err != nil {
+			return err
+		}
+		for _, child := range children {
+			if err := s.deleteGroupRecursive(tx, userID, child.ID); err != nil {
+				return err
+			}
+		}
+
+		// Delete the group itself
+		return tx.Delete(&group).Error
+	})
+}
+
+func (s *GroupService) deleteGroupRecursive(tx *gorm.DB, userID uint, groupID string) error {
+	// Unset group_id from clips
+	tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "")
+
+	// Delete children
+	var children []model.Group
+	if err := tx.Where("user_id = ? AND parent_id = ?", userID, groupID).Find(&children).Error; err != nil {
+		return err
+	}
+	for _, child := range children {
+		if err := s.deleteGroupRecursive(tx, userID, child.ID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Where("id = ? AND user_id = ?", groupID, userID).Delete(&model.Group{}).Error
+}
+
+// MoveClipsToGroup moves clips to a group
+func (s *GroupService) MoveClipsToGroup(userID uint, groupID string, clipIDs []string) error {
+	// Verify group exists
+	var group model.Group
+	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("分组不存在")
+		}
+		return err
+	}
+
+	return database.DB.Model(&model.Clip{}).
+		Where("user_id = ? AND id IN ?", userID, clipIDs).
+		Update("group_id", groupID).Error
+}
+
+// RemoveClipsFromGroup removes clips from a group (sets group_id to empty)
+func (s *GroupService) RemoveClipsFromGroup(userID uint, clipIDs []string) error {
+	return database.DB.Model(&model.Clip{}).
+		Where("user_id = ? AND id IN ?", userID, clipIDs).
+		Update("group_id", "").Error
+}

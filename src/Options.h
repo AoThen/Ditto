@@ -284,6 +284,8 @@ public:
 	static void     SetCloudServerUrl(LPCTSTR lpszValue);
 	static CStringA GetCloudDeviceToken();
 	static void     SetCloudDeviceToken(LPCSTR lpszValue);
+	static CStringA GetCloudDeviceId();
+	static void     SetCloudDeviceId(LPCSTR lpszValue);
 	static BOOL     GetCloudSyncEnabled();
 	static void     SetCloudSyncEnabled(BOOL bValue);
 	static BOOL     GetCloudAutoSync();

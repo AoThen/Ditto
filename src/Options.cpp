@@ -1648,6 +1648,19 @@ void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
 	SetProfileString("CloudDeviceToken", wide);
 }
 
+CStringA CGetSetOptions::GetCloudDeviceId()
+{
+	CString cs = GetProfileString("CloudDeviceId", _T(""));
+	CT2A utf8(cs, CP_UTF8);
+	return CStringA(utf8);
+}
+
+void CGetSetOptions::SetCloudDeviceId(LPCSTR lpszValue)
+{
+	CString wide(lpszValue);
+	SetProfileString("CloudDeviceId", wide);
+}
+
 BOOL CGetSetOptions::GetCloudSyncEnabled()
 {
 	return GetProfileLong("CloudSyncEnabled", FALSE);

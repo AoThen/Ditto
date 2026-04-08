@@ -28,6 +28,7 @@ public:
 
 private:
 	CStringA  m_deviceToken;
+	CStringA  m_deviceId;      // Device ID from login response
 	CString   m_serverUrl;
 	HANDLE    m_hStopEvent;
 	CWinThread* m_pSyncThread;

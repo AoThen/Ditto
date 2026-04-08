@@ -38,6 +38,8 @@ func Init(dbPath string) error {
 		&model.Device{},
 		&model.Clip{},
 		&model.ClipFormat{},
+		&model.Group{},
+		&model.SyncLog{},
 		&model.RateLimitRecord{},
 		&model.EncryptionSettings{},
 	); err != nil {
