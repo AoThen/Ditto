@@ -242,7 +242,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 
 	// Set chaining mode to GCM
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
-		reinterpret_cast<PUCHAR>(BCRYPT_CHAIN_MODE_GCM),
+		reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
 		sizeof(BCRYPT_CHAIN_MODE_GCM), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
@@ -332,7 +332,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 	}
 
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
-		reinterpret_cast<PUCHAR>(BCRYPT_CHAIN_MODE_GCM),
+		reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
 		sizeof(BCRYPT_CHAIN_MODE_GCM), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{

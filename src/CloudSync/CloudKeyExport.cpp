@@ -3,7 +3,13 @@
 #include "CloudCrypto.h"
 #include "../httplib.h"
 #include "../json.hpp"
+
+// Use mock CGetSetOptions for tests, real implementation for main project
+#ifdef CLOUDSYNC_TEST
+#include "GetSetOptionsMock.h"
+#else
 #include "../Options.h"
+#endif
 
 using json = nlohmann::json;
 

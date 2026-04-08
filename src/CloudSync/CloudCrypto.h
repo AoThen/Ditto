@@ -56,12 +56,7 @@ public:
 		const std::vector<BYTE>& tag
 	);
 
-private:
-	// AES-256-GCM key (stored after Initialize)
-	static std::vector<BYTE> m_aesKey;
-	static BOOL m_initialized;
-
-	// PBKDF2-HMAC-SHA256 using Windows CNG API
+	// PBKDF2-HMAC-SHA256 using Windows CNG API (public for testing)
 	static std::vector<BYTE> PBKDF2(
 		const std::vector<BYTE>& password,
 		const std::vector<BYTE>& salt,
@@ -69,9 +64,14 @@ private:
 		int dkLen
 	);
 
-	// HMAC-SHA256 helper
+	// HMAC-SHA256 helper (public for testing)
 	static std::vector<BYTE> HmacSha256(
 		const std::vector<BYTE>& key,
 		const std::vector<BYTE>& message
 	);
+
+private:
+	// AES-256-GCM key (stored after Initialize)
+	static std::vector<BYTE> m_aesKey;
+	static BOOL m_initialized;
 };
