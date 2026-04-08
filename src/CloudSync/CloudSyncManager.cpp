@@ -205,44 +205,52 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 		return;
 	}
 
-	CWinThread* pThread = AfxBeginThread([](LPVOID pParam) -> UINT {
-		// Cast to a struct that holds both the manager pointer and a completion guard
-		struct QuickSyncContext {
-			CCloudSyncManager* pThis;
-			LONG* pCounter;
-			CRITICAL_SECTION* pCS;
-		};
-		QuickSyncContext* ctx = static_cast<QuickSyncContext*>(pParam);
-		if (ctx && ctx->pThis)
-		{
-			// SAFETY: Check again under the lock that the manager is still alive
-			EnterCriticalSection(ctx->pCS);
-			BOOL bAlive = (ctx->pThis->m_pSyncThread != nullptr && ctx->pThis->m_hStopEvent != nullptr);
-			if (bAlive)
-			{
-				// Release the lock before doing actual work (long-running)
-				LeaveCriticalSection(ctx->pCS);
-				ctx->pThis->PushNewClips();
-			}
-			else
-			{
-				LeaveCriticalSection(ctx->pCS);
-				OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
-			}
+	// Use static thread proc with context struct (AfxBeginThread doesn't support lambdas)
+	QuickSyncContext* ctx = new QuickSyncContext;
+	ctx->pManager = this;
+	ctx->pCounter = &m_nActiveQuickSyncThreads;
+	ctx->pCS = &m_csSync;
 
-			// Decrement the active thread counter
-			EnterCriticalSection(ctx->pCS);
-			(*ctx->pCounter)--;
-			LeaveCriticalSection(ctx->pCS);
-		}
-		delete ctx;  // Clean up the context
-		return 0;
-	}, new QuickSyncContext{this, &m_nActiveQuickSyncThreads, &m_csSync}, THREAD_PRIORITY_NORMAL, 0, 0);
-
+	CWinThread* pThread = AfxBeginThread(QuickSyncThreadProc, ctx, THREAD_PRIORITY_NORMAL, 0, 0);
 	if (pThread)
 	{
 		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
 	}
+}
+
+UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
+{
+	QuickSyncContext* ctx = static_cast<QuickSyncContext*>(pParam);
+	if (!ctx || !ctx->pManager)
+	{
+		delete ctx;
+		return 1;
+	}
+
+	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(ctx->pManager);
+
+	// SAFETY: Check again under the lock that the manager is still alive
+	EnterCriticalSection(ctx->pCS);
+	BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
+	if (bAlive)
+	{
+		// Release the lock before doing actual work (long-running)
+		LeaveCriticalSection(ctx->pCS);
+		pThis->PushNewClips();
+	}
+	else
+	{
+		LeaveCriticalSection(ctx->pCS);
+		OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
+	}
+
+	// Decrement the active thread counter
+	EnterCriticalSection(ctx->pCS);
+	(*ctx->pCounter)--;
+	LeaveCriticalSection(ctx->pCS);
+
+	delete ctx;
+	return 0;
 }
 
 void CCloudSyncManager::TriggerSync()

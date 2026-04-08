@@ -2,6 +2,13 @@
 #include <afx.h>
 #include "../json.hpp"
 
+// Context for fire-and-forget quick sync threads
+struct QuickSyncContext {
+	void* pManager;            // CCloudSyncManager*
+	LONG* pCounter;            // pointer to active thread counter
+	CRITICAL_SECTION* pCS;     // critical section for thread-safe checks
+};
+
 class CCloudSyncManager
 {
 public:
@@ -39,6 +46,9 @@ private:
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);
+
+	// Quick sync thread proc (fire-and-forget)
+	static UINT QuickSyncThreadProc(LPVOID pParam);
 
 	// Push local clips to cloud
 	void PushNewClips();

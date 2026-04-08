@@ -11,6 +11,64 @@
 #define new DEBUG_NEW
 #endif
 
+// ---------------------------------------------------------------------------
+// CInputBox - simple input dialog helper (inline)
+// Must be defined before COptionCloud methods that use it (OnBtnRegister, etc.)
+// ---------------------------------------------------------------------------
+class CInputBox : public CDialog
+{
+public:
+	CString m_csTitle;
+	CString m_csPrompt;
+	CString m_csInput;
+
+	CInputBox() : CDialog((LPCTSTR)nullptr) {}
+
+protected:
+	CStatic m_wndLabel;
+	CEdit m_wndEdit;
+	CButton m_wndOk;
+	CButton m_wndCancel;
+
+	virtual BOOL OnInitDialog()
+	{
+		CDialog::OnInitDialog();
+		SetWindowText(m_csTitle);
+
+		CRect rcClient;
+		GetClientRect(&rcClient);
+
+		int yPos = 20;
+		m_wndLabel.Create(m_csPrompt, WS_CHILD | WS_VISIBLE | SS_LEFT,
+			CRect(15, yPos, rcClient.right - 15, yPos + 40), this, 1001);
+		yPos += 45;
+
+		m_wndEdit.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+			CRect(15, yPos, rcClient.right - 15, yPos + 22), this, 1002);
+		m_wndEdit.SetWindowText(m_csInput);
+		yPos += 30;
+
+		m_wndOk.Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+			CRect(rcClient.right / 2 - 80, yPos, rcClient.right / 2 - 10, yPos + 25), this, IDOK);
+
+		m_wndCancel.Create(_T("取消"), WS_CHILD | WS_VISIBLE,
+			CRect(rcClient.right / 2 + 10, yPos, rcClient.right / 2 + 70, yPos + 25), this, IDCANCEL);
+
+		return TRUE;
+	}
+
+	virtual void OnOK()
+	{
+		m_wndEdit.GetWindowText(m_csInput);
+		if (m_csInput.IsEmpty())
+		{
+			MessageBox(_T("请输入内容。"), _T("提示"), MB_ICONWARNING);
+			return;
+		}
+		CDialog::OnOK();
+	}
+};
+
 IMPLEMENT_DYNCREATE(COptionCloud, CPropertyPage)
 
 COptionCloud::COptionCloud()
@@ -373,64 +431,6 @@ void COptionCloud::OnBtnTestEncryption()
 
 	UpdateData(FALSE);
 }
-
-// ---------------------------------------------------------------------------
-// CInputBox - simple input dialog helper (inline)
-// Uses stack-allocated member variables to avoid memory leaks
-// ---------------------------------------------------------------------------
-class CInputBox : public CDialog
-{
-public:
-	CString m_csTitle;
-	CString m_csPrompt;
-	CString m_csInput;
-
-	CInputBox() : CDialog((LPCTSTR)nullptr) {}
-
-protected:
-	CStatic m_wndLabel;
-	CEdit m_wndEdit;
-	CButton m_wndOk;
-	CButton m_wndCancel;
-
-	virtual BOOL OnInitDialog()
-	{
-		CDialog::OnInitDialog();
-		SetWindowText(m_csTitle);
-
-		CRect rcClient;
-		GetClientRect(&rcClient);
-
-		int yPos = 20;
-		m_wndLabel.Create(m_csPrompt, WS_CHILD | WS_VISIBLE | SS_LEFT,
-			CRect(15, yPos, rcClient.right - 15, yPos + 40), this, 1001);
-		yPos += 45;
-
-		m_wndEdit.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-			CRect(15, yPos, rcClient.right - 15, yPos + 22), this, 1002);
-		m_wndEdit.SetWindowText(m_csInput);
-		yPos += 30;
-
-		m_wndOk.Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-			CRect(rcClient.right / 2 - 80, yPos, rcClient.right / 2 - 10, yPos + 25), this, IDOK);
-
-		m_wndCancel.Create(_T("取消"), WS_CHILD | WS_VISIBLE,
-			CRect(rcClient.right / 2 + 10, yPos, rcClient.right / 2 + 70, yPos + 25), this, IDCANCEL);
-
-		return TRUE;
-	}
-
-	virtual void OnOK()
-	{
-		m_wndEdit.GetWindowText(m_csInput);
-		if (m_csInput.IsEmpty())
-		{
-			MessageBox(_T("请输入内容。"), _T("提示"), MB_ICONWARNING);
-			return;
-		}
-		CDialog::OnOK();
-	}
-};
 
 // ---------------------------------------------------------------------------
 // OnBtnExportKey: export encryption key to .dittokey file
