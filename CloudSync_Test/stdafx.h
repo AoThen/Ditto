@@ -7,12 +7,10 @@
 #include <windows.h>
 #include <tchar.h>
 
-// Minimal ATL for CString (needed by CloudCrypto interface)
-#include <atlstr.h>
-
-// MFC file/time classes (needed by CloudKeyExport tests)
-#include <afx.h>      // CFile, CTime
-#include <afxwin.h>   // CString, basic MFC
+// MFC headers (provides CString, CFile, CTime, etc.)
+// Note: Do NOT include <atlstr.h> before MFC headers - MFC provides its own CString
+#include <afx.h>      // CFile, CTime, CString
+#include <afxwin.h>   // Basic MFC and CString
 
 // C++ standard headers
 #include <vector>
