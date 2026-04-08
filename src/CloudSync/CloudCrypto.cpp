@@ -192,7 +192,12 @@ CStringA CCloudCrypto::Base64Encode(const std::vector<BYTE>& data)
 		result.ReleaseBuffer(0);
 		return CStringA("");
 	}
+	// CryptBinaryToStringA includes a trailing newline even with NOCRLF
 	result.ReleaseBuffer(dwLen - 1); // trim null terminator
+	if (!result.IsEmpty() && result[result.GetLength() - 1] == '\n')
+	{
+		result.ReleaseBuffer(result.GetLength() - 1); // trim trailing newline
+	}
 	return result;
 }
 
@@ -277,42 +282,51 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
 	authInfo.pbNonce = const_cast<PUCHAR>(iv.data());
 	authInfo.cbNonce = static_cast<ULONG>(iv.size());
-	authInfo.pbTag = new BYTE[16];
-	authInfo.cbTag = 16;
+	// Note: For encryption, BCryptEncrypt appends the tag to the output buffer.
+	// We don't need to allocate pbTag here - the tag will be at the end of ciphertext.
 
-	// First call to get ciphertext size
+	// First call to get ciphertext size (includes tag for GCM mode)
 	status = BCryptEncrypt(hKey,
 		const_cast<PUCHAR>(plaintext.data()), static_cast<ULONG>(plaintext.size()),
 		&authInfo, nullptr, 0, nullptr, 0, &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
 		fprintf(stderr, "[AesGcmEncrypt] BCryptEncrypt(size) failed: 0x%08X, pt.size=%zu\n", status, plaintext.size());
-		delete[] authInfo.pbTag;
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
 
-	// Allocate output buffer
-	std::vector<BYTE> ciphertext(cbData);
+	// Allocate output buffer (BCryptEncrypt includes tag in cbData for GCM)
+	std::vector<BYTE> output(cbData);
 	status = BCryptEncrypt(hKey,
 		const_cast<PUCHAR>(plaintext.data()), static_cast<ULONG>(plaintext.size()),
 		&authInfo, nullptr, 0,
-		ciphertext.data(), static_cast<ULONG>(ciphertext.size()), &cbData, 0);
+		output.data(), static_cast<ULONG>(output.size()), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
 		fprintf(stderr, "[AesGcmEncrypt] BCryptEncrypt(actual) failed: 0x%08X\n", status);
-		delete[] authInfo.pbTag;
-		ciphertext.clear();
+		output.clear();
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
-		return ciphertext;
+		return output;
 	}
-	ciphertext.resize(cbData);
+	output.resize(cbData);
 
-	// Copy out the tag
-	outTag.assign(authInfo.pbTag, authInfo.pbTag + 16);
-	delete[] authInfo.pbTag;
+	// For GCM mode, the tag is appended to the end of the ciphertext output
+	// Extract the tag (last 16 bytes) and separate it from ciphertext
+	if (cbData < 16)
+	{
+		fprintf(stderr, "[AesGcmEncrypt] BCryptEncrypt output too short: %lu bytes\n", cbData);
+		output.clear();
+		BCryptDestroyKey(hKey);
+		BCryptCloseAlgorithmProvider(hAlg, 0);
+		return output;
+	}
+	
+	std::vector<BYTE> ciphertext;
+	outTag.assign(output.end() - 16, output.end());
+	ciphertext.assign(output.begin(), output.end() - 16);
 
 	BCryptDestroyKey(hKey);
 	BCryptCloseAlgorithmProvider(hAlg, 0);
