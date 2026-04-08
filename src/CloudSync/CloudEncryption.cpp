@@ -8,19 +8,27 @@ using json = nlohmann::json;
 
 static std::string CStringToStdString(const CString& str)
 {
+	if (str.IsEmpty())
+		return std::string();
 	CT2A utf8(str, CP_UTF8);
+	if (utf8.m_psz == nullptr)
+		return std::string();
 	return std::string(utf8.m_psz);
 }
 
 static CString StdStringToCString(const std::string& str)
 {
-	return CString(str.c_str());
+	if (str.empty())
+		return CString();
+	CA2W wide(str.c_str(), CP_UTF8);
+	return CString(wide);
 }
 
 static void SetupClient(const std::string& serverUrl, httplib::Client& cli, const CString& deviceToken)
 {
-	// httplib unified Client doesn't expose cert verification settings
-	// Use proper CA-signed certificates in production
+	cli.set_connection_timeout(10, 0);
+	cli.set_read_timeout(30, 0);
+	cli.set_write_timeout(30, 0);
 	cli.set_default_headers({
 		{"Authorization", "Bearer " + CStringToStdString(deviceToken)}
 	});
@@ -280,20 +288,23 @@ BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 
 // ---------------------------------------------------------------------------
 // EncryptClipData: wrapper around CCloudCrypto::Encrypt
+// SECURITY: Never return plaintext when encryption is not ready.
+// If crypto is not initialized, return empty to prevent accidental plaintext sync.
 // ---------------------------------------------------------------------------
 CStringA CCloudEncryption::EncryptClipData(const CStringA& plaintext)
 {
 	if (!IsEncryptionReady())
 	{
-		// If encryption not ready, return plaintext (or empty based on policy)
-		// For safety, return plaintext so sync still works (unencrypted mode)
-		return plaintext;
+		// SECURITY: Do NOT return plaintext. Return empty to prevent sync.
+		OutputDebugStringA("[CloudEncryption] EncryptClipData: encryption not ready, skipping encryption.\n");
+		return CStringA("");
 	}
 	return CCloudCrypto::Encrypt(plaintext);
 }
 
 // ---------------------------------------------------------------------------
 // DecryptClipData: wrapper around CCloudCrypto::Decrypt
+// If decryption fails, return as-is (fallback for unencrypted data)
 // ---------------------------------------------------------------------------
 CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 {
@@ -302,7 +313,7 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 
 	if (!IsEncryptionReady())
 	{
-		// If encryption not ready, return as-is
+		// If encryption not ready, return data as-is (may be unencrypted)
 		return encryptedBase64;
 	}
 

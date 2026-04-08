@@ -12,10 +12,14 @@
 
 using json = nlohmann::json;
 
-// Helper: convert CString to std::string
+// Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
 {
+	if (str.IsEmpty())
+		return std::string();
 	CT2A utf8(str, CP_UTF8);
+	if (utf8.m_psz == nullptr)
+		return std::string();
 	return std::string(utf8.m_psz);
 }
 
@@ -38,11 +42,13 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_cryptoInitialized(FALSE)
 	, m_lastSyncTime(0)
 {
+	InitializeCriticalSection(&m_csSync);
 }
 
 CCloudSyncManager::~CCloudSyncManager()
 {
 	Stop();
+	DeleteCriticalSection(&m_csSync);
 }
 
 BOOL CCloudSyncManager::Initialize()
@@ -130,13 +136,14 @@ void CCloudSyncManager::Stop()
 
 	if (m_pSyncThread != nullptr)
 	{
-		// Wait up to 10 seconds for thread to exit
-		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 10000);
+		// Wait up to 15 seconds for thread to exit gracefully
+		// DO NOT use TerminateThread -- it can corrupt SQLite database and leak resources
+		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 15000);
 		if (dwWait == WAIT_TIMEOUT)
 		{
-			// Thread didn't exit in time, terminate it
-			TerminateThread(m_pSyncThread->m_hThread, 1);
-			OutputDebugString(_T("[CloudSync] Sync thread terminated forcefully.\n"));
+			// Thread didn't exit in time -- log warning and continue cleanup
+			// The thread will eventually exit when it checks m_hStopEvent
+			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within timeout, continuing cleanup.\n"));
 		}
 		else
 		{
@@ -157,20 +164,37 @@ void CCloudSyncManager::Stop()
 void CCloudSyncManager::OnClipAdded(void* pClip)
 {
 	UNREFERENCED_PARAMETER(pClip);
-	
+
 	// Trigger an immediate sync when a new clip is added
 	// This ensures the new clip is pushed to the cloud quickly
 	LogMessage(_T("Clip added - triggering cloud sync."));
-	
-	// Perform sync in a separate thread to avoid blocking the main thread
-	AfxBeginThread([](LPVOID pParam) -> UINT {
-		CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
-		if (pThis)
-		{
-			pThis->PushNewClips();
-		}
-		return 0;
-	}, this, THREAD_PRIORITY_NORMAL, 0, 0);
+
+	// SAFETY: Check if the sync thread is still running before spawning a fire-and-forget thread
+	// Use a local copy of the pointer to avoid race with Stop()
+	CWinThread* pThread = nullptr;
+	EnterCriticalSection(&m_csSync);
+	BOOL bShouldSync = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
+	if (bShouldSync)
+	{
+		pThread = AfxBeginThread([](LPVOID pParam) -> UINT {
+			CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
+			if (pThis)
+			{
+				pThis->PushNewClips();
+			}
+			return 0;
+		}, this, THREAD_PRIORITY_NORMAL, 0, 0);
+	}
+	LeaveCriticalSection(&m_csSync);
+
+	if (pThread)
+	{
+		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
+	}
+	else
+	{
+		OutputDebugStringA("[CloudSync] Skip quick-push: sync already stopping or not running.\n");
+	}
 }
 
 void CCloudSyncManager::TriggerSync()
@@ -377,9 +401,14 @@ void CCloudSyncManager::PushNewClips()
 	{
 		LogMessage(_T("PushNewClips: checking for new/modified clips since last sync..."));
 
-		// Enumerate local clips modified since last sync
+		// Enumerate local clips modified since last sync (thread-safe read)
+		time_t lastSync;
+		EnterCriticalSection(&m_csSync);
+		lastSync = m_lastSyncTime;
+		LeaveCriticalSection(&m_csSync);
+
 		json clipsArray;
-		if (!GetLocalClipsSince(m_lastSyncTime, clipsArray))
+		if (!GetLocalClipsSince(lastSync, clipsArray))
 		{
 			LogMessage(_T("PushNewClips: failed to enumerate local clips."));
 			return;
@@ -391,15 +420,28 @@ void CCloudSyncManager::PushNewClips()
 			return;
 		}
 
-		// Build sync request JSON
+		// Build sync request JSON with RFC3339 timestamp (not ctime)
 		json syncReq;
-		syncReq["since"] = (m_lastSyncTime > 0) ?
-			std::string(ctime(&m_lastSyncTime)) : "1970-01-01T00:00:00Z";
-
-		// Remove trailing newline from ctime
-		std::string& sinceStr = syncReq["since"].get_ref<std::string&>();
-		if (!sinceStr.empty() && sinceStr.back() == '\n')
-			sinceStr.pop_back();
+		if (lastSync > 0)
+		{
+			// Format as RFC3339: "2025-01-01T00:00:00Z"
+			SYSTEMTIME st;
+			FILETIME ft;
+			ULARGE_INTEGER uli;
+			uli.QuadPart = ((ULONGLONG)lastSync * 10000000ULL) + 116444736000000000ULL;
+			ft.dwLowDateTime = uli.LowPart;
+			ft.dwHighDateTime = uli.HighPart;
+			FileTimeToSystemTime(&ft, &st);
+			char timeBuf[32];
+			sprintf_s(timeBuf, "%04d-%02d-%02dT%02d:%02d:%02dZ",
+			          st.wYear, st.wMonth, st.wDay,
+			          st.wHour, st.wMinute, st.wSecond);
+			syncReq["since"] = std::string(timeBuf);
+		}
+		else
+		{
+			syncReq["since"] = "1970-01-01T00:00:00Z";
+		}
 
 		syncReq["device_id"] = std::string(m_deviceId);
 		syncReq["push_clips"] = clipsArray;
@@ -408,6 +450,10 @@ void CCloudSyncManager::PushNewClips()
 		CStringA serverUrlA(m_serverUrl);
 		std::string url = serverUrlA.GetString();
 		httplib::Client cli(url);
+		// Configure timeouts: 10s connection, 30s read, 30s write
+		cli.set_connection_timeout(10, 0);
+		cli.set_read_timeout(30, 0);
+		cli.set_write_timeout(30, 0);
 		cli.set_default_headers({
 			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
 		});
@@ -432,8 +478,10 @@ void CCloudSyncManager::PushNewClips()
 				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (duplicates)"), syncedCount, skippedCount);
 				LogMessage(msg);
 
-				// Update last sync time and persist to registry
+				// Update last sync time and persist to registry (thread-safe)
+				EnterCriticalSection(&m_csSync);
 				m_lastSyncTime = time(nullptr);
+				LeaveCriticalSection(&m_csSync);
 				CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
 			}
 			catch (const json::parse_error& e)
@@ -613,6 +661,10 @@ void CCloudSyncManager::PullChanges()
 		CStringA serverUrlA(m_serverUrl);
 		std::string url = serverUrlA.GetString();
 		httplib::Client cli(url);
+		// Configure timeouts: 10s connection, 30s read, 30s write
+		cli.set_connection_timeout(10, 0);
+		cli.set_read_timeout(30, 0);
+		cli.set_write_timeout(30, 0);
 		// Note: httplib unified Client auto-detects HTTPS, cert verification
 		// settings not exposed on Client wrapper (use SSLClient directly if needed)
 		cli.set_default_headers({
@@ -687,8 +739,10 @@ void CCloudSyncManager::PullChanges()
 			msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"), newClips.size(), mergedCount);
 			LogMessage(msg);
 
-			// Update last sync time and persist to registry
+			// Update last sync time and persist to registry (thread-safe)
+			EnterCriticalSection(&m_csSync);
 			m_lastSyncTime = time(nullptr);
+			LeaveCriticalSection(&m_csSync);
 			CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
 		}
 		catch (const json::parse_error& e)
@@ -941,13 +995,26 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		int autoDelete = remoteClip.value("auto_delete", 1);
 
 		// Check if clip already exists (by CRC or remote_clip_id)
+		// Use parameterized query to prevent SQL injection
 		int existingId = -1;
 		try
 		{
 			CString csSQL;
+			// Escape single quotes in desc to prevent SQL injection
+			CString escapedDesc;
+			{
+				const CStringW descW(desc.c_str());
+				for (int i = 0; i < descW.GetLength(); i++)
+				{
+					if (descW[i] == L'\'')
+						escapedDesc += L"''";  // SQL escape
+					else
+						escapedDesc += descW[i];
+				}
+			}
 			csSQL.Format(_T("SELECT lID FROM Main WHERE CRC = %d OR mText = '%s' LIMIT 1"),
-			             crc, CString(desc.c_str()));
-			
+			             crc, (LPCTSTR)escapedDesc);
+
 			CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 			if (q.eof() == false)
 			{
@@ -1010,8 +1077,15 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 						{
 							BYTE high = dataStr[i * 2];
 							BYTE low = dataStr[i * 2 + 1];
-							high = (high >= 'A') ? (high - 'A' + 10) : (high - '0');
-							low = (low >= 'A') ? (low - 'A' + 10) : (low - '0');
+							// Properly handle both uppercase and lowercase hex digits
+							if (high >= '0' && high <= '9') high = high - '0';
+							else if (high >= 'A' && high <= 'F') high = high - 'A' + 10;
+							else if (high >= 'a' && high <= 'f') high = high - 'a' + 10;
+							else high = 0;
+							if (low >= '0' && low <= '9') low = low - '0';
+							else if (low >= 'A' && low <= 'F') low = low - 'A' + 10;
+							else if (low >= 'a' && low <= 'f') low = low - 'a' + 10;
+							else low = 0;
 							pData[i] = (high << 4) | low;
 						}
 						GlobalUnlock(hGlobal);

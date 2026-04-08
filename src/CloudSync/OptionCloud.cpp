@@ -184,8 +184,18 @@ void COptionCloud::OnBtnRegister()
 		return;
 	}
 
-	// For registration we need an email -- prompt for it
-	CString email = m_csUsername + _T("@example.com");  // Derive email from username
+	// Prompt for email address (required for registration)
+	CInputBox emailDlg;
+	emailDlg.m_csTitle = _T("注册 - 输入邮箱");
+	emailDlg.m_csPrompt = _T("请输入您的邮箱地址：");
+	emailDlg.m_csInput = m_csUsername + _T("@");  // Pre-fill hint
+	if (emailDlg.DoModal() != IDOK || emailDlg.m_csInput.IsEmpty())
+	{
+		m_csStatus = _T("Registration cancelled.");
+		UpdateData(FALSE);
+		return;
+	}
+	CString email = emailDlg.m_csInput;
 
 	// Show status
 	m_csStatus = _T("注册中...");
@@ -366,6 +376,7 @@ void COptionCloud::OnBtnTestEncryption()
 
 // ---------------------------------------------------------------------------
 // CInputBox - simple input dialog helper (inline)
+// Uses stack-allocated member variables to avoid memory leaks
 // ---------------------------------------------------------------------------
 class CInputBox : public CDialog
 {
@@ -377,6 +388,11 @@ public:
 	CInputBox() : CDialog((LPCTSTR)nullptr) {}
 
 protected:
+	CStatic m_wndLabel;
+	CEdit m_wndEdit;
+	CButton m_wndOk;
+	CButton m_wndCancel;
+
 	virtual BOOL OnInitDialog()
 	{
 		CDialog::OnInitDialog();
@@ -386,23 +402,19 @@ protected:
 		GetClientRect(&rcClient);
 
 		int yPos = 20;
-		CStatic* pLabel = new CStatic();
-		pLabel->Create(m_csPrompt, WS_CHILD | WS_VISIBLE | SS_LEFT,
+		m_wndLabel.Create(m_csPrompt, WS_CHILD | WS_VISIBLE | SS_LEFT,
 			CRect(15, yPos, rcClient.right - 15, yPos + 40), this, 1001);
 		yPos += 45;
 
-		CEdit* pEdit = new CEdit();
-		pEdit->Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+		m_wndEdit.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
 			CRect(15, yPos, rcClient.right - 15, yPos + 22), this, 1002);
-		pEdit->SetWindowText(m_csInput);
+		m_wndEdit.SetWindowText(m_csInput);
 		yPos += 30;
 
-		CButton* pOk = new CButton();
-		pOk->Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+		m_wndOk.Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
 			CRect(rcClient.right / 2 - 80, yPos, rcClient.right / 2 - 10, yPos + 25), this, IDOK);
 
-		CButton* pCancel = new CButton();
-		pCancel->Create(_T("取消"), WS_CHILD | WS_VISIBLE,
+		m_wndCancel.Create(_T("取消"), WS_CHILD | WS_VISIBLE,
 			CRect(rcClient.right / 2 + 10, yPos, rcClient.right / 2 + 70, yPos + 25), this, IDCANCEL);
 
 		return TRUE;
@@ -410,11 +422,7 @@ protected:
 
 	virtual void OnOK()
 	{
-		CEdit* pEdit = (CEdit*)GetDlgItem(1002);
-		if (pEdit)
-		{
-			pEdit->GetWindowText(m_csInput);
-		}
+		m_wndEdit.GetWindowText(m_csInput);
 		if (m_csInput.IsEmpty())
 		{
 			MessageBox(_T("请输入内容。"), _T("提示"), MB_ICONWARNING);

@@ -15,7 +15,10 @@ static std::string CStringToStdString(const CString& str)
 
 static CString StdStringToCString(const std::string& str)
 {
-	return CString(str.c_str());
+	if (str.empty())
+		return CString();
+	CA2W wide(str.c_str(), CP_UTF8);
+	return CString(wide);
 }
 
 // ---------------------------------------------------------------------------

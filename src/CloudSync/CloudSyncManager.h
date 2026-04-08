@@ -34,6 +34,7 @@ private:
 	CWinThread* m_pSyncThread;
 	BOOL      m_cryptoInitialized;
 	time_t    m_lastSyncTime;  // Track last successful sync time
+	CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);
