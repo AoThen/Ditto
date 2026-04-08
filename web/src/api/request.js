@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
@@ -25,24 +26,26 @@ request.interceptors.response.use(
     return response.data
   },
   (error) => {
+    // Extract backend message for rejection
+    const backendMessage = error.response?.data?.message
     if (error.response) {
       const { status } = error.response
       if (status === 401) {
         localStorage.removeItem('token')
         window.location.href = '/login'
       } else if (status === 403) {
-        ElMessage && ElMessage.error('没有权限访问')
+        ElMessage.error(backendMessage || '没有权限访问')
       } else if (status === 500) {
-        ElMessage && ElMessage.error('服务器内部错误')
+        ElMessage.error(backendMessage || '服务器内部错误')
       } else {
-        ElMessage && ElMessage.error(error.response.data?.message || '请求失败')
+        ElMessage.error(backendMessage || '请求失败')
       }
     } else if (error.request) {
-      ElMessage && ElMessage.error('网络错误，请检查连接')
+      ElMessage.error('网络错误，请检查连接')
     } else {
-      ElMessage && ElMessage.error(error.message || '未知错误')
+      ElMessage.error(error.message || '未知错误')
     }
-    return Promise.reject(error)
+    return Promise.reject(new Error(backendMessage || error.message || '请求失败'))
   }
 )
 

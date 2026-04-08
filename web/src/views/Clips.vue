@@ -1,7 +1,7 @@
 <template>
   <div class="clips-container">
     <div class="toolbar">
-      <div class="ws-status" :class="{ connected: ws.isConnected, disconnected: !ws.isConnected }">
+      <div class="ws-status" role="status" aria-live="polite" :class="{ connected: ws.isConnected, disconnected: !ws.isConnected }">
         {{ ws.isConnected ? '● 实时同步中' : '○ 未连接' }}
       </div>
       <el-input
@@ -49,11 +49,14 @@
       </el-table-column>
     </el-table>
 
+    <el-empty v-if="clipList.length === 0 && !loading" description="暂无剪贴板数据" />
+
     <el-pagination
       v-model:current-page="currentPage"
       :page-size="20"
       :total="total"
       layout="total, prev, pager, next"
+      aria-label="剪贴板分页导航"
       style="margin-top: 16px; justify-content: center"
       @current-change="handlePageChange"
     />
@@ -142,7 +145,7 @@
       <el-alert
         title="以下剪贴板在同步时因内容冲突被保留（较旧版本），您可以选择接受（覆盖现有剪贴板）或丢弃（删除冲突副本）。"
         type="warning"
-        :closable="false"
+        :closable="true"
         style="margin-bottom: 16px"
       />
       <el-table :data="conflictClips" v-loading="conflictLoading" style="width: 100%">
@@ -155,18 +158,32 @@
         </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="{ row }">
-            <el-button size="small" type="primary" @click="handleResolveConflict(row, 'accept')">接受</el-button>
-            <el-button size="small" type="danger" @click="handleResolveConflict(row, 'discard')">丢弃</el-button>
+            <el-button
+              size="small"
+              type="primary"
+              :loading="resolvingId === row.id"
+              :disabled="resolvingId !== null"
+              :aria-label="`接受剪贴板 ${row.description || row.id}`"
+              @click="handleResolveConflict(row, 'accept')"
+            >接受</el-button>
+            <el-button
+              size="small"
+              type="danger"
+              :loading="resolvingId === row.id"
+              :disabled="resolvingId !== null"
+              :aria-label="`丢弃剪贴板 ${row.description || row.id}`"
+              @click="handleResolveConflict(row, 'discard')"
+            >丢弃</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="conflictClips.length === 0" description="暂无冲突剪贴板" />
+      <el-empty v-if="conflictClips.length === 0 && !conflictLoading" description="暂无冲突剪贴板" />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { listClips, getClip, deleteClip, batchDeleteClips } from '@/api/clips'
 import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -198,7 +215,8 @@ const activeFormatTab = ref(0)
 const conflictClips = ref([])
 const conflictLoading = ref(false)
 const conflictDialogVisible = ref(false)
-const conflictCount = ref(0)
+const conflictCount = computed(() => conflictClips.value.length)
+const resolvingId = ref(null)
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -332,13 +350,9 @@ async function fetchClips() {
       params.search = searchQuery.value
     }
     const res = await listClips(params)
-    if (res.code === 200) {
-      clipList.value = res.data.items || res.data || []
-      total.value = res.data.total || 0
-    } else {
-      clipList.value = res.data?.items || res.data || []
-      total.value = res.data?.total || 0
-    }
+    // Backend returns code: 0 for success (not 200)
+    clipList.value = res.data?.items || res.data || []
+    total.value = res.data?.total || 0
   } catch (err) {
     console.error('Failed to fetch clips:', err)
     ElMessage.error('获取剪贴板列表失败')
@@ -475,6 +489,8 @@ async function handleResolveConflict(clip, action) {
       `确认${actionLabel}`,
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
     )
+
+    resolvingId.value = clip.id
     const res = await resolveConflictClip(clip.id, action)
     if (res.code === 0) {
       ElMessage.success(`${actionLabel}成功`)
@@ -486,15 +502,26 @@ async function handleResolveConflict(clip, action) {
     }
   } catch (err) {
     if (err !== 'cancel') {
-      ElMessage.error(`${actionLabel}失败: ` + err.message)
+      // Check if 404 (already resolved)
+      const errMsg = err.message || ''
+      if (errMsg.includes('不存在') || errMsg.includes('not found') || errMsg.includes('404')) {
+        ElMessage.info('该冲突剪贴板已不存在')
+        await fetchConflictClips()
+      } else {
+        ElMessage.error(`${actionLabel}失败: ${errMsg}`)
+      }
     }
+  } finally {
+    resolvingId.value = null
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   ws.connect()
   window.addEventListener('ws-clip-added', onWsClipAdded)
-  fetchClips()
+  await fetchClips()
+  // Fetch conflict count on mount so badge shows accurate number from start
+  await fetchConflictClips()
 })
 
 onUnmounted(() => {
