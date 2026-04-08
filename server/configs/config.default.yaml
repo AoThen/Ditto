@@ -1,0 +1,36 @@
+server:
+  port: 8080
+  mode: debug  # debug | release
+
+database:
+  type: sqlite3  # sqlite3 | postgres
+  path: ./data/ditto_cloud.db
+  # PostgreSQL 配置（当 type=postgres 时启用）
+  # host: localhost
+  # port: 5432
+  # user: ditto
+  # password: ditto
+  # dbname: ditto_cloud
+  # sslmode: disable
+
+jwt:
+  secret: your-secret-key-change-me-in-production
+  access_expire: 15m   # Access Token 有效期
+  refresh_expire: 7d   # Refresh Token 有效期
+
+rate_limit:
+  ip_max_fails: 5       # 单 IP 最大失败次数
+  ip_ban_duration: 15m  # IP 封禁时长
+  user_max_fails: 10    # 单用户最大失败次数
+  user_lock_duration: 1h # 用户锁定时长
+
+clip:
+  max_size_mb: 10       # 单条剪贴板最大大小（MB）
+  max_formats: 20       # 单条剪贴板最大格式数
+  auto_delete_days: 30  # 自动清理天数
+
+log:
+  level: info           # debug | info | warn | error
+  format: console       # console | json
+  output: stdout        # stdout | file
+  file_path: ./logs/server.log

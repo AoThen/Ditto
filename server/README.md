@@ -1,0 +1,171 @@
+# Ditto Cloud Server
+
+Go 后端服务，为 Ditto 剪贴板管理器提供云端同步功能。
+
+## 功能特性
+
+- ✅ 用户注册/登录 + JWT 认证
+- ✅ 设备管理（多设备同步）
+- ✅ 剪贴板 CRUD + 增量同步
+- ✅ WebSocket 实时推送
+- ✅ 端到端加密（AES-256-GCM）
+- ✅ 暴力破解防护（IP + 用户维度限流）
+- ✅ SQLite3 持久化（默认）/ PostgreSQL 支持
+
+## 快速启动
+
+### 开发环境
+
+```bash
+# 1. 安装依赖
+go mod download
+
+# 2. 复制配置文件
+cp configs/config.default.yaml configs/config.dev.yaml
+
+# 3. 启动服务（默认端口 8080）
+go run cmd/server/main.go
+
+# 或使用 Make
+make run
+```
+
+### 生产环境（Docker）
+
+```bash
+# 构建镜像
+docker build -t ditto-cloud-server .
+
+# 运行
+docker run -d -p 8080:8080 \
+  -v ./data:/app/data \
+  -e DB_PATH=/app/data/ditto_cloud.db \
+  -e JWT_SECRET=your-secret-key \
+  ditto-cloud-server
+```
+
+### 生产环境（Docker Compose + TLS）
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+## 项目结构
+
+```
+server/
+├── cmd/server/main.go          # 入口
+├── internal/
+│   ├── handler/                # HTTP 处理器
+│   ├── service/                # 业务逻辑
+│   ├── model/                  # 数据模型
+│   ├── middleware/             # JWT + 限流中间件
+│   ├── hub/                    # WebSocket 连接管理
+│   ├── database/               # 数据库初始化
+│   ├── config/                 # Viper 配置
+│   └── response/               # 统一响应格式
+├── pkg/crypto/                 # 加密工具（AES-256-GCM, PBKDF2）
+├── configs/                    # 配置文件
+├── migrations/                 # 数据库迁移
+└── api/swagger.yaml            # API 文档
+```
+
+## API 文档
+
+启动服务后访问：`http://localhost:8080/swagger/index.html`
+
+### 核心接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/auth/register` | 用户注册 |
+| POST | `/api/v1/auth/login` | 登录 |
+| POST | `/api/v1/clips/sync` | 批量同步推送 |
+| GET | `/api/v1/clips/changes?since=...` | 增量拉取变更 |
+| GET | `/api/v1/clips` | 剪贴板列表 |
+| DELETE | `/api/v1/clips/:id` | 删除剪贴板 |
+| GET | `/api/v1/devices` | 设备列表 |
+| DELETE | `/api/v1/devices/:id` | 移除设备 |
+| GET | `/api/v1/stats/overview` | 统计概览 |
+| WS | `/ws/sync` | 实时同步推送 |
+
+## 配置说明
+
+```yaml
+# configs/config.dev.yaml
+server:
+  port: 8080
+  mode: debug  # debug | release
+
+database:
+  type: sqlite3  # sqlite3 | postgres
+  path: ./data/ditto_cloud.db
+
+jwt:
+  secret: your-secret-key-change-me
+  access_expire: 15m   # Access Token 有效期
+  refresh_expire: 7d   # Refresh Token 有效期
+
+rate_limit:
+  ip_max_fails: 5       # 单 IP 最大失败次数
+  ip_ban_duration: 15m  # IP 封禁时长
+  user_max_fails: 10    # 单用户最大失败次数
+  user_lock_duration: 1h # 用户锁定时长
+```
+
+## 数据库迁移
+
+服务启动时自动迁移（GORM AutoMigrate）。手动执行：
+
+```bash
+# 查看 migrations/001_init.sql 了解表结构
+sqlite3 data/ditto_cloud.db < migrations/001_init.sql
+```
+
+## 限流管理
+
+### 查看封禁记录
+
+```bash
+sqlite3 data/ditto_cloud.db "SELECT * FROM rate_limit_records;"
+```
+
+### 重置限流
+
+```bash
+# 重置指定用户
+sqlite3 data/ditto_cloud.db "DELETE FROM rate_limit_records WHERE key = 'user:zhangsan';"
+
+# 重置指定 IP
+sqlite3 data/ditto_cloud.db "DELETE FROM rate_limit_records WHERE key = 'ip:192.168.1.100';"
+
+# 清空所有限流记录
+sqlite3 data/ditto_cloud.db "DELETE FROM rate_limit_records;"
+```
+
+## 测试
+
+```bash
+# 单元测试
+go test ./... -v
+
+# WebSocket 测试
+go test ./internal/hub -v
+```
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| Web 框架 | Gin |
+| ORM | GORM |
+| WebSocket | gorilla/websocket |
+| JWT | golang-jwt/jwt |
+| 数据库 | SQLite3 / PostgreSQL |
+| 加密 | crypto/aes + golang.org/x/crypto/pbkdf2 |
+| 日志 | zap |
+| 配置 | viper |
+
+## 许可证
+
+GPL-3.0

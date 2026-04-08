@@ -1,0 +1,28 @@
+server:
+  port: 8080
+  mode: debug
+
+database:
+  type: sqlite3
+  path: ./data/ditto_cloud.db
+
+jwt:
+  secret: dev-secret-key-change-me
+  access_expire: 15m
+  refresh_expire: 7d
+
+rate_limit:
+  ip_max_fails: 5
+  ip_ban_duration: 15m
+  user_max_fails: 10
+  user_lock_duration: 1h
+
+clip:
+  max_size_mb: 10
+  max_formats: 20
+  auto_delete_days: 30
+
+log:
+  level: debug
+  format: console
+  output: stdout
