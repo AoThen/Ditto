@@ -42,7 +42,7 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 {
 	if (!m_initialized)
 	{
-		OutputDebugStringA("[CloudCrypto] Encrypt: not initialized.\n");
+		fprintf(stderr, "[CloudCrypto] Encrypt: not initialized.\n");
 		return CStringA("");
 	}
 
@@ -59,7 +59,7 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 		std::vector<BYTE> ct = AesGcmEncrypt(m_aesKey, iv, pt, tag);
 		if (ct.empty())
 		{
-			OutputDebugStringA("[CloudCrypto] Encrypt: AesGcmEncrypt failed.\n");
+			fprintf(stderr, "[CloudCrypto] Encrypt: AesGcmEncrypt failed. pt.size()=%zu\n", pt.size());
 			return CStringA("");
 		}
 
@@ -70,11 +70,14 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 		result.insert(result.end(), ct.begin(), ct.end());
 		result.insert(result.end(), tag.begin(), tag.end());
 
-		return Base64Encode(result);
+		CStringA b64 = Base64Encode(result);
+		fprintf(stderr, "[CloudCrypto] Encrypt: pt.size()=%zu -> ct.size()=%zu, tag.size()=%zu, b64.size()=%d\n", 
+			pt.size(), ct.size(), tag.size(), b64.GetLength());
+		return b64;
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudCrypto] Encrypt: exception.\n");
+		fprintf(stderr, "[CloudCrypto] Encrypt: exception.\n");
 		return CStringA("");
 	}
 }
@@ -86,7 +89,7 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 {
 	if (!m_initialized)
 	{
-		OutputDebugStringA("[CloudCrypto] Decrypt: not initialized.\n");
+		fprintf(stderr, "[CloudCrypto] Decrypt: not initialized.\n");
 		return CStringA("");
 	}
 
@@ -95,7 +98,7 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 		std::vector<BYTE> data = Base64Decode(encryptedBase64);
 		if (data.size() < 12 + 16) // minimum: IV + tag, no ciphertext
 		{
-			OutputDebugStringA("[CloudCrypto] Decrypt: data too short.\n");
+			fprintf(stderr, "[CloudCrypto] Decrypt: data too short (%zu bytes).\n", data.size());
 			return CStringA("");
 		}
 
@@ -108,11 +111,15 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 		// Extract ciphertext (between IV and tag)
 		std::vector<BYTE> ct(data.begin() + 12, data.end() - 16);
 
+		fprintf(stderr, "[CloudCrypto] Decrypt: data.size()=%zu, ct.size()=%zu\n", data.size(), ct.size());
+
 		// Decrypt
 		std::vector<BYTE> pt = AesGcmDecrypt(m_aesKey, iv, ct, tag);
+		fprintf(stderr, "[CloudCrypto] Decrypt: pt.size()=%zu\n", pt.size());
+		
 		if (pt.empty() && !ct.empty())
 		{
-			OutputDebugStringA("[CloudCrypto] Decrypt: AesGcmDecrypt failed.\n");
+			fprintf(stderr, "[CloudCrypto] Decrypt: AesGcmDecrypt failed (had ct but got empty pt).\n");
 			return CStringA("");
 		}
 
@@ -120,7 +127,7 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudCrypto] Decrypt: exception.\n");
+		fprintf(stderr, "[CloudCrypto] Decrypt: exception.\n");
 		return CStringA("");
 	}
 }
@@ -230,12 +237,16 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 
 	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, nullptr, 0);
 	if (!BCRYPT_SUCCESS(status) || hAlg == nullptr)
+	{
+		fprintf(stderr, "[AesGcmEncrypt] BCryptOpenAlgorithmProvider failed: 0x%08X\n", status);
 		return std::vector<BYTE>();
+	}
 
 	// Get key object length
 	status = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&cbKeyObject), sizeof(cbKeyObject), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmEncrypt] BCRYPT_OBJECT_LENGTH failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -246,6 +257,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		(static_cast<ULONG>(wcslen(BCRYPT_CHAIN_MODE_GCM)) + 1) * sizeof(wchar_t), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmEncrypt] BCRYPT_CHAINING_MODE failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -255,6 +267,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		const_cast<PUCHAR>(key.data()), static_cast<ULONG>(key.size()), 0);
 	if (!BCRYPT_SUCCESS(status) || hKey == nullptr)
 	{
+		fprintf(stderr, "[AesGcmEncrypt] BCryptGenerateSymmetricKey failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -273,6 +286,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		&authInfo, nullptr, 0, nullptr, 0, &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmEncrypt] BCryptEncrypt(size) failed: 0x%08X, pt.size=%zu\n", status, plaintext.size());
 		delete[] authInfo.pbTag;
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
@@ -287,6 +301,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		ciphertext.data(), static_cast<ULONG>(ciphertext.size()), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmEncrypt] BCryptEncrypt(actual) failed: 0x%08X\n", status);
 		delete[] authInfo.pbTag;
 		ciphertext.clear();
 		BCryptDestroyKey(hKey);
@@ -322,11 +337,15 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 
 	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, nullptr, 0);
 	if (!BCRYPT_SUCCESS(status) || hAlg == nullptr)
+	{
+		fprintf(stderr, "[AesGcmDecrypt] BCryptOpenAlgorithmProvider failed: 0x%08X\n", status);
 		return std::vector<BYTE>();
+	}
 
 	status = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, reinterpret_cast<PUCHAR>(&cbKeyObject), sizeof(cbKeyObject), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmDecrypt] BCRYPT_OBJECT_LENGTH failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -336,6 +355,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		(static_cast<ULONG>(wcslen(BCRYPT_CHAIN_MODE_GCM)) + 1) * sizeof(wchar_t), 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
+		fprintf(stderr, "[AesGcmDecrypt] BCRYPT_CHAINING_MODE failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -344,6 +364,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		const_cast<PUCHAR>(key.data()), static_cast<ULONG>(key.size()), 0);
 	if (!BCRYPT_SUCCESS(status) || hKey == nullptr)
 	{
+		fprintf(stderr, "[AesGcmDecrypt] BCryptGenerateSymmetricKey failed: 0x%08X\n", status);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
@@ -364,14 +385,13 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		&authInfo, nullptr, 0, nullptr, 0, &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
-		// GCM authentication failed or other error
-		char msg[128];
-		sprintf_s(msg, "[CloudCrypto] BCryptDecrypt (size query) failed: status=0x%08X\n", status);
-		OutputDebugStringA(msg);
+		fprintf(stderr, "[AesGcmDecrypt] BCryptDecrypt(size) failed: status=0x%08X, ct.size=%zu\n", status, ciphertext.size());
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
+
+	fprintf(stderr, "[AesGcmDecrypt] BCryptDecrypt(size) ok: cbData=%lu\n", cbData);
 
 	std::vector<BYTE> plaintext(cbData);
 	status = BCryptDecrypt(hKey,
@@ -380,15 +400,14 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		plaintext.data(), static_cast<ULONG>(plaintext.size()), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
-		char msg[128];
-		sprintf_s(msg, "[CloudCrypto] BCryptDecrypt (actual) failed: status=0x%08X\n", status);
-		OutputDebugStringA(msg);
+		fprintf(stderr, "[AesGcmDecrypt] BCryptDecrypt(actual) failed: status=0x%08X\n", status);
 		plaintext.clear();
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return plaintext;
 	}
 	plaintext.resize(cbData);
+	fprintf(stderr, "[AesGcmDecrypt] BCryptDecrypt(actual) ok: pt.size=%zu\n", plaintext.size());
 
 	BCryptDestroyKey(hKey);
 	BCryptCloseAlgorithmProvider(hAlg, 0);
