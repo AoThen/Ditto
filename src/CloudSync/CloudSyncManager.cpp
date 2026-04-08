@@ -41,6 +41,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_pSyncThread(nullptr)
 	, m_cryptoInitialized(FALSE)
 	, m_lastSyncTime(0)
+	, m_nActiveQuickSyncThreads(0)
 {
 	InitializeCriticalSection(&m_csSync);
 }
@@ -154,6 +155,23 @@ void CCloudSyncManager::Stop()
 		m_pSyncThread = nullptr;
 	}
 
+	// Wait for all active quick-push threads to complete (up to 5 seconds)
+	// This prevents use-after-free if the manager is destroyed while threads are running
+	DWORD waitStart = GetTickCount();
+	while (m_nActiveQuickSyncThreads > 0)
+	{
+		Sleep(50);
+		if (GetTickCount() - waitStart > 5000)
+		{
+			OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads to complete.\n");
+			break;
+		}
+	}
+	if (m_nActiveQuickSyncThreads == 0)
+	{
+		OutputDebugStringA("[CloudSync] All quick-push threads completed.\n");
+	}
+
 	if (m_hStopEvent != nullptr)
 	{
 		CloseHandle(m_hStopEvent);
@@ -169,31 +187,61 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 	// This ensures the new clip is pushed to the cloud quickly
 	LogMessage(_T("Clip added - triggering cloud sync."));
 
-	// SAFETY: Check if the sync thread is still running before spawning a fire-and-forget thread
-	// Use a local copy of the pointer to avoid race with Stop()
-	CWinThread* pThread = nullptr;
+	// SAFETY: Use a local copy of the pointer and add a guard flag
+	// to prevent use-after-free if the sync manager is destroyed
+	// while the fire-and-forget thread is running.
 	EnterCriticalSection(&m_csSync);
 	BOOL bShouldSync = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
 	if (bShouldSync)
 	{
-		pThread = AfxBeginThread([](LPVOID pParam) -> UINT {
-			CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
-			if (pThis)
-			{
-				pThis->PushNewClips();
-			}
-			return 0;
-		}, this, THREAD_PRIORITY_NORMAL, 0, 0);
+		// Increment a reference-like counter to track active quick-push threads
+		m_nActiveQuickSyncThreads++;
 	}
 	LeaveCriticalSection(&m_csSync);
+
+	if (!bShouldSync)
+	{
+		OutputDebugStringA("[CloudSync] Skip quick-push: sync already stopping or not running.\n");
+		return;
+	}
+
+	CWinThread* pThread = AfxBeginThread([](LPVOID pParam) -> UINT {
+		// Cast to a struct that holds both the manager pointer and a completion guard
+		struct QuickSyncContext {
+			CCloudSyncManager* pThis;
+			LONG* pCounter;
+			CRITICAL_SECTION* pCS;
+		};
+		QuickSyncContext* ctx = static_cast<QuickSyncContext*>(pParam);
+		if (ctx && ctx->pThis)
+		{
+			// SAFETY: Check again under the lock that the manager is still alive
+			EnterCriticalSection(ctx->pCS);
+			BOOL bAlive = (ctx->pThis->m_pSyncThread != nullptr && ctx->pThis->m_hStopEvent != nullptr);
+			if (bAlive)
+			{
+				// Release the lock before doing actual work (long-running)
+				LeaveCriticalSection(ctx->pCS);
+				ctx->pThis->PushNewClips();
+			}
+			else
+			{
+				LeaveCriticalSection(ctx->pCS);
+				OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
+			}
+
+			// Decrement the active thread counter
+			EnterCriticalSection(ctx->pCS);
+			(*ctx->pCounter)--;
+			LeaveCriticalSection(ctx->pCS);
+		}
+		delete ctx;  // Clean up the context
+		return 0;
+	}, new QuickSyncContext{this, &m_nActiveQuickSyncThreads, &m_csSync}, THREAD_PRIORITY_NORMAL, 0, 0);
 
 	if (pThread)
 	{
 		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
-	}
-	else
-	{
-		OutputDebugStringA("[CloudSync] Skip quick-push: sync already stopping or not running.\n");
 	}
 }
 

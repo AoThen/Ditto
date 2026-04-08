@@ -9,7 +9,11 @@ using json = nlohmann::json;
 
 static std::string CStringToStdString(const CString& str)
 {
+	if (str.IsEmpty())
+		return std::string();
 	CT2A utf8(str, CP_UTF8);
+	if (utf8.m_psz == nullptr)
+		return std::string();
 	return std::string(utf8.m_psz);
 }
 
