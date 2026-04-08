@@ -84,6 +84,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="CloudCryptoTest.cpp" />
     <ClCompile Include="CloudEncryptionTest.cpp" />
     <ClCompile Include="CloudKeyExportTest.cpp" />
@@ -93,18 +94,22 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <!-- Compile CloudCrypto and CloudKeyExport source directly -->
-    <ClCompile Include="..\src\CloudSync\CloudCrypto.cpp">
+    <!-- Compile CloudSync source directly -->
+    <ClCompile Include="..\src\CloudSync\CloudAuth.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\CloudSync\CloudKeyExport.cpp">
+    <ClCompile Include="..\src\CloudSync\CloudCrypto.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\src\CloudSync\CloudEncryption.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\src\CloudSync\CloudKeyExport.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\CloudSync\CloudAuth.h" />
     <ClInclude Include="..\src\CloudSync\CloudCrypto.h" />
     <ClInclude Include="..\src\CloudSync\CloudEncryption.h" />
     <ClInclude Include="..\src\CloudSync\CloudKeyExport.h" />

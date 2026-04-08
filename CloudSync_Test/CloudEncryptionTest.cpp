@@ -1,5 +1,10 @@
 // CloudEncryptionTest.cpp - Unit tests for CloudEncryption module
 // Tests: Setup encryption, status check, stored key initialization, clip data encryption
+//
+// NOTE: This tests the actual CCloudEncryption wrapper methods including:
+// - EncryptClipData() - tests the security gate (returns empty when not ready)
+// - DecryptClipData() - tests the fallback logic (returns as-is on failure)
+// - IsEncryptionReady() - tests the readiness check
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
@@ -34,17 +39,18 @@ protected:
 
 // ============================================================================
 // Setup Encryption Tests
+// These tests simulate the SetupEncryption flow without network calls
 // ============================================================================
 
 TEST(CloudEncryption_Setup, SuccessfulEncryptionSetup)
 {
-	// This test simulates the SetupEncryption flow:
-	// 1. Generate a salt
+	// Simulate the SetupEncryption flow:
+	// 1. Generate a salt (would normally come from server)
 	// 2. Derive key from password + salt
 	// 3. Initialize crypto
 	// 4. Store key in settings
 
-	// Generate salt (simulating server response)
+	// Generate salt
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
 	CStringA saltB64 = CCloudCrypto::Base64Encode(salt);
 	
@@ -59,7 +65,7 @@ TEST(CloudEncryption_Setup, SuccessfulEncryptionSetup)
 	BOOL initOk = CCloudCrypto::Initialize(key);
 	EXPECT_TRUE(initOk);
 
-	// Store key in settings
+	// Store key in settings (simulates what SetupEncryption does)
 	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
@@ -153,16 +159,16 @@ TEST(CloudEncryption_Status, EncryptionEnabled)
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
-	// Check status
-	BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
-	EXPECT_TRUE(enabled);
+	// Check status via the wrapper
+	BOOL ready = CCloudEncryption::IsEncryptionReady();
+	EXPECT_TRUE(ready);
 }
 
 TEST(CloudEncryption_Status, EncryptionDisabled)
 {
 	// Check default state
-	BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
-	EXPECT_FALSE(enabled);
+	BOOL ready = CCloudEncryption::IsEncryptionReady();
+	EXPECT_FALSE(ready);
 }
 
 TEST(CloudEncryption_Status, KeyExists)
@@ -268,7 +274,7 @@ TEST(CloudEncryption_StoredKey, NoStoredKey)
 }
 
 // ============================================================================
-// Encrypt Clip Data Tests
+// Encrypt Clip Data Tests - Using ACTUAL CCloudEncryption::EncryptClipData()
 // ============================================================================
 
 TEST(CloudEncryption_ClipData, EncryptWhenReady)
@@ -281,26 +287,26 @@ TEST(CloudEncryption_ClipData, EncryptWhenReady)
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 	CCloudCrypto::Initialize(key);
 
-	// Encrypt clip data
+	// Use ACTUAL CCloudEncryption::EncryptClipData() wrapper method
 	CStringA plaintext("Important clipboard text");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
 	// Should succeed
-	EXPECT_FALSE(encrypted.IsEmpty());
+	EXPECT_FALSE(encrypted.IsEmpty()) << "EncryptClipData returned empty when ready";
 	EXPECT_NE(encrypted, plaintext);
 }
 
-TEST(CloudEncryption_ClipData, EncryptWhenNotReady)
+TEST(CloudEncryption_ClipData, EncryptWhenNotReady_ReturnsEmpty)
 {
-	// Don't initialize crypto
+	// SECURITY CRITICAL: Don't initialize crypto
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
 
-	// Try to encrypt
+	// Use ACTUAL CCloudEncryption::EncryptClipData() wrapper method
 	CStringA plaintext("Secret data");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
-	// Should return empty when not ready
-	EXPECT_TRUE(encrypted.IsEmpty());
+	// SECURITY: MUST return empty when not ready to prevent plaintext sync
+	EXPECT_TRUE(encrypted.IsEmpty()) << "SECURITY: EncryptClipData returned non-empty when not ready!";
 }
 
 TEST(CloudEncryption_ClipData, EncryptEmptyData)
@@ -308,10 +314,13 @@ TEST(CloudEncryption_ClipData, EncryptEmptyData)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Encrypt empty data
 	CStringA plaintext("");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
 	// Should still produce encrypted output (at least IV + tag)
 	EXPECT_FALSE(encrypted.IsEmpty());
@@ -322,6 +331,9 @@ TEST(CloudEncryption_ClipData, EncryptBinaryData)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Create binary data
 	std::vector<BYTE> binaryData(256);
@@ -331,7 +343,7 @@ TEST(CloudEncryption_ClipData, EncryptBinaryData)
 	}
 
 	CStringA plaintext(reinterpret_cast<const char*>(binaryData.data()), 256);
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
 	// Should succeed
 	EXPECT_FALSE(encrypted.IsEmpty());
@@ -347,12 +359,15 @@ TEST(CloudEncryption_ClipData, EncryptLargeData)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Create large data (100KB)
 	std::string largeData(100000, 'A');
 	CStringA plaintext(largeData.c_str());
 	
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
 	// Should succeed
 	EXPECT_FALSE(encrypted.IsEmpty());
@@ -363,7 +378,7 @@ TEST(CloudEncryption_ClipData, EncryptLargeData)
 }
 
 // ============================================================================
-// Decrypt Clip Data Tests
+// Decrypt Clip Data Tests - Using ACTUAL CCloudEncryption::DecryptClipData()
 // ============================================================================
 
 TEST(CloudEncryption_ClipData, DecryptWhenReady)
@@ -376,41 +391,44 @@ TEST(CloudEncryption_ClipData, DecryptWhenReady)
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 	CCloudCrypto::Initialize(key);
 
-	// Encrypt then decrypt
+	// Encrypt then decrypt using ACTUAL wrapper methods
 	CStringA plaintext("Test data for decryption");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
-	CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
+	CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted);
 	
 	// Should match
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST(CloudEncryption_ClipData, DecryptWhenNotReady)
+TEST(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsAsIs)
 {
 	// Don't initialize crypto
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
 
-	// Try to decrypt
-	CStringA encryptedData("dGVzdA==");
-	CStringA decrypted = CCloudCrypto::Decrypt(encryptedData);
+	// Use ACTUAL CCloudEncryption::DecryptClipData() wrapper method
+	// When not ready, it should return data as-is (fallback for unencrypted data)
+	CStringA encryptedData("some-data");
+	CStringA decrypted = CCloudEncryption::DecryptClipData(encryptedData);
 	
-	// Should return empty when not ready
-	EXPECT_TRUE(decrypted.IsEmpty());
+	// Should return as-is when not ready (fallback behavior)
+	EXPECT_EQ(decrypted, encryptedData);
 }
 
-TEST(CloudEncryption_ClipData, DecryptTamperedData)
+TEST(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Create valid encrypted data
 	CStringA plaintext("Original data");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
 	// Tamper with the encrypted data
 	CStringA tampered(encrypted);
-	// Modify a character in the middle
 	if (tampered.GetLength() > 20)
 	{
 		LPTSTR sz = tampered.GetBuffer();
@@ -418,28 +436,32 @@ TEST(CloudEncryption_ClipData, DecryptTamperedData)
 		tampered.ReleaseBuffer();
 	}
 	
-	// Decryption should fail
-	CStringA decrypted = CCloudCrypto::Decrypt(tampered);
-	EXPECT_TRUE(decrypted.IsEmpty());
+	// Decryption should fail and return empty
+	CStringA decrypted = CCloudEncryption::DecryptClipData(tampered);
+	EXPECT_TRUE(decrypted.IsEmpty()) << "Decryption should fail for tampered data";
 }
 
-TEST(CloudEncryption_ClipData, DecryptWrongKey)
+TEST(CloudEncryption_ClipData, DecryptWrongKey_ReturnsEmpty)
 {
 	// Encrypt with one key
 	std::vector<BYTE> key1 = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key1);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA key1B64 = CCloudCrypto::Base64Encode(key1);
+	CGetSetOptions::SetCloudEncryptionKey(CString(key1B64));
 	
 	CStringA plaintext("Secret message");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	
-	// Try to decrypt with different key
+	// Switch to different key
 	std::vector<BYTE> key2 = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key2);
+	CStringA key2B64 = CCloudCrypto::Base64Encode(key2);
+	CGetSetOptions::SetCloudEncryptionKey(CString(key2B64));
 	
-	CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
-	
-	// Should fail (return empty)
-	EXPECT_TRUE(decrypted.IsEmpty());
+	// Try to decrypt - should fail and return empty
+	CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted);
+	EXPECT_TRUE(decrypted.IsEmpty()) << "Decryption should fail with wrong key";
 }
 
 TEST(CloudEncryption_ClipData, DecryptEmptyInput)
@@ -447,24 +469,30 @@ TEST(CloudEncryption_ClipData, DecryptEmptyInput)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Decrypt empty string
-	CStringA decrypted = CCloudCrypto::Decrypt(CStringA(""));
+	CStringA decrypted = CCloudEncryption::DecryptClipData(CStringA(""));
 	
 	// Should return empty
 	EXPECT_TRUE(decrypted.IsEmpty());
 }
 
-TEST(CloudEncryption_ClipData, DecryptInvalidBase64)
+TEST(CloudEncryption_ClipData, DecryptInvalidBase64_ReturnsEmpty)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Try to decrypt invalid base64
-	CStringA decrypted = CCloudCrypto::Decrypt(CStringA("not-valid-base64!!!"));
+	CStringA decrypted = CCloudEncryption::DecryptClipData(CStringA("not-valid-base64!!!"));
 	
-	// Should fail gracefully
+	// Should fail gracefully and return empty
 	EXPECT_TRUE(decrypted.IsEmpty());
 }
 
@@ -516,19 +544,19 @@ TEST(CloudEncryption_Integration, FullSetupEncryptDecryptCycle)
 	// 3. Initialize crypto
 	ASSERT_TRUE(CCloudCrypto::Initialize(key));
 	
-	// 4. Store key
+	// 4. Store key (simulates SetupEncryption)
 	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 	CGetSetOptions::SetCloudEncryptionSalt(CString(saltB64));
 	
-	// 5. Encrypt clip data
+	// 5. Encrypt clip data using ACTUAL wrapper
 	CStringA plaintext("Important clipboard data to encrypt");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 	EXPECT_FALSE(encrypted.IsEmpty());
 	
-	// 6. Decrypt clip data
-	CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
+	// 6. Decrypt clip data using ACTUAL wrapper
+	CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted);
 	EXPECT_EQ(plaintext, decrypted);
 }
 
@@ -537,8 +565,11 @@ TEST(CloudEncryption_Integration, MultipleClipsWithSameKey)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
-	// Encrypt multiple clips
+	// Encrypt multiple clips using ACTUAL wrapper
 	std::vector<CStringA> originals = {
 		"Clip 1: Text data",
 		"Clip 2: HTML content",
@@ -549,16 +580,16 @@ TEST(CloudEncryption_Integration, MultipleClipsWithSameKey)
 	std::vector<CStringA> encrypted;
 	for (const auto& original : originals)
 	{
-		CStringA enc = CCloudCrypto::Encrypt(original);
-		EXPECT_FALSE(enc.IsEmpty());
+		CStringA enc = CCloudEncryption::EncryptClipData(original);
+		EXPECT_FALSE(enc.IsEmpty()) << "Encryption failed for: " << original;
 		encrypted.push_back(enc);
 	}
 
-	// Decrypt all clips
+	// Decrypt all clips using ACTUAL wrapper
 	for (size_t i = 0; i < encrypted.size(); i++)
 	{
-		CStringA decrypted = CCloudCrypto::Decrypt(encrypted[i]);
-		EXPECT_EQ(originals[i], decrypted);
+		CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted[i]);
+		EXPECT_EQ(originals[i], decrypted) << "Decryption failed for clip " << i;
 	}
 }
 
@@ -569,25 +600,31 @@ TEST(CloudEncryption_Integration, PasswordChangeRequiresReencrypt)
 	CStringA password1("Password1");
 	std::vector<BYTE> key1 = CCloudCrypto::DeriveKey(password1, salt, 100000);
 	CCloudCrypto::Initialize(key1);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA key1B64 = CCloudCrypto::Base64Encode(key1);
+	CGetSetOptions::SetCloudEncryptionKey(CString(key1B64));
 
 	// Encrypt with password 1
 	CStringA plaintext("Secret data");
-	CStringA encrypted = CCloudCrypto::Encrypt(plaintext);
+	CStringA encrypted = CCloudEncryption::EncryptClipData(plaintext);
 
 	// Change to password 2
 	CStringA password2("Password2");
 	std::vector<BYTE> key2 = CCloudCrypto::DeriveKey(password2, salt, 100000);
 	CCloudCrypto::Initialize(key2);
+	CStringA key2B64 = CCloudCrypto::Base64Encode(key2);
+	CGetSetOptions::SetCloudEncryptionKey(CString(key2B64));
 
 	// Try to decrypt with password 2 - should fail
-	CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
-	EXPECT_TRUE(decrypted.IsEmpty());
+	CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted);
+	EXPECT_TRUE(decrypted.IsEmpty()) << "Decryption should fail with wrong password";
 
 	// Switch back to password 1
 	CCloudCrypto::Initialize(key1);
+	CGetSetOptions::SetCloudEncryptionKey(CString(key1B64));
 	
 	// Now should decrypt
-	decrypted = CCloudCrypto::Decrypt(encrypted);
+	decrypted = CCloudEncryption::DecryptClipData(encrypted);
 	EXPECT_EQ(plaintext, decrypted);
 }
 
@@ -596,6 +633,9 @@ TEST(CloudEncryption_Integration, ClipboardTextRoundtrip)
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
 	CCloudCrypto::Initialize(key);
+	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+	CStringA keyB64 = CCloudCrypto::Base64Encode(key);
+	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Test various clipboard text formats
 	std::vector<std::string> testCases = {
@@ -611,10 +651,10 @@ TEST(CloudEncryption_Integration, ClipboardTextRoundtrip)
 	for (const auto& test : testCases)
 	{
 		CStringA original(test.c_str());
-		CStringA encrypted = CCloudCrypto::Encrypt(original);
+		CStringA encrypted = CCloudEncryption::EncryptClipData(original);
 		EXPECT_FALSE(encrypted.IsEmpty()) << "Failed for: " << test;
 		
-		CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
+		CStringA decrypted = CCloudEncryption::DecryptClipData(encrypted);
 		EXPECT_EQ(original, decrypted) << "Failed for: " << test;
 	}
 }
