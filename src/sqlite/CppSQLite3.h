@@ -52,9 +52,9 @@ public:
 
     virtual ~CppSQLite3Exception();
 
-    const int errorCode() { return mnErrCode; }
+    const int errorCode() const { return mnErrCode; }
 
-    const TCHAR* errorMessage() { return mpszErrMess; }
+    const TCHAR* errorMessage() const { return mpszErrMess; }
 
     static const TCHAR* errorCodeAsString(int nErrCode);
 

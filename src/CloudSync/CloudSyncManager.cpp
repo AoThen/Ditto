@@ -8,6 +8,7 @@
 #include "../Options.h"
 #include "../Clip.h"
 #include "../sqlite/CppSQLite3.h"
+#include "../CP_Main.h"
 
 using json = nlohmann::json;
 
