@@ -66,6 +66,10 @@ func (s *CleanupService) runCleanup() {
 
 // deleteOldClips removes clips older than MaxClipAge.
 func (s *CleanupService) deleteOldClips() (int, error) {
+	if database.DB == nil {
+		return 0, nil // DB not initialized, skip cleanup
+	}
+
 	cutoff := time.Now().Add(-s.cfg.MaxClipAge)
 
 	result := database.DB.Where("updated_at < ?", cutoff).Delete(&model.Clip{})
@@ -79,6 +83,10 @@ func (s *CleanupService) deleteOldClips() (int, error) {
 // enforceUserLimits removes excess clips for users exceeding MaxClipsPerUser.
 // Keeps the newest clips and removes the oldest ones.
 func (s *CleanupService) enforceUserLimits() (int, error) {
+	if database.DB == nil {
+		return 0, nil // DB not initialized, skip cleanup
+	}
+
 	totalDeleted := 0
 
 	// Find users who exceed the limit

@@ -24,13 +24,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd /home/git/working/Ditto/server && go run ./cmd/server/',
+      command: 'cd ../server && go run ./cmd/server/',
       url: 'http://localhost:8080/health',
       timeout: 30000,
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'cd /home/git/working/Ditto/web && npm run dev',
+      command: 'npm run dev',
       url: 'http://localhost:5173',
       timeout: 30000,
       reuseExistingServer: !process.env.CI,

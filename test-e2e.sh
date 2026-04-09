@@ -4,6 +4,11 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVER_DIR="$SCRIPT_DIR/server"
+WEB_DIR="$SCRIPT_DIR/web"
+
 echo "========================================="
 echo "Ditto Cloud - End-to-End Integration Test"
 echo "========================================="
@@ -34,7 +39,7 @@ info() {
 
 # Test 1: Check Go backend binary exists
 info "Test 1: Checking Go backend binary..."
-if [ -f "/home/git/working/Ditto/server/server" ]; then
+if [ -f "$SERVER_DIR/server" ]; then
     pass "Go backend binary exists"
 else
     fail "Go backend binary not found"
@@ -42,11 +47,11 @@ fi
 
 # Test 2: Check web frontend build
 info "Test 2: Checking web frontend..."
-if [ -d "/home/git/working/Ditto/web/node_modules" ]; then
+if [ -d "$WEB_DIR/node_modules" ]; then
     pass "Web frontend dependencies installed"
 else
     info "Installing web frontend dependencies..."
-    cd /home/git/working/Ditto/web && npm install > /dev/null 2>&1
+    cd "$WEB_DIR" && npm install > /dev/null 2>&1
     if [ $? -eq 0 ]; then
         pass "Web frontend dependencies installed"
     else
@@ -56,7 +61,7 @@ fi
 
 # Test 3: Try to build web frontend
 info "Test 3: Building web frontend..."
-cd /home/git/working/Ditto/web
+cd "$WEB_DIR"
 if npm run build > /dev/null 2>&1; then
     pass "Web frontend builds successfully"
 else
@@ -65,7 +70,7 @@ fi
 
 # Test 4: Start Go backend in background
 info "Test 4: Starting Go backend server..."
-cd /home/git/working/Ditto/server
+cd "$SERVER_DIR"
 ./server > /tmp/ditto-server.log 2>&1 &
 SERVER_PID=$!
 sleep 3
