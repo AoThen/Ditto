@@ -181,14 +181,14 @@ TEST(CloudEncryption_Status, KeyExists)
 	CGetSetOptions::SetCloudEncryptionKey(CString(keyB64));
 
 	// Verify key exists
-	CStringA storedKey = CGetSetOptions::GetCloudEncryptionKey();
+	CString storedKey = CGetSetOptions::GetCloudEncryptionKey();
 	EXPECT_FALSE(storedKey.IsEmpty());
 }
 
 TEST(CloudEncryption_Status, KeyDoesNotExist)
 {
 	// Check default state
-	CStringA key = CGetSetOptions::GetCloudEncryptionKey();
+	CString key = CGetSetOptions::GetCloudEncryptionKey();
 	EXPECT_TRUE(key.IsEmpty());
 }
 
@@ -238,9 +238,10 @@ TEST(CloudEncryption_StoredKey, EmptyStoredKey)
 	CGetSetOptions::SetCloudEncryptionKey(CString(""));
 
 	// Try to initialize with empty key
-	CStringA keyB64 = CGetSetOptions::GetCloudEncryptionKey();
-	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(keyB64);
-	
+	CString keyB64 = CGetSetOptions::GetCloudEncryptionKey();
+	CT2A keyA(keyB64, CP_UTF8);
+	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(CStringA(keyA));
+
 	// Should be empty
 	EXPECT_TRUE(storedKey.empty());
 }
@@ -252,8 +253,9 @@ TEST(CloudEncryption_StoredKey, CorruptedStoredKey)
 	CGetSetOptions::SetCloudEncryptionKey(CString("not-valid-base64!!!"));
 
 	// Try to decode
-	CStringA keyB64 = CGetSetOptions::GetCloudEncryptionKey();
-	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(keyB64);
+	CString keyB64 = CGetSetOptions::GetCloudEncryptionKey();
+	CT2A keyA(keyB64, CP_UTF8);
+	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(CStringA(keyA));
 	
 	// Decoding may fail or produce wrong size
 	BOOL isValid = (storedKey.size() == 32);
@@ -266,10 +268,11 @@ TEST(CloudEncryption_StoredKey, NoStoredKey)
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
 
 	// Try to initialize
-	CStringA keyB64 = CGetSetOptions::GetCloudEncryptionKey();
+	CString keyB64 = CGetSetOptions::GetCloudEncryptionKey();
 	EXPECT_TRUE(keyB64.IsEmpty());
-	
-	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(keyB64);
+
+	CT2A keyA(keyB64, CP_UTF8);
+	std::vector<BYTE> storedKey = CCloudCrypto::Base64Decode(CStringA(keyA));
 	EXPECT_TRUE(storedKey.empty());
 }
 

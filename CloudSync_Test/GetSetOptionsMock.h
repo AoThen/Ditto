@@ -9,24 +9,24 @@
 class CGetSetOptions
 {
 public:
-	static CStringA GetCloudEncryptionKey()
+	static CString GetCloudEncryptionKey()
 	{
 		return s_testKey;
 	}
 
 	static void SetCloudEncryptionKey(LPCTSTR lpszValue)
 	{
-		s_testKey = CStringA(lpszValue);
+		s_testKey = lpszValue;
 	}
 
-	static CStringA GetCloudEncryptionSalt()
+	static CString GetCloudEncryptionSalt()
 	{
 		return s_testSalt;
 	}
 
 	static void SetCloudEncryptionSalt(LPCTSTR lpszValue)
 	{
-		s_testSalt = CStringA(lpszValue);
+		s_testSalt = lpszValue;
 	}
 
 	static BOOL GetCloudSyncEncryptionEnabled()
@@ -44,7 +44,7 @@ public:
 		return s_deviceToken;
 	}
 
-	static void SetCloudDeviceToken(LPCSTR lpszValue)
+	static void SetCloudDeviceToken(LPCTSTR lpszValue)
 	{
 		s_deviceToken = CStringA(lpszValue);
 	}
@@ -54,7 +54,7 @@ public:
 		return s_deviceId;
 	}
 
-	static void SetCloudDeviceId(LPCSTR lpszValue)
+	static void SetCloudDeviceId(LPCTSTR lpszValue)
 	{
 		s_deviceId = CStringA(lpszValue);
 	}
@@ -124,8 +124,8 @@ public:
 	}
 
 private:
-	static CStringA s_testKey;
-	static CStringA s_testSalt;
+	static CString s_testKey;
+	static CString s_testSalt;
 	static BOOL s_cloudSyncEnabled;
 	static CStringA s_deviceToken;
 	static CStringA s_deviceId;
@@ -136,8 +136,8 @@ private:
 };
 
 // Static member definitions
-inline CStringA CGetSetOptions::s_testKey;
-inline CStringA CGetSetOptions::s_testSalt;
+inline CString CGetSetOptions::s_testKey;
+inline CString CGetSetOptions::s_testSalt;
 inline BOOL CGetSetOptions::s_cloudSyncEnabled = FALSE;
 inline CStringA CGetSetOptions::s_deviceToken;
 inline CStringA CGetSetOptions::s_deviceId;

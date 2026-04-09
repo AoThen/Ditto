@@ -70,8 +70,9 @@ protected:
 	// Helper to get stored key
 	std::vector<BYTE> GetStoredKey()
 	{
-		CStringA keyB64 = CGetSetOptions::GetCloudEncryptionKey();
-		return CCloudCrypto::Base64Decode(keyB64);
+		CString keyB64 = CGetSetOptions::GetCloudEncryptionKey();
+		CT2A keyA(keyB64, CP_UTF8);
+		return CCloudCrypto::Base64Decode(CStringA(keyA));
 	}
 };
 
@@ -186,7 +187,7 @@ TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 	CString password = _T("SecurePassword123!");
 
 	// Get original key before export
-	std::vector<BYTE> originalKey = GetStoredKey();
+	std::vector<BYTE> originalKey = this->GetStoredKey();
 
 	// Export using ACTUAL CCloudKeyExport::ExportKey
 	BOOL exportOk = CCloudKeyExport::ExportKey(filePath, username, password);
@@ -207,7 +208,7 @@ TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 		EXPECT_STREQ(username, keyData.username);
 
 		// Verify key was restored correctly
-		std::vector<BYTE> restoredKey = GetStoredKey();
+		std::vector<BYTE> restoredKey = this->GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
@@ -284,7 +285,7 @@ TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 	CString password = _T("密码测试123!");
 
 	// Get original key
-	std::vector<BYTE> originalKey = GetStoredKey();
+	std::vector<BYTE> originalKey = this->GetStoredKey();
 
 	// Export
 	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -297,9 +298,9 @@ TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 	if (importOk)
 	{
 		EXPECT_STREQ(username, keyData.username);
-		
+
 		// Verify key matches original
-		std::vector<BYTE> restoredKey = GetStoredKey();
+		std::vector<BYTE> restoredKey = this->GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 	}
@@ -321,7 +322,7 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 		CString filePath = GetTempFilePath("cycle_");
 		
 		// Get current key
-		std::vector<BYTE> originalKey = GetStoredKey();
+		std::vector<BYTE> originalKey = this->GetStoredKey();
 
 		// Export
 		ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -334,7 +335,7 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 		if (importOk)
 		{
 			// Verify key matches
-			std::vector<BYTE> restoredKey = GetStoredKey();
+			std::vector<BYTE> restoredKey = this->GetStoredKey();
 			EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
 			// Verify crypto works
@@ -359,7 +360,7 @@ TEST(CloudKeyExport_Roundtrip, EmptyPassword)
 	CString password = _T("");
 
 	// Get original key
-	std::vector<BYTE> originalKey = GetStoredKey();
+	std::vector<BYTE> originalKey = this->GetStoredKey();
 
 	// Export with empty password (should still work, just less secure)
 	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -372,7 +373,7 @@ TEST(CloudKeyExport_Roundtrip, EmptyPassword)
 	if (importOk)
 	{
 		// Verify key matches
-		std::vector<BYTE> restoredKey = GetStoredKey();
+		std::vector<BYTE> restoredKey = this->GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 	}
