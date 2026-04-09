@@ -73,20 +73,44 @@ info "Test 4: Starting Go backend server..."
 cd "$SERVER_DIR"
 ./server > /tmp/ditto-server.log 2>&1 &
 SERVER_PID=$!
-sleep 3
 
-# Check if server is running
-if kill -0 $SERVER_PID 2>/dev/null; then
-    pass "Go backend server started (PID: $SERVER_PID)"
+# Wait for server to be ready with retry logic
+info "Waiting for server to be ready..."
+MAX_RETRIES=10
+RETRY_INTERVAL=2
+SERVER_READY=false
+
+for i in $(seq 1 $MAX_RETRIES); do
+    if kill -0 $SERVER_PID 2>/dev/null; then
+        # Server process is running, try health check
+        HEALTH=$(curl -s --max-time 3 http://localhost:8080/health 2>/dev/null || echo "")
+        if [ -n "$HEALTH" ] && echo "$HEALTH" | grep -q "ok"; then
+            SERVER_READY=true
+            info "Server ready after ${i} attempts ($((i * RETRY_INTERVAL))s)"
+            break
+        fi
+    else
+        fail "Go backend server process exited"
+        cat /tmp/ditto-server.log
+        exit 1
+    fi
+    info "Attempt $i/$MAX_RETRIES: Server not ready yet, waiting ${RETRY_INTERVAL}s..."
+    sleep $RETRY_INTERVAL
+done
+
+if [ "$SERVER_READY" = true ]; then
+    pass "Go backend server started and healthy (PID: $SERVER_PID)"
 else
-    fail "Go backend server failed to start"
+    fail "Go backend server failed to become ready after $((MAX_RETRIES * RETRY_INTERVAL))s"
+    info "Server log:"
     cat /tmp/ditto-server.log
+    kill $SERVER_PID 2>/dev/null
     exit 1
 fi
 
-# Test 5: Health check
+# Test 5: Health check (already done above, but verify again)
 info "Test 5: Health check..."
-HEALTH=$(curl -s http://localhost:8080/health 2>/dev/null || echo "")
+HEALTH=$(curl -s --max-time 5 http://localhost:8080/health 2>/dev/null || echo "")
 if [ -n "$HEALTH" ] && echo "$HEALTH" | grep -q "ok"; then
     pass "Health check passed"
 else
@@ -96,7 +120,7 @@ fi
 
 # Test 6: User registration
 info "Test 6: User registration..."
-REGISTER_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/auth/register \
+REGISTER_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"testuser","email":"test@example.com","password":"TestPass123"}' 2>/dev/null)
 
@@ -114,7 +138,7 @@ fi
 
 # Test 7: User login (H1: cookies set automatically)
 info "Test 7: User login..."
-LOGIN_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
+LOGIN_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -c /tmp/ditto-cookies.txt \
   -d '{"username":"testuser","password":"TestPass123"}' 2>/dev/null)
@@ -133,7 +157,7 @@ fi
 
 # Test 8: Get clips list (should be empty initially)
 info "Test 8: Get clips list..."
-CLIPS_RESPONSE=$(curl -s http://localhost:8080/api/v1/clips \
+CLIPS_RESPONSE=$(curl -s --max-time 10 http://localhost:8080/api/v1/clips \
   -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$CLIPS_RESPONSE" | grep -q -E '"code":0|"data"'; then
@@ -145,7 +169,7 @@ fi
 
 # Test 9: Sync clips (push)
 info "Test 9: Push clips to server..."
-PUSH_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/clips/sync \
+PUSH_RESPONSE=$(curl -s --max-time 10 -X POST http://localhost:8080/api/v1/clips/sync \
   -b /tmp/ditto-cookies.txt \
   -H "Content-Type: application/json" \
   -d '{
@@ -177,7 +201,7 @@ fi
 
 # Test 10: Get clips list (should have 1 clip now)
 info "Test 10: Get clips list after push..."
-CLIPS_AFTER=$(curl -s http://localhost:8080/api/v1/clips \
+CLIPS_AFTER=$(curl -s --max-time 10 http://localhost:8080/api/v1/clips \
   -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$CLIPS_AFTER" | grep -q -E '"total":[1-9]|"items"'; then
@@ -189,7 +213,7 @@ fi
 
 # Test 11: Stats overview
 info "Test 11: Get stats overview..."
-STATS_RESPONSE=$(curl -s http://localhost:8080/api/v1/stats/overview \
+STATS_RESPONSE=$(curl -s --max-time 10 http://localhost:8080/api/v1/stats/overview \
   -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$STATS_RESPONSE" | grep -q -E '"total_clips"|code'; then
@@ -201,7 +225,7 @@ fi
 
 # Test 12: Get devices list
 info "Test 12: Get devices list..."
-DEVICES_RESPONSE=$(curl -s http://localhost:8080/api/v1/devices \
+DEVICES_RESPONSE=$(curl -s --max-time 10 http://localhost:8080/api/v1/devices \
   -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$DEVICES_RESPONSE" | grep -q -E '"data"|code'; then
