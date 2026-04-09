@@ -54,12 +54,12 @@ UINT  MTServerThread(LPVOID pParam)
 		LogSendRecieveInfo("ERROR - theApp.m_sSocket = socket(AF_INET, SOCK_STREAM, 0);");
 		return 0;
 	}
-	if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
+	if(::bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)");
 		return 0;
 	}
-	if(listen(theApp.m_sSocket,10)!=0)
+	if(::listen(theApp.m_sSocket,10)!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(listen(theApp.m_sSocket,10)!=0)");
 		return 0;
