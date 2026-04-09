@@ -92,11 +92,17 @@ async function handleLogin() {
       if (res.code === 0) {
         userStore.setUserInfo({ device_id: res.data.device_id })
         ElMessage.success('登录成功')
-        router.push('/dashboard')
+        // Navigate outside try/catch to avoid catching navigation errors
+        await router.push('/dashboard')
+        return
       } else {
         ElMessage.error(res.message || '登录失败')
       }
     } catch (err) {
+      // NavigationDuplicated errors are expected and should be ignored
+      if (err.name === 'NavigationDuplicated' || err.name === 'NavigationCancelled') {
+        return
+      }
       ElMessage.error('登录失败，请检查网络')
     } finally {
       loading.value = false

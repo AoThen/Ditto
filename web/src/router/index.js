@@ -50,11 +50,29 @@ const router = createRouter({
   routes,
 })
 
+// Helper: check if user is authenticated
+// Uses localStorage check since HttpOnly cookies aren't accessible from JS
+// and cross-port cookies may not be visible in some environments
+function isAuthenticated() {
+  // Check localStorage (set by setUserInfo after login)
+  const userInfo = localStorage.getItem('userInfo')
+  if (userInfo) {
+    try {
+      const parsed = JSON.parse(userInfo)
+      if (parsed.device_id) return true
+    } catch {
+      // ignore parse errors
+    }
+  }
+  // Fallback: check cookie (works in production where frontend/backend share origin)
+  const match = document.cookie.match(/(^| )device_id=([^;]+)/)
+  return match ? true : false
+}
+
 router.beforeEach((to, from, next) => {
-  const userStore = useUserStore()
-  if (to.meta.requiresAuth && !userStore.token) {
+  if (to.meta.requiresAuth && !isAuthenticated()) {
     next('/login')
-  } else if ((to.path === '/login' || to.path === '/register') && userStore.token) {
+  } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated()) {
     next('/dashboard')
   } else {
     next()
