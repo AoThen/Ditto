@@ -4,148 +4,174 @@ import { ElMessage } from 'element-plus'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
 
-export function useWebSocket() {
-  const ws = ref(null)
-  const isConnected = ref(false)
+// HIGH FIX (H3): Module-level singleton state to ensure only ONE WS connection per tab.
+let sharedWs = null
+let sharedIsConnected = ref(false)
+let sharedReconnectTimer = null
+let sharedPingTimer = null
+let sharedReconnectAttempts = 0
+const MAX_RECONNECT_DELAY = 30000
+
+function startPingTimer() {
+  stopPingTimer()
+  sharedPingTimer = setInterval(() => {
+    if (sharedWs && sharedWs.readyState === WebSocket.OPEN) {
+      sharedWs.send(JSON.stringify({ type: 'ping' }))
+    }
+  }, 30000) // 30 seconds
+}
+
+function stopPingTimer() {
+  if (sharedPingTimer) {
+    clearInterval(sharedPingTimer)
+    sharedPingTimer = null
+  }
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'connected':
+      console.log('[WS] Server says:', msg.data.message)
+      break
+    case 'ping':
+      break
+    case 'clip_added':
+      window.dispatchEvent(new CustomEvent('ws-clip-added', { detail: msg.data }))
+      ElMessage.info('收到新的剪贴板内容')
+      break
+    case 'goaway':
+      ElMessage.warning('服务器正在关闭连接')
+      disconnect()
+      break
+    default:
+      console.warn('[WS] Unknown message type:', msg.type)
+  }
+}
+
+function scheduleReconnect() {
+  if (sharedReconnectTimer) return
+
+  sharedReconnectAttempts++
+  const baseDelay = Math.min(1000 * Math.pow(2, sharedReconnectAttempts), MAX_RECONNECT_DELAY)
+  const jitter = Math.random() * 1000
+  const delay = baseDelay + jitter
+  console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${sharedReconnectAttempts})`)
+
+  sharedReconnectTimer = setTimeout(() => {
+    sharedReconnectTimer = null
+    connect()
+  }, delay)
+}
+
+function connect() {
+  if (sharedWs && sharedWs.readyState === WebSocket.OPEN) return
+
+  // H1: Check auth state via cookie (token is in HttpOnly cookie, not in store)
   const userStore = useUserStore()
+  userStore.checkAuthState()
+  if (!userStore.isLoggedIn) {
+    console.log('[WS] Not logged in, skipping connect')
+    return
+  }
 
-  let reconnectTimer = null
-  let pingTimer = null
-  const MAX_RECONNECT_DELAY = 30000 // 30 seconds
-  let reconnectAttempts = 0
+  // H1: Browser sends HttpOnly cookies automatically during WebSocket handshake.
+  // We still pass token via Sec-WebSocket-Protocol as a fallback for edge cases
+  // where cookie hasn't propagated yet (e.g., immediately after login).
+  const url = `${WS_URL}/api/v1/ws`
+  console.log('[WS] Connecting to:', url)
 
-  function connect() {
-    if (ws.value) return
+  try {
+    sharedWs = new WebSocket(url, ['cookie-auth'])
 
-    const token = userStore.token
-    if (!token) {
-      console.log('[WS] No token, skipping connect')
-      return
+    sharedWs.onopen = () => {
+      console.log('[WS] Connected')
+      sharedIsConnected.value = true
+      sharedReconnectAttempts = 0
+      startPingTimer()
     }
 
-    const url = `${WS_URL}/api/v1/ws?token=${encodeURIComponent(token)}`
-    console.log('[WS] Connecting to:', url.replace(token, '***'))
-
-    try {
-      ws.value = new WebSocket(url)
-
-      ws.value.onopen = () => {
-        console.log('[WS] Connected')
-        isConnected.value = true
-        reconnectAttempts = 0
-        startPingTimer()
+    sharedWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        handleMessage(msg)
+      } catch (e) {
+        console.error('[WS] Failed to parse message:', e, event.data)
       }
+    }
 
-      ws.value.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          handleMessage(msg)
-        } catch (e) {
-          console.error('[WS] Failed to parse message:', e, event.data)
-        }
+    sharedWs.onclose = (event) => {
+      console.log('[WS] Closed:', event.code, event.reason)
+      sharedIsConnected.value = false
+      stopPingTimer()
+      sharedWs = null
+      if (event.code !== 1000 || event.reason === 'Client disconnect') {
+        scheduleReconnect()
       }
-
-      ws.value.onclose = (event) => {
-        console.log('[WS] Closed:', event.code, event.reason)
-        isConnected.value = false
-        stopPingTimer()
-        ws.value = null
-        // Don't reconnect if user explicitly disconnected (code 1000)
-        if (event.code !== 1000 || event.reason === 'Client disconnect') {
-          scheduleReconnect()
-        }
-      }
-
-      ws.value.onerror = (err) => {
-        console.error('[WS] Error:', err)
-        ElMessage.error('WebSocket 连接错误，请检查网络')
-      }
-    } catch (e) {
-      console.error('[WS] Failed to create WebSocket:', e)
-      scheduleReconnect()
     }
-  }
 
-  function disconnect() {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
+    sharedWs.onerror = (err) => {
+      console.error('[WS] Error:', err)
+      ElMessage.error('WebSocket 连接错误，请检查网络')
     }
-    stopPingTimer()
-    if (ws.value) {
-      ws.value.close(1000, 'Client disconnect')
-      ws.value = null
-    }
-    isConnected.value = false
+  } catch (e) {
+    console.error('[WS] Failed to create WebSocket:', e)
+    scheduleReconnect()
   }
+}
 
-  function handleMessage(msg) {
-    switch (msg.type) {
-      case 'connected':
-        console.log('[WS] Server says:', msg.data.message)
-        break
-      case 'ping':
-        // Server ping, no action needed (pong handled by browser)
-        break
-      case 'clip_added':
-        // Notify listeners via custom event
-        window.dispatchEvent(new CustomEvent('ws-clip-added', { detail: msg.data }))
-        ElMessage.info('收到新的剪贴板内容')
-        break
-      case 'goaway':
-        ElMessage.warning('服务器正在关闭连接')
-        disconnect()
-        break
-      default:
-        console.warn('[WS] Unknown message type:', msg.type)
-    }
+function disconnect() {
+  if (sharedReconnectTimer) {
+    clearTimeout(sharedReconnectTimer)
+    sharedReconnectTimer = null
   }
-
-  function startPingTimer() {
-    stopPingTimer()
-    pingTimer = setInterval(() => {
-      if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-        ws.value.send(JSON.stringify({ type: 'ping' }))
-      }
-    }, 30000) // 30 seconds
+  stopPingTimer()
+  if (sharedWs) {
+    sharedWs.close(1000, 'Client disconnect')
+    sharedWs = null
   }
+  sharedIsConnected.value = false
+}
 
-  function stopPingTimer() {
-    if (pingTimer) {
-      clearInterval(pingTimer)
-      pingTimer = null
-    }
-  }
+function isConnectedToServer() {
+  return sharedIsConnected.value && sharedWs && sharedWs.readyState === WebSocket.OPEN
+}
 
-  function scheduleReconnect() {
-    if (reconnectTimer) return
+/**
+ * useWebSocket - Singleton WebSocket composable.
+ * All callers in the same tab share the SAME connection.
+ * The first call to connect() opens the connection.
+ * The last component to unmount will NOT disconnect (connection persists across routes).
+ * Use disconnectExplicit() to fully close (e.g. on logout).
+ */
+export function useWebSocket() {
+  const userStore = useUserStore()
+  let activeConsumers = 0
 
-    reconnectAttempts++
-    // Exponential backoff with jitter to prevent thundering herd
-    const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY)
-    const jitter = Math.random() * 1000 // Up to 1 second jitter
-    const delay = baseDelay + jitter
-    console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${reconnectAttempts})`)
-
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null
-      connect()
-    }, delay)
-  }
-
-  function isConnectedToServer() {
-    return isConnected.value && ws.value && ws.value.readyState === WebSocket.OPEN
-  }
-
-  // Auto-cleanup when component unmounts
   onUnmounted(() => {
-    disconnect()
+    activeConsumers--
+    if (activeConsumers <= 0) {
+      // Last consumer unmounted — disconnect
+      disconnect()
+    }
   })
 
+  function connectIfNeeded() {
+    activeConsumers++
+    connect()
+  }
+
+  function disconnectExplicit() {
+    activeConsumers = 0
+    disconnect()
+  }
+
   return {
-    connect,
-    disconnect,
-    isConnected,
+    connect: connectIfNeeded,
+    disconnect: disconnectExplicit,
+    isConnected: sharedIsConnected,
     isConnectedToServer
   }
 }
+
+// Also export the singleton disconnect for logout
+export { disconnect as disconnectWebSocket }

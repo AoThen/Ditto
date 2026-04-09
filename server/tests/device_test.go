@@ -80,12 +80,12 @@ func TestDevice_Remove(t *testing.T) {
 	testutil.RegisterUser(t, server, "devuser", "devuser@example.com", "password123")
 
 	// Login with device A
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "devuser", "password123", "DeviceToRemove")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "devuser", "password123", "DeviceToRemove")
 	require.Equal(t, http.StatusOK, statusCode)
 	deviceA := getDeviceIDFromLoginResp(t, loginRespA)
 
 	// Login with device B
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "devuser", "password123", "DeviceToKeep")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "devuser", "password123", "DeviceToKeep")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 

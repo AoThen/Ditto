@@ -289,7 +289,34 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	pushedClipIDs := make([]string, 0, len(req.PushClips))
 	if len(req.PushClips) > 0 {
 		err := database.DB.Transaction(func(tx *gorm.DB) error {
+			// MEDIUM FIX (M7): Build CRC set for existing clips to prevent cross-ID duplicates
+			var existingCRCs map[string]string // crc -> clip_id
+			type crcRecord struct {
+				CRC   int64  `gorm:"column:crc"`
+				ID    string `gorm:"column:id"`
+			}
+			var crcRecords []crcRecord
+			if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ?", userID, false).Find(&crcRecords).Error; err != nil {
+				return err
+			}
+			existingCRCs = make(map[string]string, len(crcRecords))
+			for _, r := range crcRecords {
+				existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+			}
+
 			for _, pc := range req.PushClips {
+				// M7: CRC-based de-duplication - skip if same CRC already exists for this user
+				// But skip de-dup check if CRC is 0 (meaning no CRC was provided by client)
+				crcKey := fmt.Sprintf("%d", pc.CRC)
+				if pc.CRC != 0 {
+					if existingClipID, exists := existingCRCs[crcKey]; exists {
+						// Same content already exists, skip (treat as duplicate, not conflict)
+						skippedCount++
+						log.Printf("[Sync] CRC duplicate, skipping clip %s (existing: %s)", pc.ID, existingClipID)
+						continue
+					}
+				}
+
 				// Check if clip already exists (upsert by ID)
 				var existing model.Clip
 				err := tx.Where("id = ? AND user_id = ?", pc.ID, userID).First(&existing).Error

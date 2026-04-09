@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -354,11 +355,24 @@ func LoginUser(t *testing.T, server *httptest.Server, username, password string)
 		"username": username,
 		"password": password,
 	}
-	return doJSON(t, server, "POST", "/api/v1/auth/login", "", body, "")
+	statusCode, respBody, _ := doJSONWithCookies(t, server, "POST", "/api/v1/auth/login", "", body, "")
+	return statusCode, respBody
+}
+
+// LoginUserWithCookies logs in a user and returns Set-Cookie headers.
+// H1: Used to extract HttpOnly tokens.
+func LoginUserWithCookies(t *testing.T, server *httptest.Server, username, password string) (int, []byte, []string) {
+	t.Helper()
+	body := map[string]string{
+		"username": username,
+		"password": password,
+	}
+	return doJSONWithCookies(t, server, "POST", "/api/v1/auth/login", "", body, "")
 }
 
 // RegisterAndLogin is a convenience function that registers then logs in a user.
 // Returns the auth token and device_id.
+// H1: Token is now in HttpOnly cookie, extracted from Set-Cookie header.
 func RegisterAndLogin(t *testing.T, server *httptest.Server, username, email, password string) (token, deviceID string) {
 	t.Helper()
 	statusCode, _ := RegisterUser(t, server, username, email, password)
@@ -366,21 +380,35 @@ func RegisterAndLogin(t *testing.T, server *httptest.Server, username, email, pa
 		t.Fatalf("expected register status 200, got %d", statusCode)
 	}
 
-	statusCode, loginRespBody := LoginUser(t, server, username, password)
+	statusCode, loginRespBody, setCookies := LoginUserWithCookies(t, server, username, password)
 	if statusCode != http.StatusOK {
 		t.Fatalf("expected login status 200, got %d", statusCode)
 	}
 
-	_, _, data := ParseResponse(t, loginRespBody)
-
-	token, _ = data["device_token"].(string)
-	deviceID, _ = data["device_id"].(string)
-
+	// H1: Extract device_token from Set-Cookie header
+	token = ExtractCookie(setCookies, "device_token")
 	if token == "" {
-		t.Fatal("login response missing device_token")
+		t.Fatalf("login response missing device_token cookie. Set-Cookie headers: %v", setCookies)
 	}
 
+	_, _, data := ParseResponse(t, loginRespBody)
+	deviceID, _ = data["device_id"].(string)
+
 	return token, deviceID
+}
+
+// ExtractCookie extracts a cookie value from Set-Cookie headers.
+// H1: Used to extract HttpOnly tokens from login responses.
+func ExtractCookie(setCookies []string, name string) string {
+	for _, cookie := range setCookies {
+		if strings.Contains(cookie, name+"=") {
+			parts := strings.SplitN(cookie, "=", 2)
+			if len(parts) == 2 {
+				return strings.SplitN(parts[1], ";", 2)[0]
+			}
+		}
+	}
+	return ""
 }
 
 // AuthGet performs an authenticated GET request.
@@ -414,7 +442,7 @@ func PostWithIP(t *testing.T, server *httptest.Server, path, forwardedFor string
 }
 
 // LoginUserWithDeviceName logs in a user with a specific device name via HTTP.
-func LoginUserWithDeviceName(t *testing.T, server *httptest.Server, username, password, deviceName string) (int, []byte) {
+func LoginUserWithDeviceName(t *testing.T, server *httptest.Server, username, password, deviceName string) (int, []byte, []string) {
 	t.Helper()
 	body := map[string]string{
 		"username": username,
@@ -440,7 +468,7 @@ func LoginUserWithDeviceName(t *testing.T, server *httptest.Server, username, pa
 		t.Fatalf("failed to read response body: %v", err)
 	}
 
-	return resp.StatusCode, respBody
+	return resp.StatusCode, respBody, resp.Header.Values("Set-Cookie")
 }
 
 // RegisterAndLoginWithDevice registers then logs in with a specific device name.
@@ -451,7 +479,7 @@ func RegisterAndLoginWithDevice(t *testing.T, server *httptest.Server, username,
 		t.Fatalf("expected register status 200, got %d", statusCode)
 	}
 
-	statusCode, loginRespBody := LoginUserWithDeviceName(t, server, username, password, deviceName)
+	statusCode, loginRespBody, _ := LoginUserWithDeviceName(t, server, username, password, deviceName)
 	if statusCode != http.StatusOK {
 		t.Fatalf("expected login status 200, got %d", statusCode)
 	}
@@ -527,6 +555,48 @@ func doJSON(t *testing.T, server *httptest.Server, method, path, token string, b
 	}
 
 	return resp.StatusCode, respBody
+}
+
+// doJSONWithCookies is like doJSON but also returns Set-Cookie headers.
+// H1: Used to extract HttpOnly tokens from login responses.
+func doJSONWithCookies(t *testing.T, server *httptest.Server, method, path, token string, body interface{}, forwardedFor string) (int, []byte, []string) {
+	t.Helper()
+
+	var reqBody io.Reader
+	if body != nil {
+		jsonBytes, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBytes)
+	}
+
+	req, err := http.NewRequest(method, server.URL+path, reqBody)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	if forwardedFor != "" {
+		req.Header.Set("X-Forwarded-For", forwardedFor)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+
+	return resp.StatusCode, respBody, resp.Header.Values("Set-Cookie")
 }
 
 // GenerateExpiredToken creates a JWT token that has already expired.

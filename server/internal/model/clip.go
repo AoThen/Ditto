@@ -28,8 +28,9 @@ type Clip struct {
 	PasteCount     int       `gorm:"default:0" json:"paste_count"`
 	IsConflictCopy bool      `gorm:"index:idx_clips_user_conflict;default:false" json:"is_conflict_copy"` // LWW losing clip kept for review
 
-	User   User   `gorm:"foreignKey:UserID;references:ID" json:"-"`
-	Device Device `gorm:"foreignKey:DeviceID;references:ID" json:"-"`
+	User User `gorm:"foreignKey:UserID;references:ID" json:"-"`
+	// DeviceID is a label for the source device. No FK constraint to allow
+	// clips from devices that aren't registered in the devices table.
 }
 
 func (Clip) TableName() string {

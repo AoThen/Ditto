@@ -24,13 +24,13 @@ func TestLWW_NewerWins(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 
 	// Login device A
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "lwwuser", "password123", "DeviceA")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "lwwuser", "password123", "DeviceA")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getDeviceToken(t, loginRespA)
 	deviceA := getDeviceID(t, loginRespA)
 
 	// Login device B
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "lwwuser", "password123", "DeviceB")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "lwwuser", "password123", "DeviceB")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getDeviceToken(t, loginRespB)
 	deviceB := getDeviceID(t, loginRespB)
@@ -80,7 +80,7 @@ func TestLWW_OlderSkipped(t *testing.T) {
 	statusCode, _ := testutil.RegisterUser(t, server, "lwwuser2", "lwwuser2@example.com", "password123")
 	require.Equal(t, http.StatusOK, statusCode)
 
-	statusCode, loginResp := testutil.LoginUserWithDeviceName(t, server, "lwwuser2", "password123", "DeviceX")
+	statusCode, loginResp, _ := testutil.LoginUserWithDeviceName(t, server, "lwwuser2", "password123", "DeviceX")
 	require.Equal(t, http.StatusOK, statusCode)
 	token := getDeviceToken(t, loginResp)
 	deviceID := getDeviceID(t, loginResp)
@@ -115,7 +115,7 @@ func TestLWW_SameTime(t *testing.T) {
 	statusCode, _ := testutil.RegisterUser(t, server, "lwwuser3", "lwwuser3@example.com", "password123")
 	require.Equal(t, http.StatusOK, statusCode)
 
-	statusCode, loginResp := testutil.LoginUserWithDeviceName(t, server, "lwwuser3", "password123", "DeviceY")
+	statusCode, loginResp, _ := testutil.LoginUserWithDeviceName(t, server, "lwwuser3", "password123", "DeviceY")
 	require.Equal(t, http.StatusOK, statusCode)
 	token := getDeviceToken(t, loginResp)
 	deviceID := getDeviceID(t, loginResp)

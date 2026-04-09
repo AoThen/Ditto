@@ -107,7 +107,8 @@
                 <div v-else-if="isHTMLFormat(fmt.format_type)" class="html-preview">
                   <iframe
                     :srcdoc="decodeHTMLData(fmt)"
-                    sandbox="allow-same-origin"
+                    sandbox=""
+                    title="HTML 剪贴板预览"
                     style="width: 100%; height: 400px; border: 1px solid #dcdfe6; border-radius: 4px;"
                   ></iframe>
                 </div>
@@ -191,15 +192,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listClips, getClip, deleteClip, batchDeleteClips } from '@/api/clips'
+import { listClips, getClip, deleteClip } from '@/api/clips'
 import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import { useUserStore } from '@/stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 
 const ws = useWebSocket()
-const userStore = useUserStore()
 
 // Listen for WS clip notifications
 function onWsClipAdded(event) {
@@ -224,6 +223,7 @@ const batchDeleting = ref(false)
 const conflictClips = ref([])
 const conflictLoading = ref(false)
 const conflictDialogVisible = ref(false)
+// MEDIUM FIX (M3): Use computed for conflictCount, never assign directly
 const conflictCount = computed(() => conflictClips.value.length)
 const resolvingId = ref(null)
 
@@ -400,23 +400,34 @@ function handleSelectionChange(selection) {
   selectedRows.value = selection
 }
 
-// Download raw format data via backend endpoint
-function handleDownloadFormat(clipId, formatType) {
-  const token = userStore.token
-  if (!token) {
-    ElMessage.error('未登录')
-    return
+// Download raw format data via axios + Blob (auth via HttpOnly cookies - H1)
+async function handleDownloadFormat(clipId, formatType) {
+  try {
+    // H1: No token needed - auth handled by HttpOnly cookies (withCredentials: true)
+    const axios = (await import('axios')).default
+    const res = await axios.get(`/api/v1/clips/${clipId}/download`, {
+      params: { format_type: formatType },
+      withCredentials: true,
+      responseType: 'blob',
+    })
+    // Create Blob and trigger download
+    const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const filename = res.headers['content-disposition']
+      ? res.headers['content-disposition'].split('filename=')[1]?.replace(/"/g, '') || 'clip_data'
+      : `clip_${clipId}_${formatType}`
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('下载完成')
+  } catch (err) {
+    console.error('Failed to download format:', err)
+    ElMessage.error('下载失败')
   }
-  const url = `/api/v1/clips/${clipId}/download?format_type=${formatType}&token=${encodeURIComponent(token)}`
-  // Open in hidden iframe to trigger download without leaving page
-  const iframe = document.createElement('iframe')
-  iframe.style.display = 'none'
-  iframe.src = url
-  iframe.onload = () => {
-    setTimeout(() => iframe.remove(), 1000)
-  }
-  document.body.appendChild(iframe)
-  ElMessage.success('开始下载')
 }
 
 function handleRowClick(row) {
@@ -512,7 +523,7 @@ async function fetchConflictClips() {
     const res = await listConflictClips()
     if (res.code === 0) {
       conflictClips.value = res.data || []
-      conflictCount.value = conflictClips.value.length
+      // conflictCount auto-updates via computed (M3 fix)
     }
   } catch (err) {
     ElMessage.error('获取冲突剪贴板失败: ' + err.message)
@@ -567,6 +578,11 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  // MEDIUM FIX (M4): Clear search debounce timer to prevent stale callbacks
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
   ws.disconnect()
   window.removeEventListener('ws-clip-added', onWsClipAdded)
 })

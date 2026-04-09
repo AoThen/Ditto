@@ -95,7 +95,7 @@ REGISTER_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"testuser","email":"test@example.com","password":"TestPass123"}' 2>/dev/null)
 
-if echo "$REGISTER_RESPONSE" | grep -q -E '"code":200|"success"'; then
+if echo "$REGISTER_RESPONSE" | grep -q -E '"code":0|"code":200|"success"'; then
     pass "User registration successful"
 else
     # Check if user already exists (might be from previous test)
@@ -107,15 +107,17 @@ else
     fi
 fi
 
-# Test 7: User login
+# Test 7: User login (H1: cookies set automatically)
 info "Test 7: User login..."
 LOGIN_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
+  -c /tmp/ditto-cookies.txt \
   -d '{"username":"testuser","password":"TestPass123"}' 2>/dev/null)
 
-TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+# H1: Token is now in HttpOnly cookie, check for success code
+TOKEN=$(echo "$LOGIN_RESPONSE" | grep -o '"code":0' | head -1)
 if [ -n "$TOKEN" ]; then
-    pass "User login successful, token received"
+    pass "User login successful"
 else
     fail "User login failed"
     info "Response: $LOGIN_RESPONSE"
@@ -127,9 +129,9 @@ fi
 # Test 8: Get clips list (should be empty initially)
 info "Test 8: Get clips list..."
 CLIPS_RESPONSE=$(curl -s http://localhost:8080/api/v1/clips \
-  -H "Authorization: Bearer $TOKEN" 2>/dev/null)
+  -b /tmp/ditto-cookies.txt 2>/dev/null)
 
-if echo "$CLIPS_RESPONSE" | grep -q -E '"code":200|"data"'; then
+if echo "$CLIPS_RESPONSE" | grep -q -E '"code":0|"data"'; then
     pass "Get clips list successful"
 else
     fail "Get clips list failed"
@@ -139,7 +141,7 @@ fi
 # Test 9: Sync clips (push)
 info "Test 9: Push clips to server..."
 PUSH_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/clips/sync \
-  -H "Authorization: Bearer $TOKEN" \
+  -b /tmp/ditto-cookies.txt \
   -H "Content-Type: application/json" \
   -d '{
     "since": "1970-01-01T00:00:00Z",
@@ -153,7 +155,7 @@ PUSH_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/clips/sync \
           {
             "format_name": "CF_UNICODETEXT",
             "format_type": 13,
-            "data": "Hello from e2e test!",
+            "data": "SGVsbG8gZnJvbSBlMmUgdGVzdCE=",
             "data_size": 20
           }
         ]
@@ -161,7 +163,7 @@ PUSH_RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/clips/sync \
     ]
   }' 2>/dev/null)
 
-if echo "$PUSH_RESPONSE" | grep -q -E '"synced_count":[1-9]|"code":200'; then
+if echo "$PUSH_RESPONSE" | grep -q -E '"synced_count":[1-9]|"code":0'; then
     pass "Push clips successful"
 else
     fail "Push clips failed"
@@ -171,7 +173,7 @@ fi
 # Test 10: Get clips list (should have 1 clip now)
 info "Test 10: Get clips list after push..."
 CLIPS_AFTER=$(curl -s http://localhost:8080/api/v1/clips \
-  -H "Authorization: Bearer $TOKEN" 2>/dev/null)
+  -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$CLIPS_AFTER" | grep -q -E '"total":[1-9]|"items"'; then
     pass "Clips list updated after push"
@@ -183,7 +185,7 @@ fi
 # Test 11: Stats overview
 info "Test 11: Get stats overview..."
 STATS_RESPONSE=$(curl -s http://localhost:8080/api/v1/stats/overview \
-  -H "Authorization: Bearer $TOKEN" 2>/dev/null)
+  -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$STATS_RESPONSE" | grep -q -E '"total_clips"|code'; then
     pass "Stats overview retrieved"
@@ -195,7 +197,7 @@ fi
 # Test 12: Get devices list
 info "Test 12: Get devices list..."
 DEVICES_RESPONSE=$(curl -s http://localhost:8080/api/v1/devices \
-  -H "Authorization: Bearer $TOKEN" 2>/dev/null)
+  -b /tmp/ditto-cookies.txt 2>/dev/null)
 
 if echo "$DEVICES_RESPONSE" | grep -q -E '"data"|code'; then
     pass "Devices list retrieved"

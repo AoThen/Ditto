@@ -84,7 +84,7 @@ func TestRegister_InvalidInput(t *testing.T) {
 	}
 }
 
-// TestLogin_Success — login with correct credentials, expect device_token in response
+// TestLogin_Success — login with correct credentials, expect HttpOnly cookies
 func TestLogin_Success(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 
@@ -94,20 +94,21 @@ func TestLogin_Success(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	require.Equal(t, 0, code)
 
-	// Login
-	statusCode, respBody = testutil.LoginUser(t, server, "loginuser", "password123")
+	// H1: Login returns cookies instead of JSON token
+	statusCode, respBody, setCookies := testutil.LoginUserWithCookies(t, server, "loginuser", "password123")
 	assert.Equal(t, http.StatusOK, statusCode)
-	code, message, data := testutil.ParseResponse(t, respBody)
+	code, _, data := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
-	assert.Empty(t, message) // Success without custom message
 	assert.NotNil(t, data)
-	assert.Contains(t, data, "device_token")
 	assert.Contains(t, data, "device_id")
 
-	token, _ := data["device_token"].(string)
+	// H1: Verify HttpOnly cookies are set
+	token := testutil.ExtractCookie(setCookies, "device_token")
+	refreshToken := testutil.ExtractCookie(setCookies, "refresh_token")
 	deviceID, _ := data["device_id"].(string)
-	assert.NotEmpty(t, token)
-	assert.NotEmpty(t, deviceID)
+	assert.NotEmpty(t, token, "device_token cookie should be set")
+	assert.NotEmpty(t, refreshToken, "refresh_token cookie should be set")
+	assert.NotEmpty(t, deviceID, "device_id should be in response body")
 }
 
 // TestLogin_WrongPassword — login with wrong password, expect code=40101

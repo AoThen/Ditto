@@ -29,9 +29,28 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for WebSocket (can be restricted in production)
-		return true
+		// HIGH FIX (H5): Validate Origin header against allowed list
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Allow non-browser clients
+		}
+		for _, allowed := range upgraderConfig.allowedOrigins {
+			if origin == allowed {
+				return true
+			}
+		}
+		log.Printf("[ws] blocked origin: %s", origin)
+		return false
 	},
+}
+
+var upgraderConfig = struct {
+	allowedOrigins []string
+}{}
+
+// SetAllowedOrigins configures the allowed origins for WebSocket connections.
+func SetAllowedOrigins(origins []string) {
+	upgraderConfig.allowedOrigins = origins
 }
 
 // WSHandler handles WebSocket upgrade and connection lifecycle.
@@ -47,8 +66,24 @@ func NewWSHandler(h WSHub, cfg *config.Config) *WSHandler {
 
 // HandleWebSocket upgrades HTTP to WebSocket and manages the connection.
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
-	// Validate JWT token from query param
-	tokenStr := c.Query("token")
+	// H1 + C3: Read JWT from HttpOnly cookie (primary) or Sec-WebSocket-Protocol (fallback)
+	tokenStr := ""
+
+	// Try HttpOnly cookie first (set by login, read by auth middleware)
+	if cookie, err := c.Cookie("device_token"); err == nil && cookie != "" {
+		tokenStr = cookie
+	}
+
+	// Fallback: Sec-WebSocket-Protocol header (for clients that don't support cookies)
+	if tokenStr == "" {
+		tokenStr = c.GetHeader("Sec-WebSocket-Protocol")
+	}
+
+	// Last fallback: raw request header
+	if tokenStr == "" {
+		tokenStr = c.Request.Header.Get("Sec-Websocket-Protocol")
+	}
+
 	if tokenStr == "" {
 		response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
 		return
@@ -56,6 +91,10 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 
 	claims := &WSJWTClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+		// MEDIUM FIX (M6): Enforce HMAC algorithm to prevent alg=None / algorithm confusion
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
 		return []byte(h.cfg.JWTSecret), nil
 	})
 	if err != nil || !token.Valid {
@@ -69,7 +108,14 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 	}
 
 	// Upgrade HTTP to WebSocket
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	// Must respond with the same protocol to complete handshake
+	upgraderWithProtocol := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     upgrader.CheckOrigin, // Reuse same origin validation (H5)
+		Subprotocols:    []string{tokenStr},
+	}
+	conn, err := upgraderWithProtocol.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("[ws] failed to upgrade connection: %v", err)
 		return

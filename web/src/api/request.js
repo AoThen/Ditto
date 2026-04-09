@@ -1,10 +1,13 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
+import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
   timeout: 10000,
+  // HIGH FIX (H1): Send cookies with requests (HttpOnly tokens)
+  withCredentials: true,
 })
 
 // Track whether a token refresh is in progress
@@ -23,13 +26,19 @@ function processQueue(error, token = null) {
   failedQueue = []
 }
 
-// Request interceptor: attach Authorization header
+// MEDIUM FIX (M2): Clear failedQueue on route navigation
+router.beforeEach((_to, _from, next) => {
+  if (isRefreshing && failedQueue.length > 0) {
+    processQueue(new Error('Navigation cancelled refresh'), null)
+    isRefreshing = false
+  }
+  next()
+})
+
+// Request interceptor: cookies are sent automatically (withCredentials: true)
+// No need to manually attach Authorization header (H1)
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
     return config
   },
   (error) => {
@@ -56,8 +65,7 @@ request.interceptors.response.use(
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject })
           })
-            .then((token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`
+            .then(() => {
               return request(originalRequest)
             })
             .catch((err) => {
@@ -68,46 +76,30 @@ request.interceptors.response.use(
         originalRequest._retry = true
         isRefreshing = true
 
-        const refreshToken = localStorage.getItem('refresh_token')
-        if (!refreshToken) {
-          // No refresh token available, force logout
-          localStorage.removeItem('token')
-          localStorage.removeItem('refresh_token')
-          localStorage.removeItem('userInfo')
-          router.push('/login')
-          return Promise.reject(new Error(backendMessage || '登录已过期，请重新登录'))
-        }
-
         try {
-          // Call refresh token endpoint
+          // H1: Call refresh token endpoint (cookies sent automatically)
           const refreshResponse = await axios.post(
             `${request.defaults.baseURL}/api/v1/auth/refresh`,
-            { refresh_token: refreshToken }
+            {},
+            { withCredentials: true }
           )
-          const newToken = refreshResponse.data?.data?.token
-          const newRefreshToken = refreshResponse.data?.data?.refresh_token
 
-          if (!newToken) {
-            throw new Error('No token in refresh response')
+          // H1: Backend sets new HttpOnly cookies, no need to store tokens
+          const userStore = useUserStore()
+          // Check if we got a valid response (cookies are set by backend)
+          if (refreshResponse.status === 200) {
+            // Retry all queued requests (cookies handle auth)
+            processQueue(null, null)
+            // Retry the original request
+            return request(originalRequest)
           }
 
-          localStorage.setItem('token', newToken)
-          if (newRefreshToken) {
-            localStorage.setItem('refresh_token', newRefreshToken)
-          }
-
-          // Retry all queued requests with the new token
-          processQueue(null, newToken)
-
-          // Retry the original request
-          originalRequest.headers.Authorization = `Bearer ${newToken}`
-          return request(originalRequest)
+          throw new Error('Token refresh failed')
         } catch (refreshError) {
           // Refresh failed — force logout
           processQueue(refreshError, null)
-          localStorage.removeItem('token')
-          localStorage.removeItem('refresh_token')
-          localStorage.removeItem('userInfo')
+          const userStore = useUserStore()
+          userStore.logout()
           router.push('/login')
           return Promise.reject(new Error(backendMessage || '登录已过期，请重新登录'))
         } finally {

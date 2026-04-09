@@ -38,8 +38,9 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	DeviceToken string `json:"device_token"`
-	DeviceID    string `json:"device_id"`
+	DeviceToken  string `json:"device_token"`
+	RefreshToken string `json:"refresh_token"`
+	DeviceID     string `json:"device_id"`
 }
 
 var (
@@ -111,63 +112,72 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 		return nil, err
 	}
 
-	// Generate JWT token
-	token, err := s.generateToken(user.ID, deviceID)
+	// Generate JWT token (access token + refresh token)
+	accessToken, err := s.generateToken(user.ID, deviceID, 30*24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	refreshToken, err := s.generateToken(user.ID, deviceID, 90*24*time.Hour)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LoginResponse{
-		DeviceToken: token,
-		DeviceID:    deviceID,
+		DeviceToken:  accessToken,
+		RefreshToken: refreshToken,
+		DeviceID:     deviceID,
 	}, nil
 }
 
-func (s *AuthService) RefreshDeviceToken(deviceID string, oldToken string) (string, error) {
+func (s *AuthService) RefreshDeviceToken(deviceID string, oldToken string) (string, string, error) {
 	// Verify the old token is valid first (middleware already does this)
 	// Parse the old token to extract user_id
 	token, _, err := new(jwt.Parser).ParseUnverified(oldToken, jwt.MapClaims{})
 	if err != nil {
-		return "", errors.New("无效的 Token")
+		return "", "", errors.New("无效的 Token")
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("无效的 Token 声明")
+		return "", "", errors.New("无效的 Token 声明")
 	}
 
 	userIDFloat, ok := claims["user_id"].(float64)
 	if !ok {
-		return "", errors.New("无效的 Token: 缺少 user_id")
+		return "", "", errors.New("无效的 Token: 缺少 user_id")
 	}
 	userID := uint(userIDFloat)
 
 	// Verify device_id matches
 	tokenDeviceID, ok := claims["device_id"].(string)
 	if !ok || tokenDeviceID != deviceID {
-		return "", errors.New("设备不匹配")
+		return "", "", errors.New("设备不匹配")
 	}
 
-	// Verify user still exists and is active
+	// Verify user still exists
 	var user model.User
-	if err := database.DB.Where("id = ? AND status = ?", userID, 1).First(&user).Error; err != nil {
-		return "", errors.New("用户不存在或已禁用")
+	if err := database.DB.Where("id = ?", userID).First(&user).Error; err != nil {
+		return "", "", errors.New("用户不存在")
 	}
 
-	// Generate new token
-	newToken, err := s.generateToken(userID, deviceID)
+	// Generate new tokens
+	accessToken, err := s.generateToken(userID, deviceID, 30*24*time.Hour)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+	refreshToken, err := s.generateToken(userID, deviceID, 90*24*time.Hour)
+	if err != nil {
+		return "", "", err
 	}
 
-	return newToken, nil
+	return accessToken, refreshToken, nil
 }
 
-func (s *AuthService) generateToken(userID uint, deviceID string) (string, error) {
+func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":   userID,
 		"device_id": deviceID,
-		"exp":       time.Now().Add(30 * 24 * time.Hour).Unix(),
+		"exp":       time.Now().Add(expiry).Unix(),
 		"iat":       time.Now().Unix(),
 	})
 

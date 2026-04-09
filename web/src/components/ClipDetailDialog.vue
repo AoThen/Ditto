@@ -35,6 +35,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   modelValue: {
@@ -65,7 +66,9 @@ const textContent = computed(() => {
 const htmlContent = computed(() => {
   if (!props.clip?.formats) return ''
   const htmlFormat = props.clip.formats.find(f => f.format_name?.includes('HTML'))
-  return htmlFormat?.data || ''
+  const rawHtml = htmlFormat?.data || ''
+  // CRITICAL FIX: Sanitize untrusted clipboard HTML to prevent stored XSS
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_TAGS: ['b','i','em','strong','a','p','br','ul','ol','li','h1','h2','h3','h4','h5','h6','span','div','table','tr','td','th','thead','tbody','img','code','pre','blockquote','hr','font','center','strike','u','sub','sup'], ALLOWED_ATTR: ['href','title','target','rel','src','alt','width','height','style','class','id','align','bgcolor','color','size','face','border','cellpadding','cellspacing','colspan','rowspan','valign','nowrap','width','height'] })
 })
 
 const imageUrl = computed(() => {

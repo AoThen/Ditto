@@ -46,13 +46,13 @@ func TestSync_PushAndPull(t *testing.T) {
 	require.Equal(t, 0, code)
 
 	// Login device A
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "syncuser", "password123", "DeviceA")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "syncuser", "password123", "DeviceA")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getTokenFromLoginResp(t, loginRespA)
 	deviceA := getDeviceIDFromLoginResp(t, loginRespA)
 
 	// Login device B
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "syncuser", "password123", "DeviceB")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "syncuser", "password123", "DeviceB")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 	deviceB := getDeviceIDFromLoginResp(t, loginRespB)
@@ -131,7 +131,7 @@ func TestSync_SameDevice(t *testing.T) {
 
 	// Register and login
 	testutil.RegisterUser(t, server, "samedevice", "samedevice@example.com", "password123")
-	statusCode, loginResp := testutil.LoginUserWithDeviceName(t, server, "samedevice", "password123", "OnlyDevice")
+	statusCode, loginResp, _ := testutil.LoginUserWithDeviceName(t, server, "samedevice", "password123", "OnlyDevice")
 	require.Equal(t, http.StatusOK, statusCode)
 	token := getTokenFromLoginResp(t, loginResp)
 	deviceID := getDeviceIDFromLoginResp(t, loginResp)
@@ -193,7 +193,7 @@ func TestSync_EmptyPush(t *testing.T) {
 	testutil.RegisterUser(t, server, "emptysync", "emptysync@example.com", "password123")
 
 	// Login device A and push a clip
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "emptysync", "password123", "PushDevice")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "emptysync", "password123", "PushDevice")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getTokenFromLoginResp(t, loginRespA)
 	deviceA := getDeviceIDFromLoginResp(t, loginRespA)
@@ -226,7 +226,7 @@ func TestSync_EmptyPush(t *testing.T) {
 	require.Equal(t, 0, code)
 
 	// Login device B
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "emptysync", "password123", "PullDevice")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "emptysync", "password123", "PullDevice")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 	deviceB := getDeviceIDFromLoginResp(t, loginRespB)

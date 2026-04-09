@@ -87,12 +87,9 @@ async function handleLogin() {
     if (!valid) return
     loading.value = true
     try {
+      // H1: Backend sets HttpOnly cookies, response only contains device_id
       const res = await login(form)
       if (res.code === 0) {
-        userStore.setToken(res.data.device_token)
-        if (res.data.refresh_token) {
-          userStore.setRefreshToken(res.data.refresh_token)
-        }
         userStore.setUserInfo({ device_id: res.data.device_id })
         ElMessage.success('登录成功')
         router.push('/dashboard')

@@ -74,7 +74,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Record successful login (reset rate limits)
 	h.rateLimiter.RecordLoginSuccess(c.ClientIP(), req.Username)
 
-	response.Success(c, resp)
+	// H1: Set HttpOnly Secure cookies for browser clients
+	// Also include tokens in JSON response for API clients / backward compat
+	setAuthCookies(c, resp.DeviceToken, resp.RefreshToken, resp.DeviceID)
+
+	response.Success(c, gin.H{
+		"device_token":  resp.DeviceToken,
+		"refresh_token": resp.RefreshToken,
+		"device_id":     resp.DeviceID,
+	})
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
@@ -82,12 +90,36 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	deviceID := middleware.GetDeviceID(c)
 	oldToken := middleware.GetRawToken(c)
 
-	newToken, err := h.service.RefreshDeviceToken(deviceID, oldToken)
+	newToken, refreshToken, err := h.service.RefreshDeviceToken(deviceID, oldToken)
 	if err != nil {
 		response.Error(c, http.StatusUnauthorized, 40101, "Token 刷新失败: "+err.Error())
 		return
 	}
 
-	_ = userID // userID extracted from JWT, used for logging if needed
-	response.Success(c, gin.H{"device_token": newToken})
+	_ = userID
+	// H1: Set new HttpOnly cookies
+	setAuthCookies(c, newToken, refreshToken, deviceID)
+
+	response.SuccessWithMessage(c, "Token 刷新成功", gin.H{
+		"device_id": deviceID,
+	})
+}
+
+// setAuthCookies sets HttpOnly Secure cookies for authentication tokens.
+func setAuthCookies(c *gin.Context, accessToken, refreshToken, deviceID string) {
+	// Access token cookie (30 days)
+	c.SetCookie("device_token", accessToken, 30*24*3600, "/", "", false, true)
+	// Refresh token cookie (90 days)
+	c.SetCookie("refresh_token", refreshToken, 90*24*3600, "/", "", false, true)
+	// Device ID cookie (readable by JS for display purposes only)
+	c.SetCookie("device_id", deviceID, 30*24*3600, "/", "", false, false)
+}
+
+// Logout clears auth cookies and returns success.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	// H1: Clear auth cookies by setting them with maxAge=0
+	c.SetCookie("device_token", "", 0, "/", "", false, true)
+	c.SetCookie("refresh_token", "", 0, "/", "", false, true)
+	c.SetCookie("device_id", "", 0, "/", "", false, false)
+	response.SuccessWithMessage(c, "已退出登录", nil)
 }

@@ -64,13 +64,22 @@ func main() {
 	wsHandler := handler.NewWSHandler(h, cfg)
 	statsHandler := handler.NewStatsHandler()
 
+	// HIGH FIX (H5): Configure WebSocket allowed origins
+	handler.SetAllowedOrigins(cfg.AllowedOrigins)
+
 	// Setup Gin
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	// CORS middleware (allow all origins for development)
-	r.Use(cors.Default())
+	// CORS middleware (restrict to configured origins - HIGH FIX H4)
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.AllowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Sec-WebSocket-Protocol"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
+		AllowCredentials: true,
+	}))
 
 	// Health check with stats
 	r.GET("/health", func(c *gin.Context) {
@@ -103,6 +112,7 @@ func main() {
 		auth := semiProtected.Group("/auth")
 		{
 			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/logout", authHandler.Logout)
 		}
 	}
 

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Config struct {
 	CleanupInterval time.Duration // How often to run cleanup
 	MaxClipAge      time.Duration // Maximum age of clips before removal
 	MaxClipsPerUser int           // Maximum clips per user
+	AllowedOrigins  []string      // CORS + WebSocket allowed origins
 }
 
 func Load() *Config {
@@ -53,6 +55,27 @@ func Load() *Config {
 		}
 	}
 
+	// HIGH FIX (H4/H5): Read allowed origins from env, default to localhost dev origins.
+	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
+	var allowedOrigins []string
+	if allowedOriginsStr != "" {
+		// Comma-separated list of origins
+		for _, origin := range strings.Split(allowedOriginsStr, ",") {
+			trimmed := strings.TrimSpace(origin)
+			if trimmed != "" {
+				allowedOrigins = append(allowedOrigins, trimmed)
+			}
+		}
+	} else {
+		// Default: localhost dev origins
+		allowedOrigins = []string{
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://127.0.0.1:3000",
+			"http://127.0.0.1:5173",
+		}
+	}
+
 	return &Config{
 		Port:            port,
 		DatabasePath:    dbPath,
@@ -61,5 +84,6 @@ func Load() *Config {
 		CleanupInterval: cleanupInterval,
 		MaxClipAge:      maxClipAge,
 		MaxClipsPerUser: maxClipsPerUser,
+		AllowedOrigins:  allowedOrigins,
 	}
 }

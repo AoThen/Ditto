@@ -19,21 +19,32 @@ type Claims struct {
 
 func Auth(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
-			c.Abort()
-			return
+		// HIGH FIX (H1): Read JWT from HttpOnly cookie as primary source,
+		// with Authorization header fallback for backward compatibility
+		tokenStr := ""
+
+		// Try HttpOnly cookie first (more secure than Authorization header)
+		if cookie, err := c.Cookie("device_token"); err == nil && cookie != "" {
+			tokenStr = cookie
+		} else {
+			// Fallback to Authorization header (for API clients, tests, etc.)
+			authHeader := c.GetHeader("Authorization")
+			if authHeader != "" {
+				tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
+			}
 		}
 
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenStr == authHeader {
+		if tokenStr == "" {
 			response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
 			c.Abort()
 			return
 		}
 
 		token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+			// MEDIUM FIX (M6): Enforce HMAC algorithm to prevent alg=None / algorithm confusion attacks
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
 			return []byte(cfg.JWTSecret), nil
 		})
 		if err != nil || !token.Valid {

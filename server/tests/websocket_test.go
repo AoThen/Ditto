@@ -18,13 +18,15 @@ import (
 )
 
 // wsDialURL converts an httptest.Server URL to a WebSocket URL.
-// e.g. "http://127.0.0.1:12345" -> "ws://127.0.0.1:12345/api/v1/ws?token=xxx"
+// e.g. "http://127.0.0.1:12345" -> "ws://127.0.0.1:12345/api/v1/ws"
 func wsDialURL(serverURL, token string) string {
 	path := strings.TrimPrefix(serverURL, "http://")
-	return "ws://" + path + "/api/v1/ws?token=" + token
+	return "ws://" + path + "/api/v1/ws"
 }
 
 // wsHeaders returns HTTP headers for WebSocket connection with auth.
+// The Authorization header is for the Auth middleware, while the
+// Sec-WebSocket-Protocol subprotocol is for the WS handler (CRITICAL FIX C3).
 func wsHeaders(token string) http.Header {
 	h := http.Header{}
 	h.Set("Authorization", "Bearer "+token)
@@ -91,7 +93,9 @@ func TestWebSocket_Connect(t *testing.T) {
 
 	// Connect to WebSocket
 	wsURL := wsDialURL(server.URL, token)
-	dialer := websocket.Dialer{}
+	dialer := websocket.Dialer{
+		Subprotocols: []string{token}, // CRITICAL FIX (C3): token as subprotocol
+	}
 	conn, resp, err := dialer.Dial(wsURL, wsHeaders(token))
 	require.NoError(t, err, "WebSocket connection failed")
 	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "expected HTTP 101 Switching Protocols")
@@ -124,19 +128,21 @@ func TestWebSocket_BroadcastOnSync(t *testing.T) {
 	testutil.RegisterUser(t, server, "broadcastuser", "broadcastuser@example.com", "password123")
 
 	// Login DeviceA
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "broadcastuser", "password123", "DeviceA")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "broadcastuser", "password123", "DeviceA")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getTokenFromLoginResp(t, loginRespA)
 	deviceA := getDeviceIDFromLoginResp(t, loginRespA)
 
 	// Login DeviceB
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "broadcastuser", "password123", "DeviceB")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "broadcastuser", "password123", "DeviceB")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 
 	// Connect DeviceB to WebSocket
 	wsURL := wsDialURL(server.URL, tokenB)
-	dialer := websocket.Dialer{}
+	dialer := websocket.Dialer{
+		Subprotocols: []string{tokenB},
+	}
 	connB, resp, err := dialer.Dial(wsURL, wsHeaders(tokenB))
 	require.NoError(t, err, "DeviceB WebSocket connection failed")
 	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
@@ -174,20 +180,22 @@ func TestWebSocket_NoCrossUserBroadcast(t *testing.T) {
 
 	// Register and login user A
 	testutil.RegisterUser(t, server, "crossuserA", "crossuserA@example.com", "password123")
-	statusCode, loginRespA := testutil.LoginUserWithDeviceName(t, server, "crossuserA", "password123", "DeviceA1")
+	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "crossuserA", "password123", "DeviceA1")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getTokenFromLoginResp(t, loginRespA)
 	deviceA1 := getDeviceIDFromLoginResp(t, loginRespA)
 
 	// Register and login user B
 	testutil.RegisterUser(t, server, "crossuserB", "crossuserB@example.com", "password123")
-	statusCode, loginRespB := testutil.LoginUserWithDeviceName(t, server, "crossuserB", "password123", "DeviceB1")
+	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "crossuserB", "password123", "DeviceB1")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 
 	// Connect DeviceB1 to WebSocket
 	wsURL := wsDialURL(server.URL, tokenB)
-	dialer := websocket.Dialer{}
+	dialer := websocket.Dialer{
+		Subprotocols: []string{tokenB},
+	}
 	connB1, resp, err := dialer.Dial(wsURL, wsHeaders(tokenB))
 	require.NoError(t, err, "DeviceB1 WebSocket connection failed")
 	require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)
@@ -225,7 +233,9 @@ func TestWebSocket_InvalidToken(t *testing.T) {
 	// Try to connect with an invalid JWT token
 	invalidToken := "this.is.not.a.valid.jwt.token"
 	wsURL := wsDialURL(server.URL, invalidToken)
-	dialer := websocket.Dialer{}
+	dialer := websocket.Dialer{
+		Subprotocols: []string{invalidToken},
+	}
 
 	conn, resp, err := dialer.Dial(wsURL, wsHeaders(invalidToken))
 
@@ -255,16 +265,16 @@ func TestWebSocket_MultipleConnections(t *testing.T) {
 	testutil.RegisterUser(t, server, "multiuser", "multiuser@example.com", "password123")
 
 	// Login 3 times for 3 device tokens
-	statusCode, loginResp1 := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client1")
+	statusCode, loginResp1, _ := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client1")
 	require.Equal(t, http.StatusOK, statusCode)
 	token1 := getTokenFromLoginResp(t, loginResp1)
 	device1 := getDeviceIDFromLoginResp(t, loginResp1)
 
-	statusCode, loginResp2 := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client2")
+	statusCode, loginResp2, _ := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client2")
 	require.Equal(t, http.StatusOK, statusCode)
 	token2 := getTokenFromLoginResp(t, loginResp2)
 
-	statusCode, loginResp3 := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client3")
+	statusCode, loginResp3, _ := testutil.LoginUserWithDeviceName(t, server, "multiuser", "password123", "Client3")
 	require.Equal(t, http.StatusOK, statusCode)
 	token3 := getTokenFromLoginResp(t, loginResp3)
 
@@ -273,7 +283,9 @@ func TestWebSocket_MultipleConnections(t *testing.T) {
 	tokens := []string{token1, token2, token3}
 	for i, tok := range tokens {
 		wsURL := wsDialURL(server.URL, tok)
-		dialer := websocket.Dialer{}
+		dialer := websocket.Dialer{
+			Subprotocols: []string{tok},
+		}
 		conn, resp, err := dialer.Dial(wsURL, wsHeaders(tok))
 		require.NoError(t, err, "Client %d WebSocket connection failed", i+1)
 		require.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode)

@@ -4,7 +4,7 @@
     <header class="topbar">
       <div class="topbar-title">Ditto Cloud</div>
       <div class="topbar-user">
-        <span v-if="userStore.userInfo" class="username">{{ userStore.userInfo.username }}</span>
+        <span v-if="userStore.username" class="username">{{ userStore.username }}</span>
         <el-button type="danger" size="small" @click="handleLogout">退出登录</el-button>
       </div>
     </header>
@@ -54,6 +54,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { ElMessage } from 'element-plus'
+import axios from 'axios'
 import { DataAnalysis, Document, Monitor, Setting, FolderOpened } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -65,9 +66,14 @@ const activeMenu = computed(() => route.path)
 
 function handleLogout() {
   ws.disconnect()
-  userStore.logout()
-  ElMessage.success('已退出登录')
-  router.push('/login')
+  // H1: Call backend logout to clear HttpOnly cookies
+  axios.post('/api/v1/auth/logout', {}, { withCredentials: true }).catch(() => {
+    // Ignore errors during logout
+  }).finally(() => {
+    userStore.logout()
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  })
 }
 </script>
 
