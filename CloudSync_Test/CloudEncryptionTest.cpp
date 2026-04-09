@@ -431,7 +431,7 @@ TEST(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
 	CStringA tampered(encrypted);
 	if (tampered.GetLength() > 20)
 	{
-		LPTSTR sz = tampered.GetBuffer();
+		LPSTR sz = tampered.GetBuffer();
 		sz[10] = (sz[10] == 'A') ? 'B' : 'A';
 		tampered.ReleaseBuffer();
 	}

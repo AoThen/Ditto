@@ -8,6 +8,7 @@
 #include "stdafx.h"
 #include <gtest/gtest.h>
 #include "../src/CloudSync/CloudAuth.h"
+#include "../src/CloudSync/CloudKeyExport.h"
 #include "GetSetOptionsMock.h"
 #include <vector>
 #include <string>
@@ -256,8 +257,8 @@ TEST(CloudAuth_TokenPersistence, DeviceIdPersistsAcrossCalls)
 TEST(CloudAuth_ErrorHandling, LongCredentials)
 {
 	// Test with very long credentials (should not crash)
-	CString longUsername(10000, 'A');
-	CString longPassword(10000, 'B');
+	CString longUsername(_T('A'), 10000);
+	CString longPassword(_T('B'), 10000);
 	
 	LoginResult result = CCloudAuth::Login(
 		_T("https://localhost:8080"),
