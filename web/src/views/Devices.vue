@@ -74,7 +74,7 @@ async function fetchDevices() {
   loading.value = true
   try {
     const res = await listDevices()
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 0) {
       // Mark current device (based on stored token)
       const currentDeviceId = localStorage.getItem('device_id')
       deviceList.value = (res.data || []).map(device => ({

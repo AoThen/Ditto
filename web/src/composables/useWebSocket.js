@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 
@@ -11,6 +11,9 @@ let sharedReconnectTimer = null
 let sharedPingTimer = null
 let sharedReconnectAttempts = 0
 const MAX_RECONNECT_DELAY = 30000
+
+// FIX: Shared consumer counter so all components coordinate properly
+let activeConsumers = 0
 
 function startPingTimer() {
   stopPingTimer()
@@ -104,7 +107,8 @@ function connect() {
       sharedIsConnected.value = false
       stopPingTimer()
       sharedWs = null
-      if (event.code !== 1000 || event.reason === 'Client disconnect') {
+      // Only reconnect if closed abnormally and there are still active consumers
+      if ((event.code !== 1000 || event.reason === 'Client disconnect') && activeConsumers > 0) {
         scheduleReconnect()
       }
     }
@@ -138,14 +142,15 @@ function isConnectedToServer() {
 
 /**
  * useWebSocket - Singleton WebSocket composable.
- * All callers in the same tab share the SAME connection.
- * The first call to connect() opens the connection.
- * The last component to unmount will NOT disconnect (connection persists across routes).
- * Use disconnectExplicit() to fully close (e.g. on logout).
+ * All callers in the same tab share the SAME connection AND the SAME consumer counter.
+ * Connection persists across route navigation — only closes on explicit disconnect
+ * (e.g. logout) or when the last consumer unmounts.
  */
 export function useWebSocket() {
-  const userStore = useUserStore()
-  let activeConsumers = 0
+  onMounted(() => {
+    activeConsumers++
+    connect()
+  })
 
   onUnmounted(() => {
     activeConsumers--
@@ -155,18 +160,13 @@ export function useWebSocket() {
     }
   })
 
-  function connectIfNeeded() {
-    activeConsumers++
-    connect()
-  }
-
   function disconnectExplicit() {
     activeConsumers = 0
     disconnect()
   }
 
   return {
-    connect: connectIfNeeded,
+    connect,
     disconnect: disconnectExplicit,
     isConnected: sharedIsConnected,
     isConnectedToServer

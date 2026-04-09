@@ -33,8 +33,15 @@ const routes = [
       { path: 'clips', component: () => import('../views/Clips.vue') },
       { path: 'groups', component: () => import('../views/Groups.vue') },
       { path: 'devices', component: () => import('../views/Devices.vue') },
+      { path: 'sync-logs', component: () => import('../views/SyncLogs.vue') },
       { path: 'settings', component: () => import('../views/Settings.vue') },
     ],
+  },
+  // 404 catch-all route (must be last)
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFound.vue'),
   },
 ]
 

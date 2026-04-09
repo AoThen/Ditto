@@ -23,6 +23,7 @@
 #include "UAC_Thread.h"
 #include "ICU_String.h"
 #include "ClipEditThread.h"
+#include "CloudSync/CloudSyncManager.h"
 
 
 extern class CCP_MainApp theApp;
@@ -98,6 +99,9 @@ public:
 	CCopyThread	m_CopyThread;
 	void StartCopyThread();
 	void StopCopyThread();
+
+	// Cloud Sync Manager
+	CCloudSyncManager m_CloudSyncManager;
 	// for posting messages
 	HWND GetClipboardViewer() { return m_CopyThread.m_pClipboardViewer->m_hWnd; }
 	bool EnableCbCopy(bool bState) { return m_CopyThread.SetCopyOnChange(bState); }

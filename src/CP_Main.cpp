@@ -425,6 +425,9 @@ BOOL CCP_MainApp::InitInstance()
 		CreateMainWnd();
 	}
 
+	// Initialize Cloud Sync (best effort, non-blocking)
+	m_CloudSyncManager.Initialize();
+
 	return TRUE;
 }
 
@@ -913,6 +916,9 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 int CCP_MainApp::ExitInstance() 
 {
 	Log(_T("ExitInstance"));
+
+	// Stop Cloud Sync before database closes
+	m_CloudSyncManager.Stop();
 
 	DeleteDittoTempFiles(FALSE);
 

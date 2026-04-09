@@ -15,6 +15,7 @@
 #include "ChaiScriptOnCopy.h"
 #include "DittoChaiScript.h"
 #include "ImageHelper.h"
+#include "CloudSync/CloudSyncManager.h"
 
 #include <Mmsystem.h>
 #include <memory>
@@ -842,6 +843,9 @@ bool CClip::AddToDB(bool bCheckForDuplicates)
 		{
 			RemoveStickySetting(removeStickySettingClipId, m_parentId);
 		}
+
+		// Trigger cloud sync for this new clip (fire-and-forget)
+		theApp.m_CloudSyncManager.OnClipAdded(this);
 	}
 	
 	// should be emptied by AddToDataTable

@@ -162,7 +162,7 @@ function getBarHeight(count) {
 async function fetchStats() {
   try {
     const res = await getStatsOverview()
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 0) {
       stats.value = res.data || res
     }
   } catch (err) {
@@ -175,7 +175,7 @@ async function fetchRecentClips() {
   loadingClips.value = true
   try {
     const res = await listClips({ page: 1, per_page: 5 })
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 0) {
       recentClips.value = res.data?.items || res.data || []
     }
   } catch (err) {

@@ -197,6 +197,7 @@ import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { downloadBlob } from '@/api/request'
 
 const ws = useWebSocket()
 
@@ -403,22 +404,14 @@ function handleSelectionChange(selection) {
 // Download raw format data via axios + Blob (auth via HttpOnly cookies - H1)
 async function handleDownloadFormat(clipId, formatType) {
   try {
-    // H1: No token needed - auth handled by HttpOnly cookies (withCredentials: true)
-    const axios = (await import('axios')).default
-    const res = await axios.get(`/api/v1/clips/${clipId}/download`, {
-      params: { format_type: formatType },
-      withCredentials: true,
-      responseType: 'blob',
+    const blob = await downloadBlob(`/api/v1/clips/${clipId}/download`, {
+      params: { format_type: formatType }
     })
     // Create Blob and trigger download
-    const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const filename = res.headers['content-disposition']
-      ? res.headers['content-disposition'].split('filename=')[1]?.replace(/"/g, '') || 'clip_data'
-      : `clip_${clipId}_${formatType}`
-    a.download = filename
+    a.download = `clip_${clipId}_${formatType}`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -570,7 +563,6 @@ async function handleResolveConflict(clip, action) {
 }
 
 onMounted(async () => {
-  ws.connect()
   window.addEventListener('ws-clip-added', onWsClipAdded)
   await fetchClips()
   // Fetch conflict count on mount so badge shows accurate number from start
@@ -583,7 +575,6 @@ onUnmounted(() => {
     clearTimeout(searchTimer)
     searchTimer = null
   }
-  ws.disconnect()
   window.removeEventListener('ws-clip-added', onWsClipAdded)
 })
 </script>

@@ -133,3 +133,42 @@ request.interceptors.response.use(
 )
 
 export default request
+
+/**
+ * downloadBlob - Helper for downloading files with proper token refresh handling.
+ * Unlike the main request interceptor (which returns response.data),
+ * this returns the full response so the caller can access the blob.
+ *
+ * Usage:
+ *   const blob = await downloadBlob('/clips/123/download', { params: { format_type: 'text' } })
+ */
+export async function downloadBlob(url, options = {}) {
+  const { params = {}, responseType = 'blob' } = options
+
+  try {
+    const response = await request.get(url, {
+      params,
+      responseType,
+      // Return full response object (not just data)
+      validateStatus: (status) => status < 500,
+    })
+
+    // If we got a 401, the interceptor should have handled refresh
+    if (response.status === 401) {
+      // Refresh failed or user not authenticated
+      const userStore = useUserStore()
+      userStore.logout()
+      router.push('/login')
+      throw new Error('登录已过期，请重新登录')
+    }
+
+    return response.data
+  } catch (error) {
+    // If it's already a handled error from the interceptor, re-throw
+    if (error.message && error.message.includes('登录已过期')) {
+      throw error
+    }
+    // Otherwise let the interceptor handle it and still throw
+    throw error
+  }
+}

@@ -110,3 +110,50 @@ func (s *EncryptionService) GetEncryptionSalt(userID uint) (*EncryptionStatusRes
 		PasswordHint:      settings.PasswordHint,
 	}, nil
 }
+
+// DisableEncryption disables end-to-end encryption for the user
+func (s *EncryptionService) DisableEncryption(userID uint) error {
+	var settings model.EncryptionSettings
+	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrEncryptionNotSetup
+		}
+		return err
+	}
+
+	if !settings.Enabled {
+		return ErrEncryptionNotSetup
+	}
+
+	// Disable encryption but keep salt for potential re-enable
+	settings.Enabled = false
+	return database.DB.Save(&settings).Error
+}
+
+// ChangeEncryptionPassword changes the password hint for the user's encryption
+// Note: The actual encryption key is derived client-side via PBKDF2(password, salt).
+// The server only stores the salt and a hint. Changing the password means:
+// 1. Client must re-encrypt all data with the new key (not handled here).
+// 2. This endpoint only updates the hint. The actual password change requires
+//    the client to re-derive the key and re-upload encrypted data.
+//
+// For a proper password change with data re-encryption, the client should:
+// 1. Decrypt all data with old password
+// 2. Call this endpoint to update hint
+// 3. Re-encrypt with new password and re-push all clips
+func (s *EncryptionService) ChangeEncryptionPassword(userID uint, newPasswordHint string) error {
+	var settings model.EncryptionSettings
+	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrEncryptionNotSetup
+		}
+		return err
+	}
+
+	if !settings.Enabled {
+		return ErrEncryptionNotSetup
+	}
+
+	settings.PasswordHint = newPasswordHint
+	return database.DB.Save(&settings).Error
+}

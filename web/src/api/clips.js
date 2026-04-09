@@ -25,11 +25,6 @@ export function deleteClip(id) {
   })
 }
 
-// Batch delete clips
-export function batchDeleteClips(ids) {
-  return Promise.all(ids.map(id => deleteClip(id)))
-}
-
 // Get encryption salt
 export function getEncryptionSalt() {
   return request({
@@ -52,5 +47,14 @@ export function disableEncryption() {
   return request({
     url: '/api/v1/encryption/disable',
     method: 'post'
+  })
+}
+
+// Change encryption password (updates hint only)
+export function changeEncryptionPassword(passwordHint) {
+  return request({
+    url: '/api/v1/encryption/change-password',
+    method: 'post',
+    data: { password_hint: passwordHint }
   })
 }

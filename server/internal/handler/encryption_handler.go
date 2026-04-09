@@ -57,3 +57,45 @@ func (h *EncryptionHandler) GetEncryptionSalt(c *gin.Context) {
 
 	response.Success(c, result)
 }
+
+// DisableEncryption handles POST /api/v1/encryption/disable
+func (h *EncryptionHandler) DisableEncryption(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	err := h.service.DisableEncryption(userID)
+	if err != nil {
+		if err == service.ErrEncryptionNotSetup {
+			response.Error(c, http.StatusNotFound, 40401, err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, 50000, "禁用加密失败: "+err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "加密已禁用", nil)
+}
+
+// ChangeEncryptionPassword handles POST /api/v1/encryption/change-password
+func (h *EncryptionHandler) ChangeEncryptionPassword(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req struct {
+		PasswordHint string `json:"password_hint" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		return
+	}
+
+	err := h.service.ChangeEncryptionPassword(userID, req.PasswordHint)
+	if err != nil {
+		if err == service.ErrEncryptionNotSetup {
+			response.Error(c, http.StatusNotFound, 40401, err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, 50000, "修改密码提示失败: "+err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "密码提示已更新", nil)
+}

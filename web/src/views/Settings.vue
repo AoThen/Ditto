@@ -109,7 +109,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getEncryptionSalt, setupEncryption, disableEncryption } from '@/api/clips'
+import { getEncryptionSalt, setupEncryption, disableEncryption, changeEncryptionPassword } from '@/api/clips'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const encryptionEnabled = ref(false)
@@ -133,7 +133,7 @@ const maskedSalt = '****'
 async function fetchSalt() {
   try {
     const res = await getEncryptionSalt()
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 0) {
       saltValue.value = res.data?.salt || ''
       encryptionEnabled.value = !!res.data?.salt
     }
@@ -227,12 +227,13 @@ async function handleChangePassword() {
   }
   changePasswordLoading.value = true
   try {
-    // TODO: Implement password change API when backend supports it
-    ElMessage.info('修改密码功能即将推出')
+    // Update the password hint on the server
+    await changeEncryptionPassword(newPassword)
+    ElMessage.success('密码提示已更新，请使用新密码重新加密数据')
     changePasswordDialogVisible.value = false
   } catch (err) {
     console.error('Failed to change encryption password:', err)
-    ElMessage.error('修改密码失败')
+    ElMessage.error('修改密码提示失败')
   } finally {
     changePasswordLoading.value = false
   }

@@ -33,6 +33,10 @@
             <el-icon><Monitor /></el-icon>
             <span>设备管理</span>
           </el-menu-item>
+          <el-menu-item index="/dashboard/sync-logs">
+            <el-icon><Document /></el-icon>
+            <span>同步日志</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard/settings">
             <el-icon><Setting /></el-icon>
             <span>设置</span>

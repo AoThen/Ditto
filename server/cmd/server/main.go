@@ -88,10 +88,10 @@ func main() {
 		database.DB.Model(&model.Clip{}).Count(&clipCount)
 
 		c.JSON(200, gin.H{
-			"status":       "ok",
-			"total_users":  userCount,
-			"total_clips":  clipCount,
-			"uptime":       time.Since(cfg.StartTime).Round(time.Second).String(),
+			"status":      "ok",
+			"total_users": userCount,
+			"total_clips": clipCount,
+			"uptime":      time.Since(cfg.StartTime).Round(time.Second).String(),
 		})
 	})
 
@@ -100,7 +100,8 @@ func main() {
 	{
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/register", authHandler.Register)
+			// C4 FIX: Rate limit registration to prevent abuse (uses IP-based tracking)
+			auth.POST("/register", rateLimiter.LoginRateLimit(), authHandler.Register)
 			auth.POST("/login", rateLimiter.LoginRateLimit(), authHandler.Login)
 		}
 	}
@@ -153,6 +154,8 @@ func main() {
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+			encryption.POST("/disable", encryptionHandler.DisableEncryption)
+			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
 		}
 
 		stats := protected.Group("/stats")
