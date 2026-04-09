@@ -1,7 +1,7 @@
 // Test sync logs and stats endpoints
 import { test, expect } from '@playwright/test'
 
-// Helper: login and get token + device_id
+// Helper: login as new user (cookies handled automatically)
 async function loginAsNewUser(page) {
   const timestamp = Date.now()
   const username = `synclog_user_${timestamp}`
@@ -19,28 +19,19 @@ async function loginAsNewUser(page) {
   await page.getByRole('button', { name: '登录' }).click()
   await page.waitForURL(/\/dashboard/)
 
-  const token = await page.evaluate(() => localStorage.getItem('token'))
-
-  // Get device_id
-  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  })
+  // Get device_id via API (cookies shared automatically)
+  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices')
   const devices = await devicesResp.json()
   const deviceId = devices.data?.[0]?.id
 
-  return { username, token, deviceId }
+  return { username, deviceId }
 }
 
 test.describe('Sync Logs & Stats', () => {
   test('should get sync logs after sync operation', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
+    const { deviceId } = await loginAsNewUser(page)
 
-    // Perform a sync operation
     const syncResp = await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -56,28 +47,22 @@ test.describe('Sync Logs & Stats', () => {
     })
     expect(syncResp.status()).toBe(200)
 
-    // Get sync logs
-    const logsResp = await page.request.get('http://localhost:8080/api/v1/stats/sync-logs', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const logsResp = await page.request.get('http://localhost:8080/api/v1/stats/sync-logs')
     expect(logsResp.status()).toBe(200)
     const logsData = await logsResp.json()
     expect(logsData.code).toBe(0)
     expect(logsData.data.total).toBeGreaterThanOrEqual(1)
     expect(logsData.data.items?.length).toBeGreaterThanOrEqual(1)
 
-    // Verify log content
     const logEntry = logsData.data.items[0]
     expect(logEntry.action).toBe('push')
     expect(logEntry.status).toBe('success')
   })
 
   test('should get stats overview', async ({ page }) => {
-    const { token } = await loginAsNewUser(page)
+    await loginAsNewUser(page)
 
-    const statsResp = await page.request.get('http://localhost:8080/api/v1/stats/overview', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const statsResp = await page.request.get('http://localhost:8080/api/v1/stats/overview')
     expect(statsResp.status()).toBe(200)
     const statsData = await statsResp.json()
     expect(statsData.code).toBe(0)
@@ -87,14 +72,9 @@ test.describe('Sync Logs & Stats', () => {
   })
 
   test('should filter sync logs by device_id', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
+    const { deviceId } = await loginAsNewUser(page)
 
-    // Perform a sync
     await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -109,29 +89,21 @@ test.describe('Sync Logs & Stats', () => {
       }
     })
 
-    // Filter logs by device_id
     const filteredResp = await page.request.get(
-      `http://localhost:8080/api/v1/stats/sync-logs?device_id=${deviceId}`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
+      `http://localhost:8080/api/v1/stats/sync-logs?device_id=${deviceId}`
     )
     const filteredData = await filteredResp.json()
     expect(filteredData.data.total).toBeGreaterThanOrEqual(1)
 
-    // All entries should match device_id
     for (const log of filteredData.data.items) {
       expect(log.device_id).toBe(deviceId)
     }
   })
 
   test('should show sync logs in UI (StatsDashboard)', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
+    const { deviceId } = await loginAsNewUser(page)
 
-    // Create a clip to ensure there's data
     await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -146,7 +118,6 @@ test.describe('Sync Logs & Stats', () => {
       }
     })
 
-    // Navigate to dashboard (stats page)
     await page.goto('/dashboard')
     await expect(page.getByText('剪贴板总览')).toBeVisible({ timeout: 10000 })
   })

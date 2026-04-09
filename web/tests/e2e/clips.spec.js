@@ -1,11 +1,11 @@
 // Test clip management: list, search, delete
 import { test, expect } from '@playwright/test'
 
-// Helper: login and get to dashboard
+// Helper: login as new user (cookies handled automatically)
 async function loginAsNewUser(page) {
   const timestamp = Date.now()
   const username = `clip_user_${timestamp}`
-  
+
   await page.goto('/register')
   await page.getByPlaceholder('请输入用户名').fill(username)
   await page.getByPlaceholder('请输入邮箱地址').fill(`${username}@test.com`)
@@ -13,22 +13,18 @@ async function loginAsNewUser(page) {
   await page.getByPlaceholder('请再次输入密码').fill('testpass123')
   await page.getByRole('button', { name: '注册' }).click()
   await page.waitForURL('/login')
-  
+
   await page.getByPlaceholder('请输入用户名').fill(username)
   await page.getByPlaceholder('请输入密码').fill('testpass123')
   await page.getByRole('button', { name: '登录' }).click()
   await page.waitForURL(/\/dashboard/)
-  
-  const token = await page.evaluate(() => localStorage.getItem('token'))
-  
-  // Get actual device_id from devices API
-  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  })
+
+  // Get device_id via API (cookies shared automatically)
+  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices')
   const devices = await devicesResp.json()
   const deviceId = devices.data?.[0]?.id
-  
-  return { username, token, deviceId }
+
+  return { username, deviceId }
 }
 
 test.describe('Clip Management', () => {
@@ -39,15 +35,10 @@ test.describe('Clip Management', () => {
   })
 
   test('should create clip via API and verify', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
-    
-    // Create clip via API
+    const { deviceId } = await loginAsNewUser(page)
+
     const clipId = `clip-e2e-${Date.now()}`
     const syncResp = await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -63,10 +54,7 @@ test.describe('Clip Management', () => {
     })
     expect(syncResp.status()).toBe(200)
 
-    // Verify clip exists via API
-    const clipsResp = await page.request.get('http://localhost:8080/api/v1/clips?page=1&per_page=10', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const clipsResp = await page.request.get('http://localhost:8080/api/v1/clips?page=1&per_page=10')
     const clipsData = await clipsResp.json()
     expect(clipsData.data.total).toBeGreaterThanOrEqual(1)
     const found = clipsData.data.items?.some(item => item.description === 'E2E API Test Clip')
@@ -74,14 +62,9 @@ test.describe('Clip Management', () => {
   })
 
   test('should search clips', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
-    
-    // Create a clip to search for
+    const { deviceId } = await loginAsNewUser(page)
+
     await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -96,31 +79,20 @@ test.describe('Clip Management', () => {
       }
     })
 
-    // Search for the clip
-    const clipsResp = await page.request.get('http://localhost:8080/api/v1/clips?search=UniqueSearchTerm123', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const clipsResp = await page.request.get('http://localhost:8080/api/v1/clips?search=UniqueSearchTerm123')
     const clipsData = await clipsResp.json()
     expect(clipsData.data.total).toBeGreaterThanOrEqual(1)
 
-    // Search for non-existent term
-    const emptyResp = await page.request.get('http://localhost:8080/api/v1/clips?search=nonexistent_xyz_123', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const emptyResp = await page.request.get('http://localhost:8080/api/v1/clips?search=nonexistent_xyz_123')
     const emptyData = await emptyResp.json()
     expect(emptyData.data.total).toBe(0)
   })
 
   test('should delete a clip via API', async ({ page }) => {
-    const { token, deviceId } = await loginAsNewUser(page)
-    
-    // Create a clip
+    const { deviceId } = await loginAsNewUser(page)
+
     const clipId = `clip-delete-${Date.now()}`
     await page.request.post('http://localhost:8080/api/v1/clips/sync', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -135,22 +107,13 @@ test.describe('Clip Management', () => {
       }
     })
 
-    // Verify clip exists
-    const beforeResp = await page.request.get(`http://localhost:8080/api/v1/clips/${clipId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const beforeResp = await page.request.get(`http://localhost:8080/api/v1/clips/${clipId}`)
     expect(beforeResp.status()).toBe(200)
 
-    // Delete the clip
-    const deleteResp = await page.request.delete(`http://localhost:8080/api/v1/clips/${clipId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const deleteResp = await page.request.delete(`http://localhost:8080/api/v1/clips/${clipId}`)
     expect(deleteResp.status()).toBe(200)
 
-    // Verify clip is gone
-    const afterResp = await page.request.get(`http://localhost:8080/api/v1/clips/${clipId}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    const afterResp = await page.request.get(`http://localhost:8080/api/v1/clips/${clipId}`)
     expect(afterResp.status()).toBe(404)
   })
 })
