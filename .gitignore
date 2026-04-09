@@ -1,3 +1,7 @@
+# Test artifacts
+web/playwright-report/
+web/test-results/
+
 # C++ client third-party headers (tracked, not ignored)
 # /src/httplib.h
 # /src/json.hpp
