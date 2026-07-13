@@ -233,7 +233,8 @@ func TestGetDeviceID(t *testing.T) {
 func TestGetRawToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	// Test when Authorization header is not set
+	// C3 FIX: GetRawToken now reads from context (set by Auth middleware)
+	// Test when raw_token is not set in context
 	c, _ := gin.CreateTestContext(nil)
 	c.Request = &http.Request{
 		Header: http.Header{},
@@ -241,15 +242,15 @@ func TestGetRawToken(t *testing.T) {
 	token := GetRawToken(c)
 	assert.Empty(t, token)
 
-	// Test when Authorization header is set
-	c.Request.Header.Set("Authorization", "Bearer test-token-123")
+	// Test when raw_token is set in context (simulating Auth middleware behavior)
+	c.Set("raw_token", "test-token-123")
 	token = GetRawToken(c)
 	assert.Equal(t, "test-token-123", token)
 
-	// Test when Authorization header has no Bearer prefix
-	c.Request.Header.Set("Authorization", "test-token-456")
+	// Test when raw_token is empty string in context
+	c.Set("raw_token", "")
 	token = GetRawToken(c)
-	assert.Equal(t, "test-token-456", token)
+	assert.Empty(t, token)
 }
 
 func TestClaims_Structure(t *testing.T) {

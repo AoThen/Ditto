@@ -15,7 +15,8 @@ services:
     environment:
       - PORT=8080
       - DATABASE_PATH=/app/data/ditto_cloud.db
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      # JWT_SECRET is auto-generated on first run, but you should set it explicitly
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET environment variable is required. Set it in .env or export it.}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s

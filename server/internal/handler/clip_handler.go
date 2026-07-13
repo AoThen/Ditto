@@ -165,17 +165,17 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 
 	// Build lightweight response for pull-only
 	type ChangesResponse struct {
-		Clips       []service.ClipDetail `json:"clips"`
-		ServerTime  string               `json:"server_time"`
-		HasMore     bool                 `json:"has_more"`
-		DeletedIDs  []string             `json:"deleted_ids"`
+		Clips      []service.ClipDetail `json:"clips"`
+		ServerTime string               `json:"server_time"`
+		HasMore    bool                 `json:"has_more"`
+		DeletedIDs []string             `json:"deleted_ids"`
 	}
 
 	response.Success(c, ChangesResponse{
 		Clips:      result.NewClips,
 		ServerTime: result.SyncTime,
-		HasMore:    false,
-		DeletedIDs: []string{},
+		HasMore:    result.HasMore,
+		DeletedIDs: result.DeletedIDs,
 	})
 }
 

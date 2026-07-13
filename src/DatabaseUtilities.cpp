@@ -471,6 +471,20 @@ BOOL ValidDB(CString csPath, BOOL bUpgrade)
 			e.errorCode();
 		}
 
+		// Add lModifiedDate column for cloud sync (tracks modification time, not just creation time)
+		try
+		{
+			db.execQuery(_T("SELECT lModifiedDate FROM Main"));
+		}
+		catch (CppSQLite3Exception& e)
+		{
+			db.execDML(_T("ALTER TABLE Main ADD lModifiedDate INTEGER"));
+			// Initialize with lDate for existing clips
+			db.execDML(_T("UPDATE Main SET lModifiedDate = lDate WHERE lModifiedDate IS NULL"));
+
+			e.errorCode();
+		}
+
 		db.execDML(_T("DROP INDEX IF EXISTS Main_NoGroup"));
 		db.execDML(_T("DROP INDEX IF EXISTS Main_InGroup"));
 		db.execDML(_T("DROP INDEX IF EXISTS Main_ShortCut"));
@@ -716,7 +730,8 @@ BOOL CreateDB(CString csFile)
 			_T("stickyClipOrder REAL, ")
 			_T("stickyClipGroupOrder REAL, ")
 			_T("MoveToGroupShortCut INTEGER, ")
-			_T("GlobalMoveToGroupShortCut INTEGER);"));
+			_T("GlobalMoveToGroupShortCut INTEGER, ")
+			_T("lModifiedDate INTEGER);"));
 
 		db.execDML(_T("CREATE TABLE Data(")
 			_T("lID INTEGER PRIMARY KEY AUTOINCREMENT, ")

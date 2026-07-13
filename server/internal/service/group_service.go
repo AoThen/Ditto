@@ -20,14 +20,14 @@ func NewGroupService() *GroupService {
 
 // GroupListItem represents a group for list responses
 type GroupListItem struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	ParentID    string `json:"parent_id"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	ParentID    string  `json:"parent_id"`
 	ClipOrder   float64 `json:"clip_order"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	ClipCount   int64  `json:"clip_count"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+	ClipCount   int64   `json:"clip_count"`
 }
 
 // GroupDetail represents a group with child groups
@@ -222,7 +222,10 @@ func (s *GroupService) UpdateGroup(userID uint, groupID string, req *UpdateGroup
 	if req.Name != "" {
 		updates["name"] = req.Name
 	}
-	updates["description"] = req.Description
+	// M9 FIX: Only update description if explicitly provided (consistent with name behavior)
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
 	if req.ParentID != nil {
 		updates["parent_id"] = req.ParentID
 	}
@@ -269,8 +272,10 @@ func (s *GroupService) DeleteGroup(userID uint, groupID string) error {
 			return err
 		}
 
-		// Unset group_id from clips in this group (don't delete clips)
-		tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "")
+		// M8 FIX: Check error when unsetting group_id from clips
+		if err := tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "").Error; err != nil {
+			return err
+		}
 
 		// Delete child groups recursively
 		var children []model.Group
@@ -289,8 +294,10 @@ func (s *GroupService) DeleteGroup(userID uint, groupID string) error {
 }
 
 func (s *GroupService) deleteGroupRecursive(tx *gorm.DB, userID uint, groupID string) error {
-	// Unset group_id from clips
-	tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "")
+	// M8 FIX: Check error when unsetting group_id from clips
+	if err := tx.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, groupID).Update("group_id", "").Error; err != nil {
+		return err
+	}
 
 	// Delete children
 	var children []model.Group

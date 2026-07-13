@@ -101,6 +101,10 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_CLOUD_USERNAME, m_csUsername);
 	DDX_Text(pDX, IDC_CLOUD_PASSWORD, m_csPassword);
 	DDX_Text(pDX, IDC_CLOUD_STATUS, m_csStatus);
+	DDX_Text(pDX, IDC_CLOUD_ENCRYPTION_PASSWORD, m_csEncryptionPassword);
+	DDX_Text(pDX, IDC_CLOUD_ENCRYPTION_STATUS, m_csEncryptionStatus);
+	DDX_Check(pDX, IDC_CLOUD_BTN_ENABLE_ENCRYPTION, m_bEncryptionEnabled);
+	DDX_Text(pDX, IDC_CLOUD_KEY_FILE_PATH, m_csKeyFilePath);
 }
 
 BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
@@ -110,6 +114,7 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_TEST_ENCRYPTION, &COptionCloud::OnBtnTestEncryption)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_EXPORT_KEY, &COptionCloud::OnBtnExportKey)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_IMPORT_KEY, &COptionCloud::OnBtnImportKey)
+	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
 END_MESSAGE_MAP()
 
 BOOL COptionCloud::OnInitDialog()
@@ -125,26 +130,57 @@ BOOL COptionCloud::OnInitDialog()
 		m_csServerUrl = _T("https://localhost:8080");
 	}
 
+	// Load username from encryption salt (if available) or show last used
 	CStringA token = CGetSetOptions::GetCloudDeviceToken();
 	if (!token.IsEmpty())
 	{
-		m_csStatus = _T("Logged in (token present)");
+		// Extract device ID to show more status info
+		CStringA deviceId = CGetSetOptions::GetCloudDeviceId();
+		if (!deviceId.IsEmpty())
+		{
+			m_csStatus.Format(_T("已登录 (设备: %hs)"), deviceId.GetString());
+		}
+		else
+		{
+			m_csStatus = _T("已登录");
+		}
 	}
 	else
 	{
-		m_csStatus = _T("Not logged in");
+		m_csStatus = _T("未登录");
 	}
 
-	// Check encryption status
+	// Load encryption password status
 	CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
+	CString csSalt = CGetSetOptions::GetCloudEncryptionSalt();
 	if (!csKeyB64.IsEmpty())
 	{
 		m_bEncryptionEnabled = TRUE;
-		m_csEncryptionStatus = _T("Encryption is enabled.");
+		if (!csSalt.IsEmpty())
+		{
+			// Show salt info (first 16 chars for security)
+			CString saltPreview = csSalt.Left(16);
+			m_csEncryptionStatus.Format(_T("加密已启用 (Salt: %s...)"), saltPreview);
+		}
+		else
+		{
+			m_csEncryptionStatus = _T("加密已启用");
+		}
 	}
 	else
 	{
-		m_csEncryptionStatus = _T("Encryption is not enabled.");
+		m_csEncryptionStatus = _T("未启用加密");
+	}
+
+	// Load key file path if previously exported
+	m_csKeyFilePath = CGetSetOptions::GetCloudKeyFilePath();
+	if (!m_csKeyFilePath.IsEmpty())
+	{
+		// Verify file still exists
+		if (GetFileAttributes(m_csKeyFilePath) == INVALID_FILE_ATTRIBUTES)
+		{
+			m_csKeyFilePath = _T("");
+		}
 	}
 
 	UpdateData(FALSE);
@@ -154,11 +190,29 @@ BOOL COptionCloud::OnInitDialog()
 
 BOOL COptionCloud::OnApply()
 {
+	// Validate server URL if cloud sync is enabled
+	if (m_bEnabled && m_csServerUrl.IsEmpty())
+	{
+		MessageBox(_T("启用云端同步前，请输入服务器地址。"), _T("配置错误"), MB_ICONWARNING);
+		return FALSE;
+	}
+
 	// Save values via CGetSetOptions
 	CGetSetOptions::SetCloudSyncEnabled(m_bEnabled);
 	CGetSetOptions::SetCloudAutoSync(m_bAutoSync);
-	CT2A urlA(m_csServerUrl, CP_UTF8);
 	CGetSetOptions::SetCloudServerUrl(m_csServerUrl);
+	CGetSetOptions::SetCloudLastUsername(m_csUsername);
+	if (!m_csKeyFilePath.IsEmpty())
+	{
+		CGetSetOptions::SetCloudKeyFilePath(m_csKeyFilePath);
+	}
+
+	// Re-initialize sync if settings changed
+	if (m_bEnabled && theApp.m_pCloudSyncManager != nullptr)
+	{
+		// Reinitialize with new settings
+		theApp.m_pCloudSyncManager->Initialize();
+	}
 
 	return CPropertyPage::OnApply();
 }
@@ -168,24 +222,27 @@ void COptionCloud::OnBtnLogin()
 	// Validate fields
 	if (m_csServerUrl.IsEmpty())
 	{
-		MessageBox(_T("Please enter a server URL."), _T("Login"), MB_ICONWARNING);
+		MessageBox(_T("请输入服务器地址。"), _T("登录"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csUsername.IsEmpty())
 	{
-		MessageBox(_T("Please enter a username."), _T("Login"), MB_ICONWARNING);
+		MessageBox(_T("请输入用户名。"), _T("登录"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csPassword.IsEmpty())
 	{
-		MessageBox(_T("Please enter a password."), _T("Login"), MB_ICONWARNING);
+		MessageBox(_T("请输入密码。"), _T("登录"), MB_ICONWARNING);
 		return;
 	}
 
+	// Save username for convenience
+	CGetSetOptions::SetCloudLastUsername(m_csUsername);
+
 	// Show status
-	m_csStatus = _T("登录中...");
+	m_csStatus = _T("正在登录...");
 	UpdateData(FALSE);
 
 	try
@@ -194,28 +251,35 @@ void COptionCloud::OnBtnLogin()
 
 		if (result.success)
 		{
-			m_csStatus = _T("Logged in successfully.");
-			MessageBox(_T("Login successful."), _T("Login"), MB_ICONINFORMATION);
+			m_csStatus.Format(_T("已登录 (设备: %s)"), result.deviceId.IsEmpty() ? _T("未知") : result.deviceId.GetString());
+			MessageBox(_T("登录成功！\n现在可以启用云端同步。"), _T("登录"), MB_ICONINFORMATION);
+			
+			// Update encryption status if key exists
+			CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
+			if (!csKeyB64.IsEmpty())
+			{
+				m_csEncryptionStatus = _T("加密已启用");
+			}
 		}
 		else
 		{
 			m_csStatus = result.error;
 			CString msg;
-			msg.Format(_T("Login failed: %s"), result.error.GetString());
-			MessageBox(msg, _T("Login"), MB_ICONERROR);
+			msg.Format(_T("登录失败: %s"), result.error.GetString());
+			MessageBox(msg, _T("登录"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
 	{
-		m_csStatus.Format(_T("Exception: %hs"), e.what());
+		m_csStatus.Format(_T("异常: %hs"), e.what());
 		CString msg;
-		msg.Format(_T("Login error: %hs"), e.what());
-		MessageBox(msg, _T("Login"), MB_ICONERROR);
+		msg.Format(_T("登录错误: %hs"), e.what());
+		MessageBox(msg, _T("登录"), MB_ICONERROR);
 	}
 	catch (...)
 	{
-		m_csStatus = _T("Unknown error during login.");
-		MessageBox(_T("An unknown error occurred during login."), _T("Login"), MB_ICONERROR);
+		m_csStatus = _T("登录时发生未知错误。");
+		MessageBox(_T("登录时发生未知错误。"), _T("登录"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -226,21 +290,24 @@ void COptionCloud::OnBtnRegister()
 	// Validate fields
 	if (m_csServerUrl.IsEmpty())
 	{
-		MessageBox(_T("Please enter a server URL."), _T("Register"), MB_ICONWARNING);
+		MessageBox(_T("请输入服务器地址。"), _T("注册"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csUsername.IsEmpty())
 	{
-		MessageBox(_T("Please enter a username."), _T("Register"), MB_ICONWARNING);
+		MessageBox(_T("请输入用户名。"), _T("注册"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csPassword.IsEmpty())
 	{
-		MessageBox(_T("Please enter a password."), _T("Register"), MB_ICONWARNING);
+		MessageBox(_T("请输入密码。"), _T("注册"), MB_ICONWARNING);
 		return;
 	}
+
+	// Save username
+	CGetSetOptions::SetCloudLastUsername(m_csUsername);
 
 	// Prompt for email address (required for registration)
 	CInputBox emailDlg;
@@ -249,14 +316,14 @@ void COptionCloud::OnBtnRegister()
 	emailDlg.m_csInput = m_csUsername + _T("@");  // Pre-fill hint
 	if (emailDlg.DoModal() != IDOK || emailDlg.m_csInput.IsEmpty())
 	{
-		m_csStatus = _T("Registration cancelled.");
+		m_csStatus = _T("注册已取消。");
 		UpdateData(FALSE);
 		return;
 	}
 	CString email = emailDlg.m_csInput;
 
 	// Show status
-	m_csStatus = _T("注册中...");
+	m_csStatus = _T("正在注册...");
 	UpdateData(FALSE);
 
 	try
@@ -265,29 +332,32 @@ void COptionCloud::OnBtnRegister()
 
 		if (result.success)
 		{
-			m_csStatus = result.error.IsEmpty() ? _T("Registration successful.") : result.error;
-			MessageBox(result.error.IsEmpty() ? _T("Registration successful. Please login.") : result.error,
-			           _T("Register"), MB_ICONINFORMATION);
+			m_csStatus = result.error.IsEmpty() ? _T("注册成功。请登录。") : result.error;
+			MessageBox(result.error.IsEmpty() ? _T("注册成功！\n请使用您的凭据登录。") : result.error,
+			           _T("注册"), MB_ICONINFORMATION);
+			
+			// Clear password field after successful registration
+			m_csPassword = _T("");
 		}
 		else
 		{
 			m_csStatus = result.error;
 			CString msg;
-			msg.Format(_T("Registration failed: %s"), result.error.GetString());
-			MessageBox(msg, _T("Register"), MB_ICONERROR);
+			msg.Format(_T("注册失败: %s"), result.error.GetString());
+			MessageBox(msg, _T("注册"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
 	{
-		m_csStatus.Format(_T("Exception: %hs"), e.what());
+		m_csStatus.Format(_T("异常: %hs"), e.what());
 		CString msg;
-		msg.Format(_T("Registration error: %hs"), e.what());
-		MessageBox(msg, _T("Register"), MB_ICONERROR);
+		msg.Format(_T("注册错误: %hs"), e.what());
+		MessageBox(msg, _T("注册"), MB_ICONERROR);
 	}
 	catch (...)
 	{
-		m_csStatus = _T("Unknown error during registration.");
-		MessageBox(_T("An unknown error occurred during registration."), _T("Register"), MB_ICONERROR);
+		m_csStatus = _T("注册时发生未知错误。");
+		MessageBox(_T("注册时发生未知错误。"), _T("注册"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -481,9 +551,10 @@ void COptionCloud::OnBtnExportKey()
 	if (CCloudKeyExport::ExportKey(filePath, username, exportPassword))
 	{
 		CString msg;
-		msg.Format(_T("密钥文件已成功导出到：\n%s\n\n请妥善保管此文件，切勿与其他人共享。"), filePath);
+		msg.Format(_T("密钥文件已成功导出到：\n%s\n\n⚠️ 重要提示：\n• 请妥善保管此文件，切勿与其他人共享\n• 忘记密码或密钥文件将导致数据不可恢复"), filePath);
 		MessageBox(msg, _T("导出密钥"), MB_ICONINFORMATION);
 		m_csKeyFilePath = filePath;
+		CGetSetOptions::SetCloudKeyFilePath(filePath);
 	}
 	else
 	{
@@ -550,8 +621,9 @@ void COptionCloud::OnBtnImportKey()
 		MessageBox(msg, _T("导入密钥"), MB_ICONINFORMATION);
 
 		m_bEncryptionEnabled = TRUE;
-		m_csEncryptionStatus = _T("Encryption enabled (imported from key file).");
+		m_csEncryptionStatus.Format(_T("加密已启用 (从密钥文件导入: %s)"), importedKey.username);
 		m_csKeyFilePath = filePath;
+		CGetSetOptions::SetCloudKeyFilePath(filePath);
 	}
 	else
 	{
@@ -560,4 +632,65 @@ void COptionCloud::OnBtnImportKey()
 	}
 
 	UpdateData(FALSE);
+}
+
+// ---------------------------------------------------------------------------
+// OnCloudAuthRequired: Handler for WM_CLOUD_AUTH_REQUIRED message
+// Called when sync thread detects token expiration (401/403) or encryption issue (999)
+// ---------------------------------------------------------------------------
+LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	
+	UINT statusCode = static_cast<UINT>(wParam);
+	CString msg;
+	
+	if (statusCode == 401)
+	{
+		msg = _T("云端认证令牌已过期。\n\n")
+		      _T("您的同步已暂停，请重新登录以继续同步。\n\n")
+		      _T("点击\"确定\"后，将打开登录对话框。");
+		
+		MessageBox(msg, _T("云端同步 - 需要重新认证"), MB_ICONWARNING | MB_OK);
+		
+		// Automatically open login dialog flow
+		OnBtnLogin();
+	}
+	else if (statusCode == 403)
+	{
+		msg = _T("云端访问被拒绝（HTTP 403）。\n\n")
+		      _T("可能原因：\n")
+		      _T("• 您的账号已被禁用\n")
+		      _T("• 设备已被管理员移除\n\n")
+		      _T("请联系管理员或重新登录。");
+		
+		MessageBox(msg, _T("云端同步 - 访问被拒绝"), MB_ICONERROR | MB_OK);
+		
+		// Clear credentials and prompt for re-login
+		CCloudAuth::Logout();
+		OnBtnLogin();
+	}
+	else if (statusCode == 999)
+	{
+		// Encryption initialization failed
+		msg = _T("加密初始化失败！\n\n")
+		      _T("⚠️ 警告：您的剪贴板数据将不会被加密。\n\n")
+		      _T("可能原因：\n")
+		      _T("• 未设置加密密码\n")
+		      _T("• 未导入密钥文件\n")
+		      _T("• 加密服务不可用\n\n")
+		      _T("请在\"云端同步\"设置中重新启用加密，\n")
+		      _T("以保护您的隐私数据。");
+		
+		MessageBox(msg, _T("云端同步 - 加密失败"), MB_ICONWARNING | MB_OK);
+		
+		// Open this property page to show encryption settings
+		CPropertySheet* pSheet = GetParent();
+		if (pSheet != nullptr)
+		{
+			pSheet->SetActivePage(this);
+		}
+	}
+	
+	return 0;
 }

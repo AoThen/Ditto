@@ -25,7 +25,8 @@ RUN mkdir -p /app/data
 
 ENV PORT=8080
 ENV DATABASE_PATH=/app/data/ditto_cloud.db
-ENV JWT_SECRET=change-me-in-production
+# JWT_SECRET: auto-generated on first run if not set, or override at runtime:
+# docker run -e JWT_SECRET=your-secret ...
 
 EXPOSE 8080
 

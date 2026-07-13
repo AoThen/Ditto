@@ -11,13 +11,13 @@ import (
 )
 
 type AuthHandler struct {
-	service    *service.AuthService
+	service     *service.AuthService
 	rateLimiter *middleware.RateLimiter
 }
 
 func NewAuthHandler(svc *service.AuthService, rl *middleware.RateLimiter) *AuthHandler {
 	return &AuthHandler{
-		service:    svc,
+		service:     svc,
 		rateLimiter: rl,
 	}
 }
@@ -74,9 +74,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Record successful login (reset rate limits)
 	h.rateLimiter.RecordLoginSuccess(c.ClientIP(), req.Username)
 
-	// H1: Set HttpOnly Secure cookies for browser clients
+	// H1+H2: Set HttpOnly Secure SameSite cookies for browser clients
 	// Also include tokens in JSON response for API clients / backward compat
-	setAuthCookies(c, resp.DeviceToken, resp.RefreshToken, resp.DeviceID)
+	setAuthCookies(c, resp.DeviceToken, resp.RefreshToken, resp.DeviceID, h.service)
 
 	response.Success(c, gin.H{
 		"device_token":  resp.DeviceToken,
@@ -88,38 +88,77 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	deviceID := middleware.GetDeviceID(c)
-	oldToken := middleware.GetRawToken(c)
 
-	newToken, refreshToken, err := h.service.RefreshDeviceToken(deviceID, oldToken)
+	newToken, refreshToken, err := h.service.RefreshDeviceToken(userID, deviceID)
 	if err != nil {
 		response.Error(c, http.StatusUnauthorized, 40101, "Token 刷新失败: "+err.Error())
 		return
 	}
 
-	_ = userID
-	// H1: Set new HttpOnly cookies
-	setAuthCookies(c, newToken, refreshToken, deviceID)
+	// H1+H2: Set new Secure SameSite cookies
+	setAuthCookies(c, newToken, refreshToken, deviceID, h.service)
 
 	response.SuccessWithMessage(c, "Token 刷新成功", gin.H{
 		"device_id": deviceID,
 	})
 }
 
-// setAuthCookies sets HttpOnly Secure cookies for authentication tokens.
-func setAuthCookies(c *gin.Context, accessToken, refreshToken, deviceID string) {
-	// Access token cookie (30 days)
-	c.SetCookie("device_token", accessToken, 30*24*3600, "/", "", false, true)
-	// Refresh token cookie (90 days)
-	c.SetCookie("refresh_token", refreshToken, 90*24*3600, "/", "", false, true)
+// setAuthCookies sets HttpOnly Secure SameSite cookies for authentication tokens.
+// H1 FIX: Secure flag from config (default true for production)
+// H2 FIX: SameSite=Lax via http.SetCookie (Gin c.SetCookie doesn't support SameSite)
+func setAuthCookies(c *gin.Context, accessToken, refreshToken, deviceID string, svc *service.AuthService) {
+	// Determine max-age from config
+	accessMaxAge := int(svc.GetTokenExpiryAccess().Seconds())
+	refreshMaxAge := int(svc.GetTokenExpiryRefresh().Seconds())
+	secure := svc.IsCookieSecure()
+
+	// Access token cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "device_token",
+		Value:    accessToken,
+		MaxAge:   accessMaxAge,
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Refresh token cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		MaxAge:   refreshMaxAge,
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	// Device ID cookie (readable by JS for display purposes only)
-	c.SetCookie("device_id", deviceID, 30*24*3600, "/", "", false, false)
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "device_id",
+		Value:    deviceID,
+		MaxAge:   accessMaxAge,
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // Logout clears auth cookies and returns success.
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// H1: Clear auth cookies by setting them with maxAge=0
-	c.SetCookie("device_token", "", 0, "/", "", false, true)
-	c.SetCookie("refresh_token", "", 0, "/", "", false, true)
-	c.SetCookie("device_id", "", 0, "/", "", false, false)
+	secure := h.service.IsCookieSecure()
+
+	// Clear auth cookies by setting them with maxAge=0
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "device_token", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "refresh_token", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "device_id", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: false, SameSite: http.SameSiteLaxMode,
+	})
 	response.SuccessWithMessage(c, "已退出登录", nil)
 }

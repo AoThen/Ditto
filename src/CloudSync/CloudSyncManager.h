@@ -2,6 +2,13 @@
 #include <afx.h>
 #include "../json.hpp"
 
+// Custom Windows message for cloud authentication notification
+// wParam: HTTP status code (401 = token expired, 403 = forbidden)
+// lParam: 0 (reserved)
+#ifndef WM_CLOUD_AUTH_REQUIRED
+#define WM_CLOUD_AUTH_REQUIRED (WM_USER + 1001)
+#endif
+
 // Context for fire-and-forget quick sync threads
 struct QuickSyncContext {
 	void* pManager;            // CCloudSyncManager*
@@ -79,4 +86,7 @@ private:
 
 	// Merge a remote clip into local database (returns new/updated clip ID)
 	int MergeRemoteClipToLocal(const nlohmann::json& remoteClip);
+
+	// Delete a clip from local database (for sync deletions)
+	BOOL DeleteLocalClip(int clipId);
 };

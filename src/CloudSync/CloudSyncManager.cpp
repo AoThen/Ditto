@@ -101,6 +101,16 @@ BOOL CCloudSyncManager::Initialize()
 	if (!InitializeEncryption())
 	{
 		OutputDebugString(_T("[CloudSync] WARNING: Encryption initialization failed, continuing without encryption.\n"));
+		
+		// Show user-friendly warning via main window
+		CWnd* pMainWnd = AfxGetMainWnd();
+		if (pMainWnd != nullptr)
+		{
+			// Post custom message to notify encryption issue
+			::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 999, 0);
+		}
+		
+		LogMessage(_T("WARNING: Encryption not initialized, clips will sync unencrypted."));
 	}
 
 	// Create stop event
@@ -476,7 +486,9 @@ void CCloudSyncManager::PushNewClips()
 			return;
 		}
 
-		// Build sync request JSON with RFC3339 timestamp (not ctime)
+		// Build sync request JSON matching server's PushClipItem schema:
+	 // Server expects: { since, device_id, push_clips: [{ id, description, crc,
+		// group_id, short_cut, updated_at, formats: [{format_type, data}] }] }
 		json syncReq;
 		if (lastSync > 0)
 		{
@@ -522,23 +534,82 @@ void CCloudSyncManager::PushNewClips()
 			return;
 		}
 
+		// Handle authentication errors (401/403) - trigger re-auth flow
+		if (res->status == 401 || res->status == 403)
+		{
+			LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
+			
+			// Clear stored credentials
+			CCloudAuth::Logout();
+			
+			// Notify user via main window (post message to avoid blocking sync thread)
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				// Post custom message with 401 status code
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
+			}
+			
+			LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
+			return;
+		}
+
 		if (res->status == 200)
 		{
 			try
 			{
 				json responseJson = json::parse(res->body);
-				int syncedCount = responseJson.value("synced_count", 0);
-				int skippedCount = responseJson.value("skipped_count", 0);
-				
-				CString msg;
-				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (duplicates)"), syncedCount, skippedCount);
-				LogMessage(msg);
 
-				// Update last sync time and persist to registry (thread-safe)
-				EnterCriticalSection(&m_csSync);
-				m_lastSyncTime = time(nullptr);
-				LeaveCriticalSection(&m_csSync);
-				CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
+				// Server wraps response in { code: 0, data: { ... } }
+				if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
+				{
+					CString msg;
+					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
+					LogMessage(msg);
+					return;
+				}
+
+				// Extract from data envelope
+				const json* dataNode = nullptr;
+				if (responseJson.contains("data") && responseJson["data"].is_object())
+				{
+					dataNode = &responseJson["data"];
+				}
+				else
+				{
+					dataNode = &responseJson; // Fallback: use top-level if no data wrapper
+				}
+
+				int syncedCount = dataNode->value("updated_count", 0);
+				int skippedCount = dataNode->value("skipped_count", 0);
+
+				// Update last sync time from server's sync_time (more accurate than local time)
+				if (dataNode->contains("sync_time"))
+				{
+					std::string syncTimeStr = (*dataNode)["sync_time"].get<std::string>();
+					SYSTEMTIME st = {};
+					if (sscanf_s(syncTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+						&st.wYear, &st.wMonth, &st.wDay,
+						&st.wHour, &st.wMinute, &st.wSecond) == 6)
+					{
+						FILETIME ft;
+						SystemTimeToFileTime(&st, &ft);
+						ULARGE_INTEGER uli;
+						uli.LowPart = ft.dwLowDateTime;
+						uli.HighPart = ft.dwHighDateTime;
+						// FILETIME epoch offset: 116444736000000000 (100ns intervals since 1601)
+						time_t serverTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+
+						EnterCriticalSection(&m_csSync);
+						m_lastSyncTime = serverTime;
+						LeaveCriticalSection(&m_csSync);
+						CGetSetOptions::SetCloudLastSyncTime((__int64)serverTime);
+					}
+				}
+
+				CString msg;
+				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
+				LogMessage(msg);
 			}
 			catch (const json::parse_error& e)
 			{
@@ -695,43 +766,58 @@ void CCloudSyncManager::PullChanges()
 	{
 		LogMessage(_T("PullChanges: checking for changes from other devices..."));
 
-		// Build sync request to pull changes
-		json syncReq;
-		// Use tracked last sync time (falls back to epoch if never synced)
+		// Build since timestamp as RFC3339
+		CStringA sinceStr;
 		if (m_lastSyncTime > 0)
 		{
 			CTime sinceTime((time_t)m_lastSyncTime);
-			CStringA sinceStr;
 			sinceStr.Format("%04d-%02d-%02dT%02d:%02d:%02dZ",
 				sinceTime.GetYear(), sinceTime.GetMonth(), sinceTime.GetDay(),
 				sinceTime.GetHour(), sinceTime.GetMinute(), sinceTime.GetSecond());
-			syncReq["since"] = sinceStr.GetString();
 		}
 		else
 		{
-			syncReq["since"] = "1970-01-01T00:00:00Z";
+			sinceStr = "1970-01-01T00:00:00Z";
 		}
-		syncReq["device_id"] = std::string(m_deviceId);
-		syncReq["push_clips"] = json::array();       // Empty push for pull-only
 
+		// Use GET /clips/changes for pull-only (server has a dedicated pull endpoint)
 		CStringA serverUrlA(m_serverUrl);
 		std::string url = serverUrlA.GetString();
 		httplib::Client cli(url);
-		// Configure timeouts: 10s connection, 30s read, 30s write
 		cli.set_connection_timeout(10, 0);
 		cli.set_read_timeout(30, 0);
 		cli.set_write_timeout(30, 0);
-		// Note: httplib unified Client auto-detects HTTPS, cert verification
-		// settings not exposed on Client wrapper (use SSLClient directly if needed)
 		cli.set_default_headers({
 			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
 		});
 
-		std::string bodyStr = syncReq.dump();
-		auto res = cli.Post("/api/v1/clips/sync", bodyStr, "application/json");
+		// GET /api/v1/clips/changes?since=...
+		CStringA path;
+		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
+		auto res = cli.Get(path.GetString());
 		if (!res)
 		{
 			LogMessage(_T("PullChanges: failed to connect to server"));
+			return;
+		}
+
+		// Handle authentication errors (401/403) - trigger re-auth flow
+		if (res->status == 401 || res->status == 403)
+		{
+			LogMessage(_T("PullChanges: token expired or invalid, clearing token for re-auth."));
+			
+			// Clear stored credentials
+			CCloudAuth::Logout();
+			
+			// Notify user via main window (post message to avoid blocking sync thread)
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				// Post custom message with 401 status code
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
+			}
+			
+			LogMessage(_T("PullChanges: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
 			return;
 		}
 
@@ -747,59 +833,169 @@ void CCloudSyncManager::PullChanges()
 		try
 		{
 			json responseJson = json::parse(res->body);
+
+			// Server wraps response in { code: 0, data: { clips, server_time, has_more, deleted_ids } }
 			if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
 			{
-				LogMessage(_T("PullChanges: server returned error"));
+				CString msg;
+				msg.Format(_T("PullChanges: server error code %d"), responseJson["code"].get<int>());
+				LogMessage(msg);
 				return;
 			}
 
-			if (!responseJson.contains("data") || !responseJson["data"].contains("new_clips"))
+			// Extract from data envelope
+			const json* dataNode = nullptr;
+			if (responseJson.contains("data") && responseJson["data"].is_object())
 			{
-				LogMessage(_T("PullChanges: no new clips"));
-				return;
+				dataNode = &responseJson["data"];
+			}
+			else
+			{
+				dataNode = &responseJson; // Fallback
 			}
 
-			const auto& newClips = responseJson["data"]["new_clips"];
-			if (newClips.empty())
+			// Check for new clips (server uses "clips" for GET /changes endpoint)
+			const json* clipsNode = nullptr;
+			if (dataNode->contains("new_clips"))
 			{
-				LogMessage(_T("PullChanges: no new clips from other devices"));
+				clipsNode = &(*dataNode)["new_clips"];  // POST /sync response
+			}
+			else if (dataNode->contains("clips"))
+			{
+				clipsNode = &(*dataNode)["clips"];      // GET /changes response
+			}
+
+			const json* deletedNode = nullptr;
+			if (dataNode->contains("deleted_ids"))
+			{
+				deletedNode = &(*dataNode)["deleted_ids"];
+			}
+
+			bool hasClips = (clipsNode && !clipsNode->empty());
+			bool hasDeletions = (deletedNode && !deletedNode->empty());
+
+			if (!hasClips && !hasDeletions)
+			{
+				LogMessage(_T("PullChanges: no new clips or deletions from other devices"));
 				return;
 			}
 
 			// Process each new clip
 			int mergedCount = 0;
-			for (const auto& clip : newClips)
+			if (hasClips)
 			{
-				// Decrypt formats if encryption is enabled
-				json formats = clip.contains("formats") ? clip["formats"] : json::array();
-				if (m_cryptoInitialized && !formats.empty())
+				for (const auto& clip : *clipsNode)
 				{
-					if (!DecryptClipFormats(formats))
+					// Decrypt formats if encryption is enabled
+					json formats = clip.contains("formats") ? clip["formats"] : json::array();
+					if (m_cryptoInitialized && !formats.empty())
 					{
-						CString msg;
-						msg.Format(_T("PullChanges: decryption failed for clip, skipping"));
-						LogMessage(msg);
-						continue;
+						if (!DecryptClipFormats(formats))
+						{
+							CString msg;
+							msg.Format(_T("PullChanges: decryption failed for clip, skipping"));
+							LogMessage(msg);
+							continue;
+						}
 					}
-				}
 
-				// Merge clip into local database
-				int newId = MergeRemoteClipToLocal(clip);
-				if (newId > 0)
-				{
-					mergedCount++;
+					// Merge clip into local database with LWW conflict resolution
+					int newId = MergeRemoteClipToLocal(clip);
+					if (newId > 0)
+					{
+						mergedCount++;
+					}
 				}
 			}
 
-			CString msg;
-			msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"), newClips.size(), mergedCount);
-			LogMessage(msg);
+			// Process deleted clips
+			int deletedCount = 0;
+			if (hasDeletions)
+			{
+				for (const auto& deletedIdVal : *deletedNode)
+				{
+					// Server sends string IDs (e.g. "123" or "clip-abc-123")
+					std::string idStr = deletedIdVal.get<std::string>();
 
-			// Update last sync time and persist to registry (thread-safe)
+					// Try to find and delete the local clip
+					// Local clips use int IDs, so try parsing as int first
+					BOOL found = FALSE;
+					try
+					{
+						int localId = std::stoi(idStr);
+						if (DeleteLocalClip(localId))
+						{
+							deletedCount++;
+							found = TRUE;
+						}
+					}
+					catch (...)
+					{
+						// Not an int ID - skip (server clip ID doesn't map to local)
+						// In a full implementation, we'd maintain a remote_clip_id mapping table
+					}
+
+					if (!found)
+					{
+						CString msg;
+						msg.Format(_T("PullChanges: clip %hs not found locally, skip delete"), idStr.c_str());
+						LogMessage(msg);
+					}
+				}
+			}
+
+			// Update last sync time from server's sync_time (or use current time as fallback)
+			time_t newSyncTime = time(nullptr);
+			if (dataNode->contains("server_time"))
+			{
+				std::string serverTimeStr = (*dataNode)["server_time"].get<std::string>();
+				SYSTEMTIME st = {};
+				if (sscanf_s(serverTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+					&st.wYear, &st.wMonth, &st.wDay,
+					&st.wHour, &st.wMinute, &st.wSecond) == 6)
+				{
+					FILETIME ft;
+					SystemTimeToFileTime(&st, &ft);
+					ULARGE_INTEGER uli;
+					uli.LowPart = ft.dwLowDateTime;
+					uli.HighPart = ft.dwHighDateTime;
+					newSyncTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+				}
+			}
+			else if (dataNode->contains("sync_time"))
+			{
+				std::string syncTimeStr = (*dataNode)["sync_time"].get<std::string>();
+				SYSTEMTIME st = {};
+				if (sscanf_s(syncTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+					&st.wYear, &st.wMonth, &st.wDay,
+					&st.wHour, &st.wMinute, &st.wSecond) == 6)
+				{
+					FILETIME ft;
+					SystemTimeToFileTime(&st, &ft);
+					ULARGE_INTEGER uli;
+					uli.LowPart = ft.dwLowDateTime;
+					uli.HighPart = ft.dwHighDateTime;
+					newSyncTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+				}
+			}
+
 			EnterCriticalSection(&m_csSync);
-			m_lastSyncTime = time(nullptr);
+			m_lastSyncTime = newSyncTime;
 			LeaveCriticalSection(&m_csSync);
-			CGetSetOptions::SetCloudLastSyncTime((__int64)m_lastSyncTime);
+			CGetSetOptions::SetCloudLastSyncTime((__int64)newSyncTime);
+
+			CString msg;
+			if (deletedCount > 0)
+			{
+				msg.Format(_T("PullChanges: received %d clips (%d merged), %d deletions"),
+					hasClips ? clipsNode->size() : 0, mergedCount, deletedCount);
+			}
+			else
+			{
+				msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"),
+					hasClips ? clipsNode->size() : 0, mergedCount);
+			}
+			LogMessage(msg);
 		}
 		catch (const json::parse_error& e)
 		{
@@ -822,6 +1018,8 @@ void CCloudSyncManager::PullChanges()
 
 // ---------------------------------------------------------------------------
 // GetLocalClipsSince: Enumerate local clips modified since lastSyncTime
+// Produces JSON matching server's PushClipItem schema:
+//   { id, description, crc, group_id, short_cut, updated_at, formats: [{format_type, data}] }
 // ---------------------------------------------------------------------------
 BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& clipsArray)
 {
@@ -830,24 +1028,26 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 	try
 	{
 		// Query clips modified since last sync
+		// Use lModifiedDate (modification time) instead of lDate (creation time)
+		// This ensures modified clips are synced even if their creation time is old
 		// For initial sync, get the last 100 clips
 		CString csSQL;
 		if (sinceTime > 0)
 		{
 			csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 			             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lastPasteDate ")
-			             _T("FROM Main WHERE lDate > %lld AND bIsGroup = 0 ")
-			             _T("ORDER BY lDate DESC LIMIT 100"), sinceTime);
+			             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
+			             _T("FROM Main WHERE lModifiedDate > %lld AND bIsGroup = 0 ")
+			             _T("ORDER BY lModifiedDate DESC LIMIT 100"), sinceTime);
 		}
 		else
 		{
 			// First sync: get recent clips
 			csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 			             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lastPasteDate ")
+			             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
 			             _T("FROM Main WHERE bIsGroup = 0 ")
-			             _T("ORDER BY lDate DESC LIMIT 100"));
+			             _T("ORDER BY lModifiedDate DESC LIMIT 100"));
 		}
 
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
@@ -856,26 +1056,29 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 		while(q.eof() == false)
 		{
 			int clipId = q.getIntField(_T("lID"));
-			time_t clipDate = (time_t)q.getInt64Field(_T("lDate"));
+			time_t lDate = (time_t)q.getInt64Field(_T("lDate"));
 			CString desc = q.getStringField(_T("mText"));
 			DWORD crc = (DWORD)q.getIntField(_T("CRC"));
+			time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 
-			// Build clip JSON
+			// Build clip JSON matching server's PushClipItem schema
 			json clipJson;
-			clipJson["remote_clip_id"] = std::to_string(clipId);
-			clipJson["description"] = CStringToStdString(desc);
-			clipJson["crc"] = (int)crc;
-			clipJson["is_group"] = false;
-			clipJson["clip_order"] = q.getFloatField(_T("clipOrder"));
-			clipJson["sticky_order"] = q.getFloatField(_T("stickyClipOrder"));
-			clipJson["shortcut"] = q.getIntField(_T("lShortCut"));
-			clipJson["global_shortcut"] = q.getIntField(_T("globalShortCut"));
-			clipJson["auto_delete"] = q.getIntField(_T("lDontAutoDelete"));
-			
-			time_t lastPaste = (time_t)q.getInt64Field(_T("lastPasteDate"));
-			if (lastPaste > 0)
+			clipJson["id"] = std::to_string(clipId);                 // Server expects "id" (string)
+			clipJson["description"] = CStringToStdString(desc);      // Server expects "description"
+			clipJson["crc"] = static_cast<int64_t>(crc);             // Server expects "crc" (int64)
+			clipJson["group_id"] = "";                               // Server expects "group_id"
+			clipJson["short_cut"] = q.getIntField(_T("lShortCut")); // Server expects "short_cut"
+
+			// Server uses updated_at for LWW conflict resolution
+			// Use lModifiedDate (modification time) as the authoritative timestamp
+			time_t updatedAt = (modDate > 0) ? modDate : lDate;
+			if (updatedAt > 0)
 			{
-				clipJson["last_paste_date"] = std::string(ctime(&lastPaste));
+				struct tm gmtm;
+				gmtime_s(&gmtm, &updatedAt);
+				char timeBuf[32];
+				strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
+				clipJson["updated_at"] = std::string(timeBuf);
 			}
 
 			// Load formats for this clip
@@ -885,10 +1088,21 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 				// Filter HDROP formats (file paths only, no content)
 				FilterHDROPForSync(formatsArray);
 
-				// Encrypt formats if encryption is enabled
-				if (m_cryptoInitialized)
+				// Build formats array matching server's PushFormatItem: [{format_type, data}]
+				json serverFormats;
+				for (const auto& fmt : formatsArray)
 				{
-					if (!EncryptClipFormats(formatsArray))
+					json serverFmt;
+					serverFmt["format_type"] = fmt.value("format_type", 0);
+					serverFmt["data"] = fmt.value("data", "");  // Already base64 or plain text
+					serverFormats.push_back(serverFmt);
+				}
+				clipJson["formats"] = serverFormats;
+
+				// Encrypt formats if encryption is enabled
+				if (m_cryptoInitialized && !serverFormats.empty())
+				{
+					if (!EncryptClipFormats(clipJson["formats"]))
 					{
 						CString msg;
 						msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
@@ -897,8 +1111,6 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 						continue;
 					}
 				}
-
-				clipJson["formats"] = formatsArray;
 			}
 			else
 			{
@@ -1033,48 +1245,62 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 }
 
 // ---------------------------------------------------------------------------
-// MergeRemoteClipToLocal: Merge a remote clip into local database
+// MergeRemoteClipToLocal: Merge a remote clip into local database with LWW
+// Server sends: { id, description, crc, created_at, updated_at, group_id,
+//                 short_cut, paste_count, formats: [{format_type, data, data_size}] }
+// LWW: If local clip has newer updated_at, skip. If remote is newer, update.
 // Returns the new/updated clip ID, or -1 on error
 // ---------------------------------------------------------------------------
 int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 {
 	try
 	{
-		// Extract clip metadata
-		std::string remoteIdStr = remoteClip.value("remote_clip_id", "");
+		// Extract clip metadata from server's ClipDetail schema
+		std::string serverIdStr = remoteClip.value("id", "");
 		std::string desc = remoteClip.value("description", "");
-		int crc = remoteClip.value("crc", 0);
-		double clipOrder = remoteClip.value("clip_order", 0.0);
-		double stickyOrder = remoteClip.value("sticky_order", 0.0);
-		int shortcut = remoteClip.value("shortcut", 0);
-		int globalShortcut = remoteClip.value("global_shortcut", 0);
-		int autoDelete = remoteClip.value("auto_delete", 1);
+		int64_t crc64 = remoteClip.value("crc", (int64_t)0);
+		DWORD crc = static_cast<DWORD>(crc64);
+		int shortcut = remoteClip.value("short_cut", 0);
 
-		// Check if clip already exists (by CRC or remote_clip_id)
-		// Use parameterized query to prevent SQL injection
-		int existingId = -1;
-		try
+		// Parse remote updated_at timestamp for LWW comparison
+		time_t remoteUpdatedAt = 0;
+		if (remoteClip.contains("updated_at"))
 		{
-			CString csSQL;
-			// Escape single quotes in desc to prevent SQL injection
-			CString escapedDesc;
+			std::string updatedAtStr = remoteClip["updated_at"].get<std::string>();
+			SYSTEMTIME st = {};
+			if (sscanf_s(updatedAtStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+				&st.wYear, &st.wMonth, &st.wDay,
+				&st.wHour, &st.wMinute, &st.wSecond) == 6)
 			{
-				const CStringW descW(desc.c_str());
-				for (int i = 0; i < descW.GetLength(); i++)
+				FILETIME ft;
+				if (SystemTimeToFileTime(&st, &ft))
 				{
-					if (descW[i] == L'\'')
-						escapedDesc += L"''";  // SQL escape
-					else
-						escapedDesc += descW[i];
+					ULARGE_INTEGER uli;
+					uli.LowPart = ft.dwLowDateTime;
+					uli.HighPart = ft.dwHighDateTime;
+					remoteUpdatedAt = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
 				}
 			}
-			csSQL.Format(_T("SELECT lID FROM Main WHERE CRC = %d OR mText = '%s' LIMIT 1"),
-			             crc, (LPCTSTR)escapedDesc);
+		}
 
-			CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+		// Check if clip already exists locally (by CRC match - same content)
+		int existingId = -1;
+		time_t localModDate = 0;
+		try
+		{
+			// Primary check: CRC match (same content already exists)
+			// Use parameterized query to prevent SQL injection
+			CString csSQL;
+			csSQL.Format(_T("SELECT lID, lModifiedDate FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
+			
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+			stmt.bind(1, (int64_t)crc);
+			CppSQLite3Query q = stmt.execQuery();
+			
 			if (q.eof() == false)
 			{
 				existingId = q.getIntField(_T("lID"));
+				localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 			}
 		}
 		catch (...)
@@ -1084,72 +1310,145 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 
 		if (existingId > 0)
 		{
-			// Clip exists - check if we need to update it
-			// For now, skip duplicate clips (CRC match)
-			CString msg;
-			msg.Format(_T("MergeRemoteClipToLocal: duplicate clip (CRC=%d), skipping"), crc);
-			LogMessage(msg);
+			// Clip with same content (CRC) already exists locally
+			// LWW: If remote is significantly newer, update the local clip
+			if (remoteUpdatedAt > localModDate + 1)
+			{
+				// Remote clip is newer - update local clip's modification time
+				// (Content is same per CRC match, so no need to update formats)
+				CString csUpdateSQL;
+				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld WHERE lID = %d"),
+				                   (__int64)remoteUpdatedAt, existingId);
+				theApp.m_db.execDML(csUpdateSQL);
+
+				CString msg;
+				msg.Format(_T("MergeRemoteClipToLocal: clip %d exists, remote newer (CRC match), updated timestamp"), existingId);
+				LogMessage(msg);
+			}
+			else
+			{
+				// Local clip is same age or newer - skip (LWW: local wins)
+				CString msg;
+				msg.Format(_T("MergeRemoteClipToLocal: duplicate clip (CRC=%d, local=%lld, remote=%lld), skipping (LWW: local wins)"),
+				           crc, (long long)localModDate, (long long)remoteUpdatedAt);
+				LogMessage(msg);
+			}
 			return existingId;
 		}
 
-		// Create new clip
+		// No CRC match - check if description matches (fallback for clips without CRC)
+		if (!desc.empty())
+		{
+			try
+			{
+				// Use parameterized query to prevent SQL injection
+				CString csSQL;
+				csSQL.Format(_T("SELECT lID, lModifiedDate, CRC FROM Main WHERE mText = ? AND bIsGroup = 0 LIMIT 1"));
+				
+				CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+				stmt.bind(1, desc.c_str());
+				CppSQLite3Query q = stmt.execQuery();
+				
+				if (q.eof() == false)
+				{
+					int descMatchId = q.getIntField(_T("lID"));
+					localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
+					DWORD localCRC = (DWORD)q.getIntField(_T("CRC"));
+
+					// Same description but different CRC -> different content
+					// LWW: only skip if local is same age or newer
+					if (remoteUpdatedAt <= localModDate + 1)
+					{
+						CString msg;
+						msg.Format(_T("MergeRemoteClipToLocal: same description, different CRC, local is newer (local=%lld, remote=%lld), skipping"),
+						           (long long)localModDate, (long long)remoteUpdatedAt);
+						LogMessage(msg);
+						return descMatchId;
+					}
+					else
+					{
+						// Remote is newer - will replace this clip's content
+						existingId = descMatchId;
+					}
+				}
+			}
+			catch (...)
+			{
+				// No description match or error - will create new clip
+			}
+		}
+
+		// Delete existing clip if we found one that needs to be replaced
+		if (existingId > 0)
+		{
+			DeleteLocalClip(existingId);
+			existingId = -1;  // Will create fresh clip below
+		}
+
+		// Create new clip in local database
 		CClip newClip;
 		newClip.m_Desc = CString(desc.c_str());
-		newClip.m_CRC = (DWORD)crc;
+		newClip.m_CRC = crc;
 		newClip.m_parentId = -1;  // Top-level clip
-		newClip.m_clipOrder = clipOrder;
-		newClip.m_stickyClipOrder = stickyOrder;
-		newClip.m_shortCut = shortcut;
-		newClip.m_globalShortCut = globalShortcut;
-		newClip.m_dontAutoDelete = autoDelete;
 		newClip.m_bIsGroup = FALSE;
-		newClip.m_Time = CTime::GetCurrentTime();
 
-		// Load formats from JSON
+		// Use remote's updated_at as the clip timestamp (preserves ordering)
+		if (remoteUpdatedAt > 0)
+		{
+			newClip.m_Time = CTime((time_t)remoteUpdatedAt);
+		}
+		else
+		{
+			newClip.m_Time = CTime::GetCurrentTime();
+		}
+
+		// Load formats from server response
 		if (remoteClip.contains("formats") && remoteClip["formats"].is_array())
 		{
 			for (const auto& formatJson : remoteClip["formats"])
 			{
-				std::string formatName = formatJson.value("format_name", "");
 				std::string dataStr = formatJson.value("data", "");
 				int dataSize = formatJson.value("data_size", 0);
-				std::string encoding = formatJson.value("encoding", "");
+				int formatType = formatJson.value("format_type", 0);
 
-				if (dataStr.empty() || dataSize == 0)
+				if (dataStr.empty())
 					continue;
 
-				// Decode data based on encoding
+				// Decode data based on whether it's base64 or plain text
 				HGLOBAL hGlobal = nullptr;
 
-				if (encoding == "hex")
+				// Determine if data is base64-encoded or plain text
+				// Base64 data is typically longer than the decoded size, contains only [A-Za-z0-9+/=]
+				bool isBase64 = (dataSize > 0 && dataStr.length() > static_cast<size_t>(dataSize));
+
+				if (formatType == CF_UNICODETEXT)
 				{
-					// Decode hex to binary
-					int binaryLen = dataStr.length() / 2;
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, binaryLen);
+					// UTF-8 text -> convert to UTF-16 for Windows clipboard
+					CStringA utf8Data(dataStr.c_str());
+					// For UTF-16, store the UTF-8 text directly (Ditto handles conversion)
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, utf8Data.GetLength() + 1);
 					if (hGlobal)
 					{
-						BYTE* pData = (BYTE*)GlobalLock(hGlobal);
-						for (int i = 0; i < binaryLen; i++)
-						{
-							BYTE high = dataStr[i * 2];
-							BYTE low = dataStr[i * 2 + 1];
-							// Properly handle both uppercase and lowercase hex digits
-							if (high >= '0' && high <= '9') high = high - '0';
-							else if (high >= 'A' && high <= 'F') high = high - 'A' + 10;
-							else if (high >= 'a' && high <= 'f') high = high - 'a' + 10;
-							else high = 0;
-							if (low >= '0' && low <= '9') low = low - '0';
-							else if (low >= 'A' && low <= 'F') low = low - 'A' + 10;
-							else if (low >= 'a' && low <= 'f') low = low - 'a' + 10;
-							else low = 0;
-							pData[i] = (high << 4) | low;
-						}
+						char* pData = (char*)GlobalLock(hGlobal);
+						memcpy(pData, utf8Data.GetString(), utf8Data.GetLength() + 1);
 						GlobalUnlock(hGlobal);
 					}
 				}
-				else if (encoding == "base64")
+				else if (formatType == CF_TEXT)
 				{
-					// Decode base64 to binary (for images and other binary formats)
+					// Plain text
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, dataStr.length() + 1);
+					if (hGlobal)
+					{
+						char* pData = (char*)GlobalLock(hGlobal);
+						memcpy(pData, dataStr.c_str(), dataStr.length());
+						pData[dataStr.length()] = '\0';
+						GlobalUnlock(hGlobal);
+					}
+				}
+				else if (isBase64)
+				{
+					// Base64-encoded binary data (CF_DIB images, etc.)
 					CStringA b64Str(dataStr.c_str());
 					std::vector<BYTE> decoded = CCloudCrypto::Base64Decode(b64Str);
 					if (!decoded.empty())
@@ -1165,20 +1464,31 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				}
 				else
 				{
-					// Plain text (UTF-8)
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, dataSize + 1);
+					// Plain text fallback
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, dataStr.length() + 1);
 					if (hGlobal)
 					{
 						char* pData = (char*)GlobalLock(hGlobal);
-						memcpy(pData, dataStr.c_str(), dataSize);
-						pData[dataSize] = '\0';
+						memcpy(pData, dataStr.c_str(), dataStr.length());
+						pData[dataStr.length()] = '\0';
 						GlobalUnlock(hGlobal);
 					}
 				}
 
 				if (hGlobal)
 				{
-					UINT cfType = GetFormatID(CString(formatName.c_str()));
+					// Map server format_type to Windows clipboard format
+					UINT cfType = 0;
+					switch (formatType)
+					{
+						case 1:  cfType = CF_TEXT; break;
+						case 13: cfType = CF_UNICODETEXT; break;
+						case 8:  cfType = RegisterClipboardFormat(_T("CF_DIB")); break;
+						case 49: cfType = RegisterClipboardFormat(_T("HTML Format")); break;
+						case 15: cfType = CF_HDROP; break;
+						default: cfType = formatType; break;
+					}
+
 					CClipFormat cf;
 					cf.m_cfType = cfType;
 					cf.m_hgData = hGlobal;
@@ -1195,7 +1505,8 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 			if (newClip.AddToDB(false))
 			{
 				CString msg;
-				msg.Format(_T("MergeRemoteClipToLocal: clip merged successfully (ID=%d)"), newClip.m_id);
+				msg.Format(_T("MergeRemoteClipToLocal: clip added (ID=%d, CRC=%d, desc='%s')"),
+				           newClip.m_id, crc, newClip.m_Desc.Left(50).GetString());
 				LogMessage(msg);
 				return newClip.m_id;
 			}
@@ -1225,5 +1536,57 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 	{
 		LogMessage(_T("MergeRemoteClipToLocal: unknown error"));
 		return -1;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DeleteLocalClip: Delete a clip from local database (for sync deletions)
+// Returns TRUE if clip was found and deleted, FALSE otherwise
+// ---------------------------------------------------------------------------
+BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
+{
+	try
+	{
+		// Check if clip exists
+		CString csCheckSQL;
+		csCheckSQL.Format(_T("SELECT lID FROM Main WHERE lID = %d"), clipId);
+		
+		CppSQLite3Query checkQ = theApp.m_db.execQuery(csCheckSQL);
+		if (checkQ.eof())
+		{
+			// Clip doesn't exist locally, nothing to delete
+			return FALSE;
+		}
+
+		// Delete clip (this will also trigger the delete_data_trigger to clean up Data table)
+		CString csDeleteSQL;
+		csDeleteSQL.Format(_T("DELETE FROM Main WHERE lID = %d"), clipId);
+		
+		theApp.m_db.execDML(csDeleteSQL);
+
+		CString msg;
+		msg.Format(_T("DeleteLocalClip: clip %d deleted from local DB"), clipId);
+		LogMessage(msg);
+
+		return TRUE;
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		CString err;
+		err.Format(_T("DeleteLocalClip SQLite error: %hs"), e.errorMessage());
+		LogMessage(err);
+		return FALSE;
+	}
+	catch (const std::exception& e)
+	{
+		CString err;
+		err.Format(_T("DeleteLocalClip error: %hs"), e.what());
+		LogMessage(err);
+		return FALSE;
+	}
+	catch (...)
+	{
+		LogMessage(_T("DeleteLocalClip: unknown error"));
+		return FALSE;
 	}
 }

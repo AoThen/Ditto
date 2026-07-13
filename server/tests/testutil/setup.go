@@ -43,10 +43,13 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	tmpFile.Close()
 
 	cfg := &config.Config{
-		Port:         "0",
-		DatabasePath: dbPath,
-		JWTSecret:    "test-secret-key-for-testing",
-		StartTime:    time.Now(),
+		Port:               "0",
+		DatabasePath:       dbPath,
+		JWTSecret:          "test-secret-key-for-testing",
+		StartTime:          time.Now(),
+		CookieSecure:       false, // tests run over HTTP, not HTTPS
+		TokenExpiryAccess:  config.DefaultTokenExpiryAccess,
+		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
 	if err := database.Init(dbPath); err != nil {
@@ -145,10 +148,13 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	tmpFile.Close()
 
 	cfg := &config.Config{
-		Port:         "0",
-		DatabasePath: dbPath,
-		JWTSecret:    "test-secret-key-for-testing",
-		StartTime:    time.Now(),
+		Port:               "0",
+		DatabasePath:       dbPath,
+		JWTSecret:          "test-secret-key-for-testing",
+		StartTime:          time.Now(),
+		CookieSecure:       false,
+		TokenExpiryAccess:  2 * time.Second, // short for testing
+		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
 	if err := database.Init(dbPath); err != nil {
@@ -244,10 +250,13 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	tmpFile.Close()
 
 	cfg := &config.Config{
-		Port:         "0",
-		DatabasePath: dbPath,
-		JWTSecret:    "test-secret-key-for-testing",
-		StartTime:    time.Now(),
+		Port:               "0",
+		DatabasePath:       dbPath,
+		JWTSecret:          "test-secret-key-for-testing",
+		StartTime:          time.Now(),
+		CookieSecure:       false,
+		TokenExpiryAccess:  config.DefaultTokenExpiryAccess,
+		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
 	if err := database.Init(dbPath); err != nil {

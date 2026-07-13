@@ -60,4 +60,7 @@ protected:
 	afx_msg void OnBtnTestEncryption();
 	afx_msg void OnBtnExportKey();
 	afx_msg void OnBtnImportKey();
+	
+	// Handler for cloud authentication required message
+	afx_msg LRESULT OnCloudAuthRequired(WPARAM wParam, LPARAM lParam);
 };

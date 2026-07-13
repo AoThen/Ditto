@@ -23,7 +23,7 @@ func NewStatsHandler() *StatsHandler {
 
 // GetOverview returns statistics overview
 func (h *StatsHandler) GetOverview(c *gin.Context) {
-	userID := c.GetUint("user_id")
+	userID := middleware.GetUserID(c)
 
 	var totalClips int64
 	var todayClips int64

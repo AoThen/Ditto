@@ -22,6 +22,21 @@ func NewAuthService(cfg *config.Config) *AuthService {
 	return &AuthService{cfg: cfg}
 }
 
+// GetTokenExpiryAccess returns the access token lifetime from config.
+func (s *AuthService) GetTokenExpiryAccess() time.Duration {
+	return s.cfg.TokenExpiryAccess
+}
+
+// GetTokenExpiryRefresh returns the refresh token lifetime from config.
+func (s *AuthService) GetTokenExpiryRefresh() time.Duration {
+	return s.cfg.TokenExpiryRefresh
+}
+
+// IsCookieSecure returns whether cookies should use the Secure flag.
+func (s *AuthService) IsCookieSecure() bool {
+	return s.cfg.CookieSecure
+}
+
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=32"`
 	Email    string `json:"email" binding:"required,email"`
@@ -38,6 +53,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
+	UserID       uint   `json:"user_id"`
 	DeviceToken  string `json:"device_token"`
 	RefreshToken string `json:"refresh_token"`
 	DeviceID     string `json:"device_id"`
@@ -113,46 +129,27 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 	}
 
 	// Generate JWT token (access token + refresh token)
-	accessToken, err := s.generateToken(user.ID, deviceID, 30*24*time.Hour)
+	accessToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryAccess)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := s.generateToken(user.ID, deviceID, 90*24*time.Hour)
+	refreshToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryRefresh)
 	if err != nil {
 		return nil, err
 	}
 
 	return &LoginResponse{
+		UserID:       user.ID,
 		DeviceToken:  accessToken,
 		RefreshToken: refreshToken,
 		DeviceID:     deviceID,
 	}, nil
 }
 
-func (s *AuthService) RefreshDeviceToken(deviceID string, oldToken string) (string, string, error) {
-	// Verify the old token is valid first (middleware already does this)
-	// Parse the old token to extract user_id
-	token, _, err := new(jwt.Parser).ParseUnverified(oldToken, jwt.MapClaims{})
-	if err != nil {
-		return "", "", errors.New("无效的 Token")
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return "", "", errors.New("无效的 Token 声明")
-	}
-
-	userIDFloat, ok := claims["user_id"].(float64)
-	if !ok {
-		return "", "", errors.New("无效的 Token: 缺少 user_id")
-	}
-	userID := uint(userIDFloat)
-
-	// Verify device_id matches
-	tokenDeviceID, ok := claims["device_id"].(string)
-	if !ok || tokenDeviceID != deviceID {
-		return "", "", errors.New("设备不匹配")
-	}
+func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, string, error) {
+	// C3 FIX: userID comes from the already-verified middleware context.
+	// No need to re-parse the old token (avoids ParseUnverified security risk).
+	// Device ID is also already verified by the middleware.
 
 	// Verify user still exists
 	var user model.User
@@ -161,11 +158,11 @@ func (s *AuthService) RefreshDeviceToken(deviceID string, oldToken string) (stri
 	}
 
 	// Generate new tokens
-	accessToken, err := s.generateToken(userID, deviceID, 30*24*time.Hour)
+	accessToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryAccess)
 	if err != nil {
 		return "", "", err
 	}
-	refreshToken, err := s.generateToken(userID, deviceID, 90*24*time.Hour)
+	refreshToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryRefresh)
 	if err != nil {
 		return "", "", err
 	}

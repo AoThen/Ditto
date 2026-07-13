@@ -1,13 +1,30 @@
 <template>
   <div class="settings-container">
+    <!-- User Profile Section -->
+    <el-card style="margin-bottom: 20px;">
+      <template #header>
+        <h2>账户信息</h2>
+      </template>
+      <div class="settings-section">
+        <div class="setting-item">
+          <span class="label">用户名</span>
+          <span>{{ userStore.username || '(未设置)' }}</span>
+        </div>
+        <div class="setting-item">
+          <span class="label">设备 ID</span>
+          <span class="monospace">{{ userStore.deviceId || '(未登录)' }}</span>
+        </div>
+        <div class="setting-item">
+          <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- Encryption Section -->
     <el-card>
       <template #header>
-        <h2>设置</h2>
+        <h2>端到端加密</h2>
       </template>
-
-      <!-- Encryption Section -->
-      <div class="settings-section">
-        <h3>端到端加密</h3>
         <div class="setting-item">
           <span class="label">加密状态</span>
           <el-tag :type="encryptionEnabled ? 'success' : 'info'">
@@ -109,9 +126,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { getEncryptionSalt, setupEncryption, disableEncryption, changeEncryptionPassword } from '@/api/clips'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
+const router = useRouter()
+const userStore = useUserStore()
 const encryptionEnabled = ref(false)
 const saltValue = ref('')
 const showSalt = ref(false)
@@ -239,6 +260,19 @@ async function handleChangePassword() {
   }
 }
 
+async function handleLogout() {
+  try {
+    await ElMessageBox.confirm('确定退出登录吗？', '确认', {
+      confirmButtonText: '确定', cancelButtonText: '取消', type: 'info',
+    })
+    userStore.logout()
+    router.push('/login')
+    ElMessage.success('已退出登录')
+  } catch (err) {
+    // cancelled
+  }
+}
+
 onMounted(() => {
   fetchSalt()
 })
@@ -283,5 +317,11 @@ onMounted(() => {
   gap: 8px;
   font-family: monospace;
   font-size: 14px;
+}
+
+.monospace {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #606266;
 }
 </style>

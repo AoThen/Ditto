@@ -62,6 +62,8 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 
 		c.Set("user_id", claims.UserID)
 		c.Set("device_id", claims.DeviceID)
+		// C3 FIX: Store raw token in context for refresh (avoids ParseUnverified)
+		c.Set("raw_token", tokenStr)
 		c.Next()
 	}
 }
@@ -82,8 +84,13 @@ func GetDeviceID(c *gin.Context) string {
 	return v.(string)
 }
 
-// GetRawToken returns the raw JWT token string that was used for authentication
+// GetRawToken returns the raw JWT token string that was authenticated by the middleware.
+// C3 FIX: Reads from context (set by Auth middleware) instead of re-parsing headers.
+// This ensures consistency with the token that was actually verified.
 func GetRawToken(c *gin.Context) string {
-	authHeader := c.GetHeader("Authorization")
-	return strings.TrimPrefix(authHeader, "Bearer ")
+	v, exists := c.Get("raw_token")
+	if !exists {
+		return ""
+	}
+	return v.(string)
 }

@@ -30,10 +30,12 @@ func setupAuthServiceTest(t *testing.T) (*AuthService, func()) {
 
 	// Create config
 	cfg := &config.Config{
-		Port:         "0",
-		DatabasePath: dbPath,
-		JWTSecret:    "test-jwt-secret-key",
-		StartTime:    time.Now(),
+		Port:               "0",
+		DatabasePath:       dbPath,
+		JWTSecret:          "test-jwt-secret-key",
+		StartTime:          time.Now(),
+		TokenExpiryAccess:  config.DefaultTokenExpiryAccess,
+		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
 	// Create service
@@ -256,8 +258,8 @@ func TestAuthService_RefreshDeviceToken_Success(t *testing.T) {
 	loginResp, err := svc.Login(loginReq, "test-device")
 	require.NoError(t, err)
 
-	// Refresh token
-	newToken, _, err := svc.RefreshDeviceToken(loginResp.DeviceID, loginResp.DeviceToken)
+	// C3 FIX: RefreshDeviceToken now takes userID directly (from verified middleware context)
+	newToken, _, err := svc.RefreshDeviceToken(loginResp.UserID, loginResp.DeviceID)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, newToken)
@@ -271,72 +273,20 @@ func TestAuthService_RefreshDeviceToken_Success(t *testing.T) {
 
 	// Verify claims
 	claims := token.Claims.(jwt.MapClaims)
-	assert.Equal(t, float64(1), claims["user_id"])
+	assert.Equal(t, float64(loginResp.UserID), claims["user_id"])
 	assert.Equal(t, loginResp.DeviceID, claims["device_id"])
 }
 
-func TestAuthService_RefreshDeviceToken_InvalidToken(t *testing.T) {
+// C3 FIX: InvalidToken and DeviceMismatch tests removed.
+// ParseUnverified is no longer used - userID comes from the already-verified
+// middleware context, and device_id is verified by the Auth middleware.
+
+func TestAuthService_RefreshDeviceToken_UserNotFound(t *testing.T) {
 	svc, cleanup := setupAuthServiceTest(t)
 	defer cleanup()
 
-	_, _, err := svc.RefreshDeviceToken("dev-1-test", "invalid-token-string")
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无效")
-}
-
-func TestAuthService_RefreshDeviceToken_DeviceMismatch(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// Register and login
-	regReq := &RegisterRequest{
-		Username: "mismatchuser",
-		Email:    "mismatch@example.com",
-		Password: "password",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	loginResp, err := svc.Login(&LoginRequest{
-		Username: "mismatchuser",
-		Password: "password",
-	}, "device1")
-	require.NoError(t, err)
-
-	// Try to refresh with different device ID
-	_, _, err = svc.RefreshDeviceToken("different-device-id", loginResp.DeviceToken)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "设备不匹配")
-}
-
-func TestAuthService_RefreshDeviceToken_UserDeleted(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// Register and login
-	regReq := &RegisterRequest{
-		Username: "deleteduser",
-		Email:    "deleted@example.com",
-		Password: "password",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	loginResp, err := svc.Login(&LoginRequest{
-		Username: "deleteduser",
-		Password: "password",
-	}, "device1")
-	require.NoError(t, err)
-
-	// Delete the user's devices first (due to foreign key constraints)
-	database.DB.Where("user_id = ?", 1).Delete(&model.Device{})
-	// Then delete the user
-	database.DB.Where("username = ?", "deleteduser").Delete(&model.User{})
-
-	// Try to refresh token - should fail because user no longer exists
-	_, _, err = svc.RefreshDeviceToken(loginResp.DeviceID, loginResp.DeviceToken)
+	// C3 FIX: Test that refreshing with a non-existent userID returns error
+	_, _, err := svc.RefreshDeviceToken(99999, "some-device-id")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "用户不存在")

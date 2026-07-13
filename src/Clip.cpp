@@ -962,8 +962,8 @@ bool CClip::AddToMainTable()
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
 		CString cs;
-		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut) ")
-						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d);"),
+		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lModifiedDate) ")
+						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %lld);"),
 							m_Time.GetTime(),
 							m_Desc,
 							m_shortCut,
@@ -979,7 +979,8 @@ bool CClip::AddToMainTable()
 							m_stickyClipOrder,
 							m_stickyClipGroupOrder,
 							m_moveToGroupShortCut,
-							m_globalMoveToGroupShortCut);
+							m_globalMoveToGroupShortCut,
+							m_Time.GetTime());  // lModifiedDate = creation time for new clips
 
 		theApp.m_db.execDML(cs);
 
@@ -1014,12 +1015,13 @@ bool CClip::ModifyMainTable()
 			_T("stickyClipOrder = %f, ")
 			_T("stickyClipGroupOrder = %f, ")
 			_T("MoveToGroupShortCut = %d, ")
-			_T("GlobalMoveToGroupShortCut = %d ")
-			_T("WHERE lID = %d;"), 
-			m_shortCut, 
-			m_Desc, 
-			m_parentId, 
-			m_dontAutoDelete, 
+			_T("GlobalMoveToGroupShortCut = %d, ")
+			_T("lModifiedDate = %lld ")
+			_T("WHERE lID = %d;"),
+			m_shortCut,
+			m_Desc,
+			m_parentId,
+			m_dontAutoDelete,
 			m_csQuickPaste,
 			m_clipOrder,
 			m_clipGroupOrder,
@@ -1028,6 +1030,7 @@ bool CClip::ModifyMainTable()
 			m_stickyClipGroupOrder,
 			m_moveToGroupShortCut,
 			m_globalMoveToGroupShortCut,
+			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
 		bRet = true;
@@ -1044,9 +1047,10 @@ bool CClip::ModifyDescription()
 	{
 		m_Desc.Replace(_T("'"), _T("''"));
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s' ")
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
 			m_Desc,
+			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
 		bRet = true;
@@ -2106,12 +2110,12 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		AddToDataTable();
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d WHERE lID = %d"), CRC, m_id);
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d, lModifiedDate = %lld WHERE lID = %d"), CRC, CTime::GetCurrentTime().GetTime(), m_id);
 
 		if (bUpdateDesc)
 		{
 			m_Desc.Replace(_T("'"), _T("''"));
-			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s' WHERE lID = %d"), m_Desc, m_id);
+			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, CTime::GetCurrentTime().GetTime(), m_id);
 		}
 
 		bRet = true;
