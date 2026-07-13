@@ -434,6 +434,12 @@ CString ActionEnums::EnumDescription(ActionEnumValues value)
 	case GENERATE_GUID:
 		val = "Generate GUID";
 		break;
+	case PASTE_AS_IMAGE:
+		val = "Paste as Image";
+		break;
+	case SHOW_STARRED_CLIPS:
+		val = "Show Starred Clips";
+		break;
 	}
 
 	CString translatedValue = theApp.m_Language.GetQuickPasteKeyboardString(value, val);

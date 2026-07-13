@@ -32,6 +32,7 @@ public:
 	bool m_placeCF_HDROP_OnDrag;
 	bool m_pasteAsciiOnly;
 	bool m_pasteGuid;
+	bool m_pasteAsImage;
 
 	bool LimitFormatsToText() 
 	{ 

@@ -173,6 +173,7 @@ public:
 	CPopup m_popupMsg;
 	CCustomFriendsHelper m_customFriendsHelper;
 	bool m_noSearchResults;
+	bool m_bShowStarredClips;
 	CAccel m_timerAction;
 	__int64 m_lastDbWrite;
 	bool m_pendingRefresh;
@@ -200,6 +201,7 @@ public:
     void SetTransparency(int percent);
     void OnUpdateLinesPerRow(CCmdUI *pCmdUI, int nValue);
     void OnUpdateTransparency(CCmdUI *pCmdUI, int nValue);
+	void AddShowStarredClipsMenuItem(CMenu *pMenu);
     void SetMenuChecks(CMenu *pMenu);
     void SetSendToMenu(CMenu *pMenu, int nMenuID, int nArrayPos);
 	void SetFriendChecks(CMenu *pMenu);
@@ -273,6 +275,7 @@ public:
 	bool DoExportToGoogleTranslate();
 	bool DoExportToWebSearch();
 	bool DoActionGenerateGuid();
+	bool DoPasteAsImage();
 	bool DoExportToBitMapFile();
 	bool DoSaveCurrentClipboard();
 	bool DoMoveClipDown();
@@ -477,6 +480,7 @@ protected:
 	afx_msg void OnMenuSearchDescription();
 	afx_msg void OnMenuSearchFullText();
 	afx_msg void OnMenuSearchQuickPaste();
+	afx_msg void OnMenuShowStarredClips();
 	afx_msg void OnMenuSimpleTextSearch();
 	afx_msg LRESULT OnPostOptions(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnMakeTopStickyClip();
@@ -511,6 +515,8 @@ public:
 	afx_msg void OnUpdateCliporderMovetotop(CCmdUI *pCmdUI);
 	afx_msg void OnMenuFilteron();
 	afx_msg void OnUpdateMenuFilteron(CCmdUI *pCmdUI);
+	afx_msg void OnMenuGoToEntry();
+	afx_msg void OnUpdateMenuGoToEntry(CCmdUI *pCmdUI);
 	afx_msg void OnAlwaysOnTopClicked();
 	//afx_msg HBRUSH OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor);
 	afx_msg void OnSpecialpasteUppercase();
@@ -619,4 +625,6 @@ public:
 	afx_msg void OnUpdateImportExporttowebsearch(CCmdUI* pCmdUI);
 	afx_msg void OnSpecialpastePastenewguid();
 	afx_msg void OnUpdateSpecialpastePastenewguid(CCmdUI* pCmdUI);
+	afx_msg void OnSpecialpastePasteAsImage();
+	afx_msg void OnUpdateSpecialpastePasteAsImage(CCmdUI* pCmdUI);
 };

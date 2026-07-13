@@ -62,4 +62,5 @@ protected:
 	void CamelCase(CClip& clip);
 	void AsciiOnly(CClip& clip);
 	void PutGuidOntoClipboard(CClip& clip);
+	void PasteAsImage(CClip& clip);
 };

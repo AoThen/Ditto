@@ -16,6 +16,7 @@
 #include "ChaiScriptOnCopy.h"
 #include "Slugify.h"
 #include "ImageFormatAggregator.h"
+#include "BitmapHelper.h"
 #include "Misc.h"
 #include <string>
 #include <vector>
@@ -229,6 +230,10 @@ BOOL COleClipSource::DoImmediateRender()
 	else if (m_pasteOptions.m_pasteGuid)
 	{
 		PutGuidOntoClipboard(clip);
+	}
+	else if (m_pasteOptions.m_pasteAsImage)
+	{
+		PasteAsImage(clip);
 	}
 
 	SaveDittoFileDataToFile(clip);
@@ -1570,4 +1575,75 @@ void COleClipSource::PutGuidOntoClipboard(CClip& clip)
 	cf.m_autoDeleteData = false;
 
 	Log(_T("End of put Guid on clipboard"));
+}
+
+void COleClipSource::PasteAsImage(CClip& clip)
+{
+	Log(_T("Start of PasteAsImage"));
+
+	IClipFormat* pUnicodeText = clip.m_Formats.FindFormatEx(CF_UNICODETEXT);
+	if (pUnicodeText == NULL)
+	{
+		Log(_T("PasteAsImage - no unicode text found"));
+		return;
+	}
+
+	CString path = pUnicodeText->GetAsCString();
+	path.Trim();
+
+	if (path.IsEmpty() || !PathFileExists(path))
+	{
+		Log(StrF(_T("PasteAsImage - path not found: %s"), path));
+		return;
+	}
+
+	CImage image;
+	HRESULT hr = image.Load(path);
+	if (FAILED(hr))
+	{
+		Log(StrF(_T("PasteAsImage - failed to load image: %s"), path));
+		return;
+	}
+
+	HBITMAP hBitmap = (HBITMAP)image;
+	HPALETTE hPal = NULL;
+	HANDLE hDib = CBitmapHelper::hBitmapToDIB(hBitmap, BI_RGB, hPal);
+	if (hDib == NULL)
+	{
+		Log(_T("PasteAsImage - failed to convert to DIB"));
+		return;
+	}
+
+	clip.m_Formats.RemoveAll();
+
+	CClipFormat cfDib(CF_DIB, (HGLOBAL)hDib);
+	clip.m_Formats.Add(cfDib);
+	cfDib.m_autoDeleteData = false;
+
+	IStream* pStream = nullptr;
+	if (SUCCEEDED(CreateStreamOnHGlobal(nullptr, TRUE, &pStream)))
+	{
+		if (SUCCEEDED(image.Save(pStream, Gdiplus::ImageFormatPNG)))
+		{
+			LARGE_INTEGER liZero = { 0 };
+			ULARGE_INTEGER ulSize;
+			pStream->Seek({ 0 }, STREAM_SEEK_END, &ulSize);
+			pStream->Seek(liZero, STREAM_SEEK_SET, nullptr);
+
+			HGLOBAL hPng = GlobalAlloc(GMEM_MOVEABLE, (SIZE_T)ulSize.QuadPart);
+			if (hPng)
+			{
+				LPVOID pDst = GlobalLock(hPng);
+				pStream->Read(pDst, (ULONG)ulSize.QuadPart, nullptr);
+				GlobalUnlock(hPng);
+
+				CClipFormat cfPng(theApp.m_PNG_Format, hPng);
+				clip.m_Formats.Add(cfPng);
+				cfPng.m_autoDeleteData = false;
+			}
+		}
+		pStream->Release();
+	}
+
+	Log(_T("End of PasteAsImage"));
 }
