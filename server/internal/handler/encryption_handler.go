@@ -87,7 +87,7 @@ func (h *EncryptionHandler) ChangeEncryptionPassword(c *gin.Context) {
 		return
 	}
 
-	err := h.service.ChangeEncryptionPassword(userID, req.PasswordHint)
+	result, err := h.service.ChangeEncryptionPassword(userID, req.PasswordHint)
 	if err != nil {
 		if err == service.ErrEncryptionNotSetup {
 			response.Error(c, http.StatusNotFound, 40401, err.Error())
@@ -97,5 +97,5 @@ func (h *EncryptionHandler) ChangeEncryptionPassword(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithMessage(c, "密码提示已更新", nil)
+	response.SuccessWithMessage(c, "密码提示已更新，salt 已重新生成", result)
 }

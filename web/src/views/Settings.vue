@@ -100,20 +100,16 @@
             启用加密
           </el-button>
         </div>
-      </div>
     </el-card>
 
-    <!-- Change Password Dialog -->
-    <el-dialog v-model="changePasswordDialogVisible" title="修改加密密码" width="400px">
-      <el-form :model="changePasswordForm" label-width="80px">
-        <el-form-item label="旧密码">
-          <el-input v-model="changePasswordForm.oldPassword" type="password" show-password />
+    <!-- Change Password Hint Dialog -->
+    <el-dialog v-model="changePasswordDialogVisible" title="修改密码提示" width="400px">
+      <el-form label-width="80px">
+        <el-form-item label="当前提示">
+          <span>{{ currentHint }}</span>
         </el-form-item>
-        <el-form-item label="新密码">
-          <el-input v-model="changePasswordForm.newPassword" type="password" show-password />
-        </el-form-item>
-        <el-form-item label="确认新密码">
-          <el-input v-model="changePasswordForm.confirmPassword" type="password" show-password />
+        <el-form-item label="新提示">
+          <el-input v-model="newPasswordHint" placeholder="输入新的密码提示" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -142,11 +138,8 @@ const passwordHint = ref('')
 const setupLoading = ref(false)
 
 const changePasswordDialogVisible = ref(false)
-const changePasswordForm = ref({
-  oldPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-})
+const newPasswordHint = ref('')
+const currentHint = ref('')
 const changePasswordLoading = ref(false)
 
 const maskedSalt = '****'
@@ -157,6 +150,7 @@ async function fetchSalt() {
     if (res.code === 0) {
       saltValue.value = res.data?.salt || ''
       encryptionEnabled.value = !!res.data?.salt
+      currentHint.value = res.data?.password_hint || ''
     }
   } catch (err) {
     console.error('Failed to fetch encryption salt:', err)
@@ -220,40 +214,26 @@ async function handleDisableEncryption() {
 }
 
 function showChangePasswordDialog() {
+  newPasswordHint.value = ''
   changePasswordDialogVisible.value = true
-  changePasswordForm.value = {
-    oldPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  }
 }
 
 async function handleChangePassword() {
-  const { oldPassword, newPassword, confirmPassword: confirm } = changePasswordForm.value
-  if (!oldPassword) {
-    ElMessage.warning('请输入旧密码')
-    return
-  }
-  if (!newPassword) {
-    ElMessage.warning('请输入新密码')
-    return
-  }
-  if (newPassword !== confirm) {
-    ElMessage.error('两次输入的新密码不一致')
-    return
-  }
-  if (newPassword.length < 8) {
-    ElMessage.warning('新密码至少需要 8 位')
+  if (!newPasswordHint.value) {
+    ElMessage.warning('请输入新密码提示')
     return
   }
   changePasswordLoading.value = true
   try {
-    // Update the password hint on the server
-    await changeEncryptionPassword(newPassword)
-    ElMessage.success('密码提示已更新，请使用新密码重新加密数据')
-    changePasswordDialogVisible.value = false
+    const res = await changeEncryptionPassword(newPasswordHint.value)
+    if (res.code === 0) {
+      ElMessage.success('密码提示已更新，salt 已重新生成')
+      changePasswordDialogVisible.value = false
+      newPasswordHint.value = ''
+      fetchSalt()
+    }
   } catch (err) {
-    console.error('Failed to change encryption password:', err)
+    console.error('Failed to change password hint:', err)
     ElMessage.error('修改密码提示失败')
   } finally {
     changePasswordLoading.value = false

@@ -130,30 +130,39 @@ func (s *EncryptionService) DisableEncryption(userID uint) error {
 	return database.DB.Save(&settings).Error
 }
 
-// ChangeEncryptionPassword changes the password hint for the user's encryption
+// ChangeEncryptionPassword regenerates the salt and updates the password hint.
 // Note: The actual encryption key is derived client-side via PBKDF2(password, salt).
 // The server only stores the salt and a hint. Changing the password means:
-// 1. Client must re-encrypt all data with the new key (not handled here).
-// 2. This endpoint only updates the hint. The actual password change requires
-//    the client to re-derive the key and re-upload encrypted data.
-//
-// For a proper password change with data re-encryption, the client should:
-// 1. Decrypt all data with old password
-// 2. Call this endpoint to update hint
-// 3. Re-encrypt with new password and re-push all clips
-func (s *EncryptionService) ChangeEncryptionPassword(userID uint, newPasswordHint string) error {
+// 1. Client must re-encrypt all data with the new key (not handled by this endpoint).
+// 2. This endpoint regenerates the salt and updates the hint. The actual password
+//    change requires the client to re-derive the key with the new salt and re-upload
+//    encrypted data.
+func (s *EncryptionService) ChangeEncryptionPassword(userID uint, newPasswordHint string) (*EncryptionSetupResponse, error) {
 	var settings model.EncryptionSettings
 	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrEncryptionNotSetup
+			return nil, ErrEncryptionNotSetup
 		}
-		return err
+		return nil, err
 	}
 
 	if !settings.Enabled {
-		return ErrEncryptionNotSetup
+		return nil, ErrEncryptionNotSetup
 	}
 
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return nil, err
+	}
+
+	settings.Salt = salt
 	settings.PasswordHint = newPasswordHint
-	return database.DB.Save(&settings).Error
+	if err := database.DB.Save(&settings).Error; err != nil {
+		return nil, err
+	}
+
+	return &EncryptionSetupResponse{
+		Salt:              base64.StdEncoding.EncodeToString(salt),
+		EncryptionEnabled: true,
+	}, nil
 }
