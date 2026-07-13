@@ -31,7 +31,7 @@ services:
   frontend:
     build:
       context: ./web
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: ditto-frontend
     restart: unless-stopped
     ports:

@@ -28,7 +28,6 @@ const routes = [
       next()
     },
     children: [
-      { path: '', redirect: '/dashboard' },
       { path: '', component: () => import('../views/StatsDashboard.vue') },
       { path: 'clips', component: () => import('../views/Clips.vue') },
       { path: 'groups', component: () => import('../views/Groups.vue') },
