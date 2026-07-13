@@ -27,7 +27,7 @@ test.describe('Group Management', () => {
     await loginAsNewUser(page)
 
     await page.goto('/dashboard/groups')
-    await expect(page.getByText('分组管理')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: '分组管理' })).toBeVisible({ timeout: 10000 })
 
     await expect(page.getByText('暂无分组')).toBeVisible({ timeout: 10000 })
   })
@@ -41,7 +41,7 @@ test.describe('Group Management', () => {
     await page.getByPlaceholder('请输入分组名称').fill('Test Group')
     await page.getByPlaceholder('请输入分组描述').fill('This is a test group')
 
-    await page.getByRole('button', { name: '创建' }).click()
+    await page.getByRole('button', { name: '创建', exact: true }).click()
 
     await expect(page.getByText('分组已创建')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('Test Group')).toBeVisible()
@@ -164,9 +164,9 @@ test.describe('Group Management', () => {
   test('should navigate to groups from sidebar', async ({ page }) => {
     await loginAsNewUser(page)
 
-    await expect(page.getByText('分组管理')).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '分组管理' })).toBeVisible()
 
-    await page.getByText('分组管理').click()
+    await page.getByRole('menuitem', { name: '分组管理' }).click()
     await expect(page).toHaveURL(/\/dashboard\/groups/)
   })
 })

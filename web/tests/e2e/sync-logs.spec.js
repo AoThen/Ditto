@@ -119,6 +119,6 @@ test.describe('Sync Logs & Stats', () => {
     })
 
     await page.goto('/dashboard')
-    await expect(page.getByText('剪贴板总览')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('数据总览')).toBeVisible({ timeout: 10000 })
   })
 })

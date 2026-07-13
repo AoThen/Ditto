@@ -28,8 +28,8 @@ test.describe('Navigation', () => {
   test('should navigate between clips and settings', async ({ page }) => {
     await loginAsNewUser(page)
 
-    // Should start on clips page (default redirect from /dashboard)
-    await expect(page).toHaveURL(/\/dashboard\/clips/)
+    // Should start on dashboard page
+    await expect(page).toHaveURL(/\/dashboard/)
 
     // Click settings in sidebar (el-menu-item with text '设置')
     await page.getByRole('menuitem', { name: '设置' }).click()

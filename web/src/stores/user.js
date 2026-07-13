@@ -43,6 +43,7 @@ export const useUserStore = defineStore('user', () => {
     deviceId.value = ''
     username.value = ''
     localStorage.removeItem('userInfo')
+    document.cookie = 'device_id=; max-age=0; path=/'
     // Trigger WS disconnect event
     window.dispatchEvent(new CustomEvent('ws-disconnect'))
     // Notify backend to clear cookies (POST /auth/logout)
