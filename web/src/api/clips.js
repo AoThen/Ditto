@@ -17,6 +17,15 @@ export function getClip(id) {
   })
 }
 
+// Get incremental changes since timestamp
+export function getChanges(since) {
+  return request({
+    url: '/api/v1/clips/changes',
+    method: 'get',
+    params: { since }
+  })
+}
+
 // Delete clip
 export function deleteClip(id) {
   return request({

@@ -3,6 +3,8 @@ package service
 import (
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+
+	"gorm.io/gorm"
 )
 
 type DeviceService struct{}
@@ -35,5 +37,10 @@ func (s *DeviceService) ListByUser(userID uint) ([]DeviceInfo, error) {
 }
 
 func (s *DeviceService) RemoveDevice(userID uint, deviceID string) error {
-	return database.DB.Where("id = ? AND user_id = ?", deviceID, userID).Delete(&model.Device{}).Error
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("device_id = ? AND user_id = ?", deviceID, userID).Delete(&model.SyncLog{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND user_id = ?", deviceID, userID).Delete(&model.Device{}).Error
+	})
 }

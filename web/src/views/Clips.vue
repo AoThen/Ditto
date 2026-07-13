@@ -21,6 +21,17 @@
       <el-button type="warning" @click="showConflictDialog">
         冲突剪贴板 ({{ conflictCount }})
       </el-button>
+      <el-dropdown v-if="selectedRows.length" @command="handleGroupAction" style="margin-left: 4px;">
+        <el-button type="info">
+          分组 <el-icon><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="move-to-group">移动到分组</el-dropdown-item>
+            <el-dropdown-item command="remove-from-group" :disabled="!allSelectedInGroup">从分组移除</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button type="danger" :disabled="!selectedRows.length || batchDeleting" :loading="batchDeleting" @click="handleBatchDelete">
         删除选中 ({{ selectedRows.length }})
       </el-button>
@@ -36,6 +47,12 @@
       <el-table-column type="selection" width="55" />
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
       <el-table-column prop="paste_count" label="粘贴次数" width="100" />
+      <el-table-column prop="group_name" label="分组" width="120">
+        <template #default="{ row }">
+          <el-tag v-if="row.group_name" size="small">{{ row.group_name }}</el-tag>
+          <span v-else class="no-group">-</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="created_at" label="创建时间" width="180">
         <template #default="{ row }">
           {{ formatDate(row.created_at) }}
@@ -116,13 +133,13 @@
                 <!-- Image Preview -->
                 <div v-else-if="isImageFormat(fmt.format_type)" class="image-preview">
                   <el-image
-                    v-if="fmt.data_base64"
-                    :src="'data:image/png;base64,' + fmt.data_base64"
+                    v-if="fmt.data"
+                    :src="'data:image/png;base64,' + fmt.data"
                     fit="contain"
                     style="max-height: 400px;"
-                    :preview-src-list="['data:image/png;base64,' + fmt.data_base64]"
+                    :preview-src-list="['data:image/png;base64,' + fmt.data]"
                   />
-                  <el-alert v-else title="图片数据不可预览（需要 base64 编码）" type="info" :closable="false" />
+                  <el-alert v-else title="图片数据不可预览" type="info" :closable="false" />
                 </div>
 
                 <!-- File Path Preview -->
@@ -146,6 +163,32 @@
           </el-tabs>
         </div>
       </div>
+    </el-dialog>
+
+    <!-- Move to Group Dialog -->
+    <el-dialog v-model="groupDialogVisible" title="移动到分组" width="400px">
+      <el-form>
+        <el-form-item label="目标分组">
+          <el-select v-model="selectedGroupId" placeholder="选择分组" style="width: 100%" filterable>
+            <el-option
+              v-for="g in groupList"
+              :key="g.id"
+              :label="g.name"
+              :value="g.id"
+            >
+              <span>{{ g.name }}</span>
+              <span class="group-clip-count">({{ g.clip_count || 0 }} 项)</span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-empty v-if="groupList.length === 0" description="暂无分组，请先在分组页面创建" />
+      <template #footer>
+        <el-button @click="groupDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!selectedGroupId || groupMoving" :loading="groupMoving" @click="handleMoveToGroup">
+          确定
+        </el-button>
+      </template>
     </el-dialog>
 
     <!-- Conflict Clips Dialog -->
@@ -192,20 +235,61 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listClips, getClip, deleteClip } from '@/api/clips'
+import { listClips, getClip, deleteClip, getChanges } from '@/api/clips'
 import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
+import { listGroups, moveClipsToGroup, removeClipsFromGroup } from '@/api/groups'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { Download, ArrowDown } from '@element-plus/icons-vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { downloadBlob } from '@/api/request'
 
 const ws = useWebSocket()
+const lastSyncTime = ref(null)
 
 // Listen for WS clip notifications
 function onWsClipAdded(event) {
   console.log('[Clips] WS clip added:', event.detail)
-  fetchClips()
-  ElMessage.success(`收到来自 ${event.detail.device_id} 的新剪贴板`)
+  if (searchQuery.value) {
+    fetchClips()
+    return
+  }
+  incrementalSync(event.detail?.device_id)
+}
+
+async function incrementalSync(deviceId) {
+  try {
+    const since = lastSyncTime.value || '1970-01-01T00:00:00Z'
+    const res = await getChanges(since)
+    if (res.code === 0) {
+      const { clips, deleted_ids, server_time } = res.data
+      if (server_time) lastSyncTime.value = server_time
+
+      let changed = false
+      if (deleted_ids?.length > 0) {
+        clipList.value = clipList.value.filter(c => !deleted_ids.includes(c.id))
+        total.value = Math.max(0, total.value - deleted_ids.length)
+        changed = true
+      }
+      if (clips?.length > 0) {
+        for (const clip of clips) {
+          const idx = clipList.value.findIndex(c => c.id === clip.id)
+          if (idx >= 0) {
+            clipList.value[idx] = { ...clipList.value[idx], ...clip }
+          } else {
+            clipList.value.unshift(clip)
+            total.value++
+          }
+        }
+        changed = true
+      }
+      if (changed && deviceId) {
+        ElMessage.success(`收到来自 ${deviceId} 的新剪贴板`)
+      }
+    }
+  } catch (err) {
+    console.error('Incremental sync failed, falling back to full refresh:', err)
+    fetchClips()
+  }
 }
 
 const clipList = ref([])
@@ -228,6 +312,12 @@ const conflictDialogVisible = ref(false)
 const conflictCount = computed(() => conflictClips.value.length)
 const resolvingId = ref(null)
 
+// Group state
+const groupDialogVisible = ref(false)
+const groupList = ref([])
+const selectedGroupId = ref(null)
+const groupMoving = ref(false)
+
 // Search debounce timer
 let searchTimer = null
 
@@ -239,25 +329,28 @@ function formatDate(dateStr) {
 // Format type detection
 function isTextFormat(formatType) {
   const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
-  return type === 'text' || type === 'unicode' || type === 1 || type === 13 ||
-         type === 'CF_TEXT' || type === 'CF_UNICODETEXT'
+  return type === 1 || type === 13 || type === 7 ||
+         type === 'text' || type === 'unicode' || type === 'CF_TEXT' || type === 'CF_UNICODETEXT'
 }
 
 function isHTMLFormat(formatType) {
   const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
-  return type === 'html' || type === 'CF_HTML' || type === 'CF_HTMLFORMAT' ||
+  return type === 49 ||
+         type === 'html' || type === 'CF_HTML' || type === 'CF_HTMLFORMAT' ||
          type?.includes('html')
 }
 
 function isImageFormat(formatType) {
   const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
-  return type === 'image' || type === 'dib' || type === 'CF_DIB' || type === 'CF_BITMAP' ||
-         type === 'CF_TIFF' || type?.includes('image')
+  return type === 8 || type === 17 || type === 50 ||
+         type === 'image' || type === 'dib' || type === 'CF_DIB' || type === 'CF_BITMAP' ||
+         type?.includes('image')
 }
 
 function isFileFormat(formatType) {
   const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
-  return type === 'file' || type === 'files' || type === 'hdop' || type === 'CF_HDROP' ||
+  return type === 15 ||
+         type === 'file' || type === 'files' || type === 'hdop' || type === 'CF_HDROP' ||
          type?.includes('file')
 }
 
@@ -562,9 +655,71 @@ async function handleResolveConflict(clip, action) {
   }
 }
 
+// Group operations
+const allSelectedInGroup = computed(() =>
+  selectedRows.value.length > 0 && selectedRows.value.every(r => r.group_name)
+)
+
+async function handleGroupAction(command) {
+  if (command === 'move-to-group') {
+    await openGroupDialog()
+  } else if (command === 'remove-from-group') {
+    await handleRemoveFromGroup()
+  }
+}
+
+async function openGroupDialog() {
+  try {
+    const res = await listGroups()
+    if (res.code === 0) {
+      groupList.value = res.data?.items || res.data || []
+    }
+  } catch (err) {
+    ElMessage.error('获取分组列表失败')
+  }
+  selectedGroupId.value = null
+  groupDialogVisible.value = true
+}
+
+async function handleMoveToGroup() {
+  if (!selectedGroupId.value || !selectedRows.value.length) return
+  groupMoving.value = true
+  try {
+    const clipIds = selectedRows.value.map(r => r.id)
+    await moveClipsToGroup(selectedGroupId.value, clipIds)
+    ElMessage.success('移动到分组成功')
+    groupDialogVisible.value = false
+    selectedRows.value = []
+    fetchClips()
+  } catch (err) {
+    ElMessage.error('移动到分组失败: ' + (err.message || ''))
+  } finally {
+    groupMoving.value = false
+  }
+}
+
+async function handleRemoveFromGroup() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm('确定将选中剪贴板从当前分组移除？', '确认', {
+      confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning',
+    })
+    const clipIds = selectedRows.value.map(r => r.id)
+    await removeClipsFromGroup(clipIds)
+    ElMessage.success('已从分组移除')
+    selectedRows.value = []
+    fetchClips()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('移除分组失败: ' + (err.message || ''))
+    }
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('ws-clip-added', onWsClipAdded)
   await fetchClips()
+  lastSyncTime.value = new Date().toISOString()
   // Fetch conflict count on mount so badge shows accurate number from start
   await fetchConflictClips()
 })
@@ -713,5 +868,15 @@ onUnmounted(() => {
   line-height: 1.5;
   overflow-x: auto;
   margin: 0;
+}
+
+.no-group {
+  color: #c0c4cc;
+}
+
+.group-clip-count {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 8px;
 }
 </style>

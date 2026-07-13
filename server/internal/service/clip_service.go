@@ -35,27 +35,27 @@ type ClipFormatMeta struct {
 
 // ClipListItem represents a clip with format metadata (no actual data)
 type ClipListItem struct {
-	ID          string          `json:"id"`
-	Description string          `json:"description"`
-	CRC         int64           `json:"crc"`
-	CreatedAt   string          `json:"created_at"`
-	UpdatedAt   string          `json:"updated_at"`
-	GroupID     string          `json:"group_id"`
-	ShortCut    int             `json:"short_cut"`
-	PasteCount  int             `json:"paste_count"`
+	ID          string           `json:"id"`
+	Description string           `json:"description"`
+	CRC         int64            `json:"crc"`
+	CreatedAt   string           `json:"created_at"`
+	UpdatedAt   string           `json:"updated_at"`
+	GroupID     string           `json:"group_id"`
+	ShortCut    int              `json:"short_cut"`
+	PasteCount  int              `json:"paste_count"`
 	Formats     []ClipFormatMeta `json:"formats"`
 }
 
 // ClipDetail represents a full clip with format data (base64-encoded)
 type ClipDetail struct {
-	ID          string         `json:"id"`
-	Description string         `json:"description"`
-	CRC         int64          `json:"crc"`
-	CreatedAt   string         `json:"created_at"`
-	UpdatedAt   string         `json:"updated_at"`
-	GroupID     string         `json:"group_id"`
-	ShortCut    int            `json:"short_cut"`
-	PasteCount  int            `json:"paste_count"`
+	ID          string           `json:"id"`
+	Description string           `json:"description"`
+	CRC         int64            `json:"crc"`
+	CreatedAt   string           `json:"created_at"`
+	UpdatedAt   string           `json:"updated_at"`
+	GroupID     string           `json:"group_id"`
+	ShortCut    int              `json:"short_cut"`
+	PasteCount  int              `json:"paste_count"`
 	Formats     []ClipFormatFull `json:"formats"`
 }
 
@@ -64,6 +64,7 @@ type ClipFormatFull struct {
 	FormatType int    `json:"format_type"`
 	Data       string `json:"data"`
 	DataSize   int    `json:"data_size"`
+	Encrypted  bool   `json:"encrypted"` // true if data is E2E encrypted
 }
 
 // ListClips retrieves clips for a user with pagination and optional filters
@@ -97,13 +98,20 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID 
 		return nil, err
 	}
 
+	// P1 FIX: Batch-load formats instead of N+1 queries
+	clipIDs := make([]string, len(clips))
+	for i, clip := range clips {
+		clipIDs[i] = clip.ID
+	}
+	formatsByClip, err := loadFormatsForClips(database.DB, clipIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build response items with format metadata
 	items := make([]ClipListItem, 0, len(clips))
 	for _, clip := range clips {
-		var formats []model.ClipFormat
-		if err := database.DB.Where("clip_id = ?", clip.ID).Find(&formats).Error; err != nil {
-			return nil, err
-		}
+		formats := formatsByClip[clip.ID]
 
 		formatMetas := make([]ClipFormatMeta, 0, len(formats))
 		for _, f := range formats {
@@ -155,6 +163,7 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 			FormatType: f.FormatType,
 			Data:       base64.StdEncoding.EncodeToString(f.Data),
 			DataSize:   len(f.Data),
+			Encrypted:  f.Encrypted,
 		})
 	}
 
@@ -249,10 +258,16 @@ func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 
 // SyncRequest represents the sync API request
 type SyncRequest struct {
-	Since     time.Time     `json:"since"`
-	DeviceID  string        `json:"device_id"`
+	Since     time.Time      `json:"since"`
+	DeviceID  string         `json:"device_id"`
 	PushClips []PushClipItem `json:"push_clips"`
+	Limit     int            `json:"limit"` // P9 FIX: Max clips to pull (default 1000, max 5000)
 }
+
+const (
+	DefaultSyncPullLimit = 1000
+	MaxSyncPullLimit     = 5000
+)
 
 // PushClipItem represents a clip being pushed from client
 type PushClipItem struct {
@@ -268,15 +283,18 @@ type PushClipItem struct {
 // PushFormatItem represents a format being pushed from client
 type PushFormatItem struct {
 	FormatType int    `json:"format_type"`
-	Data       string `json:"data"` // base64-encoded
+	Data       string `json:"data"`       // base64-encoded
+	Encrypted  bool   `json:"encrypted"`  // true if data is E2E encrypted
 }
 
 // SyncResponse represents the sync API response
 type SyncResponse struct {
-	NewClips       []ClipDetail `json:"new_clips"`
-	UpdatedCount   int          `json:"updated_count"`
-	SkippedCount   int          `json:"skipped_count"` // LWW: clips skipped due to conflict
-	SyncTime       string       `json:"sync_time"`
+	NewClips     []ClipDetail `json:"new_clips"`
+	DeletedIDs   []string     `json:"deleted_ids"` // IDs of clips deleted on other devices
+	UpdatedCount int          `json:"updated_count"`
+	SkippedCount int          `json:"skipped_count"` // LWW: clips skipped due to conflict
+	SyncTime     string       `json:"sync_time"`
+	HasMore      bool         `json:"has_more"` // P9 FIX: true if more clips exist beyond this batch
 }
 
 // Sync performs incremental sync for a user with LWW conflict resolution
@@ -292,8 +310,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			// MEDIUM FIX (M7): Build CRC set for existing clips to prevent cross-ID duplicates
 			var existingCRCs map[string]string // crc -> clip_id
 			type crcRecord struct {
-				CRC   int64  `gorm:"column:crc"`
-				ID    string `gorm:"column:id"`
+				CRC int64  `gorm:"column:crc"`
+				ID  string `gorm:"column:id"`
 			}
 			var crcRecords []crcRecord
 			if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ?", userID, false).Find(&crcRecords).Error; err != nil {
@@ -357,6 +375,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							ClipID:     clip.ID,
 							FormatType: pf.FormatType,
 							Data:       data,
+							Encrypted:  pf.Encrypted,
 							CreatedAt:  clipUpdatedAt,
 						}
 						if err := tx.Create(&format).Error; err != nil {
@@ -399,6 +418,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								ClipID:     existing.ID,
 								FormatType: pf.FormatType,
 								Data:       data,
+								Encrypted:  pf.Encrypted,
 								CreatedAt:  incomingUpdatedAt,
 							}
 							if err := tx.Create(&format).Error; err != nil {
@@ -425,6 +445,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								ShortCut:       pc.ShortCut,
 								PasteCount:     0,
 								IsConflictCopy: true, // Mark as conflict copy
+								WinClipID:      existing.ID, // Reference to the winning clip
 							}
 							if err := tx.Create(&conflictClip).Error; err != nil {
 								// Log but don't fail the sync
@@ -440,6 +461,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 										ClipID:     conflictClip.ID,
 										FormatType: pf.FormatType,
 										Data:       data,
+										Encrypted:  pf.Encrypted,
 										CreatedAt:  pc.UpdatedAt,
 									}
 									tx.Create(&format)
@@ -475,20 +497,42 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	// Step 2: Query clips updated since "since" from other devices
+	// P9 FIX: Apply pagination limit to prevent memory exhaustion
+	pullLimit := req.Limit
+	if pullLimit <= 0 {
+		pullLimit = DefaultSyncPullLimit
+	}
+	if pullLimit > MaxSyncPullLimit {
+		pullLimit = MaxSyncPullLimit
+	}
+
 	var clips []model.Clip
 	query := database.DB.Where("user_id = ? AND updated_at > ? AND device_id != ?",
-		userID, req.Since, req.DeviceID).Order("updated_at DESC")
+		userID, req.Since, req.DeviceID).Order("updated_at DESC").Limit(pullLimit + 1)
 
 	if err := query.Find(&clips).Error; err != nil {
 		return nil, err
 	}
 
+	// Determine if there are more clips beyond the limit
+	hasMore := len(clips) > pullLimit
+	if hasMore {
+		clips = clips[:pullLimit] // Trim to the requested limit
+	}
+
+	// P2 FIX: Batch-load formats instead of N+1 queries
+	clipIDs := make([]string, len(clips))
+	for i, clip := range clips {
+		clipIDs[i] = clip.ID
+	}
+	formatsByClip, err := loadFormatsForClips(database.DB, clipIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	newClips := make([]ClipDetail, 0, len(clips))
 	for _, clip := range clips {
-		var formats []model.ClipFormat
-		if err := database.DB.Where("clip_id = ?", clip.ID).Find(&formats).Error; err != nil {
-			return nil, err
-		}
+		formats := formatsByClip[clip.ID]
 
 		formatFulls := make([]ClipFormatFull, 0, len(formats))
 		for _, f := range formats {
@@ -496,6 +540,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				FormatType: f.FormatType,
 				Data:       base64.StdEncoding.EncodeToString(f.Data),
 				DataSize:   len(f.Data),
+				Encrypted:  f.Encrypted,
 			})
 		}
 
@@ -512,11 +557,29 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		})
 	}
 
+	// Query soft-deleted clips since 'since' timestamp (for deletion sync)
+	var deletedClips []model.Clip
+	if err := database.DB.Unscoped().Where("user_id = ? AND deleted_at > ? AND device_id != ?",
+		userID, req.Since, req.DeviceID).Find(&deletedClips).Error; err != nil {
+		log.Printf("[Sync] Error querying deleted clips: %v", err)
+	}
+
+	deletedIDs := make([]string, 0, len(deletedClips))
+	for _, clip := range deletedClips {
+		deletedIDs = append(deletedIDs, clip.ID)
+	}
+
+	if len(deletedIDs) > 0 {
+		log.Printf("[Sync] Found %d deleted clips to sync", len(deletedIDs))
+	}
+
 	return &SyncResponse{
 		NewClips:     newClips,
+		DeletedIDs:   deletedIDs,
 		UpdatedCount: pushedCount,
 		SkippedCount: skippedCount,
 		SyncTime:     syncTime.UTC().Format(time.RFC3339),
+		HasMore:      hasMore,
 	}, nil
 }
 
@@ -557,11 +620,19 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 	}
 
 	if action == "accept" {
-		// Find the winning clip by CRC match
+		// Prefer WinClipID if set (P0 fix), fall back to CRC match for legacy data
 		var winningClip model.Clip
-		if err := database.DB.Where("user_id = ? AND crc = ? AND is_conflict_copy = ? AND id != ?",
-			userID, conflictClip.CRC, false, conflictClipID).
-			Order("updated_at DESC").First(&winningClip).Error; err == nil {
+		var winErr error
+		if conflictClip.WinClipID != "" {
+			winErr = database.DB.Where("id = ? AND user_id = ?", conflictClip.WinClipID, userID).
+				First(&winningClip).Error
+		}
+		if winErr != nil || conflictClip.WinClipID == "" {
+			winErr = database.DB.Where("user_id = ? AND crc = ? AND is_conflict_copy = ? AND id != ?",
+				userID, conflictClip.CRC, false, conflictClipID).
+				Order("updated_at DESC").First(&winningClip).Error
+		}
+		if winErr == nil {
 			// Replace winning clip's content with conflict clip's content
 			if err := database.DB.Model(&winningClip).Updates(map[string]interface{}{
 				"description": conflictClip.Description,
@@ -583,4 +654,26 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 	}
 
 	return nil
+}
+
+// loadFormatsForClips batch-loads all formats for the given clip IDs.
+// P1+P2 FIX: Replaces N+1 query pattern (one query per clip) with a single IN query.
+// Returns a map from clip ID to its formats.
+func loadFormatsForClips(db *gorm.DB, clipIDs []string) (map[string][]model.ClipFormat, error) {
+	if len(clipIDs) == 0 {
+		return make(map[string][]model.ClipFormat), nil
+	}
+
+	var allFormats []model.ClipFormat
+	if err := db.Where("clip_id IN ?", clipIDs).Order("clip_id, format_type").Find(&allFormats).Error; err != nil {
+		return nil, err
+	}
+
+	// Group by clip_id
+	formatsByClip := make(map[string][]model.ClipFormat, len(clipIDs))
+	for _, f := range allFormats {
+		formatsByClip[f.ClipID] = append(formatsByClip[f.ClipID], f)
+	}
+
+	return formatsByClip, nil
 }
