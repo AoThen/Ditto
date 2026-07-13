@@ -300,6 +300,10 @@ public:
 	static void     SetCloudSyncEncryptionEnabled(BOOL bValue);
 	static __int64  GetCloudLastSyncTime();
 	static void     SetCloudLastSyncTime(__int64 value);
+	static CString  GetCloudKeyFilePath();
+	static void     SetCloudKeyFilePath(LPCTSTR lpszValue);
+	static CString  GetCloudLastUsername();
+	static void     SetCloudLastUsername(LPCTSTR lpszValue);
 
 	static BOOL		m_bDrawRTF;
 	static void		SetDrawRTF(long bDraw);
@@ -765,6 +769,9 @@ public:
 	static BOOL m_enforceClipboardIgnoreFormats;
 	static void SetEnforceClipboardIgnoreFormats(BOOL val);
 	static BOOL GetEnforceClipboardIgnoreFormats();
+
+	static BOOL GlobMatch(LPCTSTR str, LPCTSTR pattern);
+	static void GetProfileKeyNames(CString csSection, CStringArray &rNames);
 };
 
 // global for easy access and for initialization of fast access variables

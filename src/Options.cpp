@@ -1734,6 +1734,26 @@ void CGetSetOptions::SetCloudLastSyncTime(__int64 value)
 	SetProfileString("CloudLastSyncTime", csValue);
 }
 
+CString CGetSetOptions::GetCloudKeyFilePath()
+{
+	return GetProfileString("CloudKeyFilePath", _T(""));
+}
+
+void CGetSetOptions::SetCloudKeyFilePath(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudKeyFilePath", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudLastUsername()
+{
+	return GetProfileString("CloudLastUsername", _T(""));
+}
+
+void CGetSetOptions::SetCloudLastUsername(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudLastUsername", lpszValue);
+}
+
 void CGetSetOptions::SetDrawRTF(long bDraw)
 {
 	SetProfileLong("DrawRTF", bDraw); 
@@ -2080,15 +2100,106 @@ bool CGetSetOptions::GetIsChocolateyApp()
 	return m_chocolateyApp;
 }
 
+BOOL CGetSetOptions::GlobMatch(LPCTSTR str, LPCTSTR pattern)
+{
+	while (*str && *pattern)
+	{
+		if (*pattern == '*')
+		{
+			pattern++;
+			if (!*pattern) return TRUE;
+			while (*str)
+			{
+				if (GlobMatch(str, pattern)) return TRUE;
+				str++;
+			}
+			return FALSE;
+		}
+		if (*pattern == '?')
+		{
+			if (!*str) return FALSE;
+			str++;
+			pattern++;
+			continue;
+		}
+		if (_totupper(*str) != _totupper(*pattern)) return FALSE;
+		str++;
+		pattern++;
+	}
+
+	while (*pattern == '*') pattern++;
+	return !*pattern && !*str;
+}
+
+void CGetSetOptions::GetProfileKeyNames(CString csSection, CStringArray &rNames)
+{
+	rNames.RemoveAll();
+
+	if (m_bFromIni && !m_bInConversion)
+	{
+		TCHAR szKeys[32768] = { 0 };
+		GetPrivateProfileString(csSection, NULL, NULL, szKeys, 32768, m_csIniFileName);
+
+		LPCTSTR p = szKeys;
+		while (*p)
+		{
+			rNames.Add(p);
+			p += lstrlen(p) + 1;
+		}
+	}
+	else
+	{
+		CString csPath = CString(REG_PATH) + _T("\\") + csSection;
+		HKEY hkKey;
+		if (RegOpenKeyEx(HKEY_CURRENT_USER, csPath, NULL, KEY_READ, &hkKey) == ERROR_SUCCESS)
+		{
+			DWORD idx = 0;
+			while (true)
+			{
+				TCHAR szName[1024];
+				DWORD dwNameSize = 1024;
+				if (RegEnumValue(hkKey, idx++, szName, &dwNameSize, NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
+					break;
+				rNames.Add(szName);
+			}
+			RegCloseKey(hkKey);
+		}
+	}
+}
+
 CString CGetSetOptions::GetPasteString(CString csAppName)
 {
 	CString csString = GetProfileString(csAppName, _T(""), _T("PasteStrings"));
-	if (csString.IsEmpty())
+	if (!csString.IsEmpty())
 	{
-		return GetDefaultPasteString();
+		return csString;
 	}
 
-	return csString;
+	CStringArray arrKeys;
+	GetProfileKeyNames(_T("PasteStrings"), arrKeys);
+
+	int bestIdx = -1;
+	int bestLen = -1;
+	for (int i = 0; i < arrKeys.GetSize(); i++)
+	{
+		CString key = arrKeys.GetAt(i);
+		if (key.Find(_T('*')) >= 0 || key.Find(_T('?')) >= 0)
+		{
+			if (GlobMatch(csAppName, key) && (int)key.GetLength() > bestLen)
+			{
+				bestLen = (int)key.GetLength();
+				bestIdx = i;
+			}
+		}
+	}
+
+	if (bestIdx >= 0)
+	{
+		CString csKey = arrKeys.GetAt(bestIdx);
+		csString = GetProfileString(csKey, _T(""), _T("PasteStrings"));
+	}
+
+	return csString.IsEmpty() ? GetDefaultPasteString() : csString;
 }
 
 CString CGetSetOptions::GetDefaultPasteString()
