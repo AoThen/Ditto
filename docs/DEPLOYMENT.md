@@ -90,6 +90,9 @@ docker-compose -f docker-compose.prod.yml up -d
 | `PORT` | Backend server port | `8080` |
 | `DATABASE_PATH` | SQLite database path | `/app/data/ditto_cloud.db` |
 | `JWT_SECRET` | JWT signing secret key | `change-me-in-production` |
+| `ADMIN_USERNAME` | Initial admin username (auto-create on first run) | None |
+| `ADMIN_PASSWORD` | Initial admin password (min 6 chars) | None |
+| `ADMIN_EMAIL` | Initial admin email | None |
 | `TLS_CERT` | TLS certificate file path | None |
 | `TLS_KEY` | TLS private key file path | None |
 | `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |

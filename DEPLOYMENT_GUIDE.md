@@ -41,6 +41,32 @@ docker-compose logs -f
 
 **完成！** 您现在已在本地运行 Ditto 云端服务。
 
+### 初始化管理员账号
+
+部署完成后，通过以下三种方式之一创建管理员账号：
+
+**方式一：环境变量自动创建（推荐）**
+
+在 `.env` 文件中设置管理员信息，首次启动时自动创建：
+```bash
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-password
+ADMIN_EMAIL=admin@example.com
+```
+创建成功后建议注释或删除这三行。
+
+**方式二：首用户注册**
+
+数据库为空时，第一个通过客户端或 Web 注册的用户自动成为管理员。之后注册功能自动关闭。
+
+**方式三：CLI 工具**
+
+进入容器后使用 CLI 创建：
+```bash
+docker exec -it ditto-backend /app/cli create-admin
+```
+同样支持 `reset-password`（重置密码）和 `list-users`（列出用户）。
+
 ## 开发环境部署（HTTP）
 
 **适用于**: 开发、测试、本地访问
@@ -342,6 +368,7 @@ docker-compose -f docker-compose.prod.yml \
 
 - [ ] 环境变量已配置（`.env` 文件）
 - [ ] JWT 密钥唯一且安全
+- [ ] 管理员账号已初始化（环境变量 / CLI / 首用户注册）
 - [ ] 服务正在运行（`docker-compose ps`）
 - [ ] 健康检查通过（`curl https://localhost/health`）
 - [ ] 日志可访问且无错误（`docker-compose logs`）
@@ -879,6 +906,7 @@ jobs:
 
 - [ ] Environment variables configured (`.env` file)
 - [ ] JWT secret is unique and secure
+- [ ] Admin account initialized (env vars / CLI / first-user registration)
 - [ ] Services running (`docker-compose ps`)
 - [ ] Health check passing (`curl https://localhost/health`)
 - [ ] Logs accessible and clean (`docker-compose logs`)

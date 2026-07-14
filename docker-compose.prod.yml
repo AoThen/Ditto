@@ -19,6 +19,9 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - TLS_CERT=/app/certs/server.crt
       - TLS_KEY=/app/certs/server.key
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost:8443/health"]
       interval: 30s
