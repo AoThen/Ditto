@@ -11,12 +11,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"log"
 )
 
 type Claims struct {
 	UserID       uint   `json:"user_id"`
 	DeviceID     string `json:"device_id"`
 	TokenVersion int    `json:"token_version"`
+	TokenType    string `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
@@ -80,6 +82,15 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 		c.Set("device_id", claims.DeviceID)
 		// C3 FIX: Store raw token in context for refresh (avoids ParseUnverified)
 		c.Set("raw_token", tokenStr)
+
+		// Token type check: refresh tokens can only be used on refresh endpoint
+		if claims.TokenType == "refresh" && !strings.HasSuffix(c.Request.URL.Path, "/auth/refresh") {
+			log.Printf("[Auth] Rejected refresh token on non-refresh path: %s", c.Request.URL.Path)
+			response.Error(c, http.StatusUnauthorized, 40102, "无效的认证令牌")
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

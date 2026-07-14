@@ -3,6 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import * as statsApi from '@/api/stats'
 import * as clipsApi from '@/api/clips'
 import { ElMessage } from 'element-plus'
+import { formatDate, formatShortDate } from '@/composables/useFormatDate'
 
 vi.mock('@/api/stats', () => ({
   getStatsOverview: vi.fn(),
@@ -126,42 +127,30 @@ describe('StatsDashboard computed properties', () => {
 })
 
 describe('StatsDashboard data formatting', () => {
-  function formatDate(dateStr) {
-    if (!dateStr) return '-'
-    const date = new Date(dateStr)
-    return `${date.getMonth() + 1}/${date.getDate()}`
-  }
+  it('formatShortDate returns dash for null/undefined', () => {
+    expect(formatShortDate(null)).toBe('-')
+    expect(formatShortDate(undefined)).toBe('-')
+    expect(formatShortDate('')).toBe('-')
+  })
 
-  function formatDateTime(dateStr) {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString('zh-CN')
-  }
+  it('formatShortDate returns M/D format', () => {
+    const result = formatShortDate('2024-06-15T10:00:00Z')
+    expect(result).toBe('6/15')
+  })
+
+  it('formatShortDate handles different months', () => {
+    expect(formatShortDate('2024-01-01T00:00:00Z')).toBe('1/1')
+    expect(formatShortDate('2024-12-31T00:00:00Z')).toBe('12/31')
+  })
 
   it('formatDate returns dash for null/undefined', () => {
     expect(formatDate(null)).toBe('-')
     expect(formatDate(undefined)).toBe('-')
-    expect(formatDate('')).toBe('-')
   })
 
-  it('formatDate returns M/D format', () => {
-    const result = formatDate('2024-06-15T10:00:00Z')
-    expect(result).toBe('6/15')
-  })
-
-  it('formatDate handles different months', () => {
-    expect(formatDate('2024-01-01T00:00:00Z')).toBe('1/1')
-    expect(formatDate('2024-12-31T00:00:00Z')).toBe('12/31')
-  })
-
-  it('formatDateTime returns dash for null/undefined', () => {
-    expect(formatDateTime(null)).toBe('-')
-    expect(formatDateTime(undefined)).toBe('-')
-  })
-
-  it('formatDateTime formats valid date string', () => {
-    const result = formatDateTime('2024-06-15T10:30:00Z')
-    expect(result).toContain('2024')
-    expect(result.length).toBeGreaterThan(5)
+  it('formatDate formats valid date string', () => {
+    const result = formatDate('2024-06-15T10:30:00Z')
+    expect(result).toBe('2024-06-15 10:30')
   })
 })
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 
@@ -174,7 +175,7 @@ func (s *EncryptionService) ChangeEncryptionPassword(userID uint, req *ChangePas
 	if err != nil {
 		return nil, errors.New("old_verification_hash 格式无效")
 	}
-	if string(oldHash) != string(settings.VerificationHash) {
+	if subtle.ConstantTimeCompare(oldHash, settings.VerificationHash) != 1 {
 		return nil, ErrInvalidVerificationHash
 	}
 

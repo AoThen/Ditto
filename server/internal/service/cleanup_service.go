@@ -87,16 +87,12 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 		return 0, nil // DB not initialized, skip cleanup
 	}
 
-	totalDeleted := 0
-
-	// Find users who exceed the limit
 	type UserClipCount struct {
 		UserID uint
 		Count  int64
 	}
-
 	var overLimitUsers []UserClipCount
-	if err := database.DB.Model(&model.Clip{}).
+	if err := database.DB.Table("clips").
 		Select("user_id, COUNT(*) as count").
 		Group("user_id").
 		Having("COUNT(*) > ?", s.cfg.MaxClipsPerUser).
@@ -104,42 +100,41 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 		return 0, err
 	}
 
+	totalDeleted := 0
 	for _, uc := range overLimitUsers {
-		// Calculate how many clips to delete
 		excessCount := uc.Count - int64(s.cfg.MaxClipsPerUser)
 
-		// Delete the oldest clips for this user
-		var clipsToDelete []model.Clip
-		if err := database.DB.Where("user_id = ?", uc.UserID).
+		var clipIDs []string
+		if err := database.DB.Table("clips").
+			Select("id").
+			Where("user_id = ?", uc.UserID).
 			Order("updated_at ASC").
 			Limit(int(excessCount)).
-			Find(&clipsToDelete).Error; err != nil {
+			Pluck("id", &clipIDs).Error; err != nil {
 			return totalDeleted, err
 		}
 
-		if len(clipsToDelete) == 0 {
+		if len(clipIDs) == 0 {
 			continue
 		}
 
-		clipIDs := make([]string, len(clipsToDelete))
-		for i, clip := range clipsToDelete {
-			clipIDs[i] = clip.ID
-		}
-
-		// Delete associated formats first
-		if err := database.DB.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
-			log.Printf("[Cleanup] ERROR deleting formats for %d clips: %v", len(clipIDs), err)
+		n, err := s.batchDeleteClips(clipIDs)
+		if err != nil {
+			log.Printf("[Cleanup] ERROR batch deleting %d clips: %v", len(clipIDs), err)
 			continue
 		}
-
-		// Batch delete clips
-		result := database.DB.Where("id IN ?", clipIDs).Delete(&model.Clip{})
-		if result.Error != nil {
-			log.Printf("[Cleanup] ERROR batch deleting %d clips: %v", len(clipIDs), result.Error)
-			continue
-		}
-		totalDeleted += int(result.RowsAffected)
+		totalDeleted += n
 	}
 
 	return totalDeleted, nil
+}
+
+func (s *CleanupService) batchDeleteClips(clipIDs []string) (int, error) {
+	database.DB.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{})
+
+	result := database.DB.Where("id IN ?", clipIDs).Delete(&model.Clip{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return int(result.RowsAffected), nil
 }

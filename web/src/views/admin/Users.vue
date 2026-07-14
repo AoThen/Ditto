@@ -126,6 +126,7 @@
 import { ref, onMounted } from 'vue'
 import { getUsers, createUser, updateUser, deleteUser, resetPassword } from '@/api/admin'
 import { ElMessage } from 'element-plus'
+import { formatDate } from '@/composables/useFormatDate'
 
 const loading = ref(false)
 const users = ref([])
@@ -192,14 +193,6 @@ const resetPwdRules = {
       else callback()
     }, trigger: 'blur' },
   ],
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
-  })
 }
 
 function handleSearch() {

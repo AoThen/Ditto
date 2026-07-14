@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import * as devicesApi from '@/api/devices'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDate } from '@/composables/useFormatDate'
 
 vi.mock('@/api/devices', () => ({
   listDevices: vi.fn(),
@@ -16,11 +17,6 @@ vi.mock('element-plus', async () => {
     ElMessageBox: { confirm: vi.fn() },
   }
 })
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 function isDeviceActive(lastSeen) {
   if (!lastSeen) return false
@@ -39,19 +35,19 @@ describe('Devices API calls', () => {
     const mockDevices = [
       { id: '1', device_id: 'dev-1', device_name: 'Device 1', last_seen: '2024-06-15T10:00:00Z', created_at: '2024-01-01T00:00:00Z' },
     ]
-    devicesApi.listDevices.mockResolvedValue({ code: 0, data: mockDevices })
+    devicesApi.listDevices.mockResolvedValue({ code: 0, data: { items: mockDevices, total: 1, page: 1, perPage: 20 } })
 
     const res = await devicesApi.listDevices()
     expect(res.code).toBe(0)
-    expect(res.data).toHaveLength(1)
-    expect(res.data[0].device_name).toBe('Device 1')
+    expect(res.data.items).toHaveLength(1)
+    expect(res.data.items[0].device_name).toBe('Device 1')
   })
 
   it('listDevices should handle empty response', async () => {
-    devicesApi.listDevices.mockResolvedValue({ code: 0, data: [] })
+    devicesApi.listDevices.mockResolvedValue({ code: 0, data: { items: [], total: 0, page: 1, perPage: 20 } })
 
     const res = await devicesApi.listDevices()
-    expect(res.data).toHaveLength(0)
+    expect(res.data.items).toHaveLength(0)
   })
 
   it('listDevices should handle error', async () => {
@@ -81,8 +77,7 @@ describe('Devices formatting logic', () => {
 
   it('formatDate formats valid date string', () => {
     const result = formatDate('2024-06-15T10:30:00Z')
-    expect(result).toContain('2024')
-    expect(result.length).toBeGreaterThan(5)
+    expect(result).toBe('2024-06-15 10:30')
   })
 
   it('isDeviceActive returns false for null lastSeen', () => {

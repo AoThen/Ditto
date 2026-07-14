@@ -164,7 +164,7 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 	var clip model.Clip
 	if err := database.DB.Where("id = ? AND user_id = ?", clipID, userID).First(&clip).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("剪贴板不存在")
+			return nil, ErrClipNotFound
 		}
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (s *ClipService) DownloadClipFormat(userID uint, clipID string, formatType 
 	var clip model.Clip
 	if err := database.DB.Where("id = ? AND user_id = ?", clipID, userID).First(&clip).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("剪贴板不存在")
+			return nil, ErrClipNotFound
 		}
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func (s *ClipService) DownloadClipFormat(userID uint, clipID string, formatType 
 	var format model.ClipFormat
 	if err := database.DB.Where("clip_id = ? AND format_type = ?", clipID, formatType).First(&format).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("指定格式不存在")
+			return nil, ErrFormatNotFound
 		}
 		return nil, err
 	}
@@ -275,7 +275,7 @@ func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 		var clip model.Clip
 		if err := tx.Where("id = ? AND user_id = ?", clipID, userID).First(&clip).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("剪贴板不存在")
+				return ErrClipNotFound
 			}
 			return err
 		}
@@ -648,7 +648,7 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 	if err := database.DB.Where("id = ? AND user_id = ? AND is_conflict_copy = ?", conflictClipID, userID, true).
 		First(&conflictClip).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("冲突剪贴板不存在")
+			return ErrConflictClipNotFound
 		}
 		return err
 	}

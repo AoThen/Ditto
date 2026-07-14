@@ -83,7 +83,7 @@
             <div class="bar" :style="{ height: getBarHeight(item.count) + '%' }">
               <span class="bar-label">{{ item.count }}</span>
             </div>
-            <div class="bar-date">{{ formatDate(item.date) }}</div>
+            <div class="bar-date">            {{ formatShortDate(item.date) }}</div>
           </div>
         </div>
       </div>
@@ -103,7 +103,7 @@
         <el-table-column prop="source_device" label="来源设备" width="150" show-overflow-tooltip />
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
-            {{ formatDateTime(row.created_at) }}
+            {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
       </el-table>
@@ -117,6 +117,7 @@ import { getStatsOverview } from '@/api/stats'
 import { listClips } from '@/api/clips'
 import { ElMessage } from 'element-plus'
 import { Document, CirclePlus, Monitor, Coin, Refresh } from '@element-plus/icons-vue'
+import { formatDate, formatShortDate } from '@/composables/useFormatDate'
 
 const stats = ref({
   total_clips: 0,
@@ -142,17 +143,6 @@ const storageColor = computed(() => {
   if (pct < 80) return '#e6a23c'
   return '#f56c6c'
 })
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return `${date.getMonth() + 1}/${date.getDate()}`
-}
-
-function formatDateTime(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 function getBarHeight(count) {
   const maxCount = Math.max(...stats.value.trend.map(t => t.count), 1)

@@ -246,6 +246,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, ArrowDown } from '@element-plus/icons-vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { downloadBlob } from '@/api/request'
+import { formatDate } from '@/composables/useFormatDate'
 
 const ws = useWebSocket()
 const lastSyncTime = ref(null)
@@ -328,11 +329,6 @@ const groups = ref([])
 
 // Search debounce timer
 let searchTimer = null
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 // Format type detection
 function isTextFormat(formatType) {
@@ -736,9 +732,8 @@ async function fetchGroups() {
 
 onMounted(async () => {
   window.addEventListener('ws-clip-added', onWsClipAdded)
-  await fetchClips()
+  await Promise.all([fetchClips(), fetchConflictClips()])
   lastSyncTime.value = new Date().toISOString()
-  await fetchConflictClips()
   fetchGroups()
 })
 

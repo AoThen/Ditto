@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"errors"
+	"log"
 	"net/http"
+	"strconv"
 
 	"ditto-cloud-server/internal/middleware"
 	"ditto-cloud-server/internal/response"
@@ -21,14 +24,17 @@ func NewGroupHandler(svc *service.GroupService) *GroupHandler {
 // ListGroups handles GET /api/v1/groups
 func (h *GroupHandler) ListGroups(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
 
-	groups, err := h.service.ListGroups(userID)
+	result, err := h.service.ListGroups(userID, page, perPage)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取分组列表失败: "+err.Error())
+		log.Printf("[ListGroups] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取分组列表失败")
 		return
 	}
 
-	response.Success(c, groups)
+	response.Success(c, result)
 }
 
 // GetGroup handles GET /api/v1/groups/:id
@@ -38,11 +44,12 @@ func (h *GroupHandler) GetGroup(c *gin.Context) {
 
 	group, err := h.service.GetGroup(userID, groupID)
 	if err != nil {
-		if err.Error() == "分组不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrGroupNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "分组不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "获取分组失败: "+err.Error())
+		log.Printf("[GetGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取分组失败")
 		return
 	}
 
@@ -61,7 +68,8 @@ func (h *GroupHandler) CreateGroup(c *gin.Context) {
 
 	group, err := h.service.CreateGroup(userID, &req)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "创建分组失败: "+err.Error())
+		log.Printf("[CreateGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "创建分组失败")
 		return
 	}
 
@@ -81,11 +89,12 @@ func (h *GroupHandler) UpdateGroup(c *gin.Context) {
 
 	group, err := h.service.UpdateGroup(userID, groupID, &req)
 	if err != nil {
-		if err.Error() == "分组不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrGroupNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "分组不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "更新分组失败: "+err.Error())
+		log.Printf("[UpdateGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "更新分组失败")
 		return
 	}
 
@@ -98,11 +107,12 @@ func (h *GroupHandler) DeleteGroup(c *gin.Context) {
 	groupID := c.Param("id")
 
 	if err := h.service.DeleteGroup(userID, groupID); err != nil {
-		if err.Error() == "分组不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrGroupNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "分组不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "删除分组失败: "+err.Error())
+		log.Printf("[DeleteGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "删除分组失败")
 		return
 	}
 
@@ -123,11 +133,12 @@ func (h *GroupHandler) MoveClipsToGroup(c *gin.Context) {
 	}
 
 	if err := h.service.MoveClipsToGroup(userID, groupID, req.ClipIDs); err != nil {
-		if err.Error() == "分组不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrGroupNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "分组不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "移动剪贴板失败: "+err.Error())
+		log.Printf("[MoveClipsToGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "移动剪贴板失败")
 		return
 	}
 
@@ -147,7 +158,8 @@ func (h *GroupHandler) RemoveClipsFromGroup(c *gin.Context) {
 	}
 
 	if err := h.service.RemoveClipsFromGroup(userID, req.ClipIDs); err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "移除剪贴板失败: "+err.Error())
+		log.Printf("[RemoveClipsFromGroup] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "移除剪贴板失败")
 		return
 	}
 

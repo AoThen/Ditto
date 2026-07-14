@@ -1,7 +1,10 @@
 #pragma once
 #include <afx.h>
+#include <memory>
 #include <vector>
 #include "CloudCrypto.h"
+
+namespace httplib { class Client; }
 
 struct EncryptionSetupResult
 {
@@ -60,4 +63,12 @@ public:
 	static CStringA DecryptClipData(const CStringA& encryptedBase64);
 
 	static BOOL IsEncryptionReady();
+
+private:
+	// Reusable HTTP client for encryption API calls
+	static std::unique_ptr<httplib::Client> m_httpClient;
+	static CString m_httpClientUrl;
+
+	// Create or reuse HTTP client for the given server URL and device token
+	static void EnsureHttpClient(const CString& serverUrl, const CString& deviceToken);
 };

@@ -73,9 +73,10 @@ func TestGroupService_ListGroups_Success(t *testing.T) {
 	require.NoError(t, database.DB.Create(&group2).Error)
 
 	// List groups
-	groups, err := svc.ListGroups(userID)
+	result, err := svc.ListGroups(userID, 1, 20)
 
 	assert.NoError(t, err)
+	groups := result.Items.([]GroupListItem)
 	assert.Len(t, groups, 2)
 	assert.Equal(t, "group-1", groups[0].ID)
 	assert.Equal(t, "group-2", groups[1].ID)
@@ -86,10 +87,10 @@ func TestGroupService_ListGroups_Empty(t *testing.T) {
 	defer cleanup()
 
 	// List groups for user with no groups
-	groups, err := svc.ListGroups(userID)
+	result, err := svc.ListGroups(userID, 1, 20)
 
 	assert.NoError(t, err)
-	assert.Empty(t, groups)
+	assert.Empty(t, result.Items)
 }
 
 func TestGroupService_GetGroup_Success(t *testing.T) {

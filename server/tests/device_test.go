@@ -19,7 +19,7 @@ type DeviceInfo struct {
 }
 
 // parseDeviceListResponse parses the raw JSON response and returns the device list.
-// The device list endpoint returns data as a direct array (not wrapped in PaginatedResponse).
+// Supports both direct array format (legacy) and paginated format.
 func parseDeviceListResponse(t *testing.T, respBody []byte) (code int, devices []DeviceInfo) {
 	t.Helper()
 
@@ -31,19 +31,28 @@ func parseDeviceListResponse(t *testing.T, respBody []byte) (code int, devices [
 	codeFloat, _ := resp["code"].(float64)
 	code = int(codeFloat)
 
-	// The data field contains the device list directly as an array
 	dataRaw := resp["data"]
 	if dataRaw == nil {
 		return code, nil
 	}
 
+	// Try direct array first (legacy format)
 	dataBytes, err := json.Marshal(dataRaw)
 	if err != nil {
 		return code, nil
 	}
 
-	if err := json.Unmarshal(dataBytes, &devices); err != nil {
-		t.Fatalf("failed to unmarshal device list: %v", err)
+	if err := json.Unmarshal(dataBytes, &devices); err == nil {
+		return code, devices
+	}
+
+	// Try paginated format: data.items
+	var paginated map[string]interface{}
+	if err := json.Unmarshal(dataBytes, &paginated); err == nil {
+		if items, ok := paginated["items"]; ok {
+			itemsBytes, _ := json.Marshal(items)
+			json.Unmarshal(itemsBytes, &devices)
+		}
 	}
 
 	return code, devices

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,60 +29,14 @@ func NewStatsHandler(svc *service.StatsService) *StatsHandler {
 func (h *StatsHandler) GetOverview(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	var totalClips int64
-	var todayClips int64
-	var totalDevices int64
-	var totalStorage int64
-
-	// Get total clips count
-	database.DB.Model(&model.Clip{}).Where("user_id = ? AND deleted_at IS NULL", userID).Count(&totalClips)
-
-	// Get today's clips count
-	now := time.Now()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	database.DB.Model(&model.Clip{}).Where("user_id = ? AND created_at >= ? AND deleted_at IS NULL", userID, todayStart).Count(&todayClips)
-
-	// Get devices count
-	database.DB.Model(&model.Device{}).Where("user_id = ?", userID).Count(&totalDevices)
-
-	// Get total storage (sum of all format data sizes)
-	storage, err := h.service.GetDeviceStats(userID)
+	overview, err := h.service.GetOverview(userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取统计数据失败: "+err.Error())
+		log.Printf("[GetOverview] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取统计数据失败")
 		return
 	}
-	totalStorage = storage
 
-	// Get last 7 days trend
-	type DayCount struct {
-		Date  string
-		Count int64
-	}
-
-	trend := make([]DayCount, 0)
-	database.DB.Raw(`
-		SELECT DATE(created_at) as date, COUNT(*) as count
-		FROM clips
-		WHERE user_id = ? AND created_at >= ? AND deleted_at IS NULL
-		GROUP BY DATE(created_at)
-		ORDER BY date DESC
-		LIMIT 7
-	`, userID, time.Now().AddDate(0, 0, -7)).Scan(&trend)
-
-	// Reverse trend to get ascending order
-	for i, j := 0, len(trend)-1; i < j; i, j = i+1, j-1 {
-		trend[i], trend[j] = trend[j], trend[i]
-	}
-
-	response.Success(c, gin.H{
-		"total_clips":    totalClips,
-		"today_clips":    todayClips,
-		"total_devices":  totalDevices,
-		"total_storage":  totalStorage,
-		"storage_mb":     float64(totalStorage) / 1024 / 1024,
-		"max_storage_mb": 100, // From user settings
-		"trend":          trend,
-	})
+	response.Success(c, overview)
 }
 
 // GetSyncLogs returns sync logs for the user
@@ -114,13 +69,15 @@ func (h *StatsHandler) GetSyncLogs(c *gin.Context) {
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取同步日志失败: "+err.Error())
+		log.Printf("[GetSyncLogs] count error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取同步日志失败")
 		return
 	}
 
 	var logs []model.SyncLog
 	if err := query.Order("synced_at DESC").Offset((page - 1) * perPage).Limit(perPage).Find(&logs).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取同步日志失败: "+err.Error())
+		log.Printf("[GetSyncLogs] find error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取同步日志失败")
 		return
 	}
 

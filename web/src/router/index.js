@@ -46,30 +46,13 @@ const router = createRouter({
 })
 
 function isAuthenticated() {
-  const userInfo = localStorage.getItem('userInfo')
-  if (userInfo) {
-    try {
-      const parsed = JSON.parse(userInfo)
-      if (parsed.device_id) return true
-    } catch {
-      // ignore
-    }
-  }
-  const match = document.cookie.match(/(^| )device_id=([^;]+)/)
-  return match ? true : false
+  const userStore = useUserStore()
+  return userStore.isLoggedIn
 }
 
 function isAdmin() {
-  const userInfo = localStorage.getItem('userInfo')
-  if (userInfo) {
-    try {
-      const parsed = JSON.parse(userInfo)
-      return parsed.role === 'admin'
-    } catch {
-      // ignore
-    }
-  }
-  return false
+  const userStore = useUserStore()
+  return userStore.role === 'admin'
 }
 
 router.beforeEach((to, from, next) => {

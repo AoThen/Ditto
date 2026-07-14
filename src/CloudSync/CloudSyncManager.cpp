@@ -36,6 +36,28 @@ static void LogMessage(const CString& msg)
 	OutputDebugString(logMsg);
 }
 
+void CCloudSyncManager::EnsureHttpClient()
+{
+	CStringA serverUrlA(m_serverUrl);
+	std::string url = serverUrlA.GetString();
+	if (!m_httpClient || m_httpClientUrl != m_serverUrl)
+	{
+		m_httpClient = std::make_unique<httplib::Client>(url);
+		m_httpClient->set_connection_timeout(10, 0);
+		m_httpClient->set_read_timeout(30, 0);
+		m_httpClient->set_write_timeout(30, 0);
+		m_httpClient->set_default_headers({
+			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
+		});
+		m_httpClientUrl = m_serverUrl;
+	}
+}
+
+BOOL CCloudSyncManager::IsEncryptionExpected()
+{
+	return CGetSetOptions::GetCloudSyncEncryptionEnabled();
+}
+
 CCloudSyncManager::CCloudSyncManager()
 	: m_hStopEvent(nullptr)
 	, m_hWsTrigger(nullptr)
@@ -107,17 +129,32 @@ BOOL CCloudSyncManager::Initialize()
 	// Initialize encryption (best effort, log warning if fails)
 	if (!InitializeEncryption())
 	{
-		OutputDebugString(_T("[CloudSync] WARNING: Encryption initialization failed, continuing without encryption.\n"));
-		
-		// Show user-friendly warning via main window
-		CWnd* pMainWnd = AfxGetMainWnd();
-		if (pMainWnd != nullptr)
+		if (IsEncryptionExpected())
 		{
-			// Post custom message to notify encryption issue
-			::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 999, 0);
+			// User has encryption enabled but initialization failed — abort
+			LogMessage(_T("CRITICAL: Encryption is enabled but failed to initialize. Aborting sync initialization."));
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 997, 0);
+			}
+			return FALSE;
 		}
-		
-		LogMessage(_T("WARNING: Encryption not initialized, clips will sync unencrypted."));
+		else
+		{
+			// User did not enable encryption — continue without it (degraded mode)
+			OutputDebugString(_T("[CloudSync] WARNING: Encryption initialization failed, continuing without encryption.\n"));
+			
+			// Show user-friendly warning via main window
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				// Post custom message to notify encryption issue
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 999, 0);
+			}
+			
+			LogMessage(_T("WARNING: Encryption not initialized, clips will sync unencrypted."));
+		}
 	}
 
 	// Create stop event
@@ -451,15 +488,9 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 
 	try
 	{
-		std::string url = CStringToStdString(m_serverUrl);
-		httplib::Client cli(url);
-		cli.set_connection_timeout(5, 0);
-		cli.set_read_timeout(5, 0);
-		cli.set_default_headers({
-			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
-		});
+		EnsureHttpClient();
 
-		auto res = cli.Get("/api/v1/encryption/salt");
+		auto res = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!res || res->status != 200)
 			return FALSE;
 
@@ -600,19 +631,10 @@ void CCloudSyncManager::PushNewClips()
 		syncReq["push_clips"] = clipsArray;
 
 		// Send to server
-		CStringA serverUrlA(m_serverUrl);
-		std::string url = serverUrlA.GetString();
-		httplib::Client cli(url);
-		// Configure timeouts: 10s connection, 30s read, 30s write
-		cli.set_connection_timeout(10, 0);
-		cli.set_read_timeout(30, 0);
-		cli.set_write_timeout(30, 0);
-		cli.set_default_headers({
-			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
-		});
+		EnsureHttpClient();
 
 		std::string bodyStr = syncReq.dump();
-		auto res = cli.Post("/api/v1/clips/sync", bodyStr, "application/json");
+		auto res = m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json");
 		if (!res)
 		{
 			LogMessage(_T("PushNewClips: failed to connect to server"));
@@ -866,20 +888,12 @@ void CCloudSyncManager::PullChanges()
 		}
 
 		// Use GET /clips/changes for pull-only (server has a dedicated pull endpoint)
-		CStringA serverUrlA(m_serverUrl);
-		std::string url = serverUrlA.GetString();
-		httplib::Client cli(url);
-		cli.set_connection_timeout(10, 0);
-		cli.set_read_timeout(30, 0);
-		cli.set_write_timeout(30, 0);
-		cli.set_default_headers({
-			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
-		});
+		EnsureHttpClient();
 
 		// GET /api/v1/clips/changes?since=...
 		CStringA path;
 		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
-		auto res = cli.Get(path.GetString());
+		auto res = m_httpClient->Get(path.GetString());
 		if (!res)
 		{
 			LogMessage(_T("PullChanges: failed to connect to server"));
@@ -1106,108 +1120,111 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 
 	try
 	{
-		// Query clips modified since last sync
-		// Use lModifiedDate (modification time) instead of lDate (creation time)
-		// This ensures modified clips are synced even if their creation time is old
-		// For initial sync, get the last 100 clips
-		CString csSQL;
-		if (sinceTime > 0)
+		// Paginate through clips with LIMIT 100 OFFSET
+		int offset = 0;
+		bool hasMore = true;
+
+		do
 		{
-			csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
-			             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
-			             _T("FROM Main WHERE lModifiedDate > %lld AND bIsGroup = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT 100"), sinceTime);
-		}
-		else
-		{
-			// First sync: get recent clips
-			csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
-			             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
-			             _T("FROM Main WHERE bIsGroup = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT 100"));
-		}
-
-		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
-
-		int clipCount = 0;
-		while(q.eof() == false)
-		{
-			int clipId = q.getIntField(_T("lID"));
-			time_t lDate = (time_t)q.getInt64Field(_T("lDate"));
-			CString desc = q.getStringField(_T("mText"));
-			DWORD crc = (DWORD)q.getIntField(_T("CRC"));
-			time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
-
-			// Build clip JSON matching server's PushClipItem schema
-			json clipJson;
-			clipJson["id"] = std::to_string(clipId);                 // Server expects "id" (string)
-			clipJson["description"] = CStringToStdString(desc);      // Server expects "description"
-			clipJson["crc"] = static_cast<int64_t>(crc);             // Server expects "crc" (int64)
-			clipJson["group_id"] = "";                               // Server expects "group_id"
-			clipJson["short_cut"] = q.getIntField(_T("lShortCut")); // Server expects "short_cut"
-
-			// Ensure mapping entry exists for this pushed clip (M1)
-			// This maps the local integer ID to its string representation used by the server
-			SaveRemoteIdMapping(clipId, std::to_string(clipId));
-
-			// Server uses updated_at for LWW conflict resolution
-			// Use lModifiedDate (modification time) as the authoritative timestamp
-			time_t updatedAt = (modDate > 0) ? modDate : lDate;
-			if (updatedAt > 0)
+			CString csSQL;
+			if (sinceTime > 0)
 			{
-				struct tm gmtm;
-				gmtime_s(&gmtm, &updatedAt);
-				char timeBuf[32];
-				strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
-				clipJson["updated_at"] = std::string(timeBuf);
-			}
-
-			// Load formats for this clip
-			json formatsArray;
-			if (LoadClipFormats(clipId, formatsArray))
-			{
-				// Filter HDROP formats (file paths only, no content)
-				FilterHDROPForSync(formatsArray);
-
-				// Build formats array matching server's PushFormatItem: [{format_type, data}]
-				json serverFormats;
-				for (const auto& fmt : formatsArray)
-				{
-					json serverFmt;
-					serverFmt["format_type"] = fmt.value("format_type", 0);
-					serverFmt["data"] = fmt.value("data", "");  // Already base64 or plain text
-					serverFormats.push_back(serverFmt);
-				}
-				clipJson["formats"] = serverFormats;
-
-				// Encrypt formats if encryption is enabled
-				if (m_cryptoInitialized && !serverFormats.empty())
-				{
-					if (!EncryptClipFormats(clipJson["formats"]))
-					{
-						CString msg;
-						msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
-						LogMessage(msg);
-						q.nextRow();
-						continue;
-					}
-				}
+				csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
+				             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
+				             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
+				             _T("FROM Main WHERE lModifiedDate > %lld AND bIsGroup = 0 ")
+				             _T("ORDER BY lModifiedDate DESC LIMIT 100 OFFSET %d"), sinceTime, offset);
 			}
 			else
 			{
-				clipJson["formats"] = json::array();
+				csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
+				             _T("clipOrder, stickyClipOrder, lShortCut, globalShortCut, ")
+				             _T("lDontAutoDelete, lastPasteDate, lModifiedDate ")
+				             _T("FROM Main WHERE bIsGroup = 0 ")
+				             _T("ORDER BY lModifiedDate DESC LIMIT 100 OFFSET %d"), offset);
 			}
 
-			clipsArray.push_back(clipJson);
-			clipCount++;
+			CSingleLock lockDb(&m_csDb, TRUE);
+			CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
-			q.nextRow();
-		}
+			int pageCount = 0;
+			while (q.eof() == false)
+			{
+				int clipId = q.getIntField(_T("lID"));
+				time_t lDate = (time_t)q.getInt64Field(_T("lDate"));
+				CString desc = q.getStringField(_T("mText"));
+				DWORD crc = (DWORD)q.getIntField(_T("CRC"));
+				time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
+
+				json clipJson;
+				clipJson["id"] = std::to_string(clipId);
+				clipJson["description"] = CStringToStdString(desc);
+				clipJson["crc"] = static_cast<int64_t>(crc);
+				clipJson["group_id"] = "";
+				clipJson["short_cut"] = q.getIntField(_T("lShortCut"));
+
+				SaveRemoteIdMapping(clipId, std::to_string(clipId));
+
+				time_t updatedAt = (modDate > 0) ? modDate : lDate;
+				if (updatedAt > 0)
+				{
+					struct tm gmtm;
+					gmtime_s(&gmtm, &updatedAt);
+					char timeBuf[32];
+					strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
+					clipJson["updated_at"] = std::string(timeBuf);
+				}
+
+				json formatsArray;
+				if (LoadClipFormats(clipId, formatsArray))
+				{
+					FilterHDROPForSync(formatsArray);
+
+					json serverFormats;
+					for (const auto& fmt : formatsArray)
+					{
+						json serverFmt;
+						serverFmt["format_type"] = fmt.value("format_type", 0);
+						serverFmt["data"] = fmt.value("data", "");
+						serverFormats.push_back(serverFmt);
+					}
+					clipJson["formats"] = serverFormats;
+
+					if (m_cryptoInitialized && !serverFormats.empty())
+					{
+						if (!EncryptClipFormats(clipJson["formats"]))
+						{
+							CString msg;
+							msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
+							LogMessage(msg);
+							q.nextRow();
+							continue;
+						}
+					}
+				}
+				else
+				{
+					clipJson["formats"] = json::array();
+				}
+
+				clipsArray.push_back(clipJson);
+				pageCount++;
+
+				q.nextRow();
+			}
+			lockDb.Unlock();
+
+			offset += 100;
+			hasMore = (pageCount >= 100);
+
+			CString msg;
+			msg.Format(_T("GetLocalClipsSince: page offset=%d, got %d clips"), offset - 100, pageCount);
+			LogMessage(msg);
+
+		} while (hasMore);
 
 		CString msg;
-		msg.Format(_T("GetLocalClipsSince: found %d clips to sync"), clipCount);
+		msg.Format(_T("GetLocalClipsSince: total %d clips to sync"), (int)clipsArray.size());
 		LogMessage(msg);
 
 		return TRUE;
@@ -1246,9 +1263,10 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 		csSQL.Format(_T("SELECT lID, strClipBoardFormat, ooData FROM Data ")
 		             _T("WHERE lParentID = %d ORDER BY lID"), clipId);
 
+		CSingleLock lockDb(&m_csDb, TRUE);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
-		while(q.eof() == false)
+		while (q.eof() == false)
 		{
 			int formatId = q.getIntField(_T("lID"));
 			CString formatName = q.getStringField(_T("strClipBoardFormat"));
@@ -1373,6 +1391,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		{
 			// Primary check: CRC match (same content already exists)
 			// Use parameterized query to prevent SQL injection
+			CSingleLock lockDb(&m_csDb, TRUE);
 			CString csSQL;
 			csSQL.Format(_T("SELECT lID, lModifiedDate FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
 			
@@ -1385,6 +1404,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				existingId = q.getIntField(_T("lID"));
 				localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 			}
+			lockDb.Unlock();
 		}
 		catch (...)
 		{
@@ -1395,10 +1415,11 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		{
 			// Clip with same content (CRC) already exists locally
 			// LWW: If remote is significantly newer, update the local clip
-			if (remoteUpdatedAt > localModDate + 1)
+			if (remoteUpdatedAt > localModDate)
 			{
 				// Remote clip is newer - update local clip's modification time
 				// (Content is same per CRC match, so no need to update formats)
+				CSingleLock lockDb(&m_csDb, TRUE);
 				CString csUpdateSQL;
 				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld WHERE lID = %d"),
 				                   (__int64)remoteUpdatedAt, existingId);
@@ -1426,6 +1447,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 			try
 			{
 				// Use parameterized query to prevent SQL injection
+				CSingleLock lockDb(&m_csDb, TRUE);
 				CString csSQL;
 				csSQL.Format(_T("SELECT lID, lModifiedDate, CRC FROM Main WHERE mText = ? AND bIsGroup = 0 LIMIT 1"));
 				
@@ -1441,14 +1463,27 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 
 					// Same description but different CRC -> different content
 					// LWW: only skip if local is same age or newer
-					if (remoteUpdatedAt <= localModDate + 1)
+					if (remoteUpdatedAt <= localModDate)
 					{
-						CString msg;
-						msg.Format(_T("MergeRemoteClipToLocal: same description, different CRC, local is newer (local=%lld, remote=%lld), skipping"),
-						           (long long)localModDate, (long long)remoteUpdatedAt);
-						LogMessage(msg);
-						SaveRemoteIdMapping(descMatchId, serverIdStr);
-						return descMatchId;
+						time_t timeDiff = localModDate - remoteUpdatedAt;
+						if (timeDiff <= 1 && localCRC != crc)
+						{
+							// Conflict: both changed within 1s with different content
+							// Save remote as a new clip (don't replace local)
+							CString msg;
+							msg.Format(_T("MergeRemoteClipToLocal: CONFLICT (same desc, different CRC, local=%lld, remote=%lld, diff=%llds), saving remote as new clip"),
+							           (long long)localModDate, (long long)remoteUpdatedAt, (long long)timeDiff);
+							LogMessage(msg);
+						}
+						else
+						{
+							CString msg;
+							msg.Format(_T("MergeRemoteClipToLocal: same description, different CRC, local is newer (local=%lld, remote=%lld), skipping"),
+							           (long long)localModDate, (long long)remoteUpdatedAt);
+							LogMessage(msg);
+							SaveRemoteIdMapping(descMatchId, serverIdStr);
+							return descMatchId;
+						}
 					}
 					else
 					{
@@ -1634,6 +1669,7 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 	try
 	{
 		// Check if clip exists
+		CSingleLock lockDb(&m_csDb, TRUE);
 		CString csCheckSQL;
 		csCheckSQL.Format(_T("SELECT lID FROM Main WHERE lID = %d"), clipId);
 		
@@ -1685,6 +1721,7 @@ void CCloudSyncManager::EnsureMappingTable()
 {
 	try
 	{
+		CSingleLock lockDb(&m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("CREATE TABLE IF NOT EXISTS CloudClipMap (")
 		             _T("local_id INTEGER PRIMARY KEY,")
@@ -1716,6 +1753,7 @@ void CCloudSyncManager::SaveRemoteIdMapping(int localId, const std::string& remo
 
 	try
 	{
+		CSingleLock lockDb(&m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("INSERT OR REPLACE INTO CloudClipMap (local_id, remote_id) ")
 		             _T("VALUES (%d, '%hs')"), localId, remoteId.c_str());
@@ -1744,6 +1782,7 @@ int CCloudSyncManager::GetLocalIdByRemoteId(const std::string& remoteId)
 
 	try
 	{
+		CSingleLock lockDb(&m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("SELECT local_id FROM CloudClipMap WHERE remote_id = '%hs' LIMIT 1"),
 		             remoteId.c_str());

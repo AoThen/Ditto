@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { useClipStore } from '@/stores/clip'
 import { ElMessage } from 'element-plus'
 
 const WS_URL = import.meta.env.VITE_WS_URL || ''
@@ -39,7 +40,7 @@ function handleMessage(msg) {
     case 'ping':
       break
     case 'clip_added':
-      window.dispatchEvent(new CustomEvent('ws-clip-added', { detail: msg.data }))
+      { const clipStore = useClipStore(); clipStore.notifyClipAdded(msg.data) }
       ElMessage.info('收到新的剪贴板内容')
       break
     case 'goaway':

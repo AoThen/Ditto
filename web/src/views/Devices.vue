@@ -54,15 +54,11 @@ import { listDevices, removeDevice } from '@/api/devices'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { formatDate } from '@/composables/useFormatDate'
 
 const deviceList = ref([])
 const loading = ref(false)
 const userStore = useUserStore()
-
-function formatDate(dateStr) {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 function isDeviceActive(lastSeen) {
   if (!lastSeen) return false
@@ -79,7 +75,7 @@ async function fetchDevices() {
     if (res.code === 0) {
       // Mark current device (based on stored token)
       const currentDeviceId = userStore.deviceId
-      deviceList.value = (res.data || []).map(device => ({
+      deviceList.value = (res.data?.items || res.data || []).map(device => ({
         ...device,
         is_current: device.device_id === currentDeviceId
       }))

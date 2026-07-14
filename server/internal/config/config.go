@@ -78,6 +78,15 @@ func generateSecureSecret() string {
 	return hex.EncodeToString(b)
 }
 
+func loadTokenExpiry(envVar string, defaultVal time.Duration) time.Duration {
+	if env := os.Getenv(envVar); env != "" {
+		if d, err := strconv.ParseInt(env, 10, 64); err == nil && d > 0 {
+			return time.Duration(d) * time.Minute
+		}
+	}
+	return defaultVal
+}
+
 func Load() *Config {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -156,7 +165,7 @@ func Load() *Config {
 		MaxClipsPerUser:    maxClipsPerUser,
 		AllowedOrigins:     allowedOrigins,
 		CookieSecure:       cookieSecure,
-		TokenExpiryAccess:  DefaultTokenExpiryAccess,
-		TokenExpiryRefresh: DefaultTokenExpiryRefresh,
+		TokenExpiryAccess:  loadTokenExpiry("JWT_ACCESS_TOKEN_EXPIRY", DefaultTokenExpiryAccess),
+		TokenExpiryRefresh: loadTokenExpiry("JWT_REFRESH_TOKEN_EXPIRY", DefaultTokenExpiryRefresh),
 	}
 }

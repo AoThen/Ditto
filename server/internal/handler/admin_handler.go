@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -28,6 +29,7 @@ type UpdateUserRequest struct {
 	Email    *string `json:"email,omitempty"`
 	Password *string `json:"password,omitempty"`
 	IsActive *bool   `json:"is_active,omitempty"`
+	Role     *string `json:"role,omitempty"`
 }
 
 type ResetPasswordRequest struct {
@@ -69,7 +71,8 @@ func (h *AdminHandler) CreateUser(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "创建用户失败: "+err.Error())
+		log.Printf("[CreateUser] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "创建用户失败")
 		return
 	}
 
@@ -105,7 +108,8 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	offset := (page - 1) * perPage
 	rows := database.DB.Model(&model.User{}).
-		Select("users.*, (SELECT COUNT(*) FROM devices WHERE devices.user_id = users.id) as device_count").
+		Select("users.*, COALESCE(dc.device_count, 0) as device_count").
+		Joins("LEFT JOIN (SELECT user_id, COUNT(*) as device_count FROM devices GROUP BY user_id) dc ON dc.user_id = users.id").
 		Order("users.id DESC").
 		Limit(perPage).
 		Offset(offset)
@@ -116,7 +120,8 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 	}
 
 	if err := rows.Find(&users).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "查询用户列表失败: "+err.Error())
+		log.Printf("[ListUsers] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "查询用户列表失败")
 		return
 	}
 
@@ -200,9 +205,19 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 		updates["is_active"] = *req.IsActive
 	}
 
+	if req.Role != nil {
+		role := *req.Role
+		if role != "admin" && role != "user" {
+			response.Error(c, http.StatusBadRequest, 40000, "角色无效，必须是 admin 或 user")
+			return
+		}
+		updates["role"] = role
+	}
+
 	if len(updates) > 0 {
 		if err := database.DB.Model(&user).Updates(updates).Error; err != nil {
-			response.Error(c, http.StatusInternalServerError, 50000, "更新用户失败: "+err.Error())
+			log.Printf("[UpdateUser] error: %v", err)
+			response.Error(c, http.StatusInternalServerError, 50000, "更新用户失败")
 			return
 		}
 	}
@@ -251,7 +266,8 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	tx.Delete(&user)
 
 	if err := tx.Commit().Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "删除用户失败: "+err.Error())
+		log.Printf("[DeleteUser] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "删除用户失败")
 		return
 	}
 
@@ -284,7 +300,8 @@ func (h *AdminHandler) ResetPassword(c *gin.Context) {
 	}
 
 	if err := database.DB.Model(&user).Update("password_hash", hashedPassword).Error; err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "重置密码失败: "+err.Error())
+		log.Printf("[ResetPassword] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "重置密码失败")
 		return
 	}
 

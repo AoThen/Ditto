@@ -7,6 +7,7 @@ import (
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+	"ditto-cloud-server/internal/response"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -44,9 +45,24 @@ type GroupDetail struct {
 }
 
 // ListGroups retrieves all groups for a user with clip counts
-func (s *GroupService) ListGroups(userID uint) ([]GroupListItem, error) {
+func (s *GroupService) ListGroups(userID uint, page, perPage int) (*response.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	var total int64
+	if err := database.DB.Model(&model.Group{}).Where("user_id = ?", userID).Count(&total).Error; err != nil {
+		return nil, err
+	}
+
 	var groups []model.Group
-	if err := database.DB.Where("user_id = ?", userID).Order("clip_order ASC, created_at ASC").Find(&groups).Error; err != nil {
+	if err := database.DB.Where("user_id = ?", userID).Order("clip_order ASC, created_at ASC").Offset((page - 1) * perPage).Limit(perPage).Find(&groups).Error; err != nil {
 		return nil, err
 	}
 
@@ -91,7 +107,12 @@ func (s *GroupService) ListGroups(userID uint) ([]GroupListItem, error) {
 		})
 	}
 
-	return items, nil
+	return &response.PaginatedResponse{
+		Items:   items,
+		Total:   total,
+		Page:    page,
+		PerPage: perPage,
+	}, nil
 }
 
 // GetGroup retrieves a group with children
@@ -99,7 +120,7 @@ func (s *GroupService) GetGroup(userID uint, groupID string) (*GroupDetail, erro
 	var group model.Group
 	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("分组不存在")
+			return nil, ErrGroupNotFound
 		}
 		return nil, err
 	}
@@ -236,12 +257,12 @@ func (s *GroupService) UpdateGroup(userID uint, groupID string, req *UpdateGroup
 	var group model.Group
 	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("分组不存在")
+				return nil, ErrGroupNotFound
+			}
+			return nil, err
 		}
-		return nil, err
-	}
 
-	// Validate parent exists and isn't self
+		// Validate parent exists and isn't self
 	if req.ParentID != nil && *req.ParentID != "" {
 		if *req.ParentID == groupID {
 			return nil, errors.New("不能将分组设为自身")
@@ -304,7 +325,7 @@ func (s *GroupService) DeleteGroup(userID uint, groupID string) error {
 		var group model.Group
 		if err := tx.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("分组不存在")
+				return ErrGroupNotFound
 			}
 			return err
 		}
@@ -356,7 +377,7 @@ func (s *GroupService) MoveClipsToGroup(userID uint, groupID string, clipIDs []s
 	var group model.Group
 	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("分组不存在")
+			return ErrGroupNotFound
 		}
 		return err
 	}

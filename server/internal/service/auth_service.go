@@ -145,11 +145,11 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 	}
 
 	// Generate JWT token (access token + refresh token)
-	accessToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryAccess)
+	accessToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryAccess, "access")
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryRefresh)
+	refreshToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryRefresh, "refresh")
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +185,11 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 	}
 
 	// Generate new tokens
-	accessToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryAccess, device.TokenVersion)
+	accessToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryAccess, "access", device.TokenVersion)
 	if err != nil {
 		return "", "", err
 	}
-	refreshToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryRefresh, device.TokenVersion)
+	refreshToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryRefresh, "refresh", device.TokenVersion)
 	if err != nil {
 		return "", "", err
 	}
@@ -197,7 +197,7 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 	return accessToken, refreshToken, nil
 }
 
-func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration, tokenVersion ...int) (string, error) {
+func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration, tokenType string, tokenVersion ...int) (string, error) {
 	ver := 0
 	if len(tokenVersion) > 0 {
 		ver = tokenVersion[0]
@@ -206,6 +206,7 @@ func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Du
 		"user_id":       userID,
 		"device_id":     deviceID,
 		"token_version": ver,
+		"token_type":    tokenType,
 		"exp":           time.Now().Add(expiry).Unix(),
 		"iat":           time.Now().Unix(),
 	})

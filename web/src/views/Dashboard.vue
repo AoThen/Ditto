@@ -142,4 +142,23 @@ function handleLogout() {
   background: #f5f7fa;
   overflow-y: auto;
 }
+
+@media (max-width: 768px) {
+  .main-wrapper {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e4e7ed;
+  }
+  .sidebar-menu .el-menu-item {
+    display: inline-block;
+    width: auto;
+  }
+  .topbar-title {
+    font-size: 16px;
+  }
+}
 </style>

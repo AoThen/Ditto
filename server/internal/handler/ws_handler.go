@@ -113,7 +113,7 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin:     upgrader.CheckOrigin, // Reuse same origin validation (H5)
-		Subprotocols:    []string{tokenStr},
+		Subprotocols:    []string{"ditto-ws"},
 	}
 	conn, err := upgraderWithProtocol.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

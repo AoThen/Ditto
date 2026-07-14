@@ -13,6 +13,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// getGroupItems extracts group items from response data, supporting both direct array and paginated format
+func getGroupItems(dataRaw interface{}) ([]interface{}, bool) {
+	if items, ok := dataRaw.([]interface{}); ok {
+		return items, ok
+	}
+	if dataMap, ok := dataRaw.(map[string]interface{}); ok {
+		if items, ok := dataMap["items"]; ok {
+			result, ok := items.([]interface{})
+			return result, ok
+		}
+	}
+	return nil, false
+}
+
 func TestGroups_List_Empty(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 	defer server.Close()
@@ -24,10 +38,9 @@ func TestGroups_List_Empty(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// ListGroups returns data as array directly
 	var respMap map[string]interface{}
 	json.Unmarshal(respBody, &respMap)
-	items, ok := respMap["data"].([]interface{})
+	items, ok := getGroupItems(respMap["data"])
 	require.True(t, ok)
 	assert.Empty(t, items)
 }
@@ -246,5 +259,10 @@ func TestGroups_UserIsolation(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	code, _, data := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
-	assert.Empty(t, data)
+	items, ok := getGroupItems(data)
+	if !ok {
+		assert.Empty(t, data)
+	} else {
+		assert.Empty(t, items)
+	}
 }

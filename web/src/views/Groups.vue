@@ -145,7 +145,7 @@ async function fetchGroups() {
     const res = await listGroups()
     if (res.code === 0) {
       // Build tree structure from flat list
-      const flatList = res.data || []
+      const flatList = res.data?.items || res.data || []
       const map = {}
       const roots = []
       flatList.forEach(g => {

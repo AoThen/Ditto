@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import * as adminApi from '@/api/admin'
 import { ElMessage } from 'element-plus'
+import { formatDate } from '@/composables/useFormatDate'
 
 vi.mock('@/api/admin', () => ({
   getUsers: vi.fn(),
@@ -86,32 +87,21 @@ describe('Users API calls', () => {
 })
 
 describe('formatDate', () => {
-  function formatDate(dateStr) {
-    if (!dateStr) return ''
-    return new Date(dateStr).toLocaleString('zh-CN', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-    })
-  }
-
   it('returns formatted string for valid date', () => {
     const result = formatDate('2024-06-15T10:30:00Z')
-    expect(result).toContain('2024')
-    expect(result).toContain('06')
-    expect(result).toContain('15')
-    expect(result.length).toBeGreaterThan(5)
+    expect(result).toBe('2024-06-15 10:30')
   })
 
-  it('returns empty string for null', () => {
-    expect(formatDate(null)).toBe('')
+  it('returns dash for null', () => {
+    expect(formatDate(null)).toBe('-')
   })
 
-  it('returns empty string for undefined', () => {
-    expect(formatDate(undefined)).toBe('')
+  it('returns dash for undefined', () => {
+    expect(formatDate(undefined)).toBe('-')
   })
 
-  it('returns empty string for empty string', () => {
-    expect(formatDate('')).toBe('')
+  it('returns dash for empty string', () => {
+    expect(formatDate('')).toBe('-')
   })
 
   it('handles current date correctly', () => {

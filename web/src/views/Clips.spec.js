@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import * as clipsApi from '@/api/clips'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { formatDate } from '@/composables/useFormatDate'
 
 vi.mock('@/api/clips', () => ({
   listClips: vi.fn(),
@@ -79,11 +80,6 @@ describe('Clips API calls', () => {
 })
 
 describe('Clip formatting logic', () => {
-  function formatDate(dateStr) {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString('zh-CN')
-  }
-
   it('should return dash for null date', () => {
     expect(formatDate(null)).toBe('-')
     expect(formatDate(undefined)).toBe('-')
@@ -91,7 +87,6 @@ describe('Clip formatting logic', () => {
 
   it('should format valid date string', () => {
     const result = formatDate('2024-06-15T10:30:00Z')
-    expect(result).toContain('2024')
-    expect(result.length).toBeGreaterThan(5)
+    expect(result).toBe('2024-06-15 10:30')
   })
 })

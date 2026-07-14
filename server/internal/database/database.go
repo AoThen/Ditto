@@ -2,8 +2,10 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"ditto-cloud-server/internal/model"
 
@@ -25,8 +27,26 @@ func Init(dbPath string) error {
 	dsn := fmt.Sprintf("file:%s?_busy_timeout=5000&_fk=true&_journal_mode=WAL", dbPath)
 
 	var err error
+
+	logLevel := logger.Warn
+	switch strings.ToLower(os.Getenv("GORM_LOG_LEVEL")) {
+	case "info":
+		logLevel = logger.Info
+	case "warn":
+		logLevel = logger.Warn
+	case "error":
+		logLevel = logger.Error
+	case "silent":
+		logLevel = logger.Silent
+	default:
+		if v := os.Getenv("GORM_LOG_LEVEL"); v != "" {
+			log.Printf("[Database] Unknown GORM_LOG_LEVEL=%q, using default warn", v)
+		}
+	}
+	log.Printf("[Database] GORM log level set")
+
 	DB, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)

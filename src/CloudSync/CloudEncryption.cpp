@@ -6,6 +6,26 @@
 
 using json = nlohmann::json;
 
+// Static member definitions
+std::unique_ptr<httplib::Client> CCloudEncryption::m_httpClient;
+CString CCloudEncryption::m_httpClientUrl;
+
+void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString& deviceToken)
+{
+	std::string url = CStringToStdString(serverUrl);
+	if (!m_httpClient || m_httpClientUrl != serverUrl)
+	{
+		m_httpClient = std::make_unique<httplib::Client>(url);
+		m_httpClient->set_connection_timeout(10, 0);
+		m_httpClient->set_read_timeout(30, 0);
+		m_httpClient->set_write_timeout(30, 0);
+		m_httpClient->set_default_headers({
+			{"Authorization", "Bearer " + CStringToStdString(deviceToken)}
+		});
+		m_httpClientUrl = serverUrl;
+	}
+}
+
 static std::string CStringToStdString(const CString& str)
 {
 	if (str.IsEmpty())
@@ -24,16 +44,6 @@ static CString StdStringToCString(const std::string& str)
 	return CString(wide);
 }
 
-static void SetupClient(const std::string& serverUrl, httplib::Client& cli, const CString& deviceToken)
-{
-	cli.set_connection_timeout(10, 0);
-	cli.set_read_timeout(30, 0);
-	cli.set_write_timeout(30, 0);
-	cli.set_default_headers({
-		{"Authorization", "Bearer " + CStringToStdString(deviceToken)}
-	});
-}
-
 static CStringA ComputeVerificationHashForPassword(const CString& password, const CStringA& saltB64)
 {
 	CT2A passwordUtf8(password, CP_UTF8);
@@ -50,11 +60,14 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 
 	try
 	{
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli, deviceToken);
+		EnsureHttpClient(serverUrl, deviceToken);
+		if (!m_httpClient)
+		{
+			result.error = _T("无法创建 HTTP 客户端");
+			return result;
+		}
 
-		auto saltRes = cli.Get("/api/v1/encryption/salt");
+		auto saltRes = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!saltRes || saltRes->status != 200)
 		{
 			result.error = _T("无法从服务器获取加密盐值");
@@ -96,7 +109,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		body["verification_hash"] = verificationHash.GetString();
 		body["password_hint"] = "";
 
-		auto setupRes = cli.Post("/api/v1/encryption/setup", body.dump(), "application/json");
+		auto setupRes = m_httpClient->Post("/api/v1/encryption/setup", body.dump(), "application/json");
 		if (!setupRes)
 		{
 			result.error = _T("无法连接服务器（网络错误）");
@@ -172,11 +185,14 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 
 	try
 	{
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli, deviceToken);
+		EnsureHttpClient(serverUrl, deviceToken);
+		if (!m_httpClient)
+		{
+			result.error = _T("无法创建 HTTP 客户端");
+			return result;
+		}
 
-		auto res = cli.Get("/api/v1/encryption/salt");
+		auto res = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!res)
 		{
 			result.error = _T("无法连接服务器（网络错误）");
@@ -247,11 +263,14 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 
 	try
 	{
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli, deviceToken);
+		EnsureHttpClient(serverUrl, deviceToken);
+		if (!m_httpClient)
+		{
+			result.error = _T("无法创建 HTTP 客户端");
+			return result;
+		}
 
-		auto keyRes = cli.Get("/api/v1/encryption/key-material");
+		auto keyRes = m_httpClient->Get("/api/v1/encryption/key-material");
 		if (!keyRes || keyRes->status != 200)
 		{
 			result.error = _T("无法从服务器获取密钥材料");
@@ -305,7 +324,7 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 		body["new_verification_hash"] = newVerificationHash.GetString();
 		body["new_password_hint"] = "";
 
-		auto changeRes = cli.Post("/api/v1/encryption/change-password", body.dump(), "application/json");
+		auto changeRes = m_httpClient->Post("/api/v1/encryption/change-password", body.dump(), "application/json");
 		if (!changeRes)
 		{
 			result.error = _T("无法连接服务器（网络错误）");
@@ -371,11 +390,11 @@ BOOL CCloudEncryption::CheckSaltChanged(
 		if (localSalt.IsEmpty())
 			return FALSE;
 
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli, deviceToken);
+		EnsureHttpClient(serverUrl, deviceToken);
+		if (!m_httpClient)
+			return FALSE;
 
-		auto res = cli.Get("/api/v1/encryption/salt");
+		auto res = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!res || res->status != 200)
 			return FALSE;
 

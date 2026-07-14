@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"log"
 	"net/http"
+	"strconv"
 
 	"ditto-cloud-server/internal/middleware"
 	"ditto-cloud-server/internal/response"
@@ -20,14 +22,17 @@ func NewDeviceHandler(svc *service.DeviceService) *DeviceHandler {
 
 func (h *DeviceHandler) ListDevices(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
 
-	devices, err := h.service.ListByUser(userID)
+	result, err := h.service.ListByUser(userID, page, perPage)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取设备列表失败: "+err.Error())
+		log.Printf("[ListDevices] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取设备列表失败")
 		return
 	}
 
-	response.Success(c, devices)
+	response.Success(c, result)
 }
 
 func (h *DeviceHandler) RemoveDevice(c *gin.Context) {
@@ -35,7 +40,8 @@ func (h *DeviceHandler) RemoveDevice(c *gin.Context) {
 	deviceID := c.Param("id")
 
 	if err := h.service.RemoveDevice(userID, deviceID); err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "移除设备失败: "+err.Error())
+		log.Printf("[RemoveDevice] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "移除设备失败")
 		return
 	}
 

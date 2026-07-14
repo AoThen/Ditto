@@ -1,5 +1,6 @@
 #pragma once
 #include <afx.h>
+#include <memory>
 #include "../json.hpp"
 #include "../httplib.h"
 
@@ -42,6 +43,11 @@ public:
 	BOOL IsEncryptionEnabled() const;
 
 private:
+	// Ensure HTTP client is created/reused for the current server URL
+	void EnsureHttpClient();
+
+	// Check if user expects encryption (via registry setting)
+	BOOL IsEncryptionExpected();
 	CStringA  m_deviceToken;
 	CStringA  m_deviceId;      // Device ID from login response
 	CString   m_serverUrl;
@@ -55,6 +61,13 @@ private:
 	LONG      m_nActiveQuickSyncThreads; // Track active quick-push threads
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
 	int       m_wsReconnectDelay; // Exponential backoff for WS reconnection
+
+	// Reusable HTTP client (httplib::Client) for all REST API calls
+	std::unique_ptr<httplib::Client> m_httpClient;
+	CString   m_httpClientUrl; // Cached URL to detect server URL changes
+
+	// Critical section for thread-safe access to theApp.m_db from sync thread
+	CCriticalSection m_csDb;
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);

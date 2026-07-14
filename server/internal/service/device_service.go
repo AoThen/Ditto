@@ -3,6 +3,7 @@ package service
 import (
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+	"ditto-cloud-server/internal/response"
 
 	"gorm.io/gorm"
 )
@@ -14,26 +15,47 @@ func NewDeviceService() *DeviceService {
 }
 
 type DeviceInfo struct {
-	ID        string `json:"id"`
+	ID         string `json:"id"`
 	DeviceName string `json:"device_name"`
-	LastSeen  string `json:"last_seen"`
+	LastSeen   string `json:"last_seen"`
 }
 
-func (s *DeviceService) ListByUser(userID uint) ([]DeviceInfo, error) {
-	var devices []model.Device
-	if err := database.DB.Where("user_id = ?", userID).Order("last_seen DESC").Find(&devices).Error; err != nil {
+func (s *DeviceService) ListByUser(userID uint, page, perPage int) (*response.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	var total int64
+	if err := database.DB.Model(&model.Device{}).Where("user_id = ?", userID).Count(&total).Error; err != nil {
 		return nil, err
 	}
 
-	result := make([]DeviceInfo, 0, len(devices))
+	var devices []model.Device
+	if err := database.DB.Where("user_id = ?", userID).Order("last_seen DESC").Offset((page - 1) * perPage).Limit(perPage).Find(&devices).Error; err != nil {
+		return nil, err
+	}
+
+	items := make([]DeviceInfo, 0, len(devices))
 	for _, d := range devices {
-		result = append(result, DeviceInfo{
-			ID:        d.ID,
+		items = append(items, DeviceInfo{
+			ID:         d.ID,
 			DeviceName: d.DeviceName,
-			LastSeen:  d.LastSeen.Format("2006-01-02T15:04:05Z"),
+			LastSeen:   d.LastSeen.Format("2006-01-02T15:04:05Z"),
 		})
 	}
-	return result, nil
+
+	return &response.PaginatedResponse{
+		Items:   items,
+		Total:   total,
+		Page:    page,
+		PerPage: perPage,
+	}, nil
 }
 
 func (s *DeviceService) RemoveDevice(userID uint, deviceID string) error {

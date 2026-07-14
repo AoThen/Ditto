@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,7 +33,8 @@ func (h *ClipHandler) ListClips(c *gin.Context) {
 
 	result, err := h.service.ListClips(userID, page, perPage, search, groupID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取剪贴板列表失败: "+err.Error())
+		log.Printf("[ListClips] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取剪贴板列表失败")
 		return
 	}
 
@@ -45,11 +48,12 @@ func (h *ClipHandler) GetClip(c *gin.Context) {
 
 	result, err := h.service.GetClip(userID, clipID)
 	if err != nil {
-		if err.Error() == "剪贴板不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrClipNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "剪贴板不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "获取剪贴板失败: "+err.Error())
+		log.Printf("[GetClip] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取剪贴板失败")
 		return
 	}
 
@@ -62,11 +66,12 @@ func (h *ClipHandler) DeleteClip(c *gin.Context) {
 	clipID := c.Param("id")
 
 	if err := h.service.DeleteClip(userID, clipID); err != nil {
-		if err.Error() == "剪贴板不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrClipNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "剪贴板不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "删除剪贴板失败: "+err.Error())
+		log.Printf("[DeleteClip] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "删除剪贴板失败")
 		return
 	}
 
@@ -92,7 +97,8 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 	result, err := h.service.Sync(userID, &req, deviceID)
 	if err != nil {
 		service.LogSyncOperation(userID, req.DeviceID, "push", 0, "failed", err.Error())
-		response.Error(c, http.StatusInternalServerError, 50000, "同步失败: "+err.Error())
+		log.Printf("[Sync] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "同步失败")
 		return
 	}
 
@@ -112,15 +118,16 @@ func (h *ClipHandler) DownloadClip(c *gin.Context) {
 
 	result, err := h.service.DownloadClipFormat(userID, clipID, formatType)
 	if err != nil {
-		if err.Error() == "剪贴板不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrClipNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "剪贴板不存在")
 			return
 		}
-		if err.Error() == "指定格式不存在" {
-			response.Error(c, http.StatusNotFound, 40401, err.Error())
+		if errors.Is(err, service.ErrFormatNotFound) {
+			response.Error(c, http.StatusNotFound, 40401, "指定格式不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "下载失败: "+err.Error())
+		log.Printf("[DownloadClip] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "下载失败")
 		return
 	}
 
@@ -157,7 +164,8 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 	result, err := h.service.Sync(userID, req, deviceID)
 	if err != nil {
 		service.LogSyncOperation(userID, deviceID, "pull", 0, "failed", err.Error())
-		response.Error(c, http.StatusInternalServerError, 50000, "增量同步失败: "+err.Error())
+		log.Printf("[GetChanges] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "增量同步失败")
 		return
 	}
 
@@ -185,7 +193,8 @@ func (h *ClipHandler) ListConflictClips(c *gin.Context) {
 
 	clips, err := h.service.ListConflictClips(userID)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "获取冲突剪贴板失败: "+err.Error())
+		log.Printf("[ListConflictClips] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取冲突剪贴板失败")
 		return
 	}
 
@@ -211,11 +220,12 @@ func (h *ClipHandler) ResolveConflictClip(c *gin.Context) {
 	}
 
 	if err := h.service.ResolveConflictClip(userID, conflictClipID, req.Action); err != nil {
-		if err.Error() == "冲突剪贴板不存在" {
-			response.Error(c, http.StatusNotFound, 40400, err.Error())
+		if errors.Is(err, service.ErrConflictClipNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "冲突剪贴板不存在")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, 50000, "处理冲突失败: "+err.Error())
+		log.Printf("[ResolveConflictClip] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "处理冲突失败")
 		return
 	}
 

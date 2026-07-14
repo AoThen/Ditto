@@ -6,6 +6,23 @@
 
 using json = nlohmann::json;
 
+// Static member definitions
+std::unique_ptr<httplib::Client> CCloudAuth::m_httpClient;
+CString CCloudAuth::m_httpClientUrl;
+
+void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
+{
+	std::string url = CStringToStdString(serverUrl);
+	if (!m_httpClient || m_httpClientUrl != serverUrl)
+	{
+		m_httpClient = std::make_unique<httplib::Client>(url);
+		m_httpClient->set_connection_timeout(10, 0);
+		m_httpClient->set_read_timeout(30, 0);
+		m_httpClient->set_write_timeout(30, 0);
+		m_httpClientUrl = serverUrl;
+	}
+}
+
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
 {
@@ -23,15 +40,6 @@ static CString StdStringToCString(const std::string& str)
 	return CString(str.c_str());
 }
 
-// Helper: parse URL into host/port and set SSL client
-static void SetupClient(const std::string& serverUrl, httplib::Client& cli)
-{
-	cli.set_connection_timeout(10, 0);
-	cli.set_read_timeout(30, 0);
-	cli.set_write_timeout(30, 0);
-	(void)serverUrl;
-}
-
 LoginResult CCloudAuth::Login(const CString& serverUrl,
                               const CString& username,
                               const CString& password)
@@ -41,16 +49,19 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 
 	try
 	{
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli);
+		EnsureHttpClient(serverUrl);
+		if (!m_httpClient)
+		{
+			result.error = _T("Failed to create HTTP client");
+			return result;
+		}
 
 		json body;
 		body["username"] = CStringToStdString(username);
 		body["password"] = CStringToStdString(password);
 
 		std::string bodyStr = body.dump();
-		auto res = cli.Post("/api/v1/auth/login", bodyStr, "application/json");
+		auto res = m_httpClient->Post("/api/v1/auth/login", bodyStr, "application/json");
 		if (!res)
 		{
 			result.error = _T("Failed to connect to server (network error)");
@@ -158,9 +169,12 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 
 	try
 	{
-		std::string url = CStringToStdString(serverUrl);
-		httplib::Client cli(url);
-		SetupClient(url, cli);
+		EnsureHttpClient(serverUrl);
+		if (!m_httpClient)
+		{
+			result.error = _T("Failed to create HTTP client");
+			return result;
+		}
 
 		json body;
 		body["username"] = CStringToStdString(username);
@@ -168,7 +182,7 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 		body["password"] = CStringToStdString(password);
 
 		std::string bodyStr = body.dump();
-		auto res = cli.Post("/api/v1/auth/register", bodyStr, "application/json");
+		auto res = m_httpClient->Post("/api/v1/auth/register", bodyStr, "application/json");
 		if (!res)
 		{
 			result.error = _T("Failed to connect to server (network error)");

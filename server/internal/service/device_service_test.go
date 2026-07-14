@@ -74,9 +74,10 @@ func TestDeviceService_ListByUser_Success(t *testing.T) {
 	require.NoError(t, database.DB.Create(&device2).Error)
 
 	// List devices
-	devices, err := svc.ListByUser(userID)
+	result, err := svc.ListByUser(userID, 1, 20)
 
 	assert.NoError(t, err)
+	devices := result.Items.([]DeviceInfo)
 	assert.Len(t, devices, 2)
 	// Should be ordered by last_seen DESC
 	assert.Equal(t, "device-2", devices[0].ID)
@@ -88,10 +89,10 @@ func TestDeviceService_ListByUser_Empty(t *testing.T) {
 	defer cleanup()
 
 	// List devices for user with no devices
-	devices, err := svc.ListByUser(userID)
+	result, err := svc.ListByUser(userID, 1, 20)
 
 	assert.NoError(t, err)
-	assert.Empty(t, devices)
+	assert.Empty(t, result.Items)
 }
 
 func TestDeviceService_ListByUser_MultipleUsers(t *testing.T) {
@@ -123,9 +124,10 @@ func TestDeviceService_ListByUser_MultipleUsers(t *testing.T) {
 	require.NoError(t, database.DB.Create(&device2).Error)
 
 	// List devices for first user
-	devices, err := svc.ListByUser(userID)
+	result, err := svc.ListByUser(userID, 1, 20)
 
 	assert.NoError(t, err)
+	devices := result.Items.([]DeviceInfo)
 	assert.Len(t, devices, 1)
 	assert.Equal(t, "device-1", devices[0].ID)
 }

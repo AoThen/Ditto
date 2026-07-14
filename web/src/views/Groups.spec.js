@@ -224,15 +224,18 @@ describe('Groups API calls', () => {
   it('listGroups should return groups list', async () => {
     groupsApi.listGroups.mockResolvedValue({
       code: 0,
-      data: [
-        { id: '1', name: 'Group A', description: 'Test', parent_id: null, clip_count: 5 },
-      ],
+      data: {
+        items: [
+          { id: '1', name: 'Group A', description: 'Test', parent_id: null, clip_count: 5 },
+        ],
+        total: 1, page: 1, perPage: 20,
+      },
     })
 
     const res = await groupsApi.listGroups()
     expect(res.code).toBe(0)
-    expect(res.data).toHaveLength(1)
-    expect(res.data[0].name).toBe('Group A')
+    expect(res.data.items).toHaveLength(1)
+    expect(res.data.items[0].name).toBe('Group A')
   })
 
   it('createGroup should create a new group', async () => {
