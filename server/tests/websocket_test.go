@@ -178,15 +178,27 @@ func TestWebSocket_BroadcastOnSync(t *testing.T) {
 func TestWebSocket_NoCrossUserBroadcast(t *testing.T) {
 	server, _, _ := testutil.SetupTestServerWithWS(t)
 
-	// Register and login user A
+	// Register and login user A (first user, becomes admin)
 	testutil.RegisterUser(t, server, "crossuserA", "crossuserA@example.com", "password123")
-	statusCode, loginRespA, _ := testutil.LoginUserWithDeviceName(t, server, "crossuserA", "password123", "DeviceA1")
+	statusCode, loginRespA, setCookiesA := testutil.LoginUserWithDeviceName(t, server, "crossuserA", "password123", "DeviceA1")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenA := getTokenFromLoginResp(t, loginRespA)
 	deviceA1 := getDeviceIDFromLoginResp(t, loginRespA)
 
-	// Register and login user B
-	testutil.RegisterUser(t, server, "crossuserB", "crossuserB@example.com", "password123")
+	// If token is empty from body, extract from cookie
+	if tokenA == "" {
+		tokenA = testutil.ExtractCookie(setCookiesA, "device_token")
+	}
+
+	// Create user B via admin API using user A's admin token
+	statusCode, _ = testutil.AuthPost(t, server, "/api/v1/admin/users", tokenA, map[string]string{
+		"username": "crossuserB",
+		"email":    "crossuserB@example.com",
+		"password": "password123",
+	})
+	require.Equal(t, http.StatusOK, statusCode)
+
+	// Login user B
 	statusCode, loginRespB, _ := testutil.LoginUserWithDeviceName(t, server, "crossuserB", "password123", "DeviceB1")
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)

@@ -40,10 +40,12 @@ func TestHealth_Endpoint(t *testing.T) {
 func TestHealth_WithStats(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 
-	// Create 3 users
-	testutil.CreateTestUserWithCreds(t, server, "healthuser1", "health1@example.com", "password123")
-	testutil.CreateTestUserWithCreds(t, server, "healthuser2", "health2@example.com", "password123")
-	testutil.CreateTestUserWithCreds(t, server, "healthuser3", "health3@example.com", "password123")
+	// Create first user (admin)
+	admin := testutil.CreateFirstUser(t, server)
+
+	// Create additional users via admin API
+	testutil.CreateUserViaAdmin(t, server, admin.Token, "healthuser2", "health2@example.com", "password123")
+	testutil.CreateUserViaAdmin(t, server, admin.Token, "healthuser3", "health3@example.com", "password123")
 
 	// Check health after creating users
 	resp, err := http.Get(server.URL + "/health")

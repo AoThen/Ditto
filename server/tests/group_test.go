@@ -234,8 +234,9 @@ func TestGroups_UserIsolation(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 	defer server.Close()
 
-	userA := testutil.CreateTestUserWithCreds(t, server, "groupA", "groupA@example.com", "password123")
-	userB := testutil.CreateTestUserWithCreds(t, server, "groupB", "groupB@example.com", "password123")
+	admin := testutil.CreateFirstUser(t, server)
+	userA := testutil.CreateUserViaAdmin(t, server, admin.Token, "groupA", "groupA@example.com", "password123")
+	userB := testutil.CreateUserViaAdmin(t, server, admin.Token, "groupB", "groupB@example.com", "password123")
 
 	createBody := map[string]interface{}{"name": "A's Group"}
 	statusCode, respBody := testutil.AuthPost(t, server, "/api/v1/groups", userA.Token, createBody)

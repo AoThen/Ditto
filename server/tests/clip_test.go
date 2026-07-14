@@ -226,8 +226,9 @@ func TestDeleteClip_Success(t *testing.T) {
 // TestClip_UserIsolation — user A cannot see user B's clips
 func TestClip_UserIsolation(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	userA := testutil.CreateTestUserWithCreds(t, server, "userA", "userA@example.com", "password123")
-	userB := testutil.CreateTestUserWithCreds(t, server, "userB", "userB@example.com", "password123")
+	admin := testutil.CreateFirstUser(t, server)
+	userA := testutil.CreateUserViaAdmin(t, server, admin.Token, "userA", "userA@example.com", "password123")
+	userB := testutil.CreateUserViaAdmin(t, server, admin.Token, "userB", "userB@example.com", "password123")
 
 	// User A creates a clip
 	clipIDA := fmt.Sprintf("clip-isolation-%d", time.Now().UnixNano())

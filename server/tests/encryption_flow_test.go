@@ -81,7 +81,7 @@ func TestEndToEndEncryptionFlow(t *testing.T) {
 	}
 	assert.NotEqual(t, saltBytes, salt2, "server salt should not be predictable")
 
-	user2 := testutil.CreateTestUser(t, server)
+	user2 := testutil.CreateUserViaAdmin(t, server, user1.Token, "flowuser2", "flowuser2@example.com", "password123")
 	crypto2 := makeTestCrypto()
 	statusCode2, body2 := testutil.AuthPost(t, server, "/api/v1/encryption/setup", user2.Token, crypto2)
 	assert.Equal(t, http.StatusOK, statusCode2)
