@@ -157,12 +157,22 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 		return "", "", errors.New("用户不存在")
 	}
 
+	var device model.Device
+	if err := database.DB.Where("id = ?", deviceID).First(&device).Error; err != nil {
+		return "", "", errors.New("设备不存在")
+	}
+
+	device.TokenVersion++
+	if err := database.DB.Save(&device).Error; err != nil {
+		return "", "", errors.New("刷新令牌失败")
+	}
+
 	// Generate new tokens
-	accessToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryAccess)
+	accessToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryAccess, device.TokenVersion)
 	if err != nil {
 		return "", "", err
 	}
-	refreshToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryRefresh)
+	refreshToken, err := s.generateToken(userID, deviceID, s.cfg.TokenExpiryRefresh, device.TokenVersion)
 	if err != nil {
 		return "", "", err
 	}
@@ -170,12 +180,17 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 	return accessToken, refreshToken, nil
 }
 
-func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration) (string, error) {
+func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration, tokenVersion ...int) (string, error) {
+	ver := 0
+	if len(tokenVersion) > 0 {
+		ver = tokenVersion[0]
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":   userID,
-		"device_id": deviceID,
-		"exp":       time.Now().Add(expiry).Unix(),
-		"iat":       time.Now().Unix(),
+		"user_id":       userID,
+		"device_id":     deviceID,
+		"token_version": ver,
+		"exp":           time.Now().Add(expiry).Unix(),
+		"iat":           time.Now().Unix(),
 	})
 
 	return token.SignedString([]byte(s.cfg.JWTSecret))

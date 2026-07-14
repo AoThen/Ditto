@@ -50,11 +50,30 @@ func (s *GroupService) ListGroups(userID uint) ([]GroupListItem, error) {
 		return nil, err
 	}
 
+	groupIDs := make([]string, len(groups))
+	for i, g := range groups {
+		groupIDs[i] = g.ID
+	}
+
+	type GroupCount struct {
+		GroupID string
+		Count   int64
+	}
+	var counts []GroupCount
+	if len(groupIDs) > 0 {
+		database.DB.Model(&model.Clip{}).
+			Select("group_id, COUNT(*) as count").
+			Where("group_id IN ?", groupIDs).
+			Group("group_id").
+			Scan(&counts)
+	}
+	countMap := map[string]int64{}
+	for _, c := range counts {
+		countMap[c.GroupID] = c.Count
+	}
+
 	items := make([]GroupListItem, 0, len(groups))
 	for _, g := range groups {
-		var clipCount int64
-		database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, g.ID).Count(&clipCount)
-
 		parentID := ""
 		if g.ParentID != nil {
 			parentID = *g.ParentID
@@ -68,7 +87,7 @@ func (s *GroupService) ListGroups(userID uint) ([]GroupListItem, error) {
 			ClipOrder:   g.ClipOrder,
 			CreatedAt:   g.CreatedAt.UTC().Format(time.RFC3339),
 			UpdatedAt:   g.UpdatedAt.UTC().Format(time.RFC3339),
-			ClipCount:   clipCount,
+			ClipCount:   countMap[g.ID],
 		})
 	}
 
@@ -93,11 +112,29 @@ func (s *GroupService) GetGroup(userID uint, groupID string) (*GroupDetail, erro
 		return nil, err
 	}
 
+	childIDs := make([]string, len(children))
+	for i, c := range children {
+		childIDs[i] = c.ID
+	}
+	type GroupCount struct {
+		GroupID string
+		Count   int64
+	}
+	var childCounts []GroupCount
+	if len(childIDs) > 0 {
+		database.DB.Model(&model.Clip{}).
+			Select("group_id, COUNT(*) as count").
+			Where("group_id IN ?", childIDs).
+			Group("group_id").
+			Scan(&childCounts)
+	}
+	childCountMap := map[string]int64{}
+	for _, cc := range childCounts {
+		childCountMap[cc.GroupID] = cc.Count
+	}
+
 	childItems := make([]GroupListItem, 0, len(children))
 	for _, c := range children {
-		var childClipCount int64
-		database.DB.Model(&model.Clip{}).Where("user_id = ? AND group_id = ?", userID, c.ID).Count(&childClipCount)
-
 		childParentID := ""
 		if c.ParentID != nil {
 			childParentID = *c.ParentID
@@ -111,7 +148,7 @@ func (s *GroupService) GetGroup(userID uint, groupID string) (*GroupDetail, erro
 			ClipOrder:   c.ClipOrder,
 			CreatedAt:   c.CreatedAt.UTC().Format(time.RFC3339),
 			UpdatedAt:   c.UpdatedAt.UTC().Format(time.RFC3339),
-			ClipCount:   childClipCount,
+			ClipCount:   childCountMap[c.ID],
 		})
 	}
 

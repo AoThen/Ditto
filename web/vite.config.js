@@ -12,4 +12,14 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-element': ['element-plus'],
+        },
+      },
+    },
+  },
 })

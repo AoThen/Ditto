@@ -7,6 +7,7 @@
 
 #if _MSC_VER > 1000
 #pragma once
+#pragma message("DEPRECATED: EncryptDecrypt 使用旧版 AES-CBC/ECB 加密。新功能请使用 CloudCrypto (AES-GCM) 替代。")
 #endif // _MSC_VER > 1000
 
 #include "iencryption.h"
@@ -41,6 +42,9 @@ typedef struct _TD_TLHEADER // The database header
 #pragma pack()
 
 
+// DEPRECATED: 此模块使用旧版 AES-CBC/ECB 加密 (Rijndael)。
+// 所有新功能应使用 src/CloudSync/CloudCrypto.h 中的 AES-GCM 实现。
+// 旧加密数据在读取时需通过 CloudCrypto 重新加密后写入。
 class CEncryption : public IEncryption
 {
 public:

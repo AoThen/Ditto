@@ -117,13 +117,28 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 			return totalDeleted, err
 		}
 
-		for _, clip := range clipsToDelete {
-			if err := database.DB.Delete(&clip).Error; err != nil {
-				log.Printf("[Cleanup] ERROR deleting clip %s: %v", clip.ID, err)
-				continue
-			}
-			totalDeleted++
+		if len(clipsToDelete) == 0 {
+			continue
 		}
+
+		clipIDs := make([]string, len(clipsToDelete))
+		for i, clip := range clipsToDelete {
+			clipIDs[i] = clip.ID
+		}
+
+		// Delete associated formats first
+		if err := database.DB.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
+			log.Printf("[Cleanup] ERROR deleting formats for %d clips: %v", len(clipIDs), err)
+			continue
+		}
+
+		// Batch delete clips
+		result := database.DB.Where("id IN ?", clipIDs).Delete(&model.Clip{})
+		if result.Error != nil {
+			log.Printf("[Cleanup] ERROR batch deleting %d clips: %v", len(clipIDs), result.Error)
+			continue
+		}
+		totalDeleted += int(result.RowsAffected)
 	}
 
 	return totalDeleted, nil

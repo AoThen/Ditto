@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - DATABASE_URL=postgresql://ditto:password@postgres:5432/ditto_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: ditto-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ditto_db
+      POSTGRES_USER: ditto
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ditto"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ditto-net
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  ditto-net:
+    external: false

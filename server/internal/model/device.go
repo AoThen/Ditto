@@ -8,6 +8,7 @@ type Device struct {
 	DeviceName string    `gorm:"size:255;not null;uniqueIndex:idx_user_device_name" json:"device_name"`
 	LastSeen   time.Time `json:"last_seen"`
 	CreatedAt  time.Time `json:"created_at"`
+	TokenVersion int    `gorm:"default:0" json:"token_version"`
 
 	User User `gorm:"foreignKey:UserID;references:ID" json:"-"`
 }

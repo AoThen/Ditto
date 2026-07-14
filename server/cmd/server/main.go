@@ -62,7 +62,8 @@ func main() {
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
-	statsHandler := handler.NewStatsHandler()
+	statsSvc := service.NewStatsService()
+	statsHandler := handler.NewStatsHandler(statsSvc)
 
 	// HIGH FIX (H5): Configure WebSocket allowed origins
 	handler.SetAllowedOrigins(cfg.AllowedOrigins)
@@ -81,17 +82,11 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Health check with stats
+	// Health check
 	r.GET("/health", func(c *gin.Context) {
-		var userCount, clipCount int64
-		database.DB.Model(&model.User{}).Count(&userCount)
-		database.DB.Model(&model.Clip{}).Count(&clipCount)
-
 		c.JSON(200, gin.H{
-			"status":      "ok",
-			"total_users": userCount,
-			"total_clips": clipCount,
-			"uptime":      time.Since(cfg.StartTime).Round(time.Second).String(),
+			"status": "ok",
+			"uptime": time.Since(cfg.StartTime).Round(time.Second).String(),
 		})
 	})
 

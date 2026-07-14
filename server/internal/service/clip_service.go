@@ -41,6 +41,8 @@ type ClipListItem struct {
 	CreatedAt   string           `json:"created_at"`
 	UpdatedAt   string           `json:"updated_at"`
 	GroupID     string           `json:"group_id"`
+	GroupName   string           `json:"group_name"`
+	DeviceName  string           `json:"device_name"`
 	ShortCut    int              `json:"short_cut"`
 	PasteCount  int              `json:"paste_count"`
 	Formats     []ClipFormatMeta `json:"formats"`
@@ -54,6 +56,8 @@ type ClipDetail struct {
 	CreatedAt   string           `json:"created_at"`
 	UpdatedAt   string           `json:"updated_at"`
 	GroupID     string           `json:"group_id"`
+	GroupName   string           `json:"group_name"`
+	DeviceName  string           `json:"device_name"`
 	ShortCut    int              `json:"short_cut"`
 	PasteCount  int              `json:"paste_count"`
 	Formats     []ClipFormatFull `json:"formats"`
@@ -98,15 +102,26 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID 
 		return nil, err
 	}
 
-	// P1 FIX: Batch-load formats instead of N+1 queries
+	// P2 FIX: Batch-load formats instead of N+1 queries
 	clipIDs := make([]string, len(clips))
+	groupIDs := make(map[string]struct{})
+	deviceIDs := make(map[string]struct{})
 	for i, clip := range clips {
 		clipIDs[i] = clip.ID
+		if clip.GroupID != "" {
+			groupIDs[clip.GroupID] = struct{}{}
+		}
+		if clip.DeviceID != "" {
+			deviceIDs[clip.DeviceID] = struct{}{}
+		}
 	}
 	formatsByClip, err := loadFormatsForClips(database.DB, clipIDs)
 	if err != nil {
 		return nil, err
 	}
+
+	groupNames := loadGroupNames(groupIDs)
+	deviceNames := loadDeviceNames(deviceIDs)
 
 	// Build response items with format metadata
 	items := make([]ClipListItem, 0, len(clips))
@@ -128,6 +143,8 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID 
 			CreatedAt:   clip.CreatedAt.UTC().Format(time.RFC3339),
 			UpdatedAt:   clip.UpdatedAt.UTC().Format(time.RFC3339),
 			GroupID:     clip.GroupID,
+			GroupName:   groupNames[clip.GroupID],
+			DeviceName:  deviceNames[clip.DeviceID],
 			ShortCut:    clip.ShortCut,
 			PasteCount:  clip.PasteCount,
 			Formats:     formatMetas,
@@ -157,6 +174,21 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 		return nil, err
 	}
 
+	groupName := ""
+	if clip.GroupID != "" {
+		var group model.Group
+		if err := database.DB.Select("name").Where("id = ?", clip.GroupID).First(&group).Error; err == nil {
+			groupName = group.Name
+		}
+	}
+	deviceName := ""
+	if clip.DeviceID != "" {
+		var device model.Device
+		if err := database.DB.Select("device_name").Where("id = ?", clip.DeviceID).First(&device).Error; err == nil {
+			deviceName = device.DeviceName
+		}
+	}
+
 	formatFulls := make([]ClipFormatFull, 0, len(formats))
 	for _, f := range formats {
 		formatFulls = append(formatFulls, ClipFormatFull{
@@ -174,6 +206,8 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 		CreatedAt:   clip.CreatedAt.UTC().Format(time.RFC3339),
 		UpdatedAt:   clip.UpdatedAt.UTC().Format(time.RFC3339),
 		GroupID:     clip.GroupID,
+		GroupName:   groupName,
+		DeviceName:  deviceName,
 		ShortCut:    clip.ShortCut,
 		PasteCount:  clip.PasteCount,
 		Formats:     formatFulls,
@@ -676,4 +710,42 @@ func loadFormatsForClips(db *gorm.DB, clipIDs []string) (map[string][]model.Clip
 	}
 
 	return formatsByClip, nil
+}
+
+func loadGroupNames(groupIDs map[string]struct{}) map[string]string {
+	result := map[string]string{}
+	if len(groupIDs) == 0 {
+		return result
+	}
+	ids := make([]string, 0, len(groupIDs))
+	for id := range groupIDs {
+		ids = append(ids, id)
+	}
+	var groups []model.Group
+	if err := database.DB.Select("id, name").Where("id IN ?", ids).Find(&groups).Error; err != nil {
+		return result
+	}
+	for _, g := range groups {
+		result[g.ID] = g.Name
+	}
+	return result
+}
+
+func loadDeviceNames(deviceIDs map[string]struct{}) map[string]string {
+	result := map[string]string{}
+	if len(deviceIDs) == 0 {
+		return result
+	}
+	ids := make([]string, 0, len(deviceIDs))
+	for id := range deviceIDs {
+		ids = append(ids, id)
+	}
+	var devices []model.Device
+	if err := database.DB.Select("id, device_name").Where("id IN ?", ids).Find(&devices).Error; err != nil {
+		return result
+	}
+	for _, d := range devices {
+		result[d.ID] = d.DeviceName
+	}
+	return result
 }

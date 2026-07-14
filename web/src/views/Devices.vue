@@ -53,9 +53,11 @@ import { ref, onMounted } from 'vue'
 import { listDevices, removeDevice } from '@/api/devices'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const deviceList = ref([])
 const loading = ref(false)
+const userStore = useUserStore()
 
 function formatDate(dateStr) {
   if (!dateStr) return '-'
@@ -76,7 +78,7 @@ async function fetchDevices() {
     const res = await listDevices()
     if (res.code === 0) {
       // Mark current device (based on stored token)
-      const currentDeviceId = localStorage.getItem('device_id')
+      const currentDeviceId = userStore.deviceId
       deviceList.value = (res.data || []).map(device => ({
         ...device,
         is_current: device.device_id === currentDeviceId

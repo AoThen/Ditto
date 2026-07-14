@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"ditto-cloud-server/internal/config"
+	"ditto-cloud-server/internal/database"
+	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -12,8 +14,9 @@ import (
 )
 
 type Claims struct {
-	UserID   uint   `json:"user_id"`
-	DeviceID string `json:"device_id"`
+	UserID       uint   `json:"user_id"`
+	DeviceID     string `json:"device_id"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -56,6 +59,19 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 		claims, ok := token.Claims.(*Claims)
 		if !ok {
 			response.Error(c, http.StatusUnauthorized, 40102, "无效的认证令牌")
+			c.Abort()
+			return
+		}
+
+		// Verify token_version against database to support refresh token rotation
+		var device model.Device
+		if err := database.DB.Where("id = ?", claims.DeviceID).First(&device).Error; err != nil {
+			response.Error(c, http.StatusUnauthorized, 40102, "设备不存在")
+			c.Abort()
+			return
+		}
+		if claims.TokenVersion != device.TokenVersion {
+			response.Error(c, http.StatusUnauthorized, 40102, "令牌已过期，请重新登录")
 			c.Abort()
 			return
 		}

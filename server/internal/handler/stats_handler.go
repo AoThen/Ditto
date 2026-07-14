@@ -9,16 +9,19 @@ import (
 	"ditto-cloud-server/internal/middleware"
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
+	"ditto-cloud-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
 // StatsHandler handles statistics endpoints
-type StatsHandler struct{}
+type StatsHandler struct {
+	service *service.StatsService
+}
 
 // NewStatsHandler creates a new stats handler
-func NewStatsHandler() *StatsHandler {
-	return &StatsHandler{}
+func NewStatsHandler(svc *service.StatsService) *StatsHandler {
+	return &StatsHandler{service: svc}
 }
 
 // GetOverview returns statistics overview
@@ -42,16 +45,12 @@ func (h *StatsHandler) GetOverview(c *gin.Context) {
 	database.DB.Model(&model.Device{}).Where("user_id = ?", userID).Count(&totalDevices)
 
 	// Get total storage (sum of all format data sizes)
-	var clips []model.Clip
-	database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&clips)
-	
-	for _, clip := range clips {
-		var formats []model.ClipFormat
-		database.DB.Where("clip_id = ?", clip.ID).Find(&formats)
-		for _, fmt := range formats {
-			totalStorage += int64(len(fmt.Data))
-		}
+	storage, err := h.service.GetDeviceStats(userID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, 50000, "获取统计数据失败: "+err.Error())
+		return
 	}
+	totalStorage = storage
 
 	// Get last 7 days trend
 	type DayCount struct {

@@ -144,6 +144,7 @@ import { getEncryptionSalt, getKeyMaterial, setupEncryption, disableEncryption, 
 import { deriveKEK, generateDEK, wrapDEK, unwrapDEK, computeVerificationHash } from '@/utils/crypto'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import axios from 'axios'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -322,6 +323,11 @@ async function handleLogout() {
     await ElMessageBox.confirm('确定退出登录吗？', '确认', {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'info',
     })
+    try {
+      await axios.post('/api/v1/auth/logout')
+    } catch (e) {
+      // ignore
+    }
     userStore.logout()
     router.push('/login')
     ElMessage.success('已退出登录')

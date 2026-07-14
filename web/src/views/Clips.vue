@@ -17,6 +17,10 @@
           <el-button @click="handleSearch">搜索</el-button>
         </template>
       </el-input>
+      <el-select v-model="groupFilter" placeholder="全部分组" clearable style="width: 150px" @change="handleGroupFilterChange">
+        <el-option label="全部分组" value="" />
+        <el-option v-for="g in groups" :key="g.id" :label="g.name" :value="g.id" />
+      </el-select>
       <el-button type="primary" @click="handleRefresh">刷新</el-button>
       <el-button type="warning" @click="showConflictDialog">
         冲突剪贴板 ({{ conflictCount }})
@@ -318,6 +322,10 @@ const groupList = ref([])
 const selectedGroupId = ref(null)
 const groupMoving = ref(false)
 
+// Group filter
+const groupFilter = ref('')
+const groups = ref([])
+
 // Search debounce timer
 let searchTimer = null
 
@@ -455,6 +463,9 @@ async function fetchClips() {
     if (searchQuery.value) {
       params.search = searchQuery.value
     }
+    if (groupFilter.value) {
+      params.group_id = groupFilter.value
+    }
     const res = await listClips(params)
     // Backend returns code: 0 for success (not 200)
     clipList.value = res.data?.items || res.data || []
@@ -470,6 +481,11 @@ async function fetchClips() {
 }
 
 function handleSearch() {
+  currentPage.value = 1
+  fetchClips()
+}
+
+function handleGroupFilterChange() {
   currentPage.value = 1
   fetchClips()
 }
@@ -569,18 +585,9 @@ async function handleBatchDelete() {
     )
     batchDeleting.value = true
     const ids = selectedRows.value.map(row => row.id)
-    // Delete sequentially to avoid overwhelming the server
-    let successCount = 0
-    let failCount = 0
-    for (const id of ids) {
-      try {
-        await deleteClip(id)
-        successCount++
-      } catch (err) {
-        console.error(`Failed to delete clip ${id}:`, err)
-        failCount++
-      }
-    }
+    const results = await Promise.allSettled(ids.map(id => deleteClip(id)))
+    const successCount = results.filter(r => r.status === 'fulfilled').length
+    const failCount = results.filter(r => r.status === 'rejected').length
     if (successCount > 0) {
       ElMessage.success(`成功删除 ${successCount} 个剪贴板${failCount > 0 ? `，${failCount} 个失败` : ''}`)
     } else {
@@ -716,12 +723,23 @@ async function handleRemoveFromGroup() {
   }
 }
 
+async function fetchGroups() {
+  try {
+    const res = await listGroups()
+    if (res.code === 0) {
+      groups.value = res.data?.items || res.data || []
+    }
+  } catch (err) {
+    console.error('Failed to fetch groups:', err)
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('ws-clip-added', onWsClipAdded)
   await fetchClips()
   lastSyncTime.value = new Date().toISOString()
-  // Fetch conflict count on mount so badge shows accurate number from start
   await fetchConflictClips()
+  fetchGroups()
 })
 
 onUnmounted(() => {

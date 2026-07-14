@@ -79,9 +79,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	setAuthCookies(c, resp.DeviceToken, resp.RefreshToken, resp.DeviceID, h.service)
 
 	response.Success(c, gin.H{
-		"device_token":  resp.DeviceToken,
-		"refresh_token": resp.RefreshToken,
-		"device_id":     resp.DeviceID,
+		"message": "登录成功",
 	})
 }
 
