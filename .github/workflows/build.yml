@@ -59,6 +59,10 @@ jobs:
           Write-Host "=== mfc*.lib under VC\Tools\MSVC ==="
           Get-ChildItem $msvc -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
           if ($LASTEXITCODE -ne 0) { throw "MFC install failed with code $LASTEXITCODE" }
+          $v143mfc = Get-ChildItem $msvc -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\MSVC\\14\.[34]' }
+          if (-not $v143mfc) { throw "No v143 (14.3x/14.4x) MFC libs found after install. See diagnostics above." }
+          Write-Host "=== v143 MFC FOUND ==="
+          $v143mfc | Select-Object -First 5 | ForEach-Object { Write-Host $_.FullName }
 
       - name: Restore NuGet packages
         working-directory: ${{env.GITHUB_WORKSPACE}}
