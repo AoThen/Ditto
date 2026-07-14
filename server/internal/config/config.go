@@ -118,7 +118,8 @@ func Load() *Config {
 		}
 	}
 
-	// HIGH FIX (H4/H5): Read allowed origins from env, default to localhost dev origins.
+	// HIGH FIX (H4/H5): Read allowed origins from env. If empty, CORS is disabled
+	// (recommended for same-origin deployment where Go serves both API and static files).
 	allowedOriginsStr := os.Getenv("ALLOWED_ORIGINS")
 	var allowedOrigins []string
 	if allowedOriginsStr != "" {
@@ -129,15 +130,8 @@ func Load() *Config {
 				allowedOrigins = append(allowedOrigins, trimmed)
 			}
 		}
-	} else {
-		// Default: localhost dev origins
-		allowedOrigins = []string{
-			"http://localhost:3000",
-			"http://localhost:5173",
-			"http://127.0.0.1:3000",
-			"http://127.0.0.1:5173",
-		}
 	}
+	// Default: empty = CORS disabled (same-origin deployment)
 
 	// H1 FIX: Cookie Secure flag - default true for production, overridable for dev
 	// Auto-detect localhost development: disable Secure flag when no TLS cert is configured

@@ -32,8 +32,7 @@ sed -i "s/change-me-in-production/$JWT_SECRET/" .env
 docker-compose up -d
 
 # 4. 访问服务
-echo "前端: http://localhost"
-echo "后端 API: http://localhost:8080"
+echo "Web 面板 + API: http://localhost:8080"
 echo "健康检查: http://localhost:8080/health"
 
 # 5. 查看日志
@@ -55,12 +54,11 @@ curl http://localhost:8080/health
 
 # 预期响应: {"status":"ok","timestamp":"..."}
 
-# 访问 Web 管理面板: http://localhost
+# 访问 Web 管理面板: http://localhost:8080
 ```
 
 **使用端口:**
-- 前端: 80
-- 后端: 8080
+- Web 面板 + API: 8080（单端口，Go 统一输出）
 
 **停止服务:**
 ```bash
@@ -137,7 +135,7 @@ sudo chmod 600 certs/server.key
 ### 步骤 4: 启动 HTTPS 服务
 
 ```bash
-# 启动生产环境
+# 启动生产环境（单容器，Go 统一输出 API + 前端静态文件）
 docker-compose -f docker-compose.prod.yml up -d
 
 # 验证部署
@@ -380,7 +378,6 @@ docker-compose -f docker-compose.prod.yml restart backend
 
 # 查看日志
 docker-compose logs -f backend
-docker-compose logs -f frontend
 
 # 查看资源使用情况
 docker stats
@@ -445,8 +442,7 @@ sed -i "s/change-me-in-production/$JWT_SECRET/" .env
 docker-compose up -d
 
 # 4. Access services
-echo "Frontend: http://localhost"
-echo "Backend API: http://localhost:8080"
+echo "Web panel + API: http://localhost:8080"
 echo "Health Check: http://localhost:8080/health"
 
 # 5. View logs
@@ -472,12 +468,11 @@ curl http://localhost:8080/health
 
 # Expected response: {"status":"ok","timestamp":"..."}
 
-# Access web panel: http://localhost
+# Access web panel: http://localhost:8080
 ```
 
 **Ports Used:**
-- Frontend: 80
-- Backend: 8080
+- Web panel + API: 8080 (single port, Go serves both)
 
 **Stop Services:**
 ```bash
@@ -626,7 +621,7 @@ cp /etc/letsencrypt/live/ditto.your-domain.com/fullchain.pem /opt/Ditto/certs/se
 cp /etc/letsencrypt/live/ditto.your-domain.com/privkey.pem /opt/Ditto/certs/server.key
 chmod 644 /opt/Ditto/certs/server.crt
 chmod 600 /opt/Ditto/certs/server.key
-docker restart ditto-frontend
+docker restart ditto-backend
 EOF
 
 sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/ditto-restart.sh
@@ -764,7 +759,7 @@ For any API clients, use the following configuration:
 ```
 Base URL: https://ditto.your-domain.com
 API Version: /api/v1
-WebSocket: wss://ditto.your-domain.com/ws/sync
+WebSocket: wss://ditto.your-domain.com/api/v1/ws
 
 Authentication:
   Header: Authorization: Bearer <JWT_TOKEN>
@@ -824,16 +819,14 @@ docker-compose -f docker-compose.prod.yml \
 
 ```bash
 # Offline deployment without internet access
-# 1. Download images on internet-connected machine
+# 1. Download image on internet-connected machine
 docker save ditto-backend:latest > backend.tar
-docker save ditto-frontend:latest > frontend.tar
 
 # 2. Transfer to air-gapped network
-scp backend.tar frontend.tar user@air-gapped-server:/opt/ditto/
+scp backend.tar user@air-gapped-server:/opt/ditto/
 
-# 3. Load images
+# 3. Load image
 docker load < backend.tar
-docker load < frontend.tar
 
 # 4. Deploy
 docker-compose -f docker-compose.prod.yml up -d
@@ -945,7 +938,6 @@ curl -k https://localhost/
 
 # 5. Check logs for errors
 docker-compose logs backend | grep -i error
-docker-compose logs frontend | grep -i error
 
 # 6. Check database
 docker exec ditto-backend ls -la /app/data/
@@ -954,7 +946,7 @@ docker exec ditto-backend ls -la /app/data/
 openssl x509 -in certs/server.crt -noout -dates
 
 # 8. Test WebSocket connection
-wscat -c wss://localhost:8443/ws/sync?token=test
+wscat -c wss://localhost:8443/api/v1/ws
 
 # 9. Check resource usage
 docker stats --no-stream
@@ -981,7 +973,6 @@ docker-compose -f docker-compose.prod.yml restart backend
 
 # View logs
 docker-compose logs -f backend
-docker-compose logs -f frontend
 
 # View resource usage
 docker stats

@@ -4,7 +4,7 @@ import router from '@/router'
 import { useUserStore } from '@/stores/user'
 
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 10000,
   // HIGH FIX (H1): Send cookies with requests (HttpOnly tokens)
   withCredentials: true,

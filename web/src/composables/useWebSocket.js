@@ -2,7 +2,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
+const WS_URL = import.meta.env.VITE_WS_URL || ''
 
 // HIGH FIX (H3): Module-level singleton state to ensure only ONE WS connection per tab.
 let sharedWs = null
@@ -80,7 +80,7 @@ function connect() {
   // H1: Browser sends HttpOnly cookies automatically during WebSocket handshake.
   // We still pass token via Sec-WebSocket-Protocol as a fallback for edge cases
   // where cookie hasn't propagated yet (e.g., immediately after login).
-  const url = `${WS_URL}/api/v1/ws`
+  const url = WS_URL ? `${WS_URL}/api/v1/ws` : '/api/v1/ws'
   console.log('[WS] Connecting to:', url)
 
   try {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -73,14 +74,17 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	// CORS middleware (restrict to configured origins - HIGH FIX H4)
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.AllowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Sec-WebSocket-Protocol"},
-		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
-		AllowCredentials: true,
-	}))
+	// CORS middleware: only enable when ALLOWED_ORIGINS is explicitly configured.
+	// For same-origin deployment (Go serves both API and static files), CORS is not needed.
+	if len(cfg.AllowedOrigins) > 0 {
+		r.Use(cors.New(cors.Config{
+			AllowOrigins:     cfg.AllowedOrigins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Sec-WebSocket-Protocol"},
+			ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
+			AllowCredentials: true,
+		}))
+	}
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
@@ -163,6 +167,24 @@ func main() {
 		// WebSocket route (uses query param auth since headers can't be set during WS upgrade)
 		protected.GET("/ws", wsHandler.HandleWebSocket)
 	}
+
+	// Serve static web assets (Vite build output under web-dist/)
+	r.Static("/assets", "./web-dist/assets")
+
+	// SPA fallback: any non-API path returns index.html
+	r.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		if strings.HasPrefix(path, "/api/") || path == "/health" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		filePath := "./web-dist" + path
+		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+			c.File(filePath)
+			return
+		}
+		c.File("./web-dist/index.html")
+	})
 
 	// Create HTTP server
 	srv := &http.Server{

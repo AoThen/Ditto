@@ -3,19 +3,18 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: server/Dockerfile
     container_name: ditto-backend
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
       - ditto-data:/app/data
-      - ./server/.env:/app/.env:ro  # Optional: override config
+      - ./server/.env:/app/.env:ro
     environment:
       - PORT=8080
       - DATABASE_PATH=/app/data/ditto_cloud.db
-      # JWT_SECRET is auto-generated on first run, but you should set it explicitly
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET environment variable is required. Set it in .env or export it.}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -23,33 +22,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    networks:
-      - ditto-net
-
-  frontend:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    container_name: ditto-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    networks:
-      - ditto-net
 
 volumes:
   ditto-data:
     driver: local
-
-networks:
-  ditto-net:
-    driver: bridge
