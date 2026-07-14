@@ -586,7 +586,7 @@ void CCloudSyncManager::PushNewClips()
 			ft.dwHighDateTime = uli.HighPart;
 			FileTimeToSystemTime(&ft, &st);
 			char timeBuf[32];
-			sprintf_s(timeBuf, "%04d-%02d-%02dT%02d:%02d:%02dZ",
+			sprintf_s(timeBuf, "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 			          st.wYear, st.wMonth, st.wDay,
 			          st.wHour, st.wMinute, st.wSecond);
 			syncReq["since"] = std::string(timeBuf);
@@ -673,7 +673,7 @@ void CCloudSyncManager::PushNewClips()
 				{
 					std::string syncTimeStr = (*dataNode)["sync_time"].get<std::string>();
 					SYSTEMTIME st = {};
-					if (sscanf_s(syncTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+					if (sscanf_s(syncTimeStr.c_str(), "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 						&st.wYear, &st.wMonth, &st.wDay,
 						&st.wHour, &st.wMinute, &st.wSecond) == 6)
 					{
@@ -856,7 +856,7 @@ void CCloudSyncManager::PullChanges()
 		if (m_lastSyncTime > 0)
 		{
 			CTime sinceTime((time_t)m_lastSyncTime);
-			sinceStr.Format("%04d-%02d-%02dT%02d:%02d:%02dZ",
+			sinceStr.Format("%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 				sinceTime.GetYear(), sinceTime.GetMonth(), sinceTime.GetDay(),
 				sinceTime.GetHour(), sinceTime.GetMinute(), sinceTime.GetSecond());
 		}
@@ -1029,7 +1029,7 @@ void CCloudSyncManager::PullChanges()
 			{
 				std::string serverTimeStr = (*dataNode)["server_time"].get<std::string>();
 				SYSTEMTIME st = {};
-				if (sscanf_s(serverTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+				if (sscanf_s(serverTimeStr.c_str(), "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 					&st.wYear, &st.wMonth, &st.wDay,
 					&st.wHour, &st.wMinute, &st.wSecond) == 6)
 				{
@@ -1045,7 +1045,7 @@ void CCloudSyncManager::PullChanges()
 			{
 				std::string syncTimeStr = (*dataNode)["sync_time"].get<std::string>();
 				SYSTEMTIME st = {};
-				if (sscanf_s(syncTimeStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+				if (sscanf_s(syncTimeStr.c_str(), "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 					&st.wYear, &st.wMonth, &st.wDay,
 					&st.wHour, &st.wMinute, &st.wSecond) == 6)
 				{
@@ -1351,7 +1351,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		{
 			std::string updatedAtStr = remoteClip["updated_at"].get<std::string>();
 			SYSTEMTIME st = {};
-			if (sscanf_s(updatedAtStr.c_str(), "%04d-%02d-%02dT%02d:%02d:%02dZ",
+			if (sscanf_s(updatedAtStr.c_str(), "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 				&st.wYear, &st.wMonth, &st.wDay,
 				&st.wHour, &st.wMinute, &st.wSecond) == 6)
 			{

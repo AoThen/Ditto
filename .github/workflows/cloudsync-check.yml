@@ -39,13 +39,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+  - name: Add MSBuild to PATH
+    uses: microsoft/setup-msbuild@v2
 
-      - name: Restore NuGet packages
-        run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+  - name: Install MFC component
+    run: |
+      $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+        -latest -products * `
+        -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        -property installationPath
+      $installer = Join-Path $vsPath "vs_installer.exe"
+      if (Test-Path $installer) {
+        Start-Process -Wait -FilePath $installer -ArgumentList @(
+          "modify", "--installPath", $vsPath,
+          "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64",
+          "--quiet", "--norestart"
+        )
+        Write-Host "MFC component installed"
+      } else {
+        Write-Error "vs_installer.exe not found at $installer"
+        exit 1
+      }
 
-      - name: Build ${{matrix.configuration}} ${{matrix.platform}}
+  - name: Restore NuGet packages
+    run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+  - name: Build ${{matrix.configuration}} ${{matrix.platform}}
         run: |
           msbuild ${{env.SOLUTION_FILE_PATH}} `
             /p:Configuration=${{matrix.configuration}} `
@@ -110,13 +129,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+  - name: Add MSBuild to PATH
+    uses: microsoft/setup-msbuild@v2
 
-      - name: Restore NuGet packages
-        run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+  - name: Install MFC component
+    run: |
+      $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+        -latest -products * `
+        -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        -property installationPath
+      $installer = Join-Path $vsPath "vs_installer.exe"
+      if (Test-Path $installer) {
+        Start-Process -Wait -FilePath $installer -ArgumentList @(
+          "modify", "--installPath", $vsPath,
+          "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64",
+          "--quiet", "--norestart"
+        )
+        Write-Host "MFC component installed"
+      } else {
+        Write-Error "vs_installer.exe not found at $installer"
+        exit 1
+      }
 
-      - name: Build CloudSync_Test ${{matrix.configuration}} x64
+  - name: Restore NuGet packages
+    run: nuget restore ${{env.SOLUTION_FILE_PATH}}
+
+  - name: Build CloudSync_Test ${{matrix.configuration}} x64
         run: |
           msbuild ${{env.SOLUTION_FILE_PATH}} `
             /p:Configuration=${{matrix.configuration}} `
