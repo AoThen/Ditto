@@ -35,9 +35,10 @@ jobs:
           $productId = vswhere -latest -property productId
           Write-Host "VS path: $vsPath  channel: $channelId  product: $productId"
           & $installer modify --channelId $channelId --productId $productId `
-            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64 `
+            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.MFC `
+            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL `
             --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-            --add Microsoft.VisualStudio.Component.VC.ATL `
             --quiet --wait --norestart
           if ($LASTEXITCODE -ne 0) { throw "MFC install failed with code $LASTEXITCODE" }
           Get-ChildItem (Join-Path $vsPath "VC\Tools\MSVC") -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { Write-Host "Found MFC lib: $($_.FullName)" }
