@@ -17,91 +17,104 @@ func NewEncryptionService() *EncryptionService {
 	return &EncryptionService{}
 }
 
-// SetupEncryptionRequest represents the encryption setup request
 type SetupEncryptionRequest struct {
-	PasswordHint string `json:"password_hint"`
+	WrappedDEK       string `json:"wrapped_dek" binding:"required"`
+	VerificationHash string `json:"verification_hash" binding:"required"`
+	PasswordHint     string `json:"password_hint"`
 }
 
-// EncryptionSetupResponse represents the encryption setup response
+type ChangePasswordRequest struct {
+	OldVerificationHash string `json:"old_verification_hash" binding:"required"`
+	NewSalt             string `json:"new_salt" binding:"required"`
+	NewWrappedDEK       string `json:"new_wrapped_dek" binding:"required"`
+	NewVerificationHash string `json:"new_verification_hash" binding:"required"`
+	NewPasswordHint     string `json:"new_password_hint"`
+}
+
 type EncryptionSetupResponse struct {
-	Salt                string `json:"salt"`
-	EncryptionEnabled   bool   `json:"encryption_enabled"`
+	Salt              string `json:"salt"`
+	EncryptionEnabled bool   `json:"encryption_enabled"`
 }
 
-// EncryptionStatusResponse represents the encryption status response
 type EncryptionStatusResponse struct {
 	Salt              string `json:"salt"`
 	EncryptionEnabled bool   `json:"encryption_enabled"`
 	PasswordHint      string `json:"password_hint"`
 }
 
+type KeyMaterialResponse struct {
+	Salt       string `json:"salt"`
+	WrappedDEK string `json:"wrapped_dek"`
+}
+
 var (
 	ErrEncryptionAlreadyEnabled = errors.New("加密已启用，无需重复设置")
 	ErrEncryptionNotSetup       = errors.New("请先设置端到端加密密码")
+	ErrInvalidVerificationHash  = errors.New("旧密码验证失败")
 )
 
-// SetupEncryption generates a random salt and enables encryption for the user
-func (s *EncryptionService) SetupEncryption(userID uint, req *SetupEncryptionRequest) (*EncryptionSetupResponse, error) {
-	// Check if encryption is already enabled
-	var existing model.EncryptionSettings
-	if err := database.DB.Where("user_id = ?", userID).First(&existing).Error; err == nil {
-		if existing.Enabled {
-			return nil, ErrEncryptionAlreadyEnabled
-		}
-		// Update existing disabled settings
-		salt := make([]byte, 32)
-		if _, err := rand.Read(salt); err != nil {
+func (s *EncryptionService) ensureSaltRecord(userID uint) (*model.EncryptionSettings, error) {
+	var settings model.EncryptionSettings
+	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			salt := make([]byte, 32)
+			if _, err := rand.Read(salt); err != nil {
+				return nil, err
+			}
+			settings = model.EncryptionSettings{
+				UserID:           userID,
+				Salt:             salt,
+				WrappedDEK:       make([]byte, 0),
+				VerificationHash: make([]byte, 0),
+			}
+			if err := database.DB.Create(&settings).Error; err != nil {
+				return nil, err
+			}
+		} else {
 			return nil, err
 		}
-
-		existing.Salt = salt
-		existing.PasswordHint = req.PasswordHint
-		existing.Enabled = true
-		if err := database.DB.Save(&existing).Error; err != nil {
-			return nil, err
-		}
-
-		return &EncryptionSetupResponse{
-			Salt:              base64.StdEncoding.EncodeToString(salt),
-			EncryptionEnabled: true,
-		}, nil
 	}
+	return &settings, nil
+}
 
-	// Create new encryption settings
-	salt := make([]byte, 32)
-	if _, err := rand.Read(salt); err != nil {
+func (s *EncryptionService) SetupEncryption(userID uint, req *SetupEncryptionRequest) (*EncryptionSetupResponse, error) {
+	settings, err := s.ensureSaltRecord(userID)
+	if err != nil {
 		return nil, err
 	}
-
-	settings := model.EncryptionSettings{
-		UserID:       userID,
-		Salt:         salt,
-		PasswordHint: req.PasswordHint,
-		Enabled:      true,
+	if settings.Enabled {
+		return nil, ErrEncryptionAlreadyEnabled
 	}
 
-	if err := database.DB.Create(&settings).Error; err != nil {
+	wrappedDEK, err := base64.StdEncoding.DecodeString(req.WrappedDEK)
+	if err != nil {
+		return nil, errors.New("wrapped_dek 格式无效")
+	}
+	verificationHash, err := base64.StdEncoding.DecodeString(req.VerificationHash)
+	if err != nil {
+		return nil, errors.New("verification_hash 格式无效")
+	}
+
+	settings.WrappedDEK = wrappedDEK
+	settings.VerificationHash = verificationHash
+	settings.PasswordHint = req.PasswordHint
+	settings.Enabled = true
+	settings.Version = 2
+
+	if err := database.DB.Save(&settings).Error; err != nil {
 		return nil, err
 	}
 
 	return &EncryptionSetupResponse{
-		Salt:              base64.StdEncoding.EncodeToString(salt),
+		Salt:              base64.StdEncoding.EncodeToString(settings.Salt),
 		EncryptionEnabled: true,
 	}, nil
 }
 
-// GetEncryptionSalt returns the user's encryption salt
 func (s *EncryptionService) GetEncryptionSalt(userID uint) (*EncryptionStatusResponse, error) {
-	var settings model.EncryptionSettings
-	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrEncryptionNotSetup
-		}
+	settings, err := s.ensureSaltRecord(userID)
+	if err != nil {
 		return nil, err
-	}
-
-	if !settings.Enabled {
-		return nil, ErrEncryptionNotSetup
 	}
 
 	return &EncryptionStatusResponse{
@@ -111,7 +124,24 @@ func (s *EncryptionService) GetEncryptionSalt(userID uint) (*EncryptionStatusRes
 	}, nil
 }
 
-// DisableEncryption disables end-to-end encryption for the user
+func (s *EncryptionService) GetKeyMaterial(userID uint) (*KeyMaterialResponse, error) {
+	var settings model.EncryptionSettings
+	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrEncryptionNotSetup
+		}
+		return nil, err
+	}
+	if !settings.Enabled {
+		return nil, ErrEncryptionNotSetup
+	}
+
+	return &KeyMaterialResponse{
+		Salt:       base64.StdEncoding.EncodeToString(settings.Salt),
+		WrappedDEK: base64.StdEncoding.EncodeToString(settings.WrappedDEK),
+	}, nil
+}
+
 func (s *EncryptionService) DisableEncryption(userID uint) error {
 	var settings model.EncryptionSettings
 	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
@@ -120,24 +150,15 @@ func (s *EncryptionService) DisableEncryption(userID uint) error {
 		}
 		return err
 	}
-
 	if !settings.Enabled {
 		return ErrEncryptionNotSetup
 	}
 
-	// Disable encryption but keep salt for potential re-enable
 	settings.Enabled = false
 	return database.DB.Save(&settings).Error
 }
 
-// ChangeEncryptionPassword regenerates the salt and updates the password hint.
-// Note: The actual encryption key is derived client-side via PBKDF2(password, salt).
-// The server only stores the salt and a hint. Changing the password means:
-// 1. Client must re-encrypt all data with the new key (not handled by this endpoint).
-// 2. This endpoint regenerates the salt and updates the hint. The actual password
-//    change requires the client to re-derive the key with the new salt and re-upload
-//    encrypted data.
-func (s *EncryptionService) ChangeEncryptionPassword(userID uint, newPasswordHint string) (*EncryptionSetupResponse, error) {
+func (s *EncryptionService) ChangeEncryptionPassword(userID uint, req *ChangePasswordRequest) (*EncryptionSetupResponse, error) {
 	var settings model.EncryptionSettings
 	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -145,24 +166,42 @@ func (s *EncryptionService) ChangeEncryptionPassword(userID uint, newPasswordHin
 		}
 		return nil, err
 	}
-
 	if !settings.Enabled {
 		return nil, ErrEncryptionNotSetup
 	}
 
-	salt := make([]byte, 32)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
+	oldHash, err := base64.StdEncoding.DecodeString(req.OldVerificationHash)
+	if err != nil {
+		return nil, errors.New("old_verification_hash 格式无效")
+	}
+	if string(oldHash) != string(settings.VerificationHash) {
+		return nil, ErrInvalidVerificationHash
 	}
 
-	settings.Salt = salt
-	settings.PasswordHint = newPasswordHint
+	newSalt, err := base64.StdEncoding.DecodeString(req.NewSalt)
+	if err != nil {
+		return nil, errors.New("new_salt 格式无效")
+	}
+	newWrappedDEK, err := base64.StdEncoding.DecodeString(req.NewWrappedDEK)
+	if err != nil {
+		return nil, errors.New("new_wrapped_dek 格式无效")
+	}
+	newVerificationHash, err := base64.StdEncoding.DecodeString(req.NewVerificationHash)
+	if err != nil {
+		return nil, errors.New("new_verification_hash 格式无效")
+	}
+
+	settings.Salt = newSalt
+	settings.WrappedDEK = newWrappedDEK
+	settings.VerificationHash = newVerificationHash
+	settings.PasswordHint = req.NewPasswordHint
+
 	if err := database.DB.Save(&settings).Error; err != nil {
 		return nil, err
 	}
 
 	return &EncryptionSetupResponse{
-		Salt:              base64.StdEncoding.EncodeToString(salt),
+		Salt:              base64.StdEncoding.EncodeToString(settings.Salt),
 		EncryptionEnabled: true,
 	}, nil
 }

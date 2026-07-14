@@ -374,67 +374,33 @@ void COptionCloud::OnBtnEnableEncryption()
 		return;
 	}
 
-	m_csEncryptionStatus = _T("正在生成加密密钥...");
+	m_csEncryptionStatus = _T("正在设置加密...");
 	UpdateData(FALSE);
 
 	try
 	{
-		// 1. Get salt from server
-		std::string url = CT2A(m_csServerUrl, CP_UTF8).m_psz;
-		httplib::Client cli(url);
-
-		auto res = cli.Get("/api/v1/encryption/salt");
-		if (!res || res->status != 200)
+		CStringA token = CGetSetOptions::GetCloudDeviceToken();
+		if (token.IsEmpty())
 		{
-			m_csEncryptionStatus = _T("Failed to get salt from server. Check server URL and connection.");
+			m_csEncryptionStatus = _T("请先登录后再启用加密。");
 			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
 			return;
 		}
 
-		// Parse salt response: { "code": 0, "data": { "salt": "<base64>" } }
-		auto jsonRes = nlohmann::json::parse(res->body);
-		if (!jsonRes.contains("data") || !jsonRes["data"].contains("salt"))
-		{
-			m_csEncryptionStatus = _T("Invalid salt response from server.");
-			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
-			return;
-		}
+		EncryptionSetupResult result = CCloudEncryption::SetupEncryption(
+			m_csServerUrl, CString(token), m_csEncryptionPassword);
 
-		std::string saltB64 = jsonRes["data"]["salt"].get<std::string>();
-		std::vector<BYTE> salt = CCloudCrypto::Base64Decode(CStringA(saltB64.c_str()));
-		if (salt.size() != 32)
-		{
-			m_csEncryptionStatus = _T("Invalid salt size from server.");
-			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
-			return;
-		}
-
-		// 2. Derive key using PBKDF2-HMAC-SHA256
-		CT2A passwordA(m_csEncryptionPassword, CP_UTF8);
-		std::vector<BYTE> key = CCloudCrypto::DeriveKey(CStringA(passwordA), salt, 100000);
-		if (key.size() != 32)
-		{
-			m_csEncryptionStatus = _T("Failed to derive encryption key.");
-			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
-			return;
-		}
-
-		// 3. Save key to registry as base64
-		CStringA keyB64 = CCloudCrypto::Base64Encode(key);
-		CGetSetOptions::SetCloudEncryptionKey(CString(keyB64.GetString()));
-
-		// 4. Initialize CCloudCrypto
-		if (CCloudCrypto::Initialize(key))
+		if (result.success)
 		{
 			m_bEncryptionEnabled = TRUE;
-			m_csEncryptionStatus = _T("Encryption enabled successfully.");
+			m_csEncryptionStatus.Format(_T("加密已启用 (Salt: %s...)"), result.salt.Left(16));
 			MessageBox(_T("加密已启用。您的数据将在同步前进行加密。"),
 			           _T("Enable Encryption"), MB_ICONINFORMATION);
 		}
 		else
 		{
-			m_csEncryptionStatus = _T("Failed to initialize encryption.");
-			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
+			m_csEncryptionStatus = result.error;
+			MessageBox(result.error, _T("Enable Encryption"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
@@ -669,6 +635,23 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 		// Clear credentials and prompt for re-login
 		CCloudAuth::Logout();
 		OnBtnLogin();
+	}
+	else if (statusCode == 998)
+	{
+		// Encryption password changed on another device
+		msg = _T("加密密码已变更！\n\n")
+		      _T("您的加密密码已在其他设备上修改。\n")
+		      _T("请重新输入新的加密密码以继续同步。\n\n")
+		      _T("点击\"确定\"后将打开加密设置。");
+		
+		MessageBox(msg, _T("云端同步 - 加密密码已变更"), MB_ICONWARNING | MB_OK);
+		
+		// Open this property page to show encryption settings
+		CPropertySheet* pSheet = GetParent();
+		if (pSheet != nullptr)
+		{
+			pSheet->SetActivePage(this);
+		}
 	}
 	else if (statusCode == 999)
 	{

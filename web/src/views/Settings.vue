@@ -1,6 +1,5 @@
 <template>
   <div class="settings-container">
-    <!-- User Profile Section -->
     <el-card style="margin-bottom: 20px;">
       <template #header>
         <h2>账户信息</h2>
@@ -20,7 +19,6 @@
       </div>
     </el-card>
 
-    <!-- Encryption Section -->
     <el-card>
       <template #header>
         <h2>端到端加密</h2>
@@ -42,7 +40,6 @@
           </div>
         </div>
 
-        <!-- Encryption Password Input -->
         <div v-if="!encryptionEnabled" class="setting-item">
           <span class="label">加密密码</span>
           <el-input
@@ -102,14 +99,34 @@
         </div>
     </el-card>
 
-    <!-- Change Password Hint Dialog -->
-    <el-dialog v-model="changePasswordDialogVisible" title="修改密码提示" width="400px">
-      <el-form label-width="80px">
-        <el-form-item label="当前提示">
-          <span>{{ currentHint }}</span>
+    <el-dialog v-model="changePasswordDialogVisible" title="修改加密密码" width="420px">
+      <el-form label-width="100px">
+        <el-form-item label="旧密码">
+          <el-input
+            v-model="oldPassword"
+            type="password"
+            placeholder="输入当前加密密码"
+            show-password
+          />
         </el-form-item>
-        <el-form-item label="新提示">
-          <el-input v-model="newPasswordHint" placeholder="输入新的密码提示" />
+        <el-form-item label="新密码">
+          <el-input
+            v-model="newPassword"
+            type="password"
+            placeholder="输入新加密密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认新密码">
+          <el-input
+            v-model="confirmNewPassword"
+            type="password"
+            placeholder="再次输入新加密密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="密码提示">
+          <el-input v-model="newPasswordHint" placeholder="输入新的密码提示（可选）" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -123,7 +140,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getEncryptionSalt, setupEncryption, disableEncryption, changeEncryptionPassword } from '@/api/clips'
+import { getEncryptionSalt, getKeyMaterial, setupEncryption, disableEncryption, changeEncryptionPassword } from '@/api/clips'
+import { deriveKEK, generateDEK, wrapDEK, unwrapDEK, computeVerificationHash } from '@/utils/crypto'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
@@ -138,8 +156,10 @@ const passwordHint = ref('')
 const setupLoading = ref(false)
 
 const changePasswordDialogVisible = ref(false)
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmNewPassword = ref('')
 const newPasswordHint = ref('')
-const currentHint = ref('')
 const changePasswordLoading = ref(false)
 
 const maskedSalt = '****'
@@ -149,12 +169,10 @@ async function fetchSalt() {
     const res = await getEncryptionSalt()
     if (res.code === 0) {
       saltValue.value = res.data?.salt || ''
-      encryptionEnabled.value = !!res.data?.salt
-      currentHint.value = res.data?.password_hint || ''
+      encryptionEnabled.value = !!res.data?.encryption_enabled
     }
   } catch (err) {
     console.error('Failed to fetch encryption salt:', err)
-    // Salt endpoint may not exist yet; that's okay
   }
 }
 
@@ -177,8 +195,21 @@ async function handleEnableEncryption() {
   }
   setupLoading.value = true
   try {
+    const saltRes = await getEncryptionSalt()
+    if (saltRes.code !== 0 || !saltRes.data?.salt) {
+      ElMessage.error('无法获取加密盐值')
+      return
+    }
+    const saltB64 = saltRes.data.salt
+
+    const DEK = await generateDEK()
+    const KEK = await deriveKEK(encryptionPassword.value, saltB64)
+    const wrappedDEK = await wrapDEK(KEK, DEK)
+    const verificationHash = await computeVerificationHash(encryptionPassword.value, saltB64)
+
     await setupEncryption({
-      password: encryptionPassword.value,
+      wrapped_dek: wrappedDEK,
+      verification_hash: verificationHash,
       password_hint: passwordHint.value,
     })
     ElMessage.success('加密设置成功')
@@ -214,27 +245,73 @@ async function handleDisableEncryption() {
 }
 
 function showChangePasswordDialog() {
+  oldPassword.value = ''
+  newPassword.value = ''
+  confirmNewPassword.value = ''
   newPasswordHint.value = ''
   changePasswordDialogVisible.value = true
 }
 
 async function handleChangePassword() {
-  if (!newPasswordHint.value) {
-    ElMessage.warning('请输入新密码提示')
+  if (!oldPassword.value) {
+    ElMessage.warning('请输入旧密码')
+    return
+  }
+  if (!newPassword.value) {
+    ElMessage.warning('请输入新密码')
+    return
+  }
+  if (!confirmNewPassword.value) {
+    ElMessage.warning('请再次输入新密码')
+    return
+  }
+  if (newPassword.value !== confirmNewPassword.value) {
+    ElMessage.error('两次输入的新密码不一致')
+    return
+  }
+  if (newPassword.value.length < 8) {
+    ElMessage.warning('加密密码至少需要 8 位')
     return
   }
   changePasswordLoading.value = true
   try {
-    const res = await changeEncryptionPassword(newPasswordHint.value)
+    const keyMaterialRes = await getKeyMaterial()
+    if (keyMaterialRes.code !== 0 || !keyMaterialRes.data?.wrapped_dek || !keyMaterialRes.data?.salt) {
+      ElMessage.error('无法获取密钥材料')
+      return
+    }
+    const { wrapped_dek: oldWrappedDEK, salt: oldSaltB64 } = keyMaterialRes.data
+
+    const oldKEK = await deriveKEK(oldPassword.value, oldSaltB64)
+    const DEK = await unwrapDEK(oldKEK, oldWrappedDEK)
+
+    const newSaltBytes = crypto.getRandomValues(new Uint8Array(32))
+    const newSaltB64 = btoa(String.fromCharCode(...newSaltBytes))
+
+    const newKEK = await deriveKEK(newPassword.value, newSaltB64)
+    const newWrappedDEK = await wrapDEK(newKEK, DEK)
+    const oldVerificationHash = await computeVerificationHash(oldPassword.value, oldSaltB64)
+    const newVerificationHash = await computeVerificationHash(newPassword.value, newSaltB64)
+
+    const res = await changeEncryptionPassword({
+      old_verification_hash: oldVerificationHash,
+      new_salt: newSaltB64,
+      new_wrapped_dek: newWrappedDEK,
+      new_verification_hash: newVerificationHash,
+      new_password_hint: newPasswordHint.value,
+    })
     if (res.code === 0) {
-      ElMessage.success('密码提示已更新，salt 已重新生成')
+      ElMessage.success('加密密码已更新')
       changePasswordDialogVisible.value = false
-      newPasswordHint.value = ''
       fetchSalt()
     }
   } catch (err) {
-    console.error('Failed to change password hint:', err)
-    ElMessage.error('修改密码提示失败')
+    console.error('Failed to change password:', err)
+    if (err.response?.data?.code === 40301) {
+      ElMessage.error('旧密码验证失败，请重试')
+    } else {
+      ElMessage.error('修改加密密码失败')
+    }
   } finally {
     changePasswordLoading.value = false
   }

@@ -4,7 +4,7 @@
 #include "../httplib.h"
 
 // Custom Windows message for cloud authentication notification
-// wParam: HTTP status code (401 = token expired, 403 = forbidden)
+// wParam: HTTP status code (401 = token expired, 403 = forbidden, 998 = encryption salt changed)
 // lParam: 0 (reserved)
 #ifndef WM_CLOUD_AUTH_REQUIRED
 #define WM_CLOUD_AUTH_REQUIRED (WM_USER + 1001)
@@ -107,6 +107,10 @@ private:
 
 	// Look up local clip ID by remote ID; returns -1 if not found
 	int GetLocalIdByRemoteId(const std::string& remoteId);
+
+	// ---- Encryption salt change detection (H3) ----
+	// Check if server salt differs from local, notify user if so
+	BOOL CheckAndNotifyEncryptionChange();
 
 	// ---- WebSocket (H4) ----
 	// Start listening for real-time events from the server

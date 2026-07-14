@@ -598,3 +598,93 @@ std::vector<BYTE> CCloudCrypto::Sha256(const std::vector<BYTE>& data)
 
 	return hashResult;
 }
+
+// ---------------------------------------------------------------------------
+// WrapKey: AES-GCM encrypt a DEK with a KEK
+// Returns base64(IV[12] + ciphertext[32] + tag[16])
+// ---------------------------------------------------------------------------
+CStringA CCloudCrypto::WrapKey(
+	const std::vector<BYTE>& kek,
+	const std::vector<BYTE>& dek)
+{
+	if (kek.size() != 32 || dek.size() != 32)
+	{
+		OutputDebugStringA("[CloudCrypto] WrapKey: KEK and DEK must be 32 bytes.\n");
+		return CStringA("");
+	}
+
+	std::vector<BYTE> iv = RandomBytes(12);
+	std::vector<BYTE> tag;
+	std::vector<BYTE> ct = AesGcmEncrypt(kek, iv, dek, tag);
+	if (ct.empty())
+	{
+		OutputDebugStringA("[CloudCrypto] WrapKey: AesGcmEncrypt failed.\n");
+		return CStringA("");
+	}
+
+	std::vector<BYTE> result;
+	result.reserve(iv.size() + ct.size() + tag.size());
+	result.insert(result.end(), iv.begin(), iv.end());
+	result.insert(result.end(), ct.begin(), ct.end());
+	result.insert(result.end(), tag.begin(), tag.end());
+
+	return Base64Encode(result);
+}
+
+// ---------------------------------------------------------------------------
+// UnwrapKey: AES-GCM decrypt a wrapped DEK with a KEK
+// Input: base64(IV[12] + ciphertext + tag[16])
+// Returns: raw DEK (32 bytes), or empty on failure
+// ---------------------------------------------------------------------------
+std::vector<BYTE> CCloudCrypto::UnwrapKey(
+	const std::vector<BYTE>& kek,
+	const CStringA& wrappedBase64)
+{
+	if (kek.size() != 32)
+	{
+		OutputDebugStringA("[CloudCrypto] UnwrapKey: KEK must be 32 bytes.\n");
+		return std::vector<BYTE>();
+	}
+
+	std::vector<BYTE> data = Base64Decode(wrappedBase64);
+	if (data.size() < 12 + 16)
+	{
+		OutputDebugStringA("[CloudCrypto] UnwrapKey: data too short.\n");
+		return std::vector<BYTE>();
+	}
+
+	std::vector<BYTE> iv(data.begin(), data.begin() + 12);
+	std::vector<BYTE> tag(data.end() - 16, data.end());
+	std::vector<BYTE> ct(data.begin() + 12, data.end() - 16);
+
+	std::vector<BYTE> dek = AesGcmDecrypt(kek, iv, ct, tag);
+	if (dek.empty())
+	{
+		OutputDebugStringA("[CloudCrypto] UnwrapKey: AesGcmDecrypt failed (wrong KEK?).\n");
+		return std::vector<BYTE>();
+	}
+
+	return dek;
+}
+
+// ---------------------------------------------------------------------------
+// ComputeVerificationHash: SHA256("DITTO_ENC_AUTH_v1:" + password + ":" + saltB64)
+// Returns base64 of hash
+// ---------------------------------------------------------------------------
+CStringA CCloudCrypto::ComputeVerificationHash(
+	const CStringA& password,
+	const CStringA& saltB64)
+{
+	const char* domainTag = "DITTO_ENC_AUTH_v1:";
+	CStringA input = CStringA(domainTag) + password + ":" + saltB64;
+
+	std::vector<BYTE> inputBytes(
+		input.GetString(),
+		input.GetString() + input.GetLength());
+
+	std::vector<BYTE> hash = Sha256(inputBytes);
+	if (hash.empty())
+		return CStringA("");
+
+	return Base64Encode(hash);
+}

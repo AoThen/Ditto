@@ -103,7 +103,7 @@ func TestCFHDROP_EncryptedPaths(t *testing.T) {
 	user := testutil.CreateTestUser(t, server)
 
 	// Setup encryption
-	_, _ = testutil.AuthPost(t, server, "/api/v1/encryption/setup", user.Token, map[string]string{})
+	_, _ = testutil.AuthPost(t, server, "/api/v1/encryption/setup", user.Token, makeTestCrypto())
 
 	// Push clip with CF_HDROP (paths should NOT be encrypted per design)
 	clipID := "test-encrypted-hdrop"

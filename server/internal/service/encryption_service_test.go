@@ -12,21 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupEncryptionServiceTest creates an isolated test environment for EncryptionService tests
 func setupEncryptionServiceTest(t *testing.T) (*EncryptionService, uint, func()) {
 	t.Helper()
 
-	// Create temp database file
 	tmpFile, err := os.CreateTemp("", "encryption_service_test_*.db")
 	require.NoError(t, err)
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	// Initialize database
 	err = database.Init(dbPath)
 	require.NoError(t, err)
 
-	// Create test user
 	user := model.User{
 		Username:     "testuser",
 		Email:        "test@example.com",
@@ -34,7 +30,6 @@ func setupEncryptionServiceTest(t *testing.T) (*EncryptionService, uint, func())
 	}
 	require.NoError(t, database.DB.Create(&user).Error)
 
-	// Create service
 	svc := NewEncryptionService()
 
 	cleanup := func() {
@@ -47,6 +42,18 @@ func setupEncryptionServiceTest(t *testing.T) (*EncryptionService, uint, func())
 	return svc, user.ID, cleanup
 }
 
+func makeTestDEK() (string, string) {
+	dek := make([]byte, 32)
+	for i := range dek {
+		dek[i] = byte(i)
+	}
+	vhash := make([]byte, 32)
+	for i := range vhash {
+		vhash[i] = byte(0xFF - i)
+	}
+	return base64.StdEncoding.EncodeToString(dek), base64.StdEncoding.EncodeToString(vhash)
+}
+
 func TestNewEncryptionService(t *testing.T) {
 	svc := NewEncryptionService()
 	assert.NotNil(t, svc)
@@ -56,8 +63,11 @@ func TestEncryptionService_SetupEncryption_Success(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
+	wrappedDEK, vhash := makeTestDEK()
 	req := &SetupEncryptionRequest{
-		PasswordHint: "my favorite color",
+		WrappedDEK:       wrappedDEK,
+		VerificationHash: vhash,
+		PasswordHint:     "my favorite color",
 	}
 
 	resp, err := svc.SetupEncryption(userID, req)
@@ -67,35 +77,31 @@ func TestEncryptionService_SetupEncryption_Success(t *testing.T) {
 	assert.True(t, resp.EncryptionEnabled)
 	assert.NotEmpty(t, resp.Salt)
 
-	// Verify salt is valid base64
 	saltBytes, err := base64.StdEncoding.DecodeString(resp.Salt)
 	assert.NoError(t, err)
-	assert.Len(t, saltBytes, 32) // 32-byte salt
+	assert.Len(t, saltBytes, 32)
 
-	// Verify settings were saved to database
 	var settings model.EncryptionSettings
 	err = database.DB.Where("user_id = ?", userID).First(&settings).Error
 	assert.NoError(t, err)
 	assert.True(t, settings.Enabled)
 	assert.Equal(t, "my favorite color", settings.PasswordHint)
 	assert.Len(t, settings.Salt, 32)
+	assert.Len(t, settings.WrappedDEK, 32)
+	assert.Len(t, settings.VerificationHash, 32)
+	assert.Equal(t, 2, settings.Version)
 }
 
 func TestEncryptionService_SetupEncryption_AlreadyEnabled(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// First setup
-	req := &SetupEncryptionRequest{
-		PasswordHint: "first hint",
-	}
+	wrappedDEK, vhash := makeTestDEK()
+	req := &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "first hint"}
 	_, err := svc.SetupEncryption(userID, req)
 	require.NoError(t, err)
 
-	// Second setup should fail
-	req2 := &SetupEncryptionRequest{
-		PasswordHint: "second hint",
-	}
+	req2 := &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "second hint"}
 	resp, err := svc.SetupEncryption(userID, req2)
 
 	assert.Error(t, err)
@@ -107,30 +113,24 @@ func TestEncryptionService_SetupEncryption_ReenableAfterDisable(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// First setup
-	req := &SetupEncryptionRequest{
-		PasswordHint: "first hint",
-	}
+	wrappedDEK, vhash := makeTestDEK()
+	req := &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "first hint"}
 	resp, err := svc.SetupEncryption(userID, req)
 	require.NoError(t, err)
 	assert.True(t, resp.EncryptionEnabled)
 
-	// Disable encryption
 	database.DB.Model(&model.EncryptionSettings{}).
 		Where("user_id = ?", userID).
 		Update("enabled", false)
 
-	// Re-enable should work
-	req2 := &SetupEncryptionRequest{
-		PasswordHint: "new hint",
-	}
+	wrappedDEK2, vhash2 := makeTestDEK()
+	req2 := &SetupEncryptionRequest{WrappedDEK: wrappedDEK2, VerificationHash: vhash2, PasswordHint: "new hint"}
 	resp, err = svc.SetupEncryption(userID, req2)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.True(t, resp.EncryptionEnabled)
 
-	// Verify new salt was generated
 	var settings model.EncryptionSettings
 	database.DB.Where("user_id = ?", userID).First(&settings)
 	assert.Equal(t, "new hint", settings.PasswordHint)
@@ -140,14 +140,11 @@ func TestEncryptionService_GetEncryptionSalt_Success(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// Setup encryption first
-	setupReq := &SetupEncryptionRequest{
-		PasswordHint: "my hint",
-	}
+	wrappedDEK, vhash := makeTestDEK()
+	setupReq := &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "my hint"}
 	setupResp, err := svc.SetupEncryption(userID, setupReq)
 	require.NoError(t, err)
 
-	// Get salt
 	resp, err := svc.GetEncryptionSalt(userID)
 
 	assert.NoError(t, err)
@@ -163,40 +160,113 @@ func TestEncryptionService_GetEncryptionSalt_NotSetup(t *testing.T) {
 
 	resp, err := svc.GetEncryptionSalt(userID)
 
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.False(t, resp.EncryptionEnabled)
+	assert.NotEmpty(t, resp.Salt)
+}
+
+func TestEncryptionService_GetKeyMaterial_Success(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash})
+	require.NoError(t, err)
+
+	resp, err := svc.GetKeyMaterial(userID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.Equal(t, wrappedDEK, resp.WrappedDEK)
+	assert.NotEmpty(t, resp.Salt)
+}
+
+func TestEncryptionService_GetKeyMaterial_NotSetup(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	resp, err := svc.GetKeyMaterial(userID)
+
 	assert.Error(t, err)
 	assert.Equal(t, ErrEncryptionNotSetup, err)
 	assert.Nil(t, resp)
 }
 
-func TestEncryptionService_GetEncryptionSalt_Disabled(t *testing.T) {
+func TestEncryptionService_ChangeEncryptionPassword_Success(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// Setup encryption first
-	setupReq := &SetupEncryptionRequest{
-		PasswordHint: "hint",
-	}
-	_, err := svc.SetupEncryption(userID, setupReq)
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "old hint"})
 	require.NoError(t, err)
 
-	// Disable encryption
-	database.DB.Model(&model.EncryptionSettings{}).
-		Where("user_id = ?", userID).
-		Update("enabled", false)
+	newWrappedDEK, newVhash := makeTestDEK()
+	newSaltB64 := base64.StdEncoding.EncodeToString([]byte("01234567890123456789012345678901"))
+	req := &ChangePasswordRequest{
+		OldVerificationHash: vhash,
+		NewSalt:             newSaltB64,
+		NewWrappedDEK:       newWrappedDEK,
+		NewVerificationHash: newVhash,
+		NewPasswordHint:     "new hint",
+	}
 
-	// Get salt should fail
-	resp, err := svc.GetEncryptionSalt(userID)
+	resp, err := svc.ChangeEncryptionPassword(userID, req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, resp.EncryptionEnabled)
+
+	var settings model.EncryptionSettings
+	database.DB.Where("user_id = ?", userID).First(&settings)
+	assert.Equal(t, "new hint", settings.PasswordHint)
+	assert.Equal(t, newWrappedDEK, base64.StdEncoding.EncodeToString(settings.WrappedDEK))
+}
+
+func TestEncryptionService_ChangeEncryptionPassword_WrongHash(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash})
+	require.NoError(t, err)
+
+	wrongHash := base64.StdEncoding.EncodeToString([]byte("wrong-hash-value-32-bytes-long!"))
+	newWrappedDEK, newVhash := makeTestDEK()
+	req := &ChangePasswordRequest{
+		OldVerificationHash: wrongHash,
+		NewSalt:             base64.StdEncoding.EncodeToString(make([]byte, 32)),
+		NewWrappedDEK:       newWrappedDEK,
+		NewVerificationHash: newVhash,
+	}
+
+	resp, err := svc.ChangeEncryptionPassword(userID, req)
 
 	assert.Error(t, err)
-	assert.Equal(t, ErrEncryptionNotSetup, err)
+	assert.Equal(t, ErrInvalidVerificationHash, err)
 	assert.Nil(t, resp)
+}
+
+func TestEncryptionService_DisableEncryption(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash})
+	require.NoError(t, err)
+
+	err = svc.DisableEncryption(userID)
+	assert.NoError(t, err)
+
+	var settings model.EncryptionSettings
+	database.DB.Where("user_id = ?", userID).First(&settings)
+	assert.False(t, settings.Enabled)
 }
 
 func TestEncryptionService_MultipleUsers(t *testing.T) {
 	svc, userID1, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// Create second user
 	user2 := model.User{
 		Username:     "testuser2",
 		Email:        "test2@example.com",
@@ -204,9 +274,10 @@ func TestEncryptionService_MultipleUsers(t *testing.T) {
 	}
 	require.NoError(t, database.DB.Create(&user2).Error)
 
-	// Setup encryption for both users
-	req1 := &SetupEncryptionRequest{PasswordHint: "user1 hint"}
-	req2 := &SetupEncryptionRequest{PasswordHint: "user2 hint"}
+	wrappedDEK1, vhash1 := makeTestDEK()
+	wrappedDEK2, vhash2 := makeTestDEK()
+	req1 := &SetupEncryptionRequest{WrappedDEK: wrappedDEK1, VerificationHash: vhash1, PasswordHint: "user1 hint"}
+	req2 := &SetupEncryptionRequest{WrappedDEK: wrappedDEK2, VerificationHash: vhash2, PasswordHint: "user2 hint"}
 
 	resp1, err := svc.SetupEncryption(userID1, req1)
 	require.NoError(t, err)
@@ -214,10 +285,8 @@ func TestEncryptionService_MultipleUsers(t *testing.T) {
 	resp2, err := svc.SetupEncryption(user2.ID, req2)
 	require.NoError(t, err)
 
-	// Each user should have different salts
 	assert.NotEqual(t, resp1.Salt, resp2.Salt)
 
-	// Verify each user can get their own salt
 	salt1, err := svc.GetEncryptionSalt(userID1)
 	require.NoError(t, err)
 	assert.Equal(t, resp1.Salt, salt1.Salt)
@@ -230,13 +299,13 @@ func TestEncryptionService_MultipleUsers(t *testing.T) {
 func TestEncryptionService_ErrorConstants(t *testing.T) {
 	assert.Equal(t, "加密已启用，无需重复设置", ErrEncryptionAlreadyEnabled.Error())
 	assert.Equal(t, "请先设置端到端加密密码", ErrEncryptionNotSetup.Error())
+	assert.Equal(t, "旧密码验证失败", ErrInvalidVerificationHash.Error())
 }
 
 func TestEncryptionService_SaltUniqueness(t *testing.T) {
 	svc, _, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	// Create multiple users and verify salts are unique
 	salts := make([]string, 10)
 	for i := 0; i < 10; i++ {
 		user := model.User{
@@ -246,12 +315,12 @@ func TestEncryptionService_SaltUniqueness(t *testing.T) {
 		}
 		require.NoError(t, database.DB.Create(&user).Error)
 
-		resp, err := svc.SetupEncryption(user.ID, &SetupEncryptionRequest{PasswordHint: "hint"})
+		wrappedDEK, vhash := makeTestDEK()
+		resp, err := svc.SetupEncryption(user.ID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "hint"})
 		require.NoError(t, err)
 		salts[i] = resp.Salt
 	}
 
-	// Verify all salts are unique (with high probability)
 	uniqueSalts := make(map[string]bool)
 	for _, salt := range salts {
 		uniqueSalts[salt] = true
@@ -263,11 +332,30 @@ func TestEncryptionService_SaltLength(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	resp, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{PasswordHint: "hint"})
+	wrappedDEK, vhash := makeTestDEK()
+	resp, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{WrappedDEK: wrappedDEK, VerificationHash: vhash, PasswordHint: "hint"})
 	require.NoError(t, err)
 
-	// Decode salt and verify length
 	saltBytes, err := base64.StdEncoding.DecodeString(resp.Salt)
 	require.NoError(t, err)
 	assert.Len(t, saltBytes, 32, "Salt should be 32 bytes")
+}
+
+func TestEncryptionService_GetEncryptionSalt_GeneratesSaltForNewUser(t *testing.T) {
+	svc, _, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	user := model.User{
+		Username:     "newuser",
+		Email:        "new@example.com",
+		PasswordHash: "hash",
+	}
+	require.NoError(t, database.DB.Create(&user).Error)
+
+	resp, err := svc.GetEncryptionSalt(user.ID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.NotEmpty(t, resp.Salt)
+	assert.False(t, resp.EncryptionEnabled)
 }

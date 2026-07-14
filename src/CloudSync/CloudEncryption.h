@@ -6,7 +6,7 @@
 struct EncryptionSetupResult
 {
 	BOOL success;
-	CString salt;         // base64 salt from server
+	CString salt;
 	BOOL encryptionEnabled;
 	CString error;
 };
@@ -20,31 +20,44 @@ struct EncryptionStatusResult
 	CString error;
 };
 
+struct ChangePasswordResult
+{
+	BOOL success;
+	CString newSalt;
+	CString error;
+};
+
 class CCloudEncryption
 {
 public:
-	// Setup encryption: fetch salt from server, derive key, initialize crypto
 	static EncryptionSetupResult SetupEncryption(
 		const CString& serverUrl,
 		const CString& deviceToken,
 		const CString& password
 	);
 
-	// Get encryption status from server
 	static EncryptionStatusResult GetEncryptionStatus(
 		const CString& serverUrl,
 		const CString& deviceToken
 	);
 
-	// Initialize crypto from stored key (called at startup)
+	static ChangePasswordResult ChangeEncryptionPassword(
+		const CString& serverUrl,
+		const CString& deviceToken,
+		const CString& oldPassword,
+		const CString& newPassword
+	);
+
+	static BOOL CheckSaltChanged(
+		const CString& serverUrl,
+		const CString& deviceToken
+	);
+
 	static BOOL InitializeCryptoFromStoredKey();
 
-	// Encrypt clip data before push
 	static CStringA EncryptClipData(const CStringA& plaintext);
 
-	// Decrypt clip data after pull
 	static CStringA DecryptClipData(const CStringA& encryptedBase64);
 
-	// Check if encryption is initialized locally
 	static BOOL IsEncryptionReady();
 };

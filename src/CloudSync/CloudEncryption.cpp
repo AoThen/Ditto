@@ -34,9 +34,12 @@ static void SetupClient(const std::string& serverUrl, httplib::Client& cli, cons
 	});
 }
 
-// ---------------------------------------------------------------------------
-// SetupEncryption: POST /api/v1/encryption/setup
-// ---------------------------------------------------------------------------
+static CStringA ComputeVerificationHashForPassword(const CString& password, const CStringA& saltB64)
+{
+	CT2A passwordUtf8(password, CP_UTF8);
+	return CCloudCrypto::ComputeVerificationHash(CStringA(passwordUtf8), saltB64);
+}
+
 EncryptionSetupResult CCloudEncryption::SetupEncryption(
 	const CString& serverUrl,
 	const CString& deviceToken,
@@ -51,105 +54,115 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		httplib::Client cli(url);
 		SetupClient(url, cli, deviceToken);
 
-		// Step 1: Request salt from server (setup endpoint generates new salt)
-		json body;
-		body["password_hint"] = ""; // Optional: can store hint for user
+		auto saltRes = cli.Get("/api/v1/encryption/salt");
+		if (!saltRes || saltRes->status != 200)
+		{
+			result.error = _T("无法从服务器获取加密盐值");
+			return result;
+		}
 
-		std::string bodyStr = body.dump();
-		auto res = cli.Post("/api/v1/encryption/setup", bodyStr, "application/json");
-		if (!res)
+		auto saltJson = json::parse(saltRes->body);
+		if (!saltJson.contains("data") || !saltJson["data"].contains("salt"))
+		{
+			result.error = _T("服务器响应无效");
+			return result;
+		}
+
+		CStringA saltB64(saltJson["data"]["salt"].get<std::string>().c_str());
+		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(saltB64);
+
+		std::vector<BYTE> dek = CCloudCrypto::RandomBytes(32);
+
+		CT2A passwordUtf8(password, CP_UTF8);
+		CStringA passwordA(passwordUtf8);
+		std::vector<BYTE> kek = CCloudCrypto::DeriveKey(passwordA, saltBytes, 100000);
+
+		CStringA wrappedDEK = CCloudCrypto::WrapKey(kek, dek);
+		if (wrappedDEK.IsEmpty())
+		{
+			result.error = _T("密钥包裹失败");
+			return result;
+		}
+
+		CStringA verificationHash = ComputeVerificationHashForPassword(password, saltB64);
+		if (verificationHash.IsEmpty())
+		{
+			result.error = _T("验证哈希计算失败");
+			return result;
+		}
+
+		json body;
+		body["wrapped_dek"] = wrappedDEK.GetString();
+		body["verification_hash"] = verificationHash.GetString();
+		body["password_hint"] = "";
+
+		auto setupRes = cli.Post("/api/v1/encryption/setup", body.dump(), "application/json");
+		if (!setupRes)
 		{
 			result.error = _T("无法连接服务器（网络错误）");
 			return result;
 		}
 
-		if (res->status != 200 && res->status != 201)
+		if (setupRes->status != 200 && setupRes->status != 201)
 		{
 			try
 			{
-				auto errJson = json::parse(res->body);
+				auto errJson = json::parse(setupRes->body);
 				if (errJson.contains("message"))
-				{
 					result.error = StdStringToCString(errJson["message"].get<std::string>());
-				}
 				else
-				{
-					result.error.Format(_T("服务器返回 HTTP %d"), res->status);
-				}
+					result.error.Format(_T("服务器返回 HTTP %d"), setupRes->status);
 			}
 			catch (...)
 			{
-				result.error.Format(_T("服务器返回 HTTP %d"), res->status);
+				result.error.Format(_T("服务器返回 HTTP %d"), setupRes->status);
 			}
 			return result;
 		}
 
-		// Step 2: Parse response
-		try
+		auto responseJson = json::parse(setupRes->body);
+		if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
 		{
-			auto responseJson = json::parse(res->body);
-
-			if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
-			{
-				if (responseJson.contains("message"))
-				{
-					result.error = StdStringToCString(responseJson["message"].get<std::string>());
-				}
-				return result;
-			}
-
-			if (!responseJson.contains("data"))
-			{
-				result.error = _T("服务器响应无效");
-				return result;
-			}
-
-			const auto& data = responseJson["data"];
-			result.salt = StdStringToCString(data["salt"].get<std::string>());
-			result.encryptionEnabled = data.value("encryption_enabled", false);
-
-			// Step 3: Derive AES key from password + salt
-			CStringA passwordA(password);
-			std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(CStringA(result.salt));
-			std::vector<BYTE> aesKey = CCloudCrypto::DeriveKey(passwordA, saltBytes, 100000);
-
-			// Step 4: Initialize crypto
-			if (!CCloudCrypto::Initialize(aesKey))
-			{
-				result.error = _T("加密初始化失败");
-				return result;
-			}
-
-			// Step 5: Store encrypted key for persistence (so we can reload on startup)
-			// For now, we store the password-derived key directly encrypted with a machine key
-			// In production, you'd use DPAPI or a secure key store
-			CStringA keyBase64 = CCloudCrypto::Base64Encode(aesKey);
-			CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
-			CGetSetOptions::SetCloudEncryptionKey(CString(keyBase64));
-			CGetSetOptions::SetCloudEncryptionSalt(CString(result.salt));
-
-			result.success = TRUE;
+			if (responseJson.contains("message"))
+				result.error = StdStringToCString(responseJson["message"].get<std::string>());
+			return result;
 		}
-		catch (const json::parse_error& e)
+
+		if (!responseJson.contains("data"))
 		{
-			result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+			result.error = _T("服务器响应无效");
+			return result;
 		}
-		catch (const std::exception& e)
+
+		const auto& data = responseJson["data"];
+		result.salt = StdStringToCString(data["salt"].get<std::string>());
+		result.encryptionEnabled = data.value("encryption_enabled", false);
+
+		if (!CCloudCrypto::Initialize(dek))
 		{
-			result.error.Format(_T("错误: %hs"), e.what());
+			result.error = _T("加密初始化失败");
+			return result;
 		}
+
+		CStringA dekB64 = CCloudCrypto::Base64Encode(dek);
+		CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
+		CGetSetOptions::SetCloudEncryptionKey(CString(dekB64));
+		CGetSetOptions::SetCloudEncryptionSalt(result.salt);
+
+		result.success = TRUE;
+	}
+	catch (const json::parse_error& e)
+	{
+		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
 	}
 	catch (const std::exception& e)
 	{
-		result.error.Format(_T("异常: %hs"), e.what());
+		result.error.Format(_T("错误: %hs"), e.what());
 	}
 
 	return result;
 }
 
-// ---------------------------------------------------------------------------
-// GetEncryptionStatus: GET /api/v1/encryption/salt
-// ---------------------------------------------------------------------------
 EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 	const CString& serverUrl,
 	const CString& deviceToken)
@@ -176,13 +189,9 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 			{
 				auto errJson = json::parse(res->body);
 				if (errJson.contains("message"))
-				{
 					result.error = StdStringToCString(errJson["message"].get<std::string>());
-				}
 				else
-				{
 					result.error.Format(_T("服务器返回 HTTP %d"), res->status);
-				}
 			}
 			catch (...)
 			{
@@ -191,60 +200,203 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 			return result;
 		}
 
-		try
+		auto responseJson = json::parse(res->body);
+		if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
 		{
-			auto responseJson = json::parse(res->body);
-
-			if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
-			{
-				if (responseJson.contains("message"))
-				{
-					result.error = StdStringToCString(responseJson["message"].get<std::string>());
-				}
-				return result;
-			}
-
-			if (!responseJson.contains("data"))
-			{
-				result.error = _T("服务器响应无效");
-				return result;
-			}
-
-			const auto& data = responseJson["data"];
-			result.salt = StdStringToCString(data["salt"].get<std::string>());
-			result.encryptionEnabled = data.value("encryption_enabled", false);
-			if (data.contains("password_hint"))
-			{
-				result.passwordHint = StdStringToCString(data["password_hint"].get<std::string>());
-			}
-
-			result.success = TRUE;
+			if (responseJson.contains("message"))
+				result.error = StdStringToCString(responseJson["message"].get<std::string>());
+			return result;
 		}
-		catch (const json::parse_error& e)
+
+		if (!responseJson.contains("data"))
 		{
-			result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+			result.error = _T("服务器响应无效");
+			return result;
 		}
-		catch (const std::exception& e)
+
+		const auto& data = responseJson["data"];
+		result.salt = StdStringToCString(data["salt"].get<std::string>());
+		result.encryptionEnabled = data.value("encryption_enabled", false);
+		if (data.contains("password_hint"))
 		{
-			result.error.Format(_T("错误: %hs"), e.what());
+			result.passwordHint = StdStringToCString(data["password_hint"].get<std::string>());
 		}
+
+		result.success = TRUE;
+	}
+	catch (const json::parse_error& e)
+	{
+		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
 	}
 	catch (const std::exception& e)
 	{
-		result.error.Format(_T("异常: %hs"), e.what());
+		result.error.Format(_T("错误: %hs"), e.what());
 	}
 
 	return result;
 }
 
-// ---------------------------------------------------------------------------
-// InitializeCryptoFromStoredKey: reload key at startup
-// ---------------------------------------------------------------------------
+ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
+	const CString& serverUrl,
+	const CString& deviceToken,
+	const CString& oldPassword,
+	const CString& newPassword)
+{
+	ChangePasswordResult result = {};
+	result.success = FALSE;
+
+	try
+	{
+		std::string url = CStringToStdString(serverUrl);
+		httplib::Client cli(url);
+		SetupClient(url, cli, deviceToken);
+
+		auto keyRes = cli.Get("/api/v1/encryption/key-material");
+		if (!keyRes || keyRes->status != 200)
+		{
+			result.error = _T("无法从服务器获取密钥材料");
+			return result;
+		}
+
+		auto keyJson = json::parse(keyRes->body);
+		if (!keyJson.contains("data") || !keyJson["data"].contains("wrapped_dek") || !keyJson["data"].contains("salt"))
+		{
+			result.error = _T("服务器响应无效：缺少密钥材料");
+			return result;
+		}
+
+		CStringA wrappedDEKB64(keyJson["data"]["wrapped_dek"].get<std::string>().c_str());
+		CStringA oldSaltB64(keyJson["data"]["salt"].get<std::string>().c_str());
+
+		std::vector<BYTE> oldSaltBytes = CCloudCrypto::Base64Decode(oldSaltB64);
+
+		CT2A oldPasswordUtf8(oldPassword, CP_UTF8);
+		CStringA oldPasswordA(oldPasswordUtf8);
+		std::vector<BYTE> oldKEK = CCloudCrypto::DeriveKey(oldPasswordA, oldSaltBytes, 100000);
+
+		std::vector<BYTE> dek = CCloudCrypto::UnwrapKey(oldKEK, wrappedDEKB64);
+		if (dek.empty())
+		{
+			result.error = _T("旧密码验证失败，无法解包密钥");
+			return result;
+		}
+
+		std::vector<BYTE> newSaltBytes = CCloudCrypto::RandomBytes(32);
+		CStringA newSaltB64 = CCloudCrypto::Base64Encode(newSaltBytes);
+
+		CT2A newPasswordUtf8(newPassword, CP_UTF8);
+		CStringA newPasswordA(newPasswordUtf8);
+		std::vector<BYTE> newKEK = CCloudCrypto::DeriveKey(newPasswordA, newSaltBytes, 100000);
+
+		CStringA newWrappedDEK = CCloudCrypto::WrapKey(newKEK, dek);
+		if (newWrappedDEK.IsEmpty())
+		{
+			result.error = _T("新密钥包裹失败");
+			return result;
+		}
+
+		CStringA oldVerificationHash = ComputeVerificationHashForPassword(oldPassword, oldSaltB64);
+		CStringA newVerificationHash = ComputeVerificationHashForPassword(newPassword, newSaltB64);
+
+		json body;
+		body["old_verification_hash"] = oldVerificationHash.GetString();
+		body["new_salt"] = newSaltB64.GetString();
+		body["new_wrapped_dek"] = newWrappedDEK.GetString();
+		body["new_verification_hash"] = newVerificationHash.GetString();
+		body["new_password_hint"] = "";
+
+		auto changeRes = cli.Post("/api/v1/encryption/change-password", body.dump(), "application/json");
+		if (!changeRes)
+		{
+			result.error = _T("无法连接服务器（网络错误）");
+			return result;
+		}
+
+		if (changeRes->status != 200)
+		{
+			try
+			{
+				auto errJson = json::parse(changeRes->body);
+				if (errJson.contains("message"))
+					result.error = StdStringToCString(errJson["message"].get<std::string>());
+				else
+					result.error.Format(_T("服务器返回 HTTP %d"), changeRes->status);
+			}
+			catch (...)
+			{
+				result.error.Format(_T("服务器返回 HTTP %d"), changeRes->status);
+			}
+			return result;
+		}
+
+		auto responseJson = json::parse(changeRes->body);
+		if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
+		{
+			if (responseJson.contains("message"))
+				result.error = StdStringToCString(responseJson["message"].get<std::string>());
+			return result;
+		}
+
+		if (responseJson.contains("data") && responseJson["data"].contains("salt"))
+		{
+			result.newSalt = StdStringToCString(responseJson["data"]["salt"].get<std::string>());
+			CGetSetOptions::SetCloudEncryptionSalt(result.newSalt);
+		}
+
+		result.success = TRUE;
+	}
+	catch (const json::parse_error& e)
+	{
+		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+	}
+	catch (const std::exception& e)
+	{
+		result.error.Format(_T("错误: %hs"), e.what());
+	}
+
+	return result;
+}
+
+BOOL CCloudEncryption::CheckSaltChanged(
+	const CString& serverUrl,
+	const CString& deviceToken)
+{
+	try
+	{
+		BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
+		if (!enabled)
+			return FALSE;
+
+		CString localSalt = CGetSetOptions::GetCloudEncryptionSalt();
+		if (localSalt.IsEmpty())
+			return FALSE;
+
+		std::string url = CStringToStdString(serverUrl);
+		httplib::Client cli(url);
+		SetupClient(url, cli, deviceToken);
+
+		auto res = cli.Get("/api/v1/encryption/salt");
+		if (!res || res->status != 200)
+			return FALSE;
+
+		auto responseJson = json::parse(res->body);
+		if (!responseJson.contains("data") || !responseJson["data"].contains("salt"))
+			return FALSE;
+
+		CString serverSalt = StdStringToCString(responseJson["data"]["salt"].get<std::string>());
+
+		return (localSalt != serverSalt);
+	}
+	catch (...)
+	{
+		return FALSE;
+	}
+}
+
 BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 {
 	try
 	{
-		// Check if encryption is enabled
 		BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
 		if (!enabled)
 		{
@@ -252,16 +404,14 @@ BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 			return FALSE;
 		}
 
-		// Load stored key
-		CStringA keyBase64 = CGetSetOptions::GetCloudEncryptionKey();
-		if (keyBase64.IsEmpty())
+		CStringA dekB64 = CGetSetOptions::GetCloudEncryptionKey();
+		if (dekB64.IsEmpty())
 		{
 			OutputDebugStringA("[CloudEncryption] No stored key found.\n");
 			return FALSE;
 		}
 
-		// Decode and initialize
-		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(keyBase64);
+		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(dekB64);
 		if (keyBytes.empty() || keyBytes.size() != 32)
 		{
 			OutputDebugStringA("[CloudEncryption] Invalid key size.\n");
@@ -271,7 +421,7 @@ BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 		BOOL ok = CCloudCrypto::Initialize(keyBytes);
 		if (ok)
 		{
-			OutputDebugStringA("[CloudEncryption] Crypto initialized from stored key.\n");
+			OutputDebugStringA("[CloudEncryption] Crypto initialized from stored DEK.\n");
 		}
 		else
 		{
@@ -286,26 +436,16 @@ BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 	}
 }
 
-// ---------------------------------------------------------------------------
-// EncryptClipData: wrapper around CCloudCrypto::Encrypt
-// SECURITY: Never return plaintext when encryption is not ready.
-// If crypto is not initialized, return empty to prevent accidental plaintext sync.
-// ---------------------------------------------------------------------------
 CStringA CCloudEncryption::EncryptClipData(const CStringA& plaintext)
 {
 	if (!IsEncryptionReady())
 	{
-		// SECURITY: Do NOT return plaintext. Return empty to prevent sync.
 		OutputDebugStringA("[CloudEncryption] EncryptClipData: encryption not ready, skipping encryption.\n");
 		return CStringA("");
 	}
 	return CCloudCrypto::Encrypt(plaintext);
 }
 
-// ---------------------------------------------------------------------------
-// DecryptClipData: wrapper around CCloudCrypto::Decrypt
-// If decryption fails, return as-is (fallback for unencrypted data)
-// ---------------------------------------------------------------------------
 CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 {
 	if (encryptedBase64.IsEmpty())
@@ -313,27 +453,19 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 
 	if (!IsEncryptionReady())
 	{
-		// If encryption not ready, return data as-is (may be unencrypted)
 		return encryptedBase64;
 	}
 
-	// Try to decrypt; if fails, return as-is (fallback for unencrypted data)
 	CStringA result = CCloudCrypto::Decrypt(encryptedBase64);
 	if (result.IsEmpty() && !encryptedBase64.IsEmpty())
 	{
-		// Decryption failed, assume it was stored unencrypted
 		return encryptedBase64;
 	}
 	return result;
 }
 
-// ---------------------------------------------------------------------------
-// IsEncryptionReady
-// ---------------------------------------------------------------------------
 BOOL CCloudEncryption::IsEncryptionReady()
 {
-	// Check if crypto module is initialized
-	// This is a local check - doesn't verify server state
 	BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
 	return enabled;
 }

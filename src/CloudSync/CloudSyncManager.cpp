@@ -444,6 +444,50 @@ BOOL CCloudSyncManager::DecryptClipFormats(nlohmann::json& formats)
 	}
 }
 
+BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
+{
+	if (!CGetSetOptions::GetCloudSyncEncryptionEnabled())
+		return FALSE;
+
+	try
+	{
+		std::string url = CStringToStdString(m_serverUrl);
+		httplib::Client cli(url);
+		cli.set_connection_timeout(5, 0);
+		cli.set_read_timeout(5, 0);
+		cli.set_default_headers({
+			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
+		});
+
+		auto res = cli.Get("/api/v1/encryption/salt");
+		if (!res || res->status != 200)
+			return FALSE;
+
+		auto responseJson = json::parse(res->body);
+		if (!responseJson.contains("data") || !responseJson["data"].contains("salt"))
+			return FALSE;
+
+		CString serverSalt(responseJson["data"]["salt"].get<std::string>().c_str());
+		CString localSalt = CGetSetOptions::GetCloudEncryptionSalt();
+
+		if (serverSalt != localSalt)
+		{
+			LogMessage(_T("CheckAndNotifyEncryptionChange: salt changed, notifying user."));
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 998, 0);
+			}
+			return TRUE;
+		}
+	}
+	catch (...)
+	{
+		// Silent fail
+	}
+	return FALSE;
+}
+
 UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 {
 	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
@@ -482,6 +526,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		// Sync interval elapsed or WS triggered, perform sync
 		try
 		{
+			pThis->CheckAndNotifyEncryptionChange();
 			pThis->PushNewClips();
 			pThis->PullChanges();
 		}

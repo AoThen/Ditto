@@ -154,6 +154,7 @@ func main() {
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
 			encryption.POST("/disable", encryptionHandler.DisableEncryption)
 			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
 		}

@@ -118,6 +118,9 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
+			encryption.POST("/disable", encryptionHandler.DisableEncryption)
+			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
 		}
 	}
 
@@ -219,6 +222,9 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
+			encryption.POST("/disable", encryptionHandler.DisableEncryption)
+			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
 		}
 	}
 
@@ -326,6 +332,9 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 		{
 			encryption.POST("/setup", encryptionHandler.SetupEncryption)
 			encryption.GET("/salt", encryptionHandler.GetEncryptionSalt)
+			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
+			encryption.POST("/disable", encryptionHandler.DisableEncryption)
+			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
 		}
 
 		// WebSocket route

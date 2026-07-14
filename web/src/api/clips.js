@@ -1,6 +1,5 @@
 import request from '@/api/request'
 
-// List clips with pagination
 export function listClips(params = {}) {
   return request({
     url: '/api/v1/clips',
@@ -9,7 +8,6 @@ export function listClips(params = {}) {
   })
 }
 
-// Get single clip detail
 export function getClip(id) {
   return request({
     url: `/api/v1/clips/${id}`,
@@ -17,7 +15,6 @@ export function getClip(id) {
   })
 }
 
-// Get incremental changes since timestamp
 export function getChanges(since) {
   return request({
     url: '/api/v1/clips/changes',
@@ -26,7 +23,6 @@ export function getChanges(since) {
   })
 }
 
-// Delete clip
 export function deleteClip(id) {
   return request({
     url: `/api/v1/clips/${id}`,
@@ -34,7 +30,6 @@ export function deleteClip(id) {
   })
 }
 
-// Get encryption salt
 export function getEncryptionSalt() {
   return request({
     url: '/api/v1/encryption/salt',
@@ -42,7 +37,13 @@ export function getEncryptionSalt() {
   })
 }
 
-// Setup encryption
+export function getKeyMaterial() {
+  return request({
+    url: '/api/v1/encryption/key-material',
+    method: 'get'
+  })
+}
+
 export function setupEncryption(data) {
   return request({
     url: '/api/v1/encryption/setup',
@@ -51,7 +52,6 @@ export function setupEncryption(data) {
   })
 }
 
-// Disable encryption
 export function disableEncryption() {
   return request({
     url: '/api/v1/encryption/disable',
@@ -59,11 +59,10 @@ export function disableEncryption() {
   })
 }
 
-// Change encryption password (updates hint only)
-export function changeEncryptionPassword(passwordHint) {
+export function changeEncryptionPassword(data) {
   return request({
     url: '/api/v1/encryption/change-password',
     method: 'post',
-    data: { password_hint: passwordHint }
+    data
   })
 }
