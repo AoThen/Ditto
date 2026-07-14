@@ -86,15 +86,46 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install MFC libraries
+        continue-on-error: true
         shell: pwsh
         run: |
           $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          Write-Host "=== Diagnose VS installation ==="
+          Write-Host "vswhere exists: $(Test-Path $vswhere)"
+
           $vsPath = & $vswhere -latest -property installationPath
-          Write-Host "VS installation path: $vsPath"
+          Write-Host "VS installationPath: $vsPath"
+          Write-Host "VS path exists: $(Test-Path $vsPath)"
+
+          & $vswhere -latest -property catalog_productLine
+          & $vswhere -latest -property catalog_productLineVersion
+          & $vswhere -latest -property catalog_productMilestone
+          & $vswhere -latest -property installationVersion
+
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          & $installer modify --installPath $vsPath --add Microsoft.VisualStudio.Component.VC.ATLMFC --passive --wait --norestart
-          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw "MFC install failed (exit code: $LASTEXITCODE)" }
-          Write-Host "MFC installed successfully"
+          Write-Host "installer exists: $(Test-Path $installer)"
+
+          # Try multiple known MFC component IDs
+          $components = @(
+            "Microsoft.VisualStudio.Component.VC.ATLMFC",
+            "Microsoft.VisualStudio.Component.VC.ATLMFC.ARM64",
+            "Microsoft.VisualStudio.ComponentGroup.NativeDesktop.MFC",
+            "Microsoft.VisualStudio.Component.VC.v143.ATL",
+            "Microsoft.VisualStudio.Component.VC.v143.MFC"
+          )
+
+          foreach ($comp in $components) {
+            Write-Host "--- Trying component: $comp ---"
+            & $installer modify --installPath $vsPath --add $comp --passive --wait --norestart --noUpdateInstaller
+            $exitCode = $LASTEXITCODE
+            Write-Host "Exit code: $exitCode"
+            if ($exitCode -eq 0 -or $exitCode -eq 3010) {
+              Write-Host "SUCCESS with component: $comp"
+              break
+            }
+          }
+
+          Write-Host "=== Diagnostic done ==="
 
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
