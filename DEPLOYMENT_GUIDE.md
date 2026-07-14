@@ -142,7 +142,7 @@ docker-compose -f docker-compose.prod.yml up -d
 docker-compose -f docker-compose.prod.yml ps
 
 # 测试 HTTPS 端点
-curl -k https://localhost:8443/health
+curl -k https://localhost/health
 ```
 
 ### 步骤 5: 配置防火墙
@@ -563,7 +563,7 @@ docker-compose -f docker-compose.prod.yml up -d
 docker-compose -f docker-compose.prod.yml ps
 
 # Test HTTPS endpoint
-curl -k https://localhost:8443/health
+curl -k https://localhost/health
 ```
 
 #### Step 5: Configure Firewall
@@ -931,9 +931,9 @@ docker info
 docker-compose -f docker-compose.prod.yml ps
 
 # 3. Check backend health
-curl -k https://localhost:8443/health
+curl -k https://localhost/health
 
-# 4. Check frontend
+# 4. Check web panel
 curl -k https://localhost/
 
 # 5. Check logs for errors
@@ -946,7 +946,7 @@ docker exec ditto-backend ls -la /app/data/
 openssl x509 -in certs/server.crt -noout -dates
 
 # 8. Test WebSocket connection
-wscat -c wss://localhost:8443/api/v1/ws
+wscat -c wss://localhost/api/v1/ws
 
 # 9. Check resource usage
 docker stats --no-stream

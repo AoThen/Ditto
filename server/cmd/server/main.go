@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +23,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
+
+// noListFileSystem wraps http.FileSystem to disable directory listing
+type noListFileSystem struct {
+	fs http.FileSystem
+}
+
+func (n noListFileSystem) Open(name string) (http.File, error) {
+	f, err := n.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	if stat.IsDir() {
+		f.Close()
+		return nil, os.ErrNotExist
+	}
+	return f, nil
+}
 
 func main() {
 	// Load .env file if it exists
@@ -169,7 +192,8 @@ func main() {
 	}
 
 	// Serve static web assets (Vite build output under web-dist/)
-	r.Static("/assets", "./web-dist/assets")
+	// Use noListFileSystem to prevent directory listing (fingerprinting)
+	r.StaticFS("/assets", noListFileSystem{http.Dir("./web-dist/assets")})
 
 	// SPA fallback: any non-API path returns index.html
 	r.NoRoute(func(c *gin.Context) {
@@ -178,9 +202,13 @@ func main() {
 			c.Status(http.StatusNotFound)
 			return
 		}
-		filePath := "./web-dist" + path
-		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-			c.File(filePath)
+		cleaned := filepath.Clean(filepath.Join("./web-dist", path))
+		if !strings.HasPrefix(cleaned, filepath.Clean("./web-dist")) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		if info, err := os.Stat(cleaned); err == nil && !info.IsDir() {
+			c.File(cleaned)
 			return
 		}
 		c.File("./web-dist/index.html")
