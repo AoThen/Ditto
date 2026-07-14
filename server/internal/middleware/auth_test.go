@@ -9,6 +9,7 @@ import (
 
 	"ditto-cloud-server/internal/config"
 	"ditto-cloud-server/internal/database"
+	"ditto-cloud-server/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -188,6 +189,15 @@ func TestAuth_Success(t *testing.T) {
 
 	router := createTestRouter(cfg)
 
+	// Ensure the user and device exist in the database for token_version check
+	database.DB.Create(&model.User{ID: 123, Username: "testuser", Email: "test@example.com", PasswordHash: "hash", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+	database.DB.Create(&model.Device{
+		ID:         "device-456",
+		UserID:     123,
+		DeviceName: "TestDevice",
+		LastSeen:   time.Now(),
+	})
+
 	// Create valid token
 	tokenStr, err := generateTestToken(cfg, 123, "device-456")
 	require.NoError(t, err)
@@ -258,6 +268,15 @@ func TestClaims_Structure(t *testing.T) {
 	defer cleanup()
 
 	router := createTestRouter(cfg)
+
+	// Ensure the user and device exist in the database for token_version check
+	database.DB.Create(&model.User{ID: 999, Username: "claimsuser", Email: "claims@example.com", PasswordHash: "hash", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+	database.DB.Create(&model.Device{
+		ID:         "custom-device",
+		UserID:     999,
+		DeviceName: "CustomDevice",
+		LastSeen:   time.Now(),
+	})
 
 	// Create token with custom claims
 	claims := &Claims{

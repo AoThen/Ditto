@@ -61,12 +61,16 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	deviceSvc := service.NewDeviceService()
 	clipSvc := service.NewClipService(nil) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
+	groupSvc := service.NewGroupService()
+	statsSvc := service.NewStatsService()
 	rateLimiter := middleware.NewRateLimiter()
 
 	authHandler := handler.NewAuthHandler(authSvc, rateLimiter)
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 	clipHandler := handler.NewClipHandler(clipSvc)
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
+	groupHandler := handler.NewGroupHandler(groupSvc)
+	statsHandler := handler.NewStatsHandler(statsSvc)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -109,9 +113,24 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		clips := protected.Group("/clips")
 		{
 			clips.GET("", clipHandler.ListClips)
+			clips.GET("/changes", clipHandler.GetChanges)
+			clips.GET("/conflicts", clipHandler.ListConflictClips)
 			clips.GET("/:id", clipHandler.GetClip)
+			clips.GET("/:id/download", clipHandler.DownloadClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
+			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+		}
+
+		groups := protected.Group("/groups")
+		{
+			groups.GET("", groupHandler.ListGroups)
+			groups.GET("/:id", groupHandler.GetGroup)
+			groups.POST("", groupHandler.CreateGroup)
+			groups.PUT("/:id", groupHandler.UpdateGroup)
+			groups.DELETE("/:id", groupHandler.DeleteGroup)
+			groups.POST("/:id/move-clips", groupHandler.MoveClipsToGroup)
 		}
 
 		encryption := protected.Group("/encryption")
@@ -121,6 +140,12 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
 			encryption.POST("/disable", encryptionHandler.DisableEncryption)
 			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
+		}
+
+		stats := protected.Group("/stats")
+		{
+			stats.GET("/overview", statsHandler.GetOverview)
+			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
 	}
 
@@ -169,12 +194,16 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	deviceSvc := service.NewDeviceService()
 	clipSvc := service.NewClipService(nil) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
+	groupSvc := service.NewGroupService()
+	statsSvc := service.NewStatsService()
 	rateLimiter := middleware.NewRateLimiter()
 
 	authHandler := handler.NewAuthHandler(authSvc, rateLimiter)
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 	clipHandler := handler.NewClipHandler(clipSvc)
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
+	groupHandler := handler.NewGroupHandler(groupSvc)
+	statsHandler := handler.NewStatsHandler(statsSvc)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -213,9 +242,24 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 		clips := protected.Group("/clips")
 		{
 			clips.GET("", clipHandler.ListClips)
+			clips.GET("/changes", clipHandler.GetChanges)
+			clips.GET("/conflicts", clipHandler.ListConflictClips)
 			clips.GET("/:id", clipHandler.GetClip)
+			clips.GET("/:id/download", clipHandler.DownloadClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
+			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+		}
+
+		groups := protected.Group("/groups")
+		{
+			groups.GET("", groupHandler.ListGroups)
+			groups.GET("/:id", groupHandler.GetGroup)
+			groups.POST("", groupHandler.CreateGroup)
+			groups.PUT("/:id", groupHandler.UpdateGroup)
+			groups.DELETE("/:id", groupHandler.DeleteGroup)
+			groups.POST("/:id/move-clips", groupHandler.MoveClipsToGroup)
 		}
 
 		encryption := protected.Group("/encryption")
@@ -225,6 +269,12 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
 			encryption.POST("/disable", encryptionHandler.DisableEncryption)
 			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
+		}
+
+		stats := protected.Group("/stats")
+		{
+			stats.GET("/overview", statsHandler.GetOverview)
+			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
 	}
 
@@ -278,12 +328,16 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	deviceSvc := service.NewDeviceService()
 	clipSvc := service.NewClipService(h) // hub as broadcaster for real-time push
 	encryptionSvc := service.NewEncryptionService()
+	groupSvc := service.NewGroupService()
+	statsSvc := service.NewStatsService()
 	rateLimiter := middleware.NewRateLimiter()
 
 	authHandler := handler.NewAuthHandler(authSvc, rateLimiter)
 	deviceHandler := handler.NewDeviceHandler(deviceSvc)
 	clipHandler := handler.NewClipHandler(clipSvc)
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
+	groupHandler := handler.NewGroupHandler(groupSvc)
+	statsHandler := handler.NewStatsHandler(statsSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
 
 	r := gin.New()
@@ -323,9 +377,24 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 		clips := protected.Group("/clips")
 		{
 			clips.GET("", clipHandler.ListClips)
+			clips.GET("/changes", clipHandler.GetChanges)
+			clips.GET("/conflicts", clipHandler.ListConflictClips)
 			clips.GET("/:id", clipHandler.GetClip)
+			clips.GET("/:id/download", clipHandler.DownloadClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
 			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
+			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+		}
+
+		groups := protected.Group("/groups")
+		{
+			groups.GET("", groupHandler.ListGroups)
+			groups.GET("/:id", groupHandler.GetGroup)
+			groups.POST("", groupHandler.CreateGroup)
+			groups.PUT("/:id", groupHandler.UpdateGroup)
+			groups.DELETE("/:id", groupHandler.DeleteGroup)
+			groups.POST("/:id/move-clips", groupHandler.MoveClipsToGroup)
 		}
 
 		encryption := protected.Group("/encryption")
@@ -335,6 +404,12 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 			encryption.GET("/key-material", encryptionHandler.GetKeyMaterial)
 			encryption.POST("/disable", encryptionHandler.DisableEncryption)
 			encryption.POST("/change-password", encryptionHandler.ChangeEncryptionPassword)
+		}
+
+		stats := protected.Group("/stats")
+		{
+			stats.GET("/overview", statsHandler.GetOverview)
+			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
 
 		// WebSocket route
@@ -445,6 +520,12 @@ func AuthPost(t *testing.T, server *httptest.Server, path, token string, body in
 func AuthDelete(t *testing.T, server *httptest.Server, path, token string) (int, []byte) {
 	t.Helper()
 	return doJSON(t, server, "DELETE", path, token, nil, "")
+}
+
+// AuthPut performs an authenticated PUT request.
+func AuthPut(t *testing.T, server *httptest.Server, path, token string, body interface{}) (int, []byte) {
+	t.Helper()
+	return doJSON(t, server, "PUT", path, token, body, "")
 }
 
 // AuthPostWithIP performs an authenticated POST request with a specific X-Forwarded-For IP.

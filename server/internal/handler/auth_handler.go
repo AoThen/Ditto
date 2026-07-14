@@ -23,6 +23,12 @@ func NewAuthHandler(svc *service.AuthService, rl *middleware.RateLimiter) *AuthH
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
+	// Only allow registration when no users exist (first user becomes admin)
+	if !service.RegisterAllowed() {
+		response.Error(c, http.StatusForbidden, 40302, "注册已关闭，请联系管理员")
+		return
+	}
+
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
@@ -79,7 +85,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	setAuthCookies(c, resp.DeviceToken, resp.RefreshToken, resp.DeviceID, h.service)
 
 	response.Success(c, gin.H{
-		"message": "登录成功",
+		"message":      "登录成功",
+		"device_token":  resp.DeviceToken,
+		"refresh_token": resp.RefreshToken,
+		"device_id":     resp.DeviceID,
+		"role":          resp.Role,
 	})
 }
 

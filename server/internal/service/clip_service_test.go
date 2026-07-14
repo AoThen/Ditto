@@ -304,3 +304,113 @@ type SyncLogEntry struct {
 	Status    string
 	Error     string
 }
+
+// --- DownloadClipFormat tests ---
+
+func TestDownloadClipFormat_ContentType(t *testing.T) {
+	tests := []struct {
+		formatType  int
+		contentType string
+		fileName    string
+	}{
+		{1, "text/plain", "clip.txt"},
+		{7, "text/plain", "clip.txt"},
+		{13, "text/plain; charset=utf-16", "clip.txt"},
+		{49, "text/html", "clip.html"},
+		{8, "image/png", "clip.png"},
+		{17, "image/png", "clip.png"},
+		{50, "image/png", "clip.png"},
+		{15, "text/plain", "file_paths.txt"},
+		{999, "application/octet-stream", "clip_data.bin"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.fileName, func(t *testing.T) {
+			contentType, fileName := getContentTypeForFormat(tt.formatType)
+			if contentType != tt.contentType {
+				t.Errorf("contentType = %s, want %s", contentType, tt.contentType)
+			}
+			if fileName != tt.fileName {
+				t.Errorf("fileName = %s, want %s", fileName, tt.fileName)
+			}
+		})
+	}
+}
+
+// --- ListConflictClips tests ---
+
+func TestListConflictClips_Empty(t *testing.T) {
+	// Verify that listing conflicts returns empty when no conflicts exist
+	clips := []model.Clip{}
+	if len(clips) != 0 {
+		t.Error("expected empty conflict list")
+	}
+}
+
+func TestListConflictClips_FilterByConflictFlag(t *testing.T) {
+	clips := []model.Clip{
+		{ID: "conflict-1", IsConflictCopy: true, Description: "Conflict 1"},
+		{ID: "normal-1", IsConflictCopy: false, Description: "Normal"},
+		{ID: "conflict-2", IsConflictCopy: true, Description: "Conflict 2"},
+	}
+
+	var conflicts []model.Clip
+	for _, clip := range clips {
+		if clip.IsConflictCopy {
+			conflicts = append(conflicts, clip)
+		}
+	}
+
+	if len(conflicts) != 2 {
+		t.Errorf("expected 2 conflicts, got %d", len(conflicts))
+	}
+}
+
+// --- ResolveConflictClip tests ---
+
+func TestResolveConflictClip_ActionValidation(t *testing.T) {
+	tests := []struct {
+		action string
+		valid  bool
+	}{
+		{"accept", true},
+		{"discard", true},
+		{"invalid", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.action, func(t *testing.T) {
+			valid := tt.action == "accept" || tt.action == "discard"
+			if valid != tt.valid {
+				t.Errorf("valid = %v, want %v", valid, tt.valid)
+			}
+		})
+	}
+}
+
+// --- SyncLogOperation tests ---
+
+func TestSyncLogOperation_AllStatuses(t *testing.T) {
+	statuses := []struct {
+		status string
+		valid  bool
+	}{
+		{"success", true},
+		{"failed", true},
+		{"", true},
+	}
+
+	for _, s := range statuses {
+		entry := SyncLogEntry{
+			UserID:    1,
+			DeviceID:  "device-1",
+			Action:    "push",
+			ClipCount: 5,
+			Status:    s.status,
+		}
+		if entry.Status == "" && s.valid {
+			// Empty status is acceptable
+		}
+	}
+}

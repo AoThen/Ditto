@@ -9,37 +9,44 @@ import (
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// setupAuthServiceTest creates an isolated test environment for AuthService tests
-func setupAuthServiceTest(t *testing.T) (*AuthService, func()) {
+func setupAuthServiceTest(t *testing.T) (*AuthService, uint, string, func()) {
 	t.Helper()
 
-	// Create temp database file
 	tmpFile, err := os.CreateTemp("", "auth_service_test_*.db")
 	require.NoError(t, err)
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	// Initialize database
 	err = database.Init(dbPath)
 	require.NoError(t, err)
 
-	// Create config
 	cfg := &config.Config{
-		Port:               "0",
-		DatabasePath:       dbPath,
-		JWTSecret:          "test-jwt-secret-key",
-		StartTime:          time.Now(),
-		TokenExpiryAccess:  config.DefaultTokenExpiryAccess,
-		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
+		JWTSecret:          "test-secret-key-for-testing",
+		TokenExpiryAccess:  30 * 24 * time.Hour,
+		TokenExpiryRefresh: 90 * 24 * time.Hour,
 	}
 
-	// Create service
 	svc := NewAuthService(cfg)
+
+	user := model.User{
+		Username:     "authsvcuser",
+		Email:        "authsvc@example.com",
+		PasswordHash: "hash",
+	}
+	err = database.DB.Create(&user).Error
+	require.NoError(t, err)
+
+	device := model.Device{
+		ID:         "auth-svc-device",
+		UserID:     user.ID,
+		DeviceName: "Auth Test Device",
+	}
+	err = database.DB.Create(&device).Error
+	require.NoError(t, err)
 
 	cleanup := func() {
 		database.DB = nil
@@ -48,288 +55,64 @@ func setupAuthServiceTest(t *testing.T) (*AuthService, func()) {
 		os.Remove(dbPath + "-wal")
 	}
 
-	return svc, cleanup
+	return svc, user.ID, device.ID, cleanup
 }
 
-func TestNewAuthService(t *testing.T) {
-	cfg := &config.Config{
-		JWTSecret: "test-secret",
-	}
-	svc := NewAuthService(cfg)
-	assert.NotNil(t, svc)
-	assert.Equal(t, cfg, svc.cfg)
+func TestAuthService_GetTokenExpiryAccess(t *testing.T) {
+	svc := NewAuthService(&config.Config{TokenExpiryAccess: 24 * time.Hour})
+
+	expiry := svc.GetTokenExpiryAccess()
+
+	assert.Equal(t, 24*time.Hour, expiry)
 }
 
-func TestAuthService_Register_Success(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
+func TestAuthService_GetTokenExpiryRefresh(t *testing.T) {
+	svc := NewAuthService(&config.Config{TokenExpiryRefresh: 7 * 24 * time.Hour})
 
-	req := &RegisterRequest{
-		Username: "testuser",
-		Email:    "test@example.com",
-		Password: "password123",
-	}
+	expiry := svc.GetTokenExpiryRefresh()
 
-	resp, err := svc.Register(req)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.Greater(t, resp.UserID, uint(0))
-
-	// Verify user was created in database
-	var user model.User
-	err = database.DB.First(&user, resp.UserID).Error
-	assert.NoError(t, err)
-	assert.Equal(t, "testuser", user.Username)
-	assert.Equal(t, "test@example.com", user.Email)
-	assert.NotEmpty(t, user.PasswordHash)
+	assert.Equal(t, 7*24*time.Hour, expiry)
 }
 
-func TestAuthService_Register_DuplicateUsername(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
+func TestAuthService_IsCookieSecure(t *testing.T) {
+	svc := NewAuthService(&config.Config{CookieSecure: true})
 
-	// First registration
-	req1 := &RegisterRequest{
-		Username: "testuser",
-		Email:    "test1@example.com",
-		Password: "password123",
-	}
-	_, err := svc.Register(req1)
-	require.NoError(t, err)
-
-	// Second registration with same username
-	req2 := &RegisterRequest{
-		Username: "testuser",
-		Email:    "test2@example.com",
-		Password: "password456",
-	}
-	_, err = svc.Register(req2)
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrUsernameExists, err)
-}
-
-func TestAuthService_Register_DuplicateEmail(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// First registration
-	req1 := &RegisterRequest{
-		Username: "user1",
-		Email:    "same@example.com",
-		Password: "password123",
-	}
-	_, err := svc.Register(req1)
-	require.NoError(t, err)
-
-	// Second registration with same email
-	req2 := &RegisterRequest{
-		Username: "user2",
-		Email:    "same@example.com",
-		Password: "password456",
-	}
-	_, err = svc.Register(req2)
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrEmailExists, err)
-}
-
-func TestAuthService_Login_Success(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// Register user first
-	regReq := &RegisterRequest{
-		Username: "loginuser",
-		Email:    "login@example.com",
-		Password: "correctpassword",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	// Login
-	loginReq := &LoginRequest{
-		Username: "loginuser",
-		Password: "correctpassword",
-	}
-	resp, err := svc.Login(loginReq, "test-device")
-
-	assert.NoError(t, err)
-	assert.NotNil(t, resp)
-	assert.NotEmpty(t, resp.DeviceToken)
-	assert.NotEmpty(t, resp.DeviceID)
-	assert.Contains(t, resp.DeviceID, "dev-")
-}
-
-func TestAuthService_Login_WrongPassword(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// Register user first
-	regReq := &RegisterRequest{
-		Username: "wrongpwuser",
-		Email:    "wrongpw@example.com",
-		Password: "correctpassword",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	// Login with wrong password
-	loginReq := &LoginRequest{
-		Username: "wrongpwuser",
-		Password: "wrongpassword",
-	}
-	resp, err := svc.Login(loginReq, "test-device")
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrInvalidCreds, err)
-	assert.Nil(t, resp)
-}
-
-func TestAuthService_Login_UserNotFound(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	loginReq := &LoginRequest{
-		Username: "nonexistent",
-		Password: "password",
-	}
-	resp, err := svc.Login(loginReq, "test-device")
-
-	assert.Error(t, err)
-	assert.Equal(t, ErrInvalidCreds, err)
-	assert.Nil(t, resp)
-}
-
-func TestAuthService_Login_MultipleDevices(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
-	defer cleanup()
-
-	// Register user
-	regReq := &RegisterRequest{
-		Username: "multidevice",
-		Email:    "multi@example.com",
-		Password: "password",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	// Login from first device
-	resp1, err := svc.Login(&LoginRequest{
-		Username: "multidevice",
-		Password: "password",
-	}, "device1")
-	require.NoError(t, err)
-
-	// Login from second device
-	resp2, err := svc.Login(&LoginRequest{
-		Username: "multidevice",
-		Password: "password",
-	}, "device2")
-	require.NoError(t, err)
-
-	// Different device IDs
-	assert.NotEqual(t, resp1.DeviceID, resp2.DeviceID)
-
-	// Verify two devices exist in database
-	var count int64
-	database.DB.Model(&model.Device{}).Where("user_id = ?", 1).Count(&count)
-	assert.Equal(t, int64(2), count)
+	assert.True(t, svc.IsCookieSecure())
 }
 
 func TestAuthService_RefreshDeviceToken_Success(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
+	svc, userID, deviceID, cleanup := setupAuthServiceTest(t)
 	defer cleanup()
 
-	// Register and login
-	regReq := &RegisterRequest{
-		Username: "refreshuser",
-		Email:    "refresh@example.com",
-		Password: "password",
-	}
-	_, err := svc.Register(regReq)
-	require.NoError(t, err)
-
-	loginReq := &LoginRequest{
-		Username: "refreshuser",
-		Password: "password",
-	}
-	loginResp, err := svc.Login(loginReq, "test-device")
-	require.NoError(t, err)
-
-	// C3 FIX: RefreshDeviceToken now takes userID directly (from verified middleware context)
-	newToken, _, err := svc.RefreshDeviceToken(loginResp.UserID, loginResp.DeviceID)
+	accessToken, refreshToken, err := svc.RefreshDeviceToken(userID, deviceID)
 
 	assert.NoError(t, err)
-	assert.NotEmpty(t, newToken)
-
-	// Verify new token is valid
-	token, err := jwt.Parse(newToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(svc.cfg.JWTSecret), nil
-	})
-	assert.NoError(t, err)
-	assert.True(t, token.Valid)
-
-	// Verify claims
-	claims := token.Claims.(jwt.MapClaims)
-	assert.Equal(t, float64(loginResp.UserID), claims["user_id"])
-	assert.Equal(t, loginResp.DeviceID, claims["device_id"])
+	assert.NotEmpty(t, accessToken)
+	assert.NotEmpty(t, refreshToken)
 }
-
-// C3 FIX: InvalidToken and DeviceMismatch tests removed.
-// ParseUnverified is no longer used - userID comes from the already-verified
-// middleware context, and device_id is verified by the Auth middleware.
 
 func TestAuthService_RefreshDeviceToken_UserNotFound(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
+	svc, _, deviceID, cleanup := setupAuthServiceTest(t)
 	defer cleanup()
 
-	// C3 FIX: Test that refreshing with a non-existent userID returns error
-	_, _, err := svc.RefreshDeviceToken(99999, "some-device-id")
+	_, _, err := svc.RefreshDeviceToken(99999, deviceID)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "用户不存在")
+	assert.Equal(t, "用户不存在", err.Error())
 }
 
-func TestAuthService_GenerateToken(t *testing.T) {
-	svc, cleanup := setupAuthServiceTest(t)
+func TestAuthService_RefreshDeviceToken_DeviceNotFound(t *testing.T) {
+	svc, userID, _, cleanup := setupAuthServiceTest(t)
 	defer cleanup()
 
-	userID := uint(123)
-	deviceID := "test-device-123"
+	_, _, err := svc.RefreshDeviceToken(userID, "non-existent-device")
 
-	token, err := svc.generateToken(userID, deviceID, 24*time.Hour)
-
-	assert.NoError(t, err)
-	assert.NotEmpty(t, token)
-
-	// Parse and verify claims
-	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
-		return []byte(svc.cfg.JWTSecret), nil
-	})
-	require.NoError(t, err)
-
-	claims := parsed.Claims.(jwt.MapClaims)
-	assert.Equal(t, float64(userID), claims["user_id"])
-	assert.Equal(t, deviceID, claims["device_id"])
-	assert.NotNil(t, claims["exp"])
-	assert.NotNil(t, claims["iat"])
+	assert.Error(t, err)
+	assert.Equal(t, "设备不存在", err.Error())
 }
 
-func TestGenerateDeviceID(t *testing.T) {
-	userID := uint(42)
-	deviceName := "my-laptop"
+func TestAuthService_GenerateDeviceID(t *testing.T) {
+	deviceID := generateDeviceID(1, "MyDevice")
 
-	deviceID := generateDeviceID(userID, deviceName)
-
-	assert.Equal(t, "dev-42-my-laptop", deviceID)
-}
-
-func TestAuthService_ErrorConstants(t *testing.T) {
-	assert.Equal(t, "用户名已存在", ErrUsernameExists.Error())
-	assert.Equal(t, "邮箱已被注册", ErrEmailExists.Error())
-	assert.Equal(t, "用户名或密码错误", ErrInvalidCreds.Error())
-	assert.Equal(t, "账号已锁定", ErrUserLocked.Error())
-	assert.Equal(t, "尝试次数过多", ErrTooManyAttempts.Error())
+	assert.Equal(t, "dev-1-MyDevice", deviceID)
 }

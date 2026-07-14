@@ -58,7 +58,7 @@ func (h *StatsHandler) GetOverview(c *gin.Context) {
 		Count int64
 	}
 
-	var trend []DayCount
+	trend := make([]DayCount, 0)
 	database.DB.Raw(`
 		SELECT DATE(created_at) as date, COUNT(*) as count
 		FROM clips
