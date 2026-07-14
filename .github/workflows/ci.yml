@@ -78,44 +78,18 @@ jobs:
 
   # ── Windows Client (C++/MFC) ──────────────────────────────
   client-build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Install VC++ workload (includes MFC)
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-          Write-Host "Installing VC++ workload with MFC..."
-          & $installer modify --installPath $vsPath --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --wait --norestart
-          Write-Host "Exit code: $LASTEXITCODE"
-
-      - name: Verify MFC files
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $vsPath = "C:\Program Files\Microsoft Visual Studio\18\Enterprise"
-          Write-Host "=== MFC file verification ==="
-          $afxFiles = Get-ChildItem -Path $vsPath -Filter "afx.h" -Recurse -ErrorAction SilentlyContinue
-          Write-Host "afx.h found: $($afxFiles.Length) files"
-          foreach ($f in $afxFiles) { Write-Host "  $($f.FullName)" }
-          $mfcLibs = Get-ChildItem -Path $vsPath -Filter "mfc*.lib" -Recurse -ErrorAction SilentlyContinue
-          Write-Host "mfc*.lib found: $($mfcLibs.Length) files"
-          foreach ($f in $mfcLibs) { Write-Host "  $($f.FullName)" }
-          $atlmfcDirs = Get-ChildItem -Path $vsPath -Directory -Filter "atlmfc" -Recurse -ErrorAction SilentlyContinue
-          Write-Host "atlmfc dirs: $($atlmfcDirs.Length)"
-          foreach ($d in $atlmfcDirs) { Write-Host "  $($d.FullName)" }
-
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
 
       - name: Build (Release x64)
-        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64 /p:MfcUsable=true
+        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
 
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:
