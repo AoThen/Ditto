@@ -27,42 +27,23 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Install MFC libraries (v143) [diagnostic]
+      - name: Provide v143 MFC libs
         run: |
-          $ErrorActionPreference = 'Continue'
-          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
           $vsPath = vswhere -latest -property installationPath
-          $channelId = vswhere -latest -property channelId
-          $productId = vswhere -latest -property productId
-          $version = vswhere -latest -property installationVersion
-          Write-Host "=== VS info ==="
-          Write-Host "installPath : $vsPath"
-          Write-Host "channelId   : $channelId"
-          Write-Host "productId   : $productId"
-          Write-Host "version     : $version"
           $msvc = Join-Path $vsPath "VC\Tools\MSVC"
-          Write-Host "=== MSVC toolsets BEFORE ==="
-          Get-ChildItem $msvc -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.Name }
-          $log = "$env:RUNNER_TEMP\vs_install.log"
-          Write-Host "=== running vs_installer modify (log: $log) ==="
-          & $installer modify --channelId $channelId --productId $productId `
-            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64 `
-            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.MFC `
-            --add Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL `
-            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-            --quiet --wait --norestart --log $log
-          Write-Host "vs_installer exit code: $LASTEXITCODE"
-          Write-Host "=== installer log tail ==="
-          if (Test-Path $log) { Get-Content $log -Tail 50 | ForEach-Object { Write-Host $_ } }
-          Write-Host "=== MSVC toolsets AFTER ==="
-          Get-ChildItem $msvc -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.Name }
-          Write-Host "=== mfc*.lib under VC\Tools\MSVC ==="
-          Get-ChildItem $msvc -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
-          if ($LASTEXITCODE -ne 0) { throw "MFC install failed with code $LASTEXITCODE" }
-          $v143mfc = Get-ChildItem $msvc -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\MSVC\\14\.[34]' }
-          if (-not $v143mfc) { throw "No v143 (14.3x/14.4x) MFC libs found after install. See diagnostics above." }
-          Write-Host "=== v143 MFC FOUND ==="
-          $v143mfc | Select-Object -First 5 | ForEach-Object { Write-Host $_.FullName }
+          $v145 = Get-ChildItem $msvc -Directory | Where-Object { $_.Name -match '^14\.5' } | Sort-Object Name | Select-Object -Last 1
+          $v143 = Get-ChildItem $msvc -Directory | Where-Object { $_.Name -match '^14\.4[0-9]' } | Sort-Object Name | Select-Object -Last 1
+          if (-not $v143) { throw "No v143 toolset found under $msvc" }
+          if (-not $v145) { throw "No v145 toolset found under $msvc (source of MFC libs)" }
+          $src = Join-Path $v145.FullName "atlmfc"
+          $dst = Join-Path $v143.FullName "atlmfc"
+          if (Test-Path $dst) {
+            Write-Host "atlmfc already present in $($v143.Name); skipping copy"
+          } else {
+            Write-Host "Copying atlmfc from $($v145.Name) to $($v143.Name)"
+            Copy-Item $src $dst -Recurse
+          }
+          Get-ChildItem $dst -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Select-Object -First 3 | ForEach-Object { Write-Host "Found: $($_.FullName)" }
 
       - name: Restore NuGet packages
         working-directory: ${{env.GITHUB_WORKSPACE}}
