@@ -27,6 +27,11 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      - name: Install MFC libraries
+        run: |
+          $vsPath = vswhere -latest -property installationPath
+          & "$vsPath\Installer\vs_installer.exe" modify --installPath $vsPath --add "Microsoft.VisualStudio.Component.VC.ATLMFC" --quiet --norestart
+
       - name: Restore NuGet packages
         working-directory: ${{env.GITHUB_WORKSPACE}}
         run: nuget restore ${{env.SOLUTION_FILE_PATH}}
