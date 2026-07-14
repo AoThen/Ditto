@@ -115,7 +115,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build (Release x64)
-        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64 /p:MfcUsable=true
 
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:
