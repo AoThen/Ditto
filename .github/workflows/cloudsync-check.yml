@@ -43,25 +43,19 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install MFC component
+        shell: powershell
         run: |
-          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -products * `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-          if (-not (Test-Path $installer) -and $vsPath) {
-            $installer = Join-Path $vsPath "vs_installer.exe"
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          Write-Host "Installing MFC component at: $vsPath"
+          $proc = Start-Process -FilePath $installer -ArgumentList "modify", "--installPath", $vsPath, "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64", "--quiet", "--wait", "--norestart" -Wait -PassThru -NoNewWindow
+          $exitCode = $proc.ExitCode
+          Write-Host "vs_installer exit code: $exitCode"
+          if ($exitCode -ne 0 -and $exitCode -ne 3010) {
+            Write-Host "MFC installation failed with exit code: $exitCode"
+            exit $exitCode
           }
-          if (Test-Path $installer) {
-            Start-Process -Wait -FilePath $installer -ArgumentList @(
-              "modify", "--installPath", $vsPath,
-              "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64",
-              "--quiet", "--norestart"
-            )
-            Write-Host "MFC component installed"
-          } else {
-            Write-Host "vs_installer.exe not found, skipping MFC installation"
-          }
+          Write-Host "MFC component installed successfully"
 
       - name: Restore NuGet packages
         run: nuget restore ${{env.SOLUTION_FILE_PATH}}
@@ -135,25 +129,19 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install MFC component
+        shell: powershell
         run: |
-          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -products * `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-          if (-not (Test-Path $installer) -and $vsPath) {
-            $installer = Join-Path $vsPath "vs_installer.exe"
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          Write-Host "Installing MFC component at: $vsPath"
+          $proc = Start-Process -FilePath $installer -ArgumentList "modify", "--installPath", $vsPath, "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64", "--quiet", "--wait", "--norestart" -Wait -PassThru -NoNewWindow
+          $exitCode = $proc.ExitCode
+          Write-Host "vs_installer exit code: $exitCode"
+          if ($exitCode -ne 0 -and $exitCode -ne 3010) {
+            Write-Host "MFC installation failed with exit code: $exitCode"
+            exit $exitCode
           }
-          if (Test-Path $installer) {
-            Start-Process -Wait -FilePath $installer -ArgumentList @(
-              "modify", "--installPath", $vsPath,
-              "--add", "Microsoft.VisualStudio.Component.VC.MFC.x86.x64",
-              "--quiet", "--norestart"
-            )
-            Write-Host "MFC component installed"
-          } else {
-            Write-Host "vs_installer.exe not found, skipping MFC installation"
-          }
+          Write-Host "MFC component installed successfully"
 
       - name: Restore NuGet packages
         run: nuget restore ${{env.SOLUTION_FILE_PATH}}
