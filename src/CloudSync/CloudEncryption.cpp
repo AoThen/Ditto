@@ -10,6 +10,17 @@ using json = nlohmann::json;
 std::unique_ptr<httplib::Client> CCloudEncryption::m_httpClient;
 CString CCloudEncryption::m_httpClientUrl;
 
+// Helper: convert CString to std::string (with null safety)
+static std::string CStringToStdString(const CString& str)
+{
+	if (str.IsEmpty())
+		return std::string();
+	CT2A utf8(str, CP_UTF8);
+	if (utf8.m_psz == nullptr)
+		return std::string();
+	return std::string(utf8.m_psz);
+}
+
 void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString& deviceToken)
 {
 	std::string url = CStringToStdString(serverUrl);
@@ -19,21 +30,13 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
-		m_httpClient->set_default_headers({
-			{"Authorization", "Bearer " + CStringToStdString(deviceToken)}
-		});
+		{
+			httplib::Headers headers;
+			headers.emplace("Authorization", "Bearer " + CStringToStdString(deviceToken));
+			m_httpClient->set_default_headers(headers);
+		}
 		m_httpClientUrl = serverUrl;
 	}
-}
-
-static std::string CStringToStdString(const CString& str)
-{
-	if (str.IsEmpty())
-		return std::string();
-	CT2A utf8(str, CP_UTF8);
-	if (utf8.m_psz == nullptr)
-		return std::string();
-	return std::string(utf8.m_psz);
 }
 
 static CString StdStringToCString(const std::string& str)

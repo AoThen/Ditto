@@ -10,6 +10,17 @@ using json = nlohmann::json;
 std::unique_ptr<httplib::Client> CCloudAuth::m_httpClient;
 CString CCloudAuth::m_httpClientUrl;
 
+// Helper: convert CString to std::string (with null safety)
+static std::string CStringToStdString(const CString& str)
+{
+	if (str.IsEmpty())
+		return std::string();
+	CT2A utf8(str, CP_UTF8);
+	if (utf8.m_psz == nullptr)
+		return std::string();
+	return std::string(utf8.m_psz);
+}
+
 void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 {
 	std::string url = CStringToStdString(serverUrl);
@@ -21,17 +32,6 @@ void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 		m_httpClient->set_write_timeout(30, 0);
 		m_httpClientUrl = serverUrl;
 	}
-}
-
-// Helper: convert CString to std::string (with null safety)
-static std::string CStringToStdString(const CString& str)
-{
-	if (str.IsEmpty())
-		return std::string();
-	CT2A utf8(str, CP_UTF8);
-	if (utf8.m_psz == nullptr)
-		return std::string();
-	return std::string(utf8.m_psz);
 }
 
 // Helper: convert std::string to CString
