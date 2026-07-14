@@ -116,6 +116,9 @@ jobs:
       - name: Install web dependencies
         run: cd web && npm ci
 
+      - name: Build web frontend
+        run: cd web && npm run build && cp -r dist ../server/web-dist
+
       - name: Build Go server
         run: cd server && go build -o server ./cmd/server/
 
