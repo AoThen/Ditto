@@ -1,11 +1,17 @@
 package service
 
 import (
+	"encoding/base64"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
+	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSyncRequestValidation tests validation of sync requests
@@ -413,4 +419,367 @@ func TestSyncLogOperation_AllStatuses(t *testing.T) {
 			// Empty status is acceptable
 		}
 	}
+}
+
+// --- DB Integration Tests ---
+
+func setupClipServiceTest(t *testing.T) (*ClipService, uint, string, func()) {
+	t.Helper()
+
+	tmpFile, err := os.CreateTemp("", "clip_service_test_*.db")
+	require.NoError(t, err)
+	dbPath := tmpFile.Name()
+	tmpFile.Close()
+
+	err = database.Init(dbPath)
+	require.NoError(t, err)
+
+	svc := NewClipService(nil)
+
+	user := model.User{
+		Username:     "clipuser",
+		Email:        "clip@example.com",
+		PasswordHash: "hash",
+	}
+	err = database.DB.Create(&user).Error
+	require.NoError(t, err)
+
+	device := model.Device{
+		ID:         "test-device-1",
+		UserID:     user.ID,
+		DeviceName: "Test Device",
+	}
+	err = database.DB.Create(&device).Error
+	require.NoError(t, err)
+
+	clip := model.Clip{
+		ID:          "test-clip-1",
+		UserID:      user.ID,
+		DeviceID:    "test-device-1",
+		Description: "Test clip 1",
+		CRC:         12345,
+		GroupID:     "test-group-1",
+		ShortCut:    0,
+		PasteCount:  0,
+	}
+	err = database.DB.Create(&clip).Error
+	require.NoError(t, err)
+
+	format := model.ClipFormat{
+		ClipID:     "test-clip-1",
+		FormatType: 1,
+		Data:       []byte("hello world"),
+		Encrypted:  false,
+	}
+	err = database.DB.Create(&format).Error
+	require.NoError(t, err)
+
+	cleanup := func() {
+		database.DB = nil
+		os.Remove(dbPath)
+		os.Remove(dbPath + "-shm")
+		os.Remove(dbPath + "-wal")
+	}
+
+	return svc, user.ID, "test-device-1", cleanup
+}
+
+func TestListClips_Success(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	for i := 2; i <= 3; i++ {
+		clip := model.Clip{
+			ID:          fmt.Sprintf("test-clip-%d", i),
+			UserID:      userID,
+			DeviceID:    "test-device-1",
+			Description: fmt.Sprintf("Test clip %d", i),
+			CRC:         int64(10000 + i),
+		}
+		require.NoError(t, database.DB.Create(&clip).Error)
+	}
+
+	resp, err := svc.ListClips(userID, 1, 20, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), resp.Total)
+	assert.Len(t, resp.Items.([]ClipListItem), 3)
+}
+
+func TestListClips_WithSearch(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	clip2 := model.Clip{
+		ID:          "test-clip-search",
+		UserID:      userID,
+		DeviceID:    "test-device-1",
+		Description: "unique search term",
+		CRC:         99999,
+	}
+	require.NoError(t, database.DB.Create(&clip2).Error)
+
+	resp, err := svc.ListClips(userID, 1, 20, "unique", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), resp.Total)
+	assert.Len(t, resp.Items.([]ClipListItem), 1)
+
+	resp, err = svc.ListClips(userID, 1, 20, "nonexistent", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.Total)
+}
+
+func TestListClips_Empty(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	require.NoError(t, database.DB.Delete(&model.Clip{}, "user_id = ?", userID).Error)
+
+	resp, err := svc.ListClips(userID, 1, 20, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.Total)
+	assert.Len(t, resp.Items.([]ClipListItem), 0)
+}
+
+func TestListClips_Pagination(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	for i := 2; i <= 5; i++ {
+		clip := model.Clip{
+			ID:          fmt.Sprintf("test-clip-%d", i),
+			UserID:      userID,
+			DeviceID:    "test-device-1",
+			Description: fmt.Sprintf("Test clip %d", i),
+			CRC:         int64(10000 + i),
+		}
+		require.NoError(t, database.DB.Create(&clip).Error)
+	}
+
+	resp, err := svc.ListClips(userID, 1, 2, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), resp.Total)
+	assert.Len(t, resp.Items.([]ClipListItem), 2)
+	assert.Equal(t, 1, resp.Page)
+	assert.Equal(t, 2, resp.PerPage)
+}
+
+func TestGetClip_Success(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	detail, err := svc.GetClip(userID, "test-clip-1")
+	require.NoError(t, err)
+	assert.Equal(t, "test-clip-1", detail.ID)
+	assert.Equal(t, "Test clip 1", detail.Description)
+	assert.Len(t, detail.Formats, 1)
+	assert.Equal(t, 1, detail.Formats[0].FormatType)
+	assert.Equal(t, base64.StdEncoding.EncodeToString([]byte("hello world")), detail.Formats[0].Data)
+}
+
+func TestGetClip_NotFound(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	_, err := svc.GetClip(userID, "non-existent-id")
+	assert.Error(t, err)
+	assert.Equal(t, "剪贴板不存在", err.Error())
+}
+
+func TestGetClip_WrongUser(t *testing.T) {
+	svc, _, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	_, err := svc.GetClip(99999, "test-clip-1")
+	assert.Error(t, err)
+	assert.Equal(t, "剪贴板不存在", err.Error())
+}
+
+func TestDownloadClipFormat_Success(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	result, err := svc.DownloadClipFormat(userID, "test-clip-1", 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.FormatType)
+	assert.Equal(t, []byte("hello world"), result.Data)
+	assert.Equal(t, "text/plain", result.ContentType)
+	assert.Equal(t, "clip.txt", result.FileName)
+}
+
+func TestDownloadClipFormat_NotFound(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	_, err := svc.DownloadClipFormat(userID, "test-clip-1", 999)
+	assert.Error(t, err)
+	assert.Equal(t, "指定格式不存在", err.Error())
+}
+
+func TestDeleteClip_Success(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	err := svc.DeleteClip(userID, "test-clip-1")
+	require.NoError(t, err)
+
+	var count int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", "test-clip-1").Count(&count)
+	assert.Equal(t, int64(0), count)
+
+	database.DB.Model(&model.ClipFormat{}).Where("clip_id = ?", "test-clip-1").Count(&count)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestDeleteClip_NotFound(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	err := svc.DeleteClip(userID, "non-existent-id")
+	assert.Error(t, err)
+	assert.Equal(t, "剪贴板不存在", err.Error())
+}
+
+func TestSync_PushNewClip(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	data := base64.StdEncoding.EncodeToString([]byte("sync content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "sync-new-clip",
+				Description: "Pushed during sync",
+				CRC:         54321,
+				UpdatedAt:   time.Now(),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	var clip model.Clip
+	err = database.DB.Where("id = ?", "sync-new-clip").First(&clip).Error
+	require.NoError(t, err)
+	assert.Equal(t, "Pushed during sync", clip.Description)
+
+	var count int64
+	database.DB.Model(&model.ClipFormat{}).Where("clip_id = ?", "sync-new-clip").Count(&count)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestSync_PullChanges(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	otherClip := model.Clip{
+		ID:          "other-device-clip",
+		UserID:      userID,
+		DeviceID:    "other-device",
+		Description: "From other device",
+		CRC:         11111,
+		UpdatedAt:   time.Now(),
+	}
+	require.NoError(t, database.DB.Create(&otherClip).Error)
+
+	// Use test-device-1 as current device so setup clip is excluded from pull
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: "test-device-1",
+		Limit:    100,
+	}
+
+	resp, err := svc.Sync(userID, req, "")
+	require.NoError(t, err)
+	assert.Len(t, resp.NewClips, 1)
+	assert.Equal(t, "other-device-clip", resp.NewClips[0].ID)
+}
+
+func TestListConflictClips_WithConflicts(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	conflictClip := model.Clip{
+		ID:             "conflict-clip-1",
+		UserID:         userID,
+		DeviceID:       "test-device-1",
+		Description:    "Conflict clip",
+		CRC:            77777,
+		IsConflictCopy: true,
+	}
+	require.NoError(t, database.DB.Create(&conflictClip).Error)
+
+	clips, err := svc.ListConflictClips(userID)
+	require.NoError(t, err)
+	assert.Len(t, clips, 1)
+	assert.Equal(t, "conflict-clip-1", clips[0].ID)
+	assert.True(t, clips[0].IsConflictCopy)
+}
+
+func TestResolveConflictClip_Accept(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	conflictClip := model.Clip{
+		ID:             "conflict-accept",
+		UserID:         userID,
+		DeviceID:       "test-device-1",
+		Description:    "Accepted version",
+		CRC:            88888,
+		IsConflictCopy: true,
+		WinClipID:      "test-clip-1",
+	}
+	require.NoError(t, database.DB.Create(&conflictClip).Error)
+
+	format := model.ClipFormat{
+		ClipID:     "conflict-accept",
+		FormatType: 1,
+		Data:       []byte("accepted data"),
+	}
+	require.NoError(t, database.DB.Create(&format).Error)
+
+	err := svc.ResolveConflictClip(userID, "conflict-accept", "accept")
+	require.NoError(t, err)
+
+	var count int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", "conflict-accept").Count(&count)
+	assert.Equal(t, int64(0), count)
+}
+
+func TestResolveConflictClip_Discard(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	conflictClip := model.Clip{
+		ID:             "conflict-discard",
+		UserID:         userID,
+		DeviceID:       "test-device-1",
+		Description:    "Discarded version",
+		CRC:            88888,
+		IsConflictCopy: true,
+	}
+	require.NoError(t, database.DB.Create(&conflictClip).Error)
+
+	format := model.ClipFormat{
+		ClipID:     "conflict-discard",
+		FormatType: 1,
+		Data:       []byte("discarded data"),
+	}
+	require.NoError(t, database.DB.Create(&format).Error)
+
+	err := svc.ResolveConflictClip(userID, "conflict-discard", "discard")
+	require.NoError(t, err)
+
+	var count int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", "conflict-discard").Count(&count)
+	assert.Equal(t, int64(0), count)
+
+	database.DB.Model(&model.ClipFormat{}).Where("clip_id = ?", "conflict-discard").Count(&count)
+	assert.Equal(t, int64(0), count)
 }
