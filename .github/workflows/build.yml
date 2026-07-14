@@ -1,7 +1,8 @@
 name: MSBuild
 
 on:
-  workflow_dispatch:  # 允许手动触发
+  push:
+    branches: [ master ]
 
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln

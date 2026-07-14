@@ -52,6 +52,8 @@ protected:
 	virtual BOOL OnInitDialog();
 	virtual BOOL OnApply();
 
+	CString m_csTitle;
+
 	DECLARE_MESSAGE_MAP()
 
 	afx_msg void OnBtnLogin();

@@ -363,6 +363,7 @@
 		<Item English_Text = "Quick Paste" ID = "QuickPasteTitle"></Item>
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle"></Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle"></Item>
+		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle"></Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database"></Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao"></Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format"></Item>

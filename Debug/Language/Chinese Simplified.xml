@@ -363,6 +363,7 @@
 		<Item English_Text = "Quick Paste" ID = "QuickPasteTitle">快速粘贴</Item>
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle">键盘快捷键</Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle">关于 Ditto</Item>
+		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle">云端同步</Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database">打开数据库时出错。</Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao">无法初始化 DAO/Jet 数据库引擎。\n选择 '是' 将从 http://ditto-cp.sourceforge.net/dao_setup.exe 下载 DAO。\n\n安装 DAO 后请重新启动 Ditto。</Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format">无法识别的数据库格式</Item>

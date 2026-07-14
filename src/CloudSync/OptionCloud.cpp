@@ -86,8 +86,8 @@ COptionCloud::COptionCloud()
 	, m_csEncryptionStatus(_T(""))
 	, m_bEncryptionEnabled(FALSE)
 {
-	// Set property sheet title to "Cloud Sync" (Chinese: 云端同步)
-	m_psp.pszTitle = _T("云端同步");
+	m_csTitle = theApp.m_Language.GetString("CloudSyncTitle", "Cloud Sync");
+	m_psp.pszTitle = m_csTitle;
 	m_psp.dwFlags |= PSP_USETITLE;
 }
 
