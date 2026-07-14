@@ -66,21 +66,21 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		EnsureHttpClient(serverUrl, deviceToken);
 		if (!m_httpClient)
 		{
-			result.error = _T("无法创建 HTTP 客户端");
+			result.error = _T("Failed to create HTTP client");
 			return result;
 		}
 
 		auto saltRes = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!saltRes || saltRes->status != 200)
 		{
-			result.error = _T("无法从服务器获取加密盐值");
+			result.error = _T("Failed to get encryption salt from server");
 			return result;
 		}
 
 		auto saltJson = json::parse(saltRes->body);
 		if (!saltJson.contains("data") || !saltJson["data"].contains("salt"))
 		{
-			result.error = _T("服务器响应无效");
+			result.error = _T("Invalid server response");
 			return result;
 		}
 
@@ -96,14 +96,14 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		CStringA wrappedDEK = CCloudCrypto::WrapKey(kek, dek);
 		if (wrappedDEK.IsEmpty())
 		{
-			result.error = _T("密钥包裹失败");
+			result.error = _T("Key wrapping failed");
 			return result;
 		}
 
 		CStringA verificationHash = ComputeVerificationHashForPassword(password, saltB64);
 		if (verificationHash.IsEmpty())
 		{
-			result.error = _T("验证哈希计算失败");
+			result.error = _T("Verification hash calculation failed");
 			return result;
 		}
 
@@ -115,7 +115,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		auto setupRes = m_httpClient->Post("/api/v1/encryption/setup", body.dump(), "application/json");
 		if (!setupRes)
 		{
-			result.error = _T("无法连接服务器（网络错误）");
+			result.error = _T("Failed to connect to server (network error)");
 			return result;
 		}
 
@@ -127,11 +127,11 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 				if (errJson.contains("message"))
 					result.error = StdStringToCString(errJson["message"].get<std::string>());
 				else
-					result.error.Format(_T("服务器返回 HTTP %d"), setupRes->status);
+					result.error.Format(_T("Server returned HTTP %d"), setupRes->status);
 			}
 			catch (...)
 			{
-				result.error.Format(_T("服务器返回 HTTP %d"), setupRes->status);
+				result.error.Format(_T("Server returned HTTP %d"), setupRes->status);
 			}
 			return result;
 		}
@@ -146,7 +146,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 
 		if (!responseJson.contains("data"))
 		{
-			result.error = _T("服务器响应无效");
+			result.error = _T("Invalid server response");
 			return result;
 		}
 
@@ -156,7 +156,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 
 		if (!CCloudCrypto::Initialize(dek))
 		{
-			result.error = _T("加密初始化失败");
+			result.error = _T("Encryption initialization failed");
 			return result;
 		}
 
@@ -169,11 +169,11 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 	}
 	catch (const json::parse_error& e)
 	{
-		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+		result.error.Format(_T("JSON parse error: %hs"), e.what());
 	}
 	catch (const std::exception& e)
 	{
-		result.error.Format(_T("错误: %hs"), e.what());
+		result.error.Format(_T("Error: %hs"), e.what());
 	}
 
 	return result;
@@ -191,14 +191,14 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 		EnsureHttpClient(serverUrl, deviceToken);
 		if (!m_httpClient)
 		{
-			result.error = _T("无法创建 HTTP 客户端");
+			result.error = _T("Failed to create HTTP client");
 			return result;
 		}
 
 		auto res = m_httpClient->Get("/api/v1/encryption/salt");
 		if (!res)
 		{
-			result.error = _T("无法连接服务器（网络错误）");
+			result.error = _T("Failed to connect to server (network error)");
 			return result;
 		}
 
@@ -210,11 +210,11 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 				if (errJson.contains("message"))
 					result.error = StdStringToCString(errJson["message"].get<std::string>());
 				else
-					result.error.Format(_T("服务器返回 HTTP %d"), res->status);
+					result.error.Format(_T("Server returned HTTP %d"), res->status);
 			}
 			catch (...)
 			{
-				result.error.Format(_T("服务器返回 HTTP %d"), res->status);
+				result.error.Format(_T("Server returned HTTP %d"), res->status);
 			}
 			return result;
 		}
@@ -229,7 +229,7 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 
 		if (!responseJson.contains("data"))
 		{
-			result.error = _T("服务器响应无效");
+			result.error = _T("Invalid server response");
 			return result;
 		}
 
@@ -245,11 +245,11 @@ EncryptionStatusResult CCloudEncryption::GetEncryptionStatus(
 	}
 	catch (const json::parse_error& e)
 	{
-		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+		result.error.Format(_T("JSON parse error: %hs"), e.what());
 	}
 	catch (const std::exception& e)
 	{
-		result.error.Format(_T("错误: %hs"), e.what());
+		result.error.Format(_T("Error: %hs"), e.what());
 	}
 
 	return result;
@@ -269,21 +269,21 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 		EnsureHttpClient(serverUrl, deviceToken);
 		if (!m_httpClient)
 		{
-			result.error = _T("无法创建 HTTP 客户端");
+			result.error = _T("Failed to create HTTP client");
 			return result;
 		}
 
 		auto keyRes = m_httpClient->Get("/api/v1/encryption/key-material");
 		if (!keyRes || keyRes->status != 200)
 		{
-			result.error = _T("无法从服务器获取密钥材料");
+			result.error = _T("Failed to get key material from server");
 			return result;
 		}
 
 		auto keyJson = json::parse(keyRes->body);
 		if (!keyJson.contains("data") || !keyJson["data"].contains("wrapped_dek") || !keyJson["data"].contains("salt"))
 		{
-			result.error = _T("服务器响应无效：缺少密钥材料");
+			result.error = _T("Invalid server response: missing key material");
 			return result;
 		}
 
@@ -299,7 +299,7 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 		std::vector<BYTE> dek = CCloudCrypto::UnwrapKey(oldKEK, wrappedDEKB64);
 		if (dek.empty())
 		{
-			result.error = _T("旧密码验证失败，无法解包密钥");
+			result.error = _T("Old password verification failed, unable to unwrap key");
 			return result;
 		}
 
@@ -313,7 +313,7 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 		CStringA newWrappedDEK = CCloudCrypto::WrapKey(newKEK, dek);
 		if (newWrappedDEK.IsEmpty())
 		{
-			result.error = _T("新密钥包裹失败");
+			result.error = _T("New key wrapping failed");
 			return result;
 		}
 
@@ -330,7 +330,7 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 		auto changeRes = m_httpClient->Post("/api/v1/encryption/change-password", body.dump(), "application/json");
 		if (!changeRes)
 		{
-			result.error = _T("无法连接服务器（网络错误）");
+			result.error = _T("Failed to connect to server (network error)");
 			return result;
 		}
 
@@ -342,11 +342,11 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 				if (errJson.contains("message"))
 					result.error = StdStringToCString(errJson["message"].get<std::string>());
 				else
-					result.error.Format(_T("服务器返回 HTTP %d"), changeRes->status);
+					result.error.Format(_T("Server returned HTTP %d"), changeRes->status);
 			}
 			catch (...)
 			{
-				result.error.Format(_T("服务器返回 HTTP %d"), changeRes->status);
+				result.error.Format(_T("Server returned HTTP %d"), changeRes->status);
 			}
 			return result;
 		}
@@ -369,11 +369,11 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 	}
 	catch (const json::parse_error& e)
 	{
-		result.error.Format(_T("JSON 解析错误: %hs"), e.what());
+		result.error.Format(_T("JSON parse error: %hs"), e.what());
 	}
 	catch (const std::exception& e)
 	{
-		result.error.Format(_T("错误: %hs"), e.what());
+		result.error.Format(_T("Error: %hs"), e.what());
 	}
 
 	return result;

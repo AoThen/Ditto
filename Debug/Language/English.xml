@@ -364,6 +364,72 @@
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle"></Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle"></Item>
 		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle"></Item>
+		<Item English_Text = "OK" ID = "CloudBtnOK"></Item>
+		<Item English_Text = "Cancel" ID = "CloudBtnCancel"></Item>
+		<Item English_Text = "Please enter a value." ID = "CloudMsgInputRequired"></Item>
+		<Item English_Text = "Prompt" ID = "CloudTitlePrompt"></Item>
+		<Item English_Text = "Logged in (Device: %hs)" ID = "CloudStatusLoggedInDevice"></Item>
+		<Item English_Text = "Logged in" ID = "CloudStatusLoggedIn"></Item>
+		<Item English_Text = "Not logged in" ID = "CloudStatusNotLoggedIn"></Item>
+		<Item English_Text = "Encryption enabled (Salt: %s...)" ID = "CloudEncryptionEnabledSalt"></Item>
+		<Item English_Text = "Encryption enabled" ID = "CloudEncryptionEnabled"></Item>
+		<Item English_Text = "Encryption not enabled" ID = "CloudEncryptionNotEnabled"></Item>
+		<Item English_Text = "Please enter the server URL before enabling cloud sync." ID = "CloudMsgEnterServerUrl"></Item>
+		<Item English_Text = "Configuration Error" ID = "CloudTitleConfigError"></Item>
+		<Item English_Text = "Please enter the server URL." ID = "CloudMsgEnterServerUrlLogin"></Item>
+		<Item English_Text = "Login" ID = "CloudTitleLogin"></Item>
+		<Item English_Text = "Please enter a username." ID = "CloudMsgEnterUsername"></Item>
+		<Item English_Text = "Please enter a password." ID = "CloudMsgEnterPassword"></Item>
+		<Item English_Text = "Logging in..." ID = "CloudStatusLoggingIn"></Item>
+		<Item English_Text = "Logged in (Device: %s)" ID = "CloudStatusLoggedInDevice2"></Item>
+		<Item English_Text = "Unknown" ID = "CloudUnknown"></Item>
+		<Item English_Text = "Login successful!\nYou can now enable cloud sync." ID = "CloudMsgLoginSuccess"></Item>
+		<Item English_Text = "Login failed: %s" ID = "CloudMsgLoginFailed"></Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusException"></Item>
+		<Item English_Text = "Login error: %hs" ID = "CloudMsgLoginError"></Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudStatusLoginUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudMsgLoginUnknownError"></Item>
+		<Item English_Text = "Registration is closed. Please contact your administrator to create an account." ID = "CloudMsgRegisterDisabled"></Item>
+		<Item English_Text = "Register" ID = "CloudTitleRegister"></Item>
+		<Item English_Text = "Setting up encryption..." ID = "CloudStatusSettingUpEncryption"></Item>
+		<Item English_Text = "Please log in first before enabling encryption." ID = "CloudStatusLoginRequired"></Item>
+		<Item English_Text = "Enable Encryption" ID = "CloudTitleEnableEncryption"></Item>
+		<Item English_Text = "Encryption has been enabled. Your data will be encrypted before syncing." ID = "CloudMsgEncryptionEnabled"></Item>
+		<Item English_Text = "Error enabling encryption: %hs" ID = "CloudMsgEncryptionError"></Item>
+		<Item English_Text = "Unknown error enabling encryption." ID = "CloudStatusEncryptionUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred." ID = "CloudMsgEncryptionUnknownError"></Item>
+		<Item English_Text = "Encryption test failed: encryption failed." ID = "CloudEncTestFailed"></Item>
+		<Item English_Text = "Encryption test failed. Encryption is not working correctly." ID = "CloudMsgEncTestFailed"></Item>
+		<Item English_Text = "Test Encryption" ID = "CloudTitleTestEncryption"></Item>
+		<Item English_Text = "Encryption test succeeded" ID = "CloudEncTestSuccess"></Item>
+		<Item English_Text = "Encryption test succeeded!\nEncryption is working correctly." ID = "CloudMsgEncTestSuccess"></Item>
+		<Item English_Text = "Encryption test failed: decrypted text does not match." ID = "CloudEncTestMismatch"></Item>
+		<Item English_Text = "Encryption test failed. Decrypted text does not match original." ID = "CloudMsgEncTestMismatch"></Item>
+		<Item English_Text = "Encryption test failed: %hs" ID = "CloudEncTestException"></Item>
+		<Item English_Text = "Test encryption error: %hs" ID = "CloudMsgEncTestError"></Item>
+		<Item English_Text = "Encryption test failed: unknown error." ID = "CloudEncTestUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred during encryption test." ID = "CloudMsgEncTestUnknownError"></Item>
+		<Item English_Text = "Please enable encryption (set end-to-end encryption password) first, then export the key file." ID = "CloudMsgEnableEncryptionFirst"></Item>
+		<Item English_Text = "Export Key" ID = "CloudTitleExportKey"></Item>
+		<Item English_Text = "Enter a password to protect the key file:\n(Losing this password means the key cannot be imported)" ID = "CloudPromptExportKeyPassword"></Item>
+		<Item English_Text = "Key file exported successfully!" ID = "CloudMsgKeyExported"></Item>
+		<Item English_Text = "Failed to export key file. Please check the file path and permissions." ID = "CloudMsgExportFailed"></Item>
+		<Item English_Text = "Invalid key file format." ID = "CloudMsgInvalidKeyFile"></Item>
+		<Item English_Text = "Import Key" ID = "CloudTitleImportKey"></Item>
+		<Item English_Text = "Cannot read key file information." ID = "CloudMsgCannotReadKeyFile"></Item>
+		<Item English_Text = "Key File Info: %s\n\nDo you want to import this key?" ID = "CloudMsgKeyFileInfo"></Item>
+		<Item English_Text = "Enter the password that was used when exporting the key file:" ID = "CloudPromptImportKeyPassword"></Item>
+		<Item English_Text = "Key imported successfully.\nEncryption has been enabled." ID = "CloudMsgKeyImported"></Item>
+		<Item English_Text = "Encryption enabled (imported from key: %s)" ID = "CloudEncryptionEnabledImported"></Item>
+		<Item English_Text = "Failed to import key file. The password might be incorrect." ID = "CloudMsgImportFailed"></Item>
+		<Item English_Text = "Cloud authentication token has expired.\n\nYour sync has been paused. Please log in again to continue syncing.\n\nClick OK to open the login dialog." ID = "CloudMsgAuthExpired"></Item>
+		<Item English_Text = "Cloud Sync - Authentication Required" ID = "CloudTitleAuthRequired"></Item>
+		<Item English_Text = "Cloud access denied (HTTP 403).\n\nPossible causes:\n- Your account has been disabled\n- Your device has been removed by an administrator\n\nPlease contact your administrator or log in again." ID = "CloudMsgAccessDenied"></Item>
+		<Item English_Text = "Cloud Sync - Access Denied" ID = "CloudTitleAccessDenied"></Item>
+		<Item English_Text = "Encryption password has changed!\n\nYour encryption password has been modified on another device.\nPlease enter the new encryption password to continue syncing.\n\nClick OK to open encryption settings." ID = "CloudMsgEncryptionChanged"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged"></Item>
+		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed"></Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database"></Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao"></Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format"></Item>

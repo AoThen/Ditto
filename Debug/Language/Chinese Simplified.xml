@@ -364,6 +364,72 @@
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle">键盘快捷键</Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle">关于 Ditto</Item>
 		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle">云端同步</Item>
+		<Item English_Text = "OK" ID = "CloudBtnOK">确定</Item>
+		<Item English_Text = "Cancel" ID = "CloudBtnCancel">取消</Item>
+		<Item English_Text = "Please enter a value." ID = "CloudMsgInputRequired">请输入一个值。</Item>
+		<Item English_Text = "Prompt" ID = "CloudTitlePrompt">提示</Item>
+		<Item English_Text = "Logged in (Device: %hs)" ID = "CloudStatusLoggedInDevice">已登录（设备：%hs）</Item>
+		<Item English_Text = "Logged in" ID = "CloudStatusLoggedIn">已登录</Item>
+		<Item English_Text = "Not logged in" ID = "CloudStatusNotLoggedIn">未登录</Item>
+		<Item English_Text = "Encryption enabled (Salt: %s...)" ID = "CloudEncryptionEnabledSalt">加密已启用（盐值：%s...）</Item>
+		<Item English_Text = "Encryption enabled" ID = "CloudEncryptionEnabled">加密已启用</Item>
+		<Item English_Text = "Encryption not enabled" ID = "CloudEncryptionNotEnabled">加密未启用</Item>
+		<Item English_Text = "Please enter the server URL before enabling cloud sync." ID = "CloudMsgEnterServerUrl">请先输入服务器地址再开启云端同步。</Item>
+		<Item English_Text = "Configuration Error" ID = "CloudTitleConfigError">配置错误</Item>
+		<Item English_Text = "Please enter the server URL." ID = "CloudMsgEnterServerUrlLogin">请输入服务器地址。</Item>
+		<Item English_Text = "Login" ID = "CloudTitleLogin">登录</Item>
+		<Item English_Text = "Please enter a username." ID = "CloudMsgEnterUsername">请输入用户名。</Item>
+		<Item English_Text = "Please enter a password." ID = "CloudMsgEnterPassword">请输入密码。</Item>
+		<Item English_Text = "Logging in..." ID = "CloudStatusLoggingIn">正在登录…</Item>
+		<Item English_Text = "Logged in (Device: %s)" ID = "CloudStatusLoggedInDevice2">已登录（设备：%s）</Item>
+		<Item English_Text = "Unknown" ID = "CloudUnknown">未知</Item>
+		<Item English_Text = "Login successful!\nYou can now enable cloud sync." ID = "CloudMsgLoginSuccess">登录成功！\n现在可以启用云端同步了。</Item>
+		<Item English_Text = "Login failed: %s" ID = "CloudMsgLoginFailed">登录失败：%s</Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusException">异常：%hs</Item>
+		<Item English_Text = "Login error: %hs" ID = "CloudMsgLoginError">登录错误：%hs</Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudStatusLoginUnknownError">登录时发生未知错误。</Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudMsgLoginUnknownError">登录时发生未知错误。</Item>
+		<Item English_Text = "Registration is closed. Please contact your administrator to create an account." ID = "CloudMsgRegisterDisabled">注册已关闭。请联系管理员创建账号。</Item>
+		<Item English_Text = "Register" ID = "CloudTitleRegister">注册</Item>
+		<Item English_Text = "Setting up encryption..." ID = "CloudStatusSettingUpEncryption">正在设置加密…</Item>
+		<Item English_Text = "Please log in first before enabling encryption." ID = "CloudStatusLoginRequired">请在启用加密前先登录。</Item>
+		<Item English_Text = "Enable Encryption" ID = "CloudTitleEnableEncryption">启用加密</Item>
+		<Item English_Text = "Encryption has been enabled. Your data will be encrypted before syncing." ID = "CloudMsgEncryptionEnabled">加密已启用。您的数据将在同步前加密。</Item>
+		<Item English_Text = "Error enabling encryption: %hs" ID = "CloudMsgEncryptionError">启用加密时出错：%hs</Item>
+		<Item English_Text = "Unknown error enabling encryption." ID = "CloudStatusEncryptionUnknownError">启用加密时发生未知错误。</Item>
+		<Item English_Text = "An unknown error occurred." ID = "CloudMsgEncryptionUnknownError">发生未知错误。</Item>
+		<Item English_Text = "Encryption test failed: encryption failed." ID = "CloudEncTestFailed">加密测试失败。</Item>
+		<Item English_Text = "Encryption test failed. Encryption is not working correctly." ID = "CloudMsgEncTestFailed">加密测试失败。加密功能不正常。</Item>
+		<Item English_Text = "Test Encryption" ID = "CloudTitleTestEncryption">测试加密</Item>
+		<Item English_Text = "Encryption test succeeded" ID = "CloudEncTestSuccess">加密测试成功</Item>
+		<Item English_Text = "Encryption test succeeded!\nEncryption is working correctly." ID = "CloudMsgEncTestSuccess">加密测试成功！\n加密功能正常。</Item>
+		<Item English_Text = "Encryption test failed: decrypted text does not match." ID = "CloudEncTestMismatch">加密测试失败：解密文本不匹配。</Item>
+		<Item English_Text = "Encryption test failed. Decrypted text does not match original." ID = "CloudMsgEncTestMismatch">加密测试失败。解密文本与原文不匹配。</Item>
+		<Item English_Text = "Encryption test failed: %hs" ID = "CloudEncTestException">加密测试失败：%hs</Item>
+		<Item English_Text = "Test encryption error: %hs" ID = "CloudMsgEncTestError">测试加密错误：%hs</Item>
+		<Item English_Text = "Encryption test failed: unknown error." ID = "CloudEncTestUnknownError">加密测试失败：未知错误。</Item>
+		<Item English_Text = "An unknown error occurred during encryption test." ID = "CloudMsgEncTestUnknownError">加密测试时发生未知错误。</Item>
+		<Item English_Text = "Please enable encryption (set end-to-end encryption password) first, then export the key file." ID = "CloudMsgEnableEncryptionFirst">请先启用加密（设置端到端加密密码），然后导出密钥文件。</Item>
+		<Item English_Text = "Export Key" ID = "CloudTitleExportKey">导出密钥</Item>
+		<Item English_Text = "Enter a password to protect the key file:\n(Losing this password means the key cannot be imported)" ID = "CloudPromptExportKeyPassword">输入密码以保护密钥文件：\n（丢失此密码将导致密钥无法导入）</Item>
+		<Item English_Text = "Key file exported successfully!" ID = "CloudMsgKeyExported">密钥文件导出成功！</Item>
+		<Item English_Text = "Failed to export key file. Please check the file path and permissions." ID = "CloudMsgExportFailed">导出密钥文件失败。请检查文件路径和权限。</Item>
+		<Item English_Text = "Invalid key file format." ID = "CloudMsgInvalidKeyFile">密钥文件格式无效。</Item>
+		<Item English_Text = "Import Key" ID = "CloudTitleImportKey">导入密钥</Item>
+		<Item English_Text = "Cannot read key file information." ID = "CloudMsgCannotReadKeyFile">无法读取密钥文件信息。</Item>
+		<Item English_Text = "Key File Info: %s\n\nDo you want to import this key?" ID = "CloudMsgKeyFileInfo">密钥文件信息：%s\n\n是否要导入此密钥？</Item>
+		<Item English_Text = "Enter the password that was used when exporting the key file:" ID = "CloudPromptImportKeyPassword">请输入导出密钥文件时使用的密码：</Item>
+		<Item English_Text = "Key imported successfully.\nEncryption has been enabled." ID = "CloudMsgKeyImported">密钥导入成功。\n加密已启用。</Item>
+		<Item English_Text = "Encryption enabled (imported from key: %s)" ID = "CloudEncryptionEnabledImported">加密已启用（从密钥导入：%s）</Item>
+		<Item English_Text = "Failed to import key file. The password might be incorrect." ID = "CloudMsgImportFailed">导入密钥文件失败。密码可能不正确。</Item>
+		<Item English_Text = "Cloud authentication token has expired.\n\nYour sync has been paused. Please log in again to continue syncing.\n\nClick OK to open the login dialog." ID = "CloudMsgAuthExpired">云端认证令牌已过期。\n\n同步已暂停，请重新登录以继续同步。\n\n点击确定打开登录对话框。</Item>
+		<Item English_Text = "Cloud Sync - Authentication Required" ID = "CloudTitleAuthRequired">云端同步 - 需要重新认证</Item>
+		<Item English_Text = "Cloud access denied (HTTP 403).\n\nPossible causes:\n- Your account has been disabled\n- Your device has been removed by an administrator\n\nPlease contact your administrator or log in again." ID = "CloudMsgAccessDenied">云端访问被拒绝（HTTP 403）。\n\n可能原因：\n- 账号已被禁用\n- 设备已被管理员移除\n\n请联系管理员或重新登录。</Item>
+		<Item English_Text = "Cloud Sync - Access Denied" ID = "CloudTitleAccessDenied">云端同步 - 访问被拒绝</Item>
+		<Item English_Text = "Encryption password has changed!\n\nYour encryption password has been modified on another device.\nPlease enter the new encryption password to continue syncing.\n\nClick OK to open encryption settings." ID = "CloudMsgEncryptionChanged">加密密码已变更！\n\n您的加密密码已在其他设备上修改。\n请重新输入新的加密密码以继续同步。\n\n点击确定打开加密设置。</Item>
+		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged">云端同步 - 加密密码已变更</Item>
+		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed">加密初始化失败！\n\n警告：剪贴板数据将不会被加密。\n\n可能原因：\n- 未设置加密密码\n- 未导入密钥文件\n- 加密服务不可用\n\n请在云端同步设置中重新启用加密以保护数据。</Item>
+		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed">云端同步 - 加密失败</Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database">打开数据库时出错。</Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao">无法初始化 DAO/Jet 数据库引擎。\n选择 '是' 将从 http://ditto-cp.sourceforge.net/dao_setup.exe 下载 DAO。\n\n安装 DAO 后请重新启动 Ditto。</Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format">无法识别的数据库格式</Item>
