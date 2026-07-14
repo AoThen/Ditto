@@ -38,10 +38,14 @@ static void LogMessage(const CString& msg)
 
 CCloudSyncManager::CCloudSyncManager()
 	: m_hStopEvent(nullptr)
+	, m_hWsTrigger(nullptr)
 	, m_pSyncThread(nullptr)
+	, m_pWsThread(nullptr)
 	, m_cryptoInitialized(FALSE)
 	, m_lastSyncTime(0)
 	, m_nActiveQuickSyncThreads(0)
+	, m_pWsClient(nullptr)
+	, m_wsReconnectDelay(1000)
 {
 	InitializeCriticalSection(&m_csSync);
 }
@@ -97,6 +101,9 @@ BOOL CCloudSyncManager::Initialize()
 		return FALSE;
 	}
 
+	// Ensure remote ID mapping table exists (M1)
+	EnsureMappingTable();
+
 	// Initialize encryption (best effort, log warning if fails)
 	if (!InitializeEncryption())
 	{
@@ -121,11 +128,23 @@ BOOL CCloudSyncManager::Initialize()
 		return FALSE;
 	}
 
+	// Create WS trigger event
+	m_hWsTrigger = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (m_hWsTrigger == nullptr)
+	{
+		OutputDebugString(_T("[CloudSync] Failed to create WS trigger event.\n"));
+		CloseHandle(m_hStopEvent);
+		m_hStopEvent = nullptr;
+		return FALSE;
+	}
+
 	// Create sync thread (suspended, then resumed)
 	m_pSyncThread = AfxBeginThread(SyncThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
 	if (m_pSyncThread == nullptr)
 	{
 		OutputDebugString(_T("[CloudSync] Failed to create sync thread.\n"));
+		CloseHandle(m_hWsTrigger);
+		m_hWsTrigger = nullptr;
 		CloseHandle(m_hStopEvent);
 		m_hStopEvent = nullptr;
 		return FALSE;
@@ -133,6 +152,9 @@ BOOL CCloudSyncManager::Initialize()
 
 	m_pSyncThread->m_bAutoDelete = FALSE;
 	m_pSyncThread->ResumeThread();
+
+	// Start WebSocket listener thread (H4)
+	StartWebSocket();
 
 	LogMessage(_T("Initialized successfully."));
 	return TRUE;
@@ -180,6 +202,15 @@ void CCloudSyncManager::Stop()
 	if (m_nActiveQuickSyncThreads == 0)
 	{
 		OutputDebugStringA("[CloudSync] All quick-push threads completed.\n");
+	}
+
+	// Stop WebSocket thread (H4)
+	StopWebSocket();
+
+	if (m_hWsTrigger != nullptr)
+	{
+		CloseHandle(m_hWsTrigger);
+		m_hWsTrigger = nullptr;
 	}
 
 	if (m_hStopEvent != nullptr)
@@ -423,14 +454,23 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 
 	LogMessage(_T("Background sync thread started."));
 
+	HANDLE waitHandles[2] = { pThis->m_hStopEvent, pThis->m_hWsTrigger };
+
 	while (true)
 	{
-		// Wait for stop event or timeout (30 second sync interval)
-		DWORD dwResult = WaitForSingleObject(pThis->m_hStopEvent, 30000);
+		// Wait for stop event, WS trigger, or timeout (30 second sync interval)
+		DWORD dwResult = WaitForMultipleObjects(2, waitHandles, FALSE, 30000);
 		if (dwResult == WAIT_OBJECT_0)
 		{
 			// Stop event was signaled
 			break;
+		}
+
+		if (dwResult == WAIT_OBJECT_0 + 1)
+		{
+			// WS trigger was signaled — reset for next time
+			ResetEvent(pThis->m_hWsTrigger);
+			LogMessage(_T("Sync triggered by WebSocket event."));
 		}
 
 		// Check if auto sync is enabled
@@ -439,7 +479,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 			continue;
 		}
 
-		// Sync interval elapsed, perform sync
+		// Sync interval elapsed or WS triggered, perform sync
 		try
 		{
 			pThis->PushNewClips();
@@ -908,37 +948,31 @@ void CCloudSyncManager::PullChanges()
 				}
 			}
 
-			// Process deleted clips
+			// Process deleted clips (M1: use mapping table for string IDs)
 			int deletedCount = 0;
 			if (hasDeletions)
 			{
 				for (const auto& deletedIdVal : *deletedNode)
 				{
-					// Server sends string IDs (e.g. "123" or "clip-abc-123")
 					std::string idStr = deletedIdVal.get<std::string>();
 
-					// Try to find and delete the local clip
-					// Local clips use int IDs, so try parsing as int first
-					BOOL found = FALSE;
-					try
+					// Look up local ID via mapping table (supports string UUIDs)
+					int localId = GetLocalIdByRemoteId(idStr);
+
+					if (localId > 0)
 					{
-						int localId = std::stoi(idStr);
 						if (DeleteLocalClip(localId))
 						{
 							deletedCount++;
-							found = TRUE;
+							CString msg;
+							msg.Format(_T("PullChanges: deleted local clip %d (remote %hs)"), localId, idStr.c_str());
+							LogMessage(msg);
 						}
 					}
-					catch (...)
-					{
-						// Not an int ID - skip (server clip ID doesn't map to local)
-						// In a full implementation, we'd maintain a remote_clip_id mapping table
-					}
-
-					if (!found)
+					else
 					{
 						CString msg;
-						msg.Format(_T("PullChanges: clip %hs not found locally, skip delete"), idStr.c_str());
+						msg.Format(_T("PullChanges: clip %hs not found in mapping table, skip delete"), idStr.c_str());
 						LogMessage(msg);
 					}
 				}
@@ -1068,6 +1102,10 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& cli
 			clipJson["crc"] = static_cast<int64_t>(crc);             // Server expects "crc" (int64)
 			clipJson["group_id"] = "";                               // Server expects "group_id"
 			clipJson["short_cut"] = q.getIntField(_T("lShortCut")); // Server expects "short_cut"
+
+			// Ensure mapping entry exists for this pushed clip (M1)
+			// This maps the local integer ID to its string representation used by the server
+			SaveRemoteIdMapping(clipId, std::to_string(clipId));
 
 			// Server uses updated_at for LWW conflict resolution
 			// Use lModifiedDate (modification time) as the authoritative timestamp
@@ -1333,6 +1371,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				           crc, (long long)localModDate, (long long)remoteUpdatedAt);
 				LogMessage(msg);
 			}
+			SaveRemoteIdMapping(existingId, serverIdStr);
 			return existingId;
 		}
 
@@ -1363,6 +1402,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 						msg.Format(_T("MergeRemoteClipToLocal: same description, different CRC, local is newer (local=%lld, remote=%lld), skipping"),
 						           (long long)localModDate, (long long)remoteUpdatedAt);
 						LogMessage(msg);
+						SaveRemoteIdMapping(descMatchId, serverIdStr);
 						return descMatchId;
 					}
 					else
@@ -1504,6 +1544,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		{
 			if (newClip.AddToDB(false))
 			{
+				SaveRemoteIdMapping(newClip.m_id, serverIdStr);
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: clip added (ID=%d, CRC=%d, desc='%s')"),
 				           newClip.m_id, crc, newClip.m_Desc.Left(50).GetString());
@@ -1588,5 +1629,336 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 	{
 		LogMessage(_T("DeleteLocalClip: unknown error"));
 		return FALSE;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// EnsureMappingTable: Create CloudClipMap table if it doesn't exist (M1)
+// Maps server-side string clip IDs to local integer clip IDs
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::EnsureMappingTable()
+{
+	try
+	{
+		CString csSQL;
+		csSQL.Format(_T("CREATE TABLE IF NOT EXISTS CloudClipMap (")
+		             _T("local_id INTEGER PRIMARY KEY,")
+		             _T("remote_id TEXT NOT NULL UNIQUE,")
+		             _T("created_at INTEGER DEFAULT (strftime('%%s','now'))")
+		             _T(")"));
+		theApp.m_db.execDML(csSQL);
+		LogMessage(_T("EnsureMappingTable: CloudClipMap table ready."));
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		CString err;
+		err.Format(_T("EnsureMappingTable SQLite error: %hs"), e.errorMessage());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("EnsureMappingTable: unknown error"));
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SaveRemoteIdMapping: Insert or update a local-to-remote ID mapping (M1)
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::SaveRemoteIdMapping(int localId, const std::string& remoteId)
+{
+	if (localId <= 0 || remoteId.empty())
+		return;
+
+	try
+	{
+		CString csSQL;
+		csSQL.Format(_T("INSERT OR REPLACE INTO CloudClipMap (local_id, remote_id) ")
+		             _T("VALUES (%d, '%hs')"), localId, remoteId.c_str());
+		theApp.m_db.execDML(csSQL);
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		CString err;
+		err.Format(_T("SaveRemoteIdMapping SQLite error: %hs"), e.errorMessage());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("SaveRemoteIdMapping: unknown error"));
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetLocalIdByRemoteId: Look up local clip ID by server string ID (M1)
+// Returns -1 if not found
+// ---------------------------------------------------------------------------
+int CCloudSyncManager::GetLocalIdByRemoteId(const std::string& remoteId)
+{
+	if (remoteId.empty())
+		return -1;
+
+	try
+	{
+		CString csSQL;
+		csSQL.Format(_T("SELECT local_id FROM CloudClipMap WHERE remote_id = '%hs' LIMIT 1"),
+		             remoteId.c_str());
+		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+		if (q.eof() == false)
+		{
+			return q.getIntField(_T("local_id"));
+		}
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		CString err;
+		err.Format(_T("GetLocalIdByRemoteId SQLite error: %hs"), e.errorMessage());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("GetLocalIdByRemoteId: unknown error"));
+	}
+	return -1;
+}
+
+// ---------------------------------------------------------------------------
+// BuildWsUrl: Convert HTTP(S) server URL to WebSocket URL (H4)
+// ---------------------------------------------------------------------------
+CString CCloudSyncManager::BuildWsUrl()
+{
+	CString wsUrl(m_serverUrl);
+	wsUrl.Replace(_T("https://"), _T("wss://"));
+	wsUrl.Replace(_T("http://"), _T("ws://"));
+	// Append WebSocket endpoint path
+	if (wsUrl.Right(1) != _T("/"))
+		wsUrl += _T("/");
+	wsUrl += _T("api/v1/ws");
+	return wsUrl;
+}
+
+// ---------------------------------------------------------------------------
+// StartWebSocket: Launch WebSocket listener thread (H4)
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::StartWebSocket()
+{
+	if (m_pWsThread != nullptr)
+	{
+		LogMessage(_T("StartWebSocket: WS thread already running."));
+		return;
+	}
+
+	if (m_deviceToken.IsEmpty())
+	{
+		LogMessage(_T("StartWebSocket: no device token, skipping."));
+		return;
+	}
+
+	m_pWsThread = AfxBeginThread(WsThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+	if (m_pWsThread == nullptr)
+	{
+		LogMessage(_T("StartWebSocket: failed to create WS thread."));
+		return;
+	}
+
+	m_pWsThread->m_bAutoDelete = FALSE;
+	m_pWsThread->ResumeThread();
+	LogMessage(_T("StartWebSocket: WS listener thread started."));
+}
+
+// ---------------------------------------------------------------------------
+// StopWebSocket: Signal WS thread to stop and clean up (H4)
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::StopWebSocket()
+{
+	// First, force-close the WS connection to interrupt any blocking read()
+	if (m_pWsClient != nullptr)
+	{
+		auto* wsClient = static_cast<httplib::WebSocketClient*>(m_pWsClient);
+		if (wsClient->is_open())
+		{
+			wsClient->close(httplib::CloseStatus::Normal, "Shutdown");
+		}
+	}
+
+	if (m_pWsThread != nullptr)
+	{
+		// m_hStopEvent is already set by Stop(), WS thread will see it
+		DWORD dwWait = WaitForSingleObject(m_pWsThread->m_hThread, 5000);
+		if (dwWait == WAIT_TIMEOUT)
+		{
+			LogMessage(_T("StopWebSocket: WS thread did not exit within timeout."));
+		}
+		else
+		{
+			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
+		}
+
+		delete m_pWsThread;
+		m_pWsThread = nullptr;
+	}
+
+	// Clean up WS client
+	if (m_pWsClient != nullptr)
+	{
+		auto* wsClient = static_cast<httplib::WebSocketClient*>(m_pWsClient);
+		delete wsClient;
+		m_pWsClient = nullptr;
+	}
+
+	m_wsReconnectDelay = 1000; // Reset backoff
+}
+
+// ---------------------------------------------------------------------------
+// WsThreadProc: WebSocket listener thread (H4)
+// Connects to the server, listens for real-time events, signals sync on
+// "clip_added" messages. Reconnects with exponential backoff on disconnect.
+// ---------------------------------------------------------------------------
+UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
+{
+	auto* pThis = static_cast<CCloudSyncManager*>(pParam);
+	if (pThis == nullptr)
+		return 1;
+
+	LogMessage(_T("WsThreadProc: WebSocket listener started."));
+
+	while (true)
+	{
+		// Check stop event before attempting connection
+		if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)
+			break;
+
+		// Build WebSocket URL
+		CString wsUrlCStr = pThis->BuildWsUrl();
+		CStringA wsUrlA(wsUrlCStr);
+		std::string wsUrl(wsUrlA.GetString());
+
+		// Prepare auth headers: pass device_token as Sec-WebSocket-Protocol
+		httplib::Headers headers = {
+			{"Authorization", "Bearer " + std::string(CStringA(pThis->m_deviceToken))}
+		};
+
+		auto* wsClient = new httplib::WebSocketClient(wsUrl, headers);
+		pThis->m_pWsClient = wsClient;
+
+		if (!wsClient->is_valid())
+		{
+			LogMessage(_T("WsThreadProc: invalid WS URL, retrying later."));
+			delete wsClient;
+			pThis->m_pWsClient = nullptr;
+			Sleep(pThis->m_wsReconnectDelay);
+			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+			continue;
+		}
+
+		// Connect to server
+		if (!wsClient->connect())
+		{
+			CString msg;
+			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
+			LogMessage(msg);
+			delete wsClient;
+			pThis->m_pWsClient = nullptr;
+			Sleep(pThis->m_wsReconnectDelay);
+			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+			continue;
+		}
+
+		// Connected successfully — reset backoff
+		pThis->m_wsReconnectDelay = 1000;
+		LogMessage(_T("WsThreadProc: connected to WebSocket server."));
+
+		// Read loop
+		while (true)
+		{
+			// Non-blocking check for stop event
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)
+			{
+				LogMessage(_T("WsThreadProc: stop event received, exiting."));
+				break;
+			}
+
+			std::string msg;
+			auto result = wsClient->read(msg);
+
+			if (result == httplib::ReadResult::Text)
+			{
+				pThis->OnWsMessage(msg);
+			}
+			else if (result == httplib::ReadResult::Fail)
+			{
+				LogMessage(_T("WsThreadProc: connection lost, will reconnect."));
+				break;
+			}
+			// Binary messages are ignored
+		}
+
+		// Close connection gracefully
+		if (wsClient->is_open())
+		{
+			wsClient->close(httplib::CloseStatus::Normal, "Client shutting down");
+		}
+		delete wsClient;
+		pThis->m_pWsClient = nullptr;
+
+		// Check stop before reconnecting
+		if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)
+			break;
+
+		// Exponential backoff before reconnection
+		CString msg;
+		msg.Format(_T("WsThreadProc: reconnecting in %d ms"), pThis->m_wsReconnectDelay);
+		LogMessage(msg);
+		Sleep(pThis->m_wsReconnectDelay);
+		pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+	}
+
+	LogMessage(_T("WsThreadProc: WebSocket listener exiting."));
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// OnWsMessage: Handle incoming WebSocket message (H4)
+// Parses message, triggers sync on "clip_added" events
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::OnWsMessage(const std::string& msg)
+{
+	try
+	{
+		json j = json::parse(msg);
+		std::string type = j.value("type", "");
+
+		if (type == "clip_added")
+		{
+			LogMessage(_T("OnWsMessage: clip_added received, triggering sync."));
+			SetEvent(m_hWsTrigger);
+		}
+		else if (type == "connected")
+		{
+			LogMessage(_T("OnWsMessage: connected to server (initial handshake)."));
+		}
+		else if (type == "ping")
+		{
+			// Server sent ping; httplib handles pong internally, no action needed
+		}
+		else if (type == "goaway")
+		{
+			LogMessage(_T("OnWsMessage: server requested disconnect (goaway)."));
+		}
+		else
+		{
+			CString msg;
+			msg.Format(_T("OnWsMessage: unhandled message type '%hs'"), type.c_str());
+			LogMessage(msg);
+		}
+	}
+	catch (const json::parse_error& e)
+	{
+		CString err;
+		err.Format(_T("OnWsMessage: JSON parse error: %hs"), e.what());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("OnWsMessage: unknown error"));
 	}
 }

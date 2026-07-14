@@ -1,6 +1,7 @@
 #pragma once
 #include <afx.h>
 #include "../json.hpp"
+#include "../httplib.h"
 
 // Custom Windows message for cloud authentication notification
 // wParam: HTTP status code (401 = token expired, 403 = forbidden)
@@ -45,14 +46,21 @@ private:
 	CStringA  m_deviceId;      // Device ID from login response
 	CString   m_serverUrl;
 	HANDLE    m_hStopEvent;
+	HANDLE    m_hWsTrigger;    // Signaled by WS thread when clip_added received
 	CWinThread* m_pSyncThread;
+	CWinThread* m_pWsThread;   // WebSocket listener thread
 	BOOL      m_cryptoInitialized;
 	time_t    m_lastSyncTime;  // Track last successful sync time
 	CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
 	LONG      m_nActiveQuickSyncThreads; // Track active quick-push threads
+	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
+	int       m_wsReconnectDelay; // Exponential backoff for WS reconnection
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);
+
+	// WebSocket listener thread proc
+	static UINT WsThreadProc(LPVOID pParam);
 
 	// Quick sync thread proc (fire-and-forget)
 	static UINT QuickSyncThreadProc(LPVOID pParam);
@@ -89,4 +97,27 @@ private:
 
 	// Delete a clip from local database (for sync deletions)
 	BOOL DeleteLocalClip(int clipId);
+
+	// ---- Remote ID mapping table (M1) ----
+	// Ensure the CloudClipMap table exists in the local DB
+	void EnsureMappingTable();
+
+	// Save mapping between local and remote clip IDs
+	void SaveRemoteIdMapping(int localId, const std::string& remoteId);
+
+	// Look up local clip ID by remote ID; returns -1 if not found
+	int GetLocalIdByRemoteId(const std::string& remoteId);
+
+	// ---- WebSocket (H4) ----
+	// Start listening for real-time events from the server
+	void StartWebSocket();
+
+	// Stop WebSocket thread and close connection
+	void StopWebSocket();
+
+	// Handle incoming WebSocket message (called from WS thread)
+	void OnWsMessage(const std::string& msg);
+
+	// Build WebSocket URL from m_serverUrl
+	CString BuildWsUrl();
 };
