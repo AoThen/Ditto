@@ -44,7 +44,7 @@ test.describe('Group Management', () => {
     await page.getByRole('button', { name: '创建', exact: true }).click()
 
     await expect(page.getByText('分组已创建')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('Test Group')).toBeVisible()
+    await expect(page.locator('.group-tree-card .el-table').getByText('Test Group', { exact: true })).toBeVisible()
   })
 
   test('should create and delete a group via API', async ({ page, request }) => {

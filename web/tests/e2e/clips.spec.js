@@ -31,7 +31,7 @@ test.describe('Clip Management', () => {
   test('should show empty clip list after login', async ({ page }) => {
     await loginAsNewUser(page)
     await expect(page).toHaveURL(/\/dashboard/)
-    await expect(page.getByText(/暂无剪贴板|暂无数据|暂无/)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('暂无数据', { exact: true })).toBeVisible({ timeout: 10000 })
   })
 
   test('should create clip via API and verify', async ({ page }) => {
