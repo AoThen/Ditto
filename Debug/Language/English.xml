@@ -453,6 +453,28 @@
 		<Item English_Text = "Cancel" ID = "2"></Item>
 		<Item English_Text = "Apply" ID = "12321"></Item>
 	</Ditto_Options_Sheet>
+	<Ditto_Options_Cloud>
+		<Item English_Text = "Cloud Sync" ID = "-1" PropertyPage = "true"></Item>
+		<Item English_Text = "Cloud Sync Settings" ID = "2224"></Item>
+		<Item English_Text = "Enable Cloud Sync" ID = "2201"></Item>
+		<Item English_Text = "Auto Sync" ID = "2202"></Item>
+		<Item English_Text = "Server URL" ID = "2216"></Item>
+		<Item English_Text = "Username" ID = "2217"></Item>
+		<Item English_Text = "Password" ID = "2218"></Item>
+		<Item English_Text = "Status:" ID = "2219"></Item>
+		<Item English_Text = "Login" ID = "2207"></Item>
+		<Item English_Text = "Register" ID = "2208"></Item>
+		<Item English_Text = "End-to-End Encryption" ID = "2225"></Item>
+		<Item English_Text = "Encryption Password" ID = "2220"></Item>
+		<Item English_Text = "Enable Encryption" ID = "2209"></Item>
+		<Item English_Text = "Test Encryption" ID = "2210"></Item>
+		<Item English_Text = "Encryption Status:" ID = "2221"></Item>
+		<Item English_Text = "Warning: Lost password means lost data!" ID = "2222"></Item>
+		<Item English_Text = "Key File Management" ID = "2226"></Item>
+		<Item English_Text = "Key File Path" ID = "2223"></Item>
+		<Item English_Text = "Export Key" ID = "2213"></Item>
+		<Item English_Text = "Import Key" ID = "2214"></Item>
+	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773"></Item>
 		<Item English_Text = "Options" ID = "32771"></Item>

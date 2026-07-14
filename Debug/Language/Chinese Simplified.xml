@@ -453,6 +453,28 @@
 		<Item English_Text = "Cancel" ID = "2">取消</Item>
 		<Item English_Text = "Apply" ID = "12321">应用</Item>
 	</Ditto_Options_Sheet>
+	<Ditto_Options_Cloud>
+		<Item English_Text = "Cloud Sync" ID = "-1">云端同步</Item>
+		<Item English_Text = "Cloud Sync Settings" ID = "2224">云端同步设置</Item>
+		<Item English_Text = "Enable Cloud Sync" ID = "2201">启用云端同步</Item>
+		<Item English_Text = "Auto Sync" ID = "2202">自动同步</Item>
+		<Item English_Text = "Server URL" ID = "2216">服务器地址</Item>
+		<Item English_Text = "Username" ID = "2217">用户名</Item>
+		<Item English_Text = "Password" ID = "2218">密码</Item>
+		<Item English_Text = "Status:" ID = "2219">状态：</Item>
+		<Item English_Text = "Login" ID = "2207">登录</Item>
+		<Item English_Text = "Register" ID = "2208">注册</Item>
+		<Item English_Text = "End-to-End Encryption" ID = "2225">端到端加密</Item>
+		<Item English_Text = "Encryption Password" ID = "2220">加密密码</Item>
+		<Item English_Text = "Enable Encryption" ID = "2209">启用加密</Item>
+		<Item English_Text = "Test Encryption" ID = "2210">测试加密</Item>
+		<Item English_Text = "Encryption Status:" ID = "2221">加密状态：</Item>
+		<Item English_Text = "Warning: Lost password means lost data!" ID = "2222">警告：忘记密码将导致数据不可恢复</Item>
+		<Item English_Text = "Key File Management" ID = "2226">密钥文件管理</Item>
+		<Item English_Text = "Key File Path" ID = "2223">密钥文件路径</Item>
+		<Item English_Text = "Export Key" ID = "2213">导出密钥</Item>
+		<Item English_Text = "Import Key" ID = "2214">导入密钥</Item>
+	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773">显示快速粘贴</Item>
 		<Item English_Text = "Options" ID = "32771">选项</Item>

@@ -233,6 +233,11 @@ bool CMultiLanguage::UpdateOptionCopyBuffers(CWnd *pParent)
 	return UpdateWindowToLanguage(pParent, m_OptionsCopyBuffers);
 }
 
+bool CMultiLanguage::UpdateOptionCloud(CWnd *pParent)
+{
+	return UpdateWindowToLanguage(pParent, m_OptionsCloud);
+}
+
 bool CMultiLanguage::UpdateGlobalHotKeys(CWnd *pParent)
 {
 	return UpdateWindowToLanguage(pParent, m_GlobalHotKeys);
@@ -396,6 +401,7 @@ bool CMultiLanguage::LoadLanguageFile(CString csFile)
 	bRet = LoadSection(*ItemHeader, m_OptionsSheet, "Ditto_Options_Sheet");
 	bRet = LoadSection(*ItemHeader, m_TrayIconRightClickMenu, "Ditto_Tray_Icon_Menu");
 	bRet = LoadSection(*ItemHeader, m_OptionsCopyBuffers, "Ditto_Options_CopyBuffers");
+	bRet = LoadSection(*ItemHeader, m_OptionsCloud, "Ditto_Options_Cloud");
 	bRet = LoadSection(*ItemHeader, m_GlobalHotKeys, "Ditto_GlobalHotKeys");
 	bRet = LoadSection(*ItemHeader, m_DeleteClipData, "Ditto_DeleteClipData");
 	

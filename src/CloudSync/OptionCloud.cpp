@@ -51,10 +51,10 @@ protected:
 		m_wndEdit.SetWindowText(m_csInput);
 		yPos += 30;
 
-		m_wndOk.Create(_T("确定"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+		m_wndOk.Create(theApp.m_Language.GetString("CloudBtnOK", "OK"), WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
 			CRect(rcClient.right / 2 - 80, yPos, rcClient.right / 2 - 10, yPos + 25), this, IDOK);
 
-		m_wndCancel.Create(_T("取消"), WS_CHILD | WS_VISIBLE,
+		m_wndCancel.Create(theApp.m_Language.GetString("CloudBtnCancel", "Cancel"), WS_CHILD | WS_VISIBLE,
 			CRect(rcClient.right / 2 + 10, yPos, rcClient.right / 2 + 70, yPos + 25), this, IDCANCEL);
 
 		return TRUE;
@@ -65,7 +65,8 @@ protected:
 		m_wndEdit.GetWindowText(m_csInput);
 		if (m_csInput.IsEmpty())
 		{
-			MessageBox(_T("请输入内容。"), _T("提示"), MB_ICONWARNING);
+			MessageBox(theApp.m_Language.GetString("CloudMsgInputRequired", "Please enter a value."),
+			theApp.m_Language.GetString("CloudTitlePrompt", "Prompt"), MB_ICONWARNING);
 			return;
 		}
 		CDialog::OnOK();
@@ -124,6 +125,8 @@ BOOL COptionCloud::OnInitDialog()
 {
 	CPropertyPage::OnInitDialog();
 
+	theApp.m_Language.UpdateOptionCloud(this);
+
 	// Load saved values from CGetSetOptions
 	m_bEnabled = CGetSetOptions::GetCloudSyncEnabled();
 	m_bAutoSync = CGetSetOptions::GetCloudAutoSync();
@@ -141,16 +144,16 @@ BOOL COptionCloud::OnInitDialog()
 		CStringA deviceId = CGetSetOptions::GetCloudDeviceId();
 		if (!deviceId.IsEmpty())
 		{
-			m_csStatus.Format(_T("已登录 (设备: %hs)"), deviceId.GetString());
+			m_csStatus.Format(theApp.m_Language.GetString("CloudStatusLoggedInDevice", "Logged in (Device: %hs)"), deviceId.GetString());
 		}
 		else
 		{
-			m_csStatus = _T("已登录");
+			m_csStatus = theApp.m_Language.GetString("CloudStatusLoggedIn", "Logged in");
 		}
 	}
 	else
 	{
-		m_csStatus = _T("未登录");
+		m_csStatus = theApp.m_Language.GetString("CloudStatusNotLoggedIn", "Not logged in");
 	}
 
 	// Load encryption password status
@@ -163,16 +166,16 @@ BOOL COptionCloud::OnInitDialog()
 		{
 			// Show salt info (first 16 chars for security)
 			CString saltPreview = csSalt.Left(16);
-			m_csEncryptionStatus.Format(_T("加密已启用 (Salt: %s...)"), saltPreview);
+			m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncryptionEnabledSalt", "Encryption enabled (Salt: %s...)"), saltPreview);
 		}
 		else
 		{
-			m_csEncryptionStatus = _T("加密已启用");
+			m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncryptionEnabled", "Encryption enabled");
 		}
 	}
 	else
 	{
-		m_csEncryptionStatus = _T("未启用加密");
+		m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncryptionNotEnabled", "Encryption not enabled");
 	}
 
 	// Load key file path if previously exported
@@ -196,7 +199,8 @@ BOOL COptionCloud::OnApply()
 	// Validate server URL if cloud sync is enabled
 	if (m_bEnabled && m_csServerUrl.IsEmpty())
 	{
-		MessageBox(_T("启用云端同步前，请输入服务器地址。"), _T("配置错误"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnterServerUrl", "Please enter the server URL before enabling cloud sync."),
+		theApp.m_Language.GetString("CloudTitleConfigError", "Configuration Error"), MB_ICONWARNING);
 		return FALSE;
 	}
 
@@ -225,19 +229,22 @@ void COptionCloud::OnBtnLogin()
 	// Validate fields
 	if (m_csServerUrl.IsEmpty())
 	{
-		MessageBox(_T("请输入服务器地址。"), _T("登录"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnterServerUrlLogin", "Please enter the server URL."),
+			theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csUsername.IsEmpty())
 	{
-		MessageBox(_T("请输入用户名。"), _T("登录"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnterUsername", "Please enter a username."),
+			theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONWARNING);
 		return;
 	}
 
 	if (m_csPassword.IsEmpty())
 	{
-		MessageBox(_T("请输入密码。"), _T("登录"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnterPassword", "Please enter a password."),
+			theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONWARNING);
 		return;
 	}
 
@@ -245,7 +252,7 @@ void COptionCloud::OnBtnLogin()
 	CGetSetOptions::SetCloudLastUsername(m_csUsername);
 
 	// Show status
-	m_csStatus = _T("正在登录...");
+	m_csStatus = theApp.m_Language.GetString("CloudStatusLoggingIn", "Logging in...");
 	UpdateData(FALSE);
 
 	try
@@ -254,35 +261,37 @@ void COptionCloud::OnBtnLogin()
 
 		if (result.success)
 		{
-			m_csStatus.Format(_T("已登录 (设备: %s)"), result.deviceId.IsEmpty() ? _T("未知") : result.deviceId.GetString());
-			MessageBox(_T("登录成功！\n现在可以启用云端同步。"), _T("登录"), MB_ICONINFORMATION);
+			m_csStatus.Format(theApp.m_Language.GetString("CloudStatusLoggedInDevice2", "Logged in (Device: %s)"), result.deviceId.IsEmpty() ? theApp.m_Language.GetString("CloudUnknown", "Unknown") : result.deviceId.GetString());
+			MessageBox(theApp.m_Language.GetString("CloudMsgLoginSuccess", "Login successful!\nYou can now enable cloud sync."),
+			           theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONINFORMATION);
 			
 			// Update encryption status if key exists
 			CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
 			if (!csKeyB64.IsEmpty())
 			{
-				m_csEncryptionStatus = _T("加密已启用");
+m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncryptionEnabled", "Encryption enabled");
 			}
 		}
 		else
 		{
 			m_csStatus = result.error;
 			CString msg;
-			msg.Format(_T("登录失败: %s"), result.error.GetString());
-			MessageBox(msg, _T("登录"), MB_ICONERROR);
+			msg.Format(theApp.m_Language.GetString("CloudMsgLoginFailed", "Login failed: %s"), result.error.GetString());
+			MessageBox(msg, theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
 	{
-		m_csStatus.Format(_T("异常: %hs"), e.what());
+		m_csStatus.Format(theApp.m_Language.GetString("CloudStatusException", "Exception: %hs"), e.what());
 		CString msg;
-		msg.Format(_T("登录错误: %hs"), e.what());
-		MessageBox(msg, _T("登录"), MB_ICONERROR);
+		msg.Format(theApp.m_Language.GetString("CloudMsgLoginError", "Login error: %hs"), e.what());
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONERROR);
 	}
 	catch (...)
 	{
-		m_csStatus = _T("登录时发生未知错误。");
-		MessageBox(_T("登录时发生未知错误。"), _T("登录"), MB_ICONERROR);
+		m_csStatus = theApp.m_Language.GetString("CloudStatusLoginUnknownError", "An unknown error occurred during login.");
+		MessageBox(theApp.m_Language.GetString("CloudMsgLoginUnknownError", "An unknown error occurred during login."),
+		           theApp.m_Language.GetString("CloudTitleLogin", "Login"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -290,7 +299,8 @@ void COptionCloud::OnBtnLogin()
 
 void COptionCloud::OnBtnRegister()
 {
-	MessageBox(_T("注册功能已关闭，请联系管理员创建账号。"), _T("注册"), MB_ICONINFORMATION);
+	MessageBox(theApp.m_Language.GetString("CloudMsgRegisterDisabled", "Registration is closed. Please contact your administrator to create an account."),
+		theApp.m_Language.GetString("CloudTitleRegister", "Register"), MB_ICONINFORMATION);
 	UpdateData(FALSE);
 }
 
@@ -305,7 +315,7 @@ void COptionCloud::OnBtnEnableEncryption()
 		return;
 	}
 
-	m_csEncryptionStatus = _T("正在设置加密...");
+	m_csEncryptionStatus = theApp.m_Language.GetString("CloudStatusSettingUpEncryption", "Setting up encryption...");
 	UpdateData(FALSE);
 
 	try
@@ -313,8 +323,8 @@ void COptionCloud::OnBtnEnableEncryption()
 		CStringA token = CGetSetOptions::GetCloudDeviceToken();
 		if (token.IsEmpty())
 		{
-			m_csEncryptionStatus = _T("请先登录后再启用加密。");
-			MessageBox(m_csEncryptionStatus, _T("Enable Encryption"), MB_ICONERROR);
+			m_csEncryptionStatus = theApp.m_Language.GetString("CloudStatusLoginRequired", "Please log in first before enabling encryption.");
+			MessageBox(m_csEncryptionStatus, theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONERROR);
 			return;
 		}
 
@@ -324,9 +334,9 @@ void COptionCloud::OnBtnEnableEncryption()
 		if (result.success)
 		{
 			m_bEncryptionEnabled = TRUE;
-			m_csEncryptionStatus.Format(_T("加密已启用 (Salt: %s...)"), result.salt.Left(16));
-			MessageBox(_T("加密已启用。您的数据将在同步前进行加密。"),
-			           _T("Enable Encryption"), MB_ICONINFORMATION);
+			m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncryptionEnabledSalt", "Encryption enabled (Salt: %s...)"), result.salt.Left(16));
+			MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabled", "Encryption has been enabled. Your data will be encrypted before syncing."),
+			           theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONINFORMATION);
 		}
 		else
 		{
@@ -336,15 +346,16 @@ void COptionCloud::OnBtnEnableEncryption()
 	}
 	catch (const std::exception& e)
 	{
-		m_csEncryptionStatus.Format(_T("Exception: %hs"), e.what());
+		m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudStatusEncryptionException", "Exception: %hs"), e.what());
 		CString msg;
-		msg.Format(_T("Error enabling encryption: %hs"), e.what());
-		MessageBox(msg, _T("Enable Encryption"), MB_ICONERROR);
+		msg.Format(theApp.m_Language.GetString("CloudMsgEncryptionError", "Error enabling encryption: %hs"), e.what());
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONERROR);
 	}
 	catch (...)
 	{
-		m_csEncryptionStatus = _T("Unknown error enabling encryption.");
-		MessageBox(_T("An unknown error occurred."), _T("Enable Encryption"), MB_ICONERROR);
+		m_csEncryptionStatus = theApp.m_Language.GetString("CloudStatusEncryptionUnknownError", "Unknown error enabling encryption.");
+		MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionUnknownError", "An unknown error occurred."),
+		           theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -362,38 +373,38 @@ void COptionCloud::OnBtnTestEncryption()
 		CStringA encrypted = CCloudCrypto::Encrypt(testPlain);
 		if (encrypted.IsEmpty())
 		{
-			m_csEncryptionStatus = _T("加密测试失败: encryption failed.");
-			MessageBox(_T("加密测试失败。Encryption is not working correctly."),
-			           _T("Test Encryption"), MB_ICONERROR);
+			m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncTestFailed", "Encryption test failed: encryption failed.");
+			MessageBox(theApp.m_Language.GetString("CloudMsgEncTestFailed", "Encryption test failed. Encryption is not working correctly."),
+			           theApp.m_Language.GetString("CloudTitleTestEncryption", "Test Encryption"), MB_ICONERROR);
 			return;
 		}
 
 		CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
 		if (decrypted == testPlain)
 		{
-			m_csEncryptionStatus = _T("加密测试成功");
-			MessageBox(_T("加密测试成功！\nEncryption is working correctly."),
-			           _T("Test Encryption"), MB_ICONINFORMATION);
+			m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncTestSuccess", "Encryption test succeeded");
+			MessageBox(theApp.m_Language.GetString("CloudMsgEncTestSuccess", "Encryption test succeeded!\nEncryption is working correctly."),
+			           theApp.m_Language.GetString("CloudTitleTestEncryption", "Test Encryption"), MB_ICONINFORMATION);
 		}
 		else
 		{
-			m_csEncryptionStatus = _T("加密测试失败: decrypted text does not match.");
-			MessageBox(_T("加密测试失败。Decrypted text does not match original."),
-			           _T("Test Encryption"), MB_ICONERROR);
+			m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncTestMismatch", "Encryption test failed: decrypted text does not match.");
+			MessageBox(theApp.m_Language.GetString("CloudMsgEncTestMismatch", "Encryption test failed. Decrypted text does not match original."),
+			           theApp.m_Language.GetString("CloudTitleTestEncryption", "Test Encryption"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
 	{
-		m_csEncryptionStatus.Format(_T("加密测试失败: %hs"), e.what());
+		m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncTestException", "Encryption test failed: %hs"), e.what());
 		CString msg;
-		msg.Format(_T("Test encryption error: %hs"), e.what());
-		MessageBox(msg, _T("Test Encryption"), MB_ICONERROR);
+		msg.Format(theApp.m_Language.GetString("CloudMsgEncTestError", "Test encryption error: %hs"), e.what());
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleTestEncryption", "Test Encryption"), MB_ICONERROR);
 	}
 	catch (...)
 	{
-		m_csEncryptionStatus = _T("加密测试失败: unknown error.");
-		MessageBox(_T("An unknown error occurred during encryption test."),
-		           _T("Test Encryption"), MB_ICONERROR);
+		m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncTestUnknownError", "Encryption test failed: unknown error.");
+		MessageBox(theApp.m_Language.GetString("CloudMsgEncTestUnknownError", "An unknown error occurred during encryption test."),
+		           theApp.m_Language.GetString("CloudTitleTestEncryption", "Test Encryption"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -408,15 +419,15 @@ void COptionCloud::OnBtnExportKey()
 	CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
 	if (csKeyB64.IsEmpty())
 	{
-		MessageBox(_T("请先启用加密（设置端到端加密密码），然后再导出密钥文件。"),
-		           _T("导出密钥"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnableEncryptionFirst", "Please enable encryption (set end-to-end encryption password) first, then export the key file."),
+		           theApp.m_Language.GetString("CloudTitleExportKey", "Export Key"), MB_ICONWARNING);
 		return;
 	}
 
 	// Prompt for password to encrypt the exported key
 	CInputBox dlg;
-	dlg.m_csTitle = _T("导出密钥文件");
-	dlg.m_csPrompt = _T("请输入密码以保护密钥文件：\n（忘记此密码将无法导入）");
+	dlg.m_csTitle = theApp.m_Language.GetString("CloudTitleExportKey", "Export Key");
+	dlg.m_csPrompt = theApp.m_Language.GetString("CloudPromptExportKeyPassword", "Enter a password to protect the key file:\n(Losing this password means the key cannot be imported)");
 	dlg.m_csInput = _T("");
 	if (dlg.DoModal() != IDOK || dlg.m_csInput.IsEmpty())
 		return;
@@ -448,15 +459,16 @@ void COptionCloud::OnBtnExportKey()
 	if (CCloudKeyExport::ExportKey(filePath, username, exportPassword))
 	{
 		CString msg;
-		msg.Format(_T("密钥文件已成功导出到：\n%s\n\n⚠️ 重要提示：\n• 请妥善保管此文件，切勿与其他人共享\n• 忘记密码或密钥文件将导致数据不可恢复"), filePath);
-		MessageBox(msg, _T("导出密钥"), MB_ICONINFORMATION);
+		msg.Format(theApp.m_Language.GetString("CloudMsgKeyExported",
+			"Key file exported to:\n%s\n\nImportant:\n- Keep this file safe, do not share it\n- Losing the password or key file means data cannot be recovered"), filePath);
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleExportKey", "Export Key"), MB_ICONINFORMATION);
 		m_csKeyFilePath = filePath;
 		CGetSetOptions::SetCloudKeyFilePath(filePath);
 	}
 	else
 	{
-		MessageBox(_T("导出密钥文件失败。请检查文件路径和权限。"),
-		           _T("导出密钥"), MB_ICONERROR);
+		MessageBox(theApp.m_Language.GetString("CloudMsgExportFailed", "Failed to export key file. Please check the file path and permissions."),
+		           theApp.m_Language.GetString("CloudTitleExportKey", "Export Key"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -480,7 +492,8 @@ void COptionCloud::OnBtnImportKey()
 	// Validate key file
 	if (!CCloudKeyExport::IsValidKeyFile(filePath))
 	{
-		MessageBox(_T("无效的密钥文件格式。"), _T("导入密钥"), MB_ICONERROR);
+		MessageBox(theApp.m_Language.GetString("CloudMsgInvalidKeyFile", "Invalid key file format."),
+		           theApp.m_Language.GetString("CloudTitleImportKey", "Import Key"), MB_ICONERROR);
 		return;
 	}
 
@@ -488,20 +501,22 @@ void COptionCloud::OnBtnImportKey()
 	DittoKeyData keyInfo;
 	if (!CCloudKeyExport::GetKeyFileInfo(filePath, keyInfo))
 	{
-		MessageBox(_T("无法读取密钥文件信息。"), _T("导入密钥"), MB_ICONERROR);
+		MessageBox(theApp.m_Language.GetString("CloudMsgCannotReadKeyFile", "Cannot read key file information."),
+		           theApp.m_Language.GetString("CloudTitleImportKey", "Import Key"), MB_ICONERROR);
 		return;
 	}
 
 	// Show key file info
 	CString info;
-	info.Format(_T("密钥文件信息：\n  用户名：%s\n  创建时间：%s\n  版本：%d\n\n请输入密码以解密密钥："),
+	info.Format(theApp.m_Language.GetString("CloudMsgKeyFileInfo",
+		"Key File Info:\n  Username: %s\n  Created: %s\n  Version: %d\n\nEnter password to decrypt the key:"),
 		keyInfo.username, keyInfo.createdAt, keyInfo.version);
-	MessageBox(info, _T("导入密钥"), MB_ICONINFORMATION);
+	MessageBox(info, theApp.m_Language.GetString("CloudTitleImportKey", "Import Key"), MB_ICONINFORMATION);
 
 	// Prompt for password
 	CInputBox dlg;
-	dlg.m_csTitle = _T("导入密钥文件");
-	dlg.m_csPrompt = _T("请输入导出密钥文件时使用的密码：");
+	dlg.m_csTitle = theApp.m_Language.GetString("CloudTitleImportKey", "Import Key");
+	dlg.m_csPrompt = theApp.m_Language.GetString("CloudPromptImportKeyPassword", "Enter the password that was used when exporting the key file:");
 	dlg.m_csInput = _T("");
 	if (dlg.DoModal() != IDOK || dlg.m_csInput.IsEmpty())
 		return;
@@ -513,19 +528,20 @@ void COptionCloud::OnBtnImportKey()
 	if (CCloudKeyExport::ImportKey(filePath, importPassword, importedKey))
 	{
 		CString msg;
-		msg.Format(_T("密钥文件导入成功！\n用户名：%s\n创建时间：%s\n\n加密已自动启用。"),
+		msg.Format(theApp.m_Language.GetString("CloudMsgKeyImported",
+			"Key file imported successfully!\nUsername: %s\nCreated: %s\n\nEncryption has been enabled automatically."),
 			importedKey.username, importedKey.createdAt);
-		MessageBox(msg, _T("导入密钥"), MB_ICONINFORMATION);
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleImportKey", "Import Key"), MB_ICONINFORMATION);
 
 		m_bEncryptionEnabled = TRUE;
-		m_csEncryptionStatus.Format(_T("加密已启用 (从密钥文件导入: %s)"), importedKey.username);
+		m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncryptionEnabledImported", "Encryption enabled (imported from key: %s)"), importedKey.username);
 		m_csKeyFilePath = filePath;
 		CGetSetOptions::SetCloudKeyFilePath(filePath);
 	}
 	else
 	{
-		MessageBox(_T("导入密钥文件失败。密码可能不正确。"),
-		           _T("导入密钥"), MB_ICONERROR);
+		MessageBox(theApp.m_Language.GetString("CloudMsgImportFailed", "Failed to import key file. The password might be incorrect."),
+		           theApp.m_Language.GetString("CloudTitleImportKey", "Import Key"), MB_ICONERROR);
 	}
 
 	UpdateData(FALSE);
@@ -544,24 +560,26 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 	
 	if (statusCode == 401)
 	{
-		msg = _T("云端认证令牌已过期。\n\n")
-		      _T("您的同步已暂停，请重新登录以继续同步。\n\n")
-		      _T("点击\"确定\"后，将打开登录对话框。");
-		
-		MessageBox(msg, _T("云端同步 - 需要重新认证"), MB_ICONWARNING | MB_OK);
+msg = theApp.m_Language.GetString("CloudMsgAuthExpired",
+			"Cloud authentication token has expired.\n\n"
+			"Your sync has been paused. Please log in again to continue syncing.\n\n"
+			"Click OK to open the login dialog.");
+
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleAuthRequired", "Cloud Sync - Authentication Required"), MB_ICONWARNING | MB_OK);
 		
 		// Automatically open login dialog flow
 		OnBtnLogin();
 	}
 	else if (statusCode == 403)
 	{
-		msg = _T("云端访问被拒绝（HTTP 403）。\n\n")
-		      _T("可能原因：\n")
-		      _T("• 您的账号已被禁用\n")
-		      _T("• 设备已被管理员移除\n\n")
-		      _T("请联系管理员或重新登录。");
-		
-		MessageBox(msg, _T("云端同步 - 访问被拒绝"), MB_ICONERROR | MB_OK);
+msg = theApp.m_Language.GetString("CloudMsgAccessDenied",
+			"Cloud access denied (HTTP 403).\n\n"
+			"Possible causes:\n"
+			"- Your account has been disabled\n"
+			"- Your device has been removed by an administrator\n\n"
+			"Please contact your administrator or log in again.");
+
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleAccessDenied", "Cloud Sync - Access Denied"), MB_ICONERROR | MB_OK);
 		
 		// Clear credentials and prompt for re-login
 		CCloudAuth::Logout();
@@ -570,12 +588,13 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 	else if (statusCode == 998)
 	{
 		// Encryption password changed on another device
-		msg = _T("加密密码已变更！\n\n")
-		      _T("您的加密密码已在其他设备上修改。\n")
-		      _T("请重新输入新的加密密码以继续同步。\n\n")
-		      _T("点击\"确定\"后将打开加密设置。");
-		
-		MessageBox(msg, _T("云端同步 - 加密密码已变更"), MB_ICONWARNING | MB_OK);
+msg = theApp.m_Language.GetString("CloudMsgEncryptionChanged",
+			"Encryption password has changed!\n\n"
+			"Your encryption password has been modified on another device.\n"
+			"Please enter the new encryption password to continue syncing.\n\n"
+			"Click OK to open encryption settings.");
+
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleEncryptionChanged", "Cloud Sync - Encryption Password Changed"), MB_ICONWARNING | MB_OK);
 		
 		// Open this property page to show encryption settings
 		CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());
@@ -587,16 +606,16 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 	else if (statusCode == 999)
 	{
 		// Encryption initialization failed
-		msg = _T("加密初始化失败！\n\n")
-		      _T("⚠️ 警告：您的剪贴板数据将不会被加密。\n\n")
-		      _T("可能原因：\n")
-		      _T("• 未设置加密密码\n")
-		      _T("• 未导入密钥文件\n")
-		      _T("• 加密服务不可用\n\n")
-		      _T("请在\"云端同步\"设置中重新启用加密，\n")
-		      _T("以保护您的隐私数据。");
-		
-		MessageBox(msg, _T("云端同步 - 加密失败"), MB_ICONWARNING | MB_OK);
+msg = theApp.m_Language.GetString("CloudMsgEncryptionFailed",
+			"Encryption initialization failed!\n\n"
+			"Warning: Your clipboard data will NOT be encrypted.\n\n"
+			"Possible causes:\n"
+			"- Encryption password not set\n"
+			"- Key file not imported\n"
+			"- Encryption service unavailable\n\n"
+			"Please re-enable encryption in the Cloud Sync settings to protect your data.");
+
+		MessageBox(msg, theApp.m_Language.GetString("CloudTitleEncryptionFailed", "Cloud Sync - Encryption Failed"), MB_ICONWARNING | MB_OK);
 		
 		// Open this property page to show encryption settings
 		CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());

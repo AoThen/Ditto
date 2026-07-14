@@ -25,6 +25,19 @@
 #define IDC_CLOUD_BTN_IMPORT_KEY       2214
 #define IDC_CLOUD_KEY_FILE_PATH        2215
 
+// Static text control IDs for language system
+#define IDC_CLOUD_STATIC_SERVER_URL    2216
+#define IDC_CLOUD_STATIC_USERNAME      2217
+#define IDC_CLOUD_STATIC_PASSWORD      2218
+#define IDC_CLOUD_STATIC_STATUS        2219
+#define IDC_CLOUD_STATIC_ENCRYPT_PWD   2220
+#define IDC_CLOUD_STATIC_ENCRYPT_STAT  2221
+#define IDC_CLOUD_STATIC_WARNING       2222
+#define IDC_CLOUD_STATIC_KEY_PATH      2223
+#define IDC_CLOUD_GRP_SETTINGS         2224
+#define IDC_CLOUD_GRP_ENCRYPTION       2225
+#define IDC_CLOUD_GRP_KEY_FILE         2226
+
 class COptionCloud : public CPropertyPage
 {
 	DECLARE_DYNCREATE(COptionCloud)
