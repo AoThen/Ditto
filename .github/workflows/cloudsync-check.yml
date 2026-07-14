@@ -44,11 +44,14 @@ jobs:
 
       - name: Install MFC component
         run: |
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
           $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -products * `
             -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             -property installationPath
-          $installer = Join-Path $vsPath "vs_installer.exe"
+          if (-not (Test-Path $installer) -and $vsPath) {
+            $installer = Join-Path $vsPath "vs_installer.exe"
+          }
           if (Test-Path $installer) {
             Start-Process -Wait -FilePath $installer -ArgumentList @(
               "modify", "--installPath", $vsPath,
@@ -57,8 +60,7 @@ jobs:
             )
             Write-Host "MFC component installed"
           } else {
-            Write-Error "vs_installer.exe not found at $installer"
-            exit 1
+            Write-Host "vs_installer.exe not found, skipping MFC installation"
           }
 
       - name: Restore NuGet packages
@@ -134,11 +136,14 @@ jobs:
 
       - name: Install MFC component
         run: |
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
           $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -products * `
             -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             -property installationPath
-          $installer = Join-Path $vsPath "vs_installer.exe"
+          if (-not (Test-Path $installer) -and $vsPath) {
+            $installer = Join-Path $vsPath "vs_installer.exe"
+          }
           if (Test-Path $installer) {
             Start-Process -Wait -FilePath $installer -ArgumentList @(
               "modify", "--installPath", $vsPath,
@@ -147,8 +152,7 @@ jobs:
             )
             Write-Host "MFC component installed"
           } else {
-            Write-Error "vs_installer.exe not found at $installer"
-            exit 1
+            Write-Host "vs_installer.exe not found, skipping MFC installation"
           }
 
       - name: Restore NuGet packages
