@@ -1377,7 +1377,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 			csSQL.Format(_T("SELECT lID, lModifiedDate FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
 			
 			CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
-			stmt.bind(1, (int64_t)crc);
+			stmt.bind(1, (int)crc);
 			CppSQLite3Query q = stmt.execQuery();
 			
 			if (q.eof() == false)
@@ -1430,7 +1430,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				csSQL.Format(_T("SELECT lID, lModifiedDate, CRC FROM Main WHERE mText = ? AND bIsGroup = 0 LIMIT 1"));
 				
 				CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
-				stmt.bind(1, desc.c_str());
+				stmt.bind(1, CString(desc.c_str()));
 				CppSQLite3Query q = stmt.execQuery();
 				
 				if (q.eof() == false)
@@ -1818,10 +1818,10 @@ void CCloudSyncManager::StopWebSocket()
 	// First, force-close the WS connection to interrupt any blocking read()
 	if (m_pWsClient != nullptr)
 	{
-		auto* wsClient = static_cast<httplib::WebSocketClient*>(m_pWsClient);
+		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
 		if (wsClient->is_open())
 		{
-			wsClient->close(httplib::CloseStatus::Normal, "Shutdown");
+			wsClient->close(httplib::ws::CloseStatus::Normal, "Shutdown");
 		}
 	}
 
@@ -1845,7 +1845,7 @@ void CCloudSyncManager::StopWebSocket()
 	// Clean up WS client
 	if (m_pWsClient != nullptr)
 	{
-		auto* wsClient = static_cast<httplib::WebSocketClient*>(m_pWsClient);
+		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
 		delete wsClient;
 		m_pWsClient = nullptr;
 	}
@@ -1882,7 +1882,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			{"Authorization", "Bearer " + std::string(CStringA(pThis->m_deviceToken))}
 		};
 
-		auto* wsClient = new httplib::WebSocketClient(wsUrl, headers);
+		auto* wsClient = new httplib::ws::WebSocketClient(wsUrl, headers);
 		pThis->m_pWsClient = wsClient;
 
 		if (!wsClient->is_valid())
@@ -1925,11 +1925,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			std::string msg;
 			auto result = wsClient->read(msg);
 
-			if (result == httplib::ReadResult::Text)
+			if (result == httplib::ws::ReadResult::Text)
 			{
 				pThis->OnWsMessage(msg);
 			}
-			else if (result == httplib::ReadResult::Fail)
+			else if (result == httplib::ws::ReadResult::Fail)
 			{
 				LogMessage(_T("WsThreadProc: connection lost, will reconnect."));
 				break;
@@ -1940,7 +1940,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		// Close connection gracefully
 		if (wsClient->is_open())
 		{
-			wsClient->close(httplib::CloseStatus::Normal, "Client shutting down");
+			wsClient->close(httplib::ws::CloseStatus::Normal, "Client shutting down");
 		}
 		delete wsClient;
 		pThis->m_pWsClient = nullptr;

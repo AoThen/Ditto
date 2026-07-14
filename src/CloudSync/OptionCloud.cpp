@@ -3,9 +3,12 @@
 #include "CloudAuth.h"
 #include "CloudCrypto.h"
 #include "CloudKeyExport.h"
+#include "CloudSyncManager.h"
+#include "CloudEncryption.h"
 #include "../httplib.h"
 #include "../json.hpp"
 #include "../Options.h"
+#include "../CP_Main.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -575,7 +578,7 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 		MessageBox(msg, _T("云端同步 - 加密密码已变更"), MB_ICONWARNING | MB_OK);
 		
 		// Open this property page to show encryption settings
-		CPropertySheet* pSheet = GetParent();
+		CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());
 		if (pSheet != nullptr)
 		{
 			pSheet->SetActivePage(this);
@@ -596,7 +599,7 @@ LRESULT COptionCloud::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 		MessageBox(msg, _T("云端同步 - 加密失败"), MB_ICONWARNING | MB_OK);
 		
 		// Open this property page to show encryption settings
-		CPropertySheet* pSheet = GetParent();
+		CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());
 		if (pSheet != nullptr)
 		{
 			pSheet->SetActivePage(this);
