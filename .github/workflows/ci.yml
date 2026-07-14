@@ -76,6 +76,21 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ── Windows Client (C++/MFC) ──────────────────────────────
+  client-build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (Release x64)
+        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
+
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
