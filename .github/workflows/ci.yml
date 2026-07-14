@@ -88,9 +88,13 @@ jobs:
       - name: Install MFC libraries
         shell: pwsh
         run: |
-          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-          & "$vsPath\..\..\Installer\vs_installer.exe" modify --installPath $vsPath --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart
-        continue-on-error: true
+          $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -property installationPath
+          Write-Host "VS installation path: $vsPath"
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          & $installer modify --installPath $vsPath --add Microsoft.VisualStudio.Component.VC.ATLMFC --passive --wait --norestart
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw "MFC install failed (exit code: $LASTEXITCODE)" }
+          Write-Host "MFC installed successfully"
 
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
