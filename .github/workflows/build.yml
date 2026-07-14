@@ -50,7 +50,7 @@ jobs:
         run: nuget restore ${{env.SOLUTION_FILE_PATH}}
         
       - name: Build
-        run: msbuild CP_Main_10.sln /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main_10.sln /p:Configuration=Release /p:Platform=x64 /t:CP_Main
         
       - name: Set Versions
         run: |

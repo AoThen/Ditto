@@ -42,8 +42,12 @@ BOOL CCloudKeyExport::ExportKey(
 	try
 	{
 		// Get current encryption key from settings
-		CStringA keyBase64 = CGetSetOptions::GetCloudEncryptionKey();
-		CStringA saltBase64 = CGetSetOptions::GetCloudEncryptionSalt();
+		CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
+		CT2A keyB64A(csKeyB64, CP_UTF8);
+		CStringA keyBase64(keyB64A);
+		CString csSaltB64 = CGetSetOptions::GetCloudEncryptionSalt();
+		CT2A saltB64A(csSaltB64, CP_UTF8);
+		CStringA saltBase64(saltB64A);
 
 		if (keyBase64.IsEmpty() || saltBase64.IsEmpty())
 		{
@@ -247,7 +251,9 @@ BOOL CCloudKeyExport::InitializeFromImportedKey(const DittoKeyData& keyData)
 	// Just read it back and initialize
 	try
 	{
-		CStringA keyBase64 = CGetSetOptions::GetCloudEncryptionKey();
+		CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
+		CT2A keyB64A(csKeyB64, CP_UTF8);
+		CStringA keyBase64(keyB64A);
 		if (keyBase64.IsEmpty())
 		{
 			return FALSE;

@@ -80,7 +80,7 @@ protected:
 // IsValidKeyFile tests
 // ============================================================================
 
-TEST(CloudKeyExport_IsValidKeyFile, ValidFile)
+TEST_F(CloudKeyExportTest, IsValidKeyFile_ValidFile)
 {
 	// Create a valid key file using ExportKey
 	CString filePath = GetTempFilePath("valid_");
@@ -97,7 +97,7 @@ TEST(CloudKeyExport_IsValidKeyFile, ValidFile)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_IsValidKeyFile, InvalidJson)
+TEST_F(CloudKeyExportTest, IsValidKeyFile_InvalidJson)
 {
 	CString filePath = GetTempFilePath("invalid_");
 	CStringA invalidContent = "This is not a valid key file";
@@ -110,12 +110,12 @@ TEST(CloudKeyExport_IsValidKeyFile, InvalidJson)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_IsValidKeyFile, NonExistentFile)
+TEST_F(CloudKeyExportTest, IsValidKeyFile_NonExistentFile)
 {
 	EXPECT_FALSE(CCloudKeyExport::IsValidKeyFile(_T("C:\\NonExistent\\file.dittokey")));
 }
 
-TEST(CloudKeyExport_IsValidKeyFile, FileTooLarge)
+TEST_F(CloudKeyExportTest, IsValidKeyFile_FileTooLarge)
 {
 	CString filePath = GetTempFilePath("large_");
 	CFile file;
@@ -129,7 +129,7 @@ TEST(CloudKeyExport_IsValidKeyFile, FileTooLarge)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_IsValidKeyFile, UnsupportedVersion)
+TEST_F(CloudKeyExportTest, IsValidKeyFile_UnsupportedVersion)
 {
 	CString filePath = GetTempFilePath("ver_");
 	json keyJson;
@@ -155,7 +155,7 @@ TEST(CloudKeyExport_IsValidKeyFile, UnsupportedVersion)
 // GetKeyFileInfo tests
 // ============================================================================
 
-TEST(CloudKeyExport_GetKeyFileInfo, ReadMetadata)
+TEST_F(CloudKeyExportTest, GetKeyFileInfo_ReadMetadata)
 {
 	// Export a key file first
 	CString filePath = GetTempFilePath("meta_");
@@ -180,14 +180,14 @@ TEST(CloudKeyExport_GetKeyFileInfo, ReadMetadata)
 // Full Export/Import Roundtrip - Using ACTUAL ExportKey/ImportKey methods
 // ============================================================================
 
-TEST(CloudKeyExport_Roundtrip, CorrectPassword)
+TEST_F(CloudKeyExportTest, Roundtrip_CorrectPassword)
 {
 	CString filePath = GetTempFilePath("roundtrip_");
 	CString username = _T("roundtrip_test@example.com");
 	CString password = _T("SecurePassword123!");
 
 	// Get original key before export
-	std::vector<BYTE> originalKey = this->GetStoredKey();
+	std::vector<BYTE> originalKey = GetStoredKey();
 
 	// Export using ACTUAL CCloudKeyExport::ExportKey
 	BOOL exportOk = CCloudKeyExport::ExportKey(filePath, username, password);
@@ -208,7 +208,7 @@ TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 		EXPECT_STREQ(username, keyData.username);
 
 		// Verify key was restored correctly
-		std::vector<BYTE> restoredKey = this->GetStoredKey();
+		std::vector<BYTE> restoredKey = GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
@@ -224,7 +224,7 @@ TEST(CloudKeyExport_Roundtrip, CorrectPassword)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_Roundtrip, WrongPassword)
+TEST_F(CloudKeyExportTest, Roundtrip_WrongPassword)
 {
 	CString filePath = GetTempFilePath("wrongpass_");
 	CString username = _T("user");
@@ -242,7 +242,7 @@ TEST(CloudKeyExport_Roundtrip, WrongPassword)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_Roundtrip, CorruptedFile)
+TEST_F(CloudKeyExportTest, Roundtrip_CorruptedFile)
 {
 	CString filePath = GetTempFilePath("corrupt_");
 	CString username = _T("user");
@@ -278,14 +278,14 @@ TEST(CloudKeyExport_Roundtrip, CorruptedFile)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_Roundtrip, UnicodeContent)
+TEST_F(CloudKeyExportTest, Roundtrip_UnicodeContent)
 {
 	CString filePath = GetTempFilePath("unicode_");
 	CString username = _T("用户测试@example.com");  // Chinese characters
 	CString password = _T("密码测试123!");
 
 	// Get original key
-	std::vector<BYTE> originalKey = this->GetStoredKey();
+	std::vector<BYTE> originalKey = GetStoredKey();
 
 	// Export
 	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -300,7 +300,7 @@ TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 		EXPECT_STREQ(username, keyData.username);
 
 		// Verify key matches original
-		std::vector<BYTE> restoredKey = this->GetStoredKey();
+		std::vector<BYTE> restoredKey = GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 	}
@@ -312,7 +312,7 @@ TEST(CloudKeyExport_Roundtrip, UnicodeContent)
 // Multiple Export/Import Cycles (stress test)
 // ============================================================================
 
-TEST(CloudKeyExport_Roundtrip, MultipleCycles)
+TEST_F(CloudKeyExportTest, Roundtrip_MultipleCycles)
 {
 	CString password = _T("MultiCycleTest!");
 	CString username = _T("multi_cycle_user");
@@ -322,7 +322,7 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 		CString filePath = GetTempFilePath("cycle_");
 		
 		// Get current key
-		std::vector<BYTE> originalKey = this->GetStoredKey();
+		std::vector<BYTE> originalKey = GetStoredKey();
 
 		// Export
 		ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -335,7 +335,7 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 		if (importOk)
 		{
 			// Verify key matches
-			std::vector<BYTE> restoredKey = this->GetStoredKey();
+			std::vector<BYTE> restoredKey = GetStoredKey();
 			EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 
 			// Verify crypto works
@@ -353,14 +353,14 @@ TEST(CloudKeyExport_Roundtrip, MultipleCycles)
 // Empty password test
 // ============================================================================
 
-TEST(CloudKeyExport_Roundtrip, EmptyPassword)
+TEST_F(CloudKeyExportTest, Roundtrip_EmptyPassword)
 {
 	CString filePath = GetTempFilePath("emptypass_");
 	CString username = _T("empty_pass_user");
 	CString password = _T("");
 
 	// Get original key
-	std::vector<BYTE> originalKey = this->GetStoredKey();
+	std::vector<BYTE> originalKey = GetStoredKey();
 
 	// Export with empty password (should still work, just less secure)
 	ASSERT_TRUE(CCloudKeyExport::ExportKey(filePath, username, password));
@@ -373,7 +373,7 @@ TEST(CloudKeyExport_Roundtrip, EmptyPassword)
 	if (importOk)
 	{
 		// Verify key matches
-		std::vector<BYTE> restoredKey = this->GetStoredKey();
+		std::vector<BYTE> restoredKey = GetStoredKey();
 		EXPECT_EQ(originalKey.size(), restoredKey.size());
 		EXPECT_EQ(0, memcmp(originalKey.data(), restoredKey.data(), originalKey.size()));
 	}
@@ -385,7 +385,7 @@ TEST(CloudKeyExport_Roundtrip, EmptyPassword)
 // InitializeFromImportedKey tests
 // ============================================================================
 
-TEST(CloudKeyExport_InitializeFromImportedKey, AfterImport)
+TEST_F(CloudKeyExportTest, InitializeFromImportedKey_AfterImport)
 {
 	CString filePath = GetTempFilePath("init_");
 	CString username = _T("init_test_user");
@@ -406,7 +406,7 @@ TEST(CloudKeyExport_InitializeFromImportedKey, AfterImport)
 	DeleteFile(filePath);
 }
 
-TEST(CloudKeyExport_InitializeFromImportedKey, WithoutImport)
+TEST_F(CloudKeyExportTest, InitializeFromImportedKey_WithoutImport)
 {
 	// Reset state
 	CGetSetOptions::Reset();
