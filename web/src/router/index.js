@@ -13,20 +13,10 @@ const routes = [
     meta: { requiresAuth: false },
   },
   {
-    path: '/register',
-    name: 'Register',
-    component: () => import('../views/Register.vue'),
-    meta: { requiresAuth: false },
-  },
-  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue'),
     meta: { requiresAuth: true, requiresWs: true },
-    beforeEnter: (to, from, next) => {
-      // WS connection will be handled by the composable in child components
-      next()
-    },
     children: [
       { path: '', component: () => import('../views/StatsDashboard.vue') },
       { path: 'clips', component: () => import('../views/Clips.vue') },
@@ -34,6 +24,12 @@ const routes = [
       { path: 'devices', component: () => import('../views/Devices.vue') },
       { path: 'sync-logs', component: () => import('../views/SyncLogs.vue') },
       { path: 'settings', component: () => import('../views/Settings.vue') },
+      {
+        path: 'admin/users',
+        name: 'AdminUsers',
+        component: () => import('../views/admin/Users.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true },
+      },
     ],
   },
   // 404 catch-all route (must be last)
@@ -49,29 +45,39 @@ const router = createRouter({
   routes,
 })
 
-// Helper: check if user is authenticated
-// Uses localStorage check since HttpOnly cookies aren't accessible from JS
-// and cross-port cookies may not be visible in some environments
 function isAuthenticated() {
-  // Check localStorage (set by setUserInfo after login)
   const userInfo = localStorage.getItem('userInfo')
   if (userInfo) {
     try {
       const parsed = JSON.parse(userInfo)
       if (parsed.device_id) return true
     } catch {
-      // ignore parse errors
+      // ignore
     }
   }
-  // Fallback: check cookie (works in production where frontend/backend share origin)
   const match = document.cookie.match(/(^| )device_id=([^;]+)/)
   return match ? true : false
+}
+
+function isAdmin() {
+  const userInfo = localStorage.getItem('userInfo')
+  if (userInfo) {
+    try {
+      const parsed = JSON.parse(userInfo)
+      return parsed.role === 'admin'
+    } catch {
+      // ignore
+    }
+  }
+  return false
 }
 
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !isAuthenticated()) {
     next('/login')
-  } else if ((to.path === '/login' || to.path === '/register') && isAuthenticated()) {
+  } else if (to.path === '/login' && isAuthenticated()) {
+    next('/dashboard')
+  } else if (to.meta.requiresAdmin && !isAdmin()) {
     next('/dashboard')
   } else {
     next()

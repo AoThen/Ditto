@@ -41,6 +41,10 @@
             <el-icon><Setting /></el-icon>
             <span>设置</span>
           </el-menu-item>
+          <el-menu-item v-if="userStore.role === 'admin'" index="/dashboard/admin/users">
+            <el-icon><User /></el-icon>
+            <span>用户管理</span>
+          </el-menu-item>
         </el-menu>
       </aside>
 
@@ -59,7 +63,7 @@ import { useUserStore } from '../stores/user'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
-import { DataAnalysis, Document, Monitor, Setting, FolderOpened } from '@element-plus/icons-vue'
+import { DataAnalysis, Document, Monitor, Setting, FolderOpened, User } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

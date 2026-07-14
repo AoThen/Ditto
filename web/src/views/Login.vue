@@ -49,7 +49,7 @@
       </el-form>
 
       <div class="footer-link">
-        还没有账号？<router-link to="/register">去注册</router-link>
+        联系管理员获取账号
       </div>
     </el-card>
   </div>
@@ -90,7 +90,7 @@ async function handleLogin() {
       // H1: Backend sets HttpOnly cookies, response only contains device_id
       const res = await login(form)
       if (res.code === 0) {
-        userStore.setUserInfo({ device_id: res.data.device_id, username: form.username })
+        userStore.setUserInfo({ device_id: res.data.device_id, username: form.username, role: res.data.role })
         ElMessage.success('登录成功')
         // Navigate outside try/catch to avoid catching navigation errors
         await router.push('/dashboard')

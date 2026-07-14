@@ -25,7 +25,8 @@ func TestRegister_Success(t *testing.T) {
 	assert.Contains(t, data, "user_id")
 }
 
-// TestRegister_DuplicateUsername — register same username twice, expect code=40001
+// TestRegister_DuplicateUsername — registration is only allowed for first user.
+// After the first user is registered, subsequent registration attempts should be rejected.
 func TestRegister_DuplicateUsername(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 
@@ -35,15 +36,15 @@ func TestRegister_DuplicateUsername(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// Second registration with same username should fail
+	// Second registration with same username should fail (registration closed)
 	statusCode, respBody = testutil.RegisterUser(t, server, "dupuser", "second@example.com", "password456")
-	assert.Equal(t, http.StatusBadRequest, statusCode)
+	assert.Equal(t, http.StatusForbidden, statusCode)
 	code, message, _ := testutil.ParseResponse(t, respBody)
-	assert.Equal(t, 40001, code)
-	assert.Contains(t, message, "用户名已存在")
+	assert.Equal(t, 40302, code)
+	assert.Contains(t, message, "注册已关闭")
 }
 
-// TestRegister_DuplicateEmail — register same email twice, expect code=40002
+// TestRegister_DuplicateEmail — registration is only allowed for first user.
 func TestRegister_DuplicateEmail(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 
@@ -53,12 +54,12 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// Second registration with same email should fail
+	// Second registration with same email should fail (registration closed)
 	statusCode, respBody = testutil.RegisterUser(t, server, "user2", "dupemail@example.com", "password456")
-	assert.Equal(t, http.StatusBadRequest, statusCode)
+	assert.Equal(t, http.StatusForbidden, statusCode)
 	code, message, _ := testutil.ParseResponse(t, respBody)
-	assert.Equal(t, 40002, code)
-	assert.Contains(t, message, "邮箱已被注册")
+	assert.Equal(t, 40302, code)
+	assert.Contains(t, message, "注册已关闭")
 }
 
 // TestRegister_InvalidInput — empty username/email/password, expect code=40000
@@ -84,7 +85,7 @@ func TestRegister_InvalidInput(t *testing.T) {
 	}
 }
 
-// TestLogin_Success — login with correct credentials, expect HttpOnly cookies
+// TestLogin_Success — login with correct credentials, expect HttpOnly cookies and role
 func TestLogin_Success(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 
@@ -101,6 +102,9 @@ func TestLogin_Success(t *testing.T) {
 	assert.Equal(t, 0, code)
 	assert.NotNil(t, data)
 	assert.Contains(t, data, "device_id")
+
+	// First user should be admin
+	assert.Equal(t, "admin", data["role"], "first user should have role=admin")
 
 	// H1: Verify HttpOnly cookies are set
 	token := testutil.ExtractCookie(setCookies, "device_token")

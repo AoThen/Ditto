@@ -71,6 +71,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
+	adminHandler := handler.NewAdminHandler()
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -147,6 +148,18 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 			stats.GET("/overview", statsHandler.GetOverview)
 			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
+
+		// Admin routes
+		admin := protected.Group("/admin")
+		admin.Use(middleware.AdminAuth())
+		{
+			admin.POST("/users", adminHandler.CreateUser)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.PUT("/users/:id", adminHandler.UpdateUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+			admin.POST("/users/:id/reset-password", adminHandler.ResetPassword)
+		}
 	}
 
 	server := httptest.NewServer(r)
@@ -204,6 +217,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
+	adminHandler := handler.NewAdminHandler()
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -276,6 +290,17 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 			stats.GET("/overview", statsHandler.GetOverview)
 			stats.GET("/sync-logs", statsHandler.GetSyncLogs)
 		}
+
+		admin := protected.Group("/admin")
+		admin.Use(middleware.AdminAuth())
+		{
+			admin.POST("/users", adminHandler.CreateUser)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.PUT("/users/:id", adminHandler.UpdateUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+			admin.POST("/users/:id/reset-password", adminHandler.ResetPassword)
+		}
 	}
 
 	server := httptest.NewServer(r)
@@ -339,6 +364,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
+	adminHandler := handler.NewAdminHandler()
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -414,6 +440,18 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 
 		// WebSocket route
 		protected.GET("/ws", wsHandler.HandleWebSocket)
+
+		// Admin routes
+		admin := protected.Group("/admin")
+		admin.Use(middleware.AdminAuth())
+		{
+			admin.POST("/users", adminHandler.CreateUser)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.PUT("/users/:id", adminHandler.UpdateUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+			admin.POST("/users/:id/reset-password", adminHandler.ResetPassword)
+		}
 	}
 
 	server := httptest.NewServer(r)

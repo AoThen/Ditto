@@ -19,10 +19,50 @@ import (
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/service"
 
+	"ditto-cloud-server/pkg/crypto"
+
 	cors "github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
+
+// SeedDefaultAdmin creates the first admin user from environment variables
+// if no users exist in the database.
+func SeedDefaultAdmin() {
+	if !service.IsFirstUser() {
+		return
+	}
+
+	username := os.Getenv("ADMIN_USERNAME")
+	password := os.Getenv("ADMIN_PASSWORD")
+	email := os.Getenv("ADMIN_EMAIL")
+
+	if username == "" || password == "" {
+		log.Println("[INFO] No ADMIN_USERNAME/ADMIN_PASSWORD set, skipping auto seed")
+		return
+	}
+
+	hashedPassword, err := crypto.HashPassword(password)
+	if err != nil {
+		log.Printf("[WARN] Failed to hash admin password: %v", err)
+		return
+	}
+
+	user := model.User{
+		Username:     username,
+		Email:        email,
+		PasswordHash: hashedPassword,
+		Role:         "admin",
+		IsActive:     true,
+	}
+
+	if err := database.DB.Create(&user).Error; err != nil {
+		log.Printf("[WARN] Failed to seed admin user: %v", err)
+		return
+	}
+
+	log.Printf("[INFO] Default admin user '%s' created (role: admin)", username)
+}
 
 // noListFileSystem wraps http.FileSystem to disable directory listing
 type noListFileSystem struct {
@@ -62,6 +102,9 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// Seed default admin from environment variables
+	SeedDefaultAdmin()
+
 	// Initialize WebSocket hub
 	h := hub.New()
 	h.Run()
@@ -88,6 +131,7 @@ func main() {
 	wsHandler := handler.NewWSHandler(h, cfg)
 	statsSvc := service.NewStatsService()
 	statsHandler := handler.NewStatsHandler(statsSvc)
+	adminHandler := handler.NewAdminHandler()
 
 	// HIGH FIX (H5): Configure WebSocket allowed origins
 	handler.SetAllowedOrigins(cfg.AllowedOrigins)
@@ -189,6 +233,18 @@ func main() {
 
 		// WebSocket route (uses query param auth since headers can't be set during WS upgrade)
 		protected.GET("/ws", wsHandler.HandleWebSocket)
+
+		// Admin routes (requires auth + admin role)
+		admin := protected.Group("/admin")
+		admin.Use(middleware.AdminAuth())
+		{
+			admin.POST("/users", adminHandler.CreateUser)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.PUT("/users/:id", adminHandler.UpdateUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+			admin.POST("/users/:id/reset-password", adminHandler.ResetPassword)
+		}
 	}
 
 	// Serve static web assets (Vite build output under web-dist/)
