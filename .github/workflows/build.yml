@@ -31,7 +31,8 @@ jobs:
         run: |
           $vsPath = vswhere -latest -property installationPath
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          & $installer modify --installPath $vsPath --add "Microsoft.VisualStudio.Component.VC.ATLMFC" --quiet --norestart
+          & $installer modify --installPath $vsPath --add "Microsoft.VisualStudio.Component.VC.ATLMFC" --quiet --wait --norestart
+          if ($LASTEXITCODE -ne 0) { throw "MFC install failed with code $LASTEXITCODE" }
 
       - name: Restore NuGet packages
         working-directory: ${{env.GITHUB_WORKSPACE}}
