@@ -211,10 +211,10 @@ BOOL COptionCloud::OnApply()
 	}
 
 	// Re-initialize sync if settings changed
-	if (m_bEnabled && theApp.m_pCloudSyncManager != nullptr)
+	if (m_bEnabled)
 	{
 		// Reinitialize with new settings
-		theApp.m_pCloudSyncManager->Initialize();
+		theApp.m_CloudSyncManager.Initialize();
 	}
 
 	return CPropertyPage::OnApply();
