@@ -27,7 +27,7 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Install MFC libraries
+      - name: Install MFC libraries (v143)
         run: |
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
           $vsPath = vswhere -latest -property installationPath
@@ -35,14 +35,12 @@ jobs:
           $productId = vswhere -latest -property productId
           Write-Host "VS path: $vsPath  channel: $channelId  product: $productId"
           & $installer modify --channelId $channelId --productId $productId `
+            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             --add Microsoft.VisualStudio.Component.VC.ATLMFC `
             --add Microsoft.VisualStudio.Component.VC.ATL `
-            --add Microsoft.VisualStudio.Component.VC.MFC `
             --quiet --wait --norestart
-          Write-Host "vs_installer exit code: $LASTEXITCODE"
-          $mfc = Get-ChildItem (Join-Path $vsPath "VC\Tools\MSVC") -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Select-Object -First 3
-          $mfc | ForEach-Object { Write-Host "Found MFC lib: $($_.FullName)" }
           if ($LASTEXITCODE -ne 0) { throw "MFC install failed with code $LASTEXITCODE" }
+          Get-ChildItem (Join-Path $vsPath "VC\Tools\MSVC") -Recurse -Filter "mfc*.lib" -ErrorAction SilentlyContinue | Select-Object -First 5 | ForEach-Object { Write-Host "Found MFC lib: $($_.FullName)" }
 
       - name: Restore NuGet packages
         working-directory: ${{env.GITHUB_WORKSPACE}}
