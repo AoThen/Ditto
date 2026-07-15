@@ -1,22 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 function createMockWs() {
-  const handlers = {}
   return {
     readyState: 1,
     send: vi.fn(),
     close: vi.fn(),
     addEventListener: vi.fn(),
-    get onopen() { return handlers._onopen },
-    set onopen(fn) { handlers._onopen = fn },
-    get onmessage() { return handlers._onmessage },
-    set onmessage(fn) { handlers._onmessage = fn },
-    get onclose() { return handlers._onclose },
-    set onclose(fn) { handlers._onclose = fn },
-    get onerror() { return handlers._onerror },
-    set onerror(fn) { handlers._onerror = fn },
-    _handlers: handlers,
+    onopen: vi.fn(),
+    onmessage: vi.fn(),
+    onclose: vi.fn(),
+    onerror: vi.fn(),
   }
 }
 
@@ -32,9 +26,15 @@ describe('useWebSocket', () => {
     document.cookie = 'device_id=test-device'
 
     mockWs = createMockWs()
-    global.WebSocket = vi.fn(() => mockWs)
+    const mockWsConstructor = vi.fn(() => mockWs)
+    mockWsConstructor.OPEN = 1
+    global.WebSocket = mockWsConstructor
 
     mod = await import('@/composables/useWebSocket')
+  })
+
+  afterEach(() => {
+    mod.disconnectWebSocket()
   })
 
   it('connect creates a WebSocket connection with default URL', () => {
@@ -54,7 +54,9 @@ describe('useWebSocket', () => {
     setActivePinia(createPinia())
     vi.stubEnv('VITE_WS_URL', 'https://example.com')
     mockWs = createMockWs()
-    global.WebSocket = vi.fn(() => mockWs)
+    const mockWsConstructor = vi.fn(() => mockWs)
+    mockWsConstructor.OPEN = 1
+    global.WebSocket = mockWsConstructor
     mod = await import('@/composables/useWebSocket')
 
     mod.useWebSocket().connect()
@@ -62,8 +64,9 @@ describe('useWebSocket', () => {
   })
 
   it('connect skips when not logged in', async () => {
-    const userStore = (await import('@/stores/user')).useUserStore()
-    userStore.isLoggedIn = false
+    const userMod = await import('@/stores/user')
+    vi.spyOn(userMod.useUserStore(), 'checkAuthState').mockImplementation(() => {})
+    userMod.useUserStore().isLoggedIn = false
 
     const ws = mod.useWebSocket()
     ws.connect()
@@ -106,7 +109,7 @@ describe('useWebSocket', () => {
 
     mockWs.onmessage({ data: JSON.stringify({ type: 'goaway' }) })
 
-    expect(global.WebSocket.mock.results[0].value.close).toHaveBeenCalled()
+    expect(mockWs.close).toHaveBeenCalled()
   })
 
   it('onclose with code 1000 does not schedule reconnect', () => {
