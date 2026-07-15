@@ -86,6 +86,7 @@
   <ItemGroup>
     <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="TestCrc32.cpp" />
+    <ClCompile Include="TestRegExFilter.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
     <ClCompile Include="TestTextConvert.cpp" />
     <ClCompile Include="TestWildCardMatch.cpp" />
@@ -122,6 +123,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\src\WildCardMatch.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\src\RegExFilterHelper.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\Addins\DittoUtil\TextConvert.cpp">
