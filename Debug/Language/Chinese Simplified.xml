@@ -506,6 +506,11 @@
 		
 		<Item English_Text = "Backing up database" ID = "BackupDbMsg">备份数据库信息</Item>
 		<Item English_Text = "Restoring database" ID = "RestoreDbMsg">还原数据库信息</Item>
+		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips">删除所有不在组中、标记为永不自动删除、拥有快捷键或置顶的剪辑。\n\n此操作无法撤销。</Item>
+		<Item English_Text = "Delete Group?" ID = "Delete_Clip_Groups">删除组？</Item>
+		<Item English_Text = "There are no starred clips" ID = "NoStarredClips">没有星标剪辑</Item>
+		<Item English_Text = "[Starred clips]" ID = "starred_clips">[星标剪辑]</Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusEncryptionException">异常：%hs</Item>
 		
 		<Item English_Text = "Ditto was unable to open its database, waiting until it can be opened. Update the path in Options if needed. Path: " ID = "StartupNoDbMsg">Ditto 无法打开数据库，将等待它可以打开的时候。 如果需要，更新选项中的路径。 路径： </Item>
 				

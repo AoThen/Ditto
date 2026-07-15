@@ -506,6 +506,11 @@
 		
 		<Item English_Text = "Backing up database" ID = "BackupDbMsg"></Item>
 		<Item English_Text = "Restoring database" ID = "RestoreDbMsg"></Item>
+		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips"></Item>
+		<Item English_Text = "Delete Group?" ID = "Delete_Clip_Groups"></Item>
+		<Item English_Text = "There are no starred clips" ID = "NoStarredClips"></Item>
+		<Item English_Text = "[Starred clips]" ID = "starred_clips"></Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusEncryptionException"></Item>
 		
 		<Item English_Text = "Ditto was unable to open its database, waiting until it can be opened. Update the path in Options if needed. Path: " ID = "StartupNoDbMsg"></Item>
 				
