@@ -108,6 +108,9 @@
     <ClCompile Include="..\src\CloudSync\CloudKeyExport.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
+    <ClCompile Include="..\EncryptDecrypt\rijndael.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\CloudSync\CloudAuth.h" />
