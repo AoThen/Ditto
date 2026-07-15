@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <exception>
 #include <string>
-#include <unordered_map>
+#include "PinyinConvertCache.h"
 #include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
@@ -1661,7 +1661,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 					CT2A searchA(lowSearch, CP_UTF8);
 					std::string searchStr(searchA);
-					static std::unordered_map<long, std::pair<std::string, std::string>> s_pinyinCache;
+					static CPinyinConvertCache s_pinyinCache;
 
 					while (!q.eof())
 					{
@@ -1670,17 +1670,17 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 						std::wstring wText(mText.GetString());
 
 						std::string pinyin, abbr;
-						auto cacheIt = s_pinyinCache.find(id);
-						if (cacheIt != s_pinyinCache.end())
+						auto* cached = s_pinyinCache.Get(id);
+						if (cached)
 						{
-							pinyin = cacheIt->second.first;
-							abbr = cacheIt->second.second;
+							pinyin = cached->first;
+							abbr = cached->second;
 						}
 						else
 						{
 							pinyin = pinyinConv.ConvertToPinyin(wText);
 							abbr = pinyinConv.ConvertToAbbreviation(wText);
-							s_pinyinCache[id] = { pinyin, abbr };
+							s_pinyinCache.Put(id, { pinyin, abbr });
 						}
 
 						std::string lowPinyin;
