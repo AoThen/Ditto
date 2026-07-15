@@ -42,6 +42,18 @@ const char* CPinyinConvert::LookupPinyin(wchar_t ch)
     return NULL;
 }
 
+std::string CPinyinConvert::ConvertToAbbreviation(const std::wstring& text)
+{
+    std::string result;
+    for (size_t i = 0; i < text.length(); i++)
+    {
+        const char* py = LookupPinyin(text[i]);
+        if (py != NULL && py[0] != '\0')
+            result += py[0];
+    }
+    return result;
+}
+
 std::string CPinyinConvert::ConvertToPinyin(const std::wstring& text)
 {
     std::string result;

@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <exception>
 #include <string>
+#include <unordered_map>
 #include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
@@ -1658,24 +1659,46 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 					CppSQLite3Query q = theApp.m_db.execQuery(pinyinSql);
 					std::vector<long> pinyinIDs;
 
+					CT2A searchA(lowSearch, CP_UTF8);
+					std::string searchStr(searchA);
+					static std::unordered_map<long, std::pair<std::string, std::string>> s_pinyinCache;
+
 					while (!q.eof())
 					{
 						long id = q.getIntField(0);
 						CString mText = q.getStringField(1);
-
 						std::wstring wText(mText.GetString());
-						std::string pinyin = pinyinConv.ConvertToPinyin(wText);
 
-						// Convert pinyin to lowercase for comparison
+						std::string pinyin, abbr;
+						auto cacheIt = s_pinyinCache.find(id);
+						if (cacheIt != s_pinyinCache.end())
+						{
+							pinyin = cacheIt->second.first;
+							abbr = cacheIt->second.second;
+						}
+						else
+						{
+							pinyin = pinyinConv.ConvertToPinyin(wText);
+							abbr = pinyinConv.ConvertToAbbreviation(wText);
+							s_pinyinCache[id] = { pinyin, abbr };
+						}
+
 						std::string lowPinyin;
 						lowPinyin.resize(pinyin.size());
 						std::transform(pinyin.begin(), pinyin.end(), lowPinyin.begin(), ::tolower);
 
-						CT2A searchA(lowSearch, CP_UTF8);
-						if (lowPinyin.find(std::string(searchA)) != std::string::npos)
+						bool matched = lowPinyin.find(searchStr) != std::string::npos;
+
+						if (!matched)
 						{
-							pinyinIDs.push_back(id);
+							std::string lowAbbr;
+							lowAbbr.resize(abbr.size());
+							std::transform(abbr.begin(), abbr.end(), lowAbbr.begin(), ::tolower);
+							matched = lowAbbr.find(searchStr) != std::string::npos;
 						}
+
+						if (matched)
+							pinyinIDs.push_back(id);
 
 						q.nextRow();
 					}
