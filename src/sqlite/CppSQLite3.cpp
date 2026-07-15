@@ -869,12 +869,11 @@ CppSQLite3Statement CppSQLite3DB::compileStatement(const TCHAR* szSQL)
 
 bool CppSQLite3DB::tableExists(const TCHAR* szTable)
 {
-	TCHAR szSQL[128];
-
-	SPRINTF(szSQL,
-			_T("select count(*) from sqlite_master where type='table' and name='%s'"),
-			szTable);
-	int nRet = execScalar(szSQL);
+	CppSQLite3Statement stmt = compileStatement(
+		_T("select count(*) from sqlite_master where type='table' and name=?"));
+	stmt.bind(1, szTable);
+	CppSQLite3Query q = stmt.execQuery();
+	int nRet = q.eof() ? 0 : q.getIntField(0);
 	return (nRet > 0);
 }
 

@@ -6,7 +6,7 @@
 // Copyright (C) 1997, 1998 Chris Maunder
 // All rights reserved. May not be sold for profit.
 //
-// Thanks to Pål K. Tønder for auto-size and window caption changes.
+// Thanks to Pï¿½l K. Tï¿½nder for auto-size and window caption changes.
 //
 // "GotoURL" function by Stuart Patterson
 // As seen in the August, 1997 Windows Developer's Journal.
@@ -282,7 +282,7 @@ BOOL CHyperLink::GetAutoSize() const
 // then the window is merely shrunk, but if it is centred or right
 // justified then the window will have to be moved as well.
 //
-// Suggested by Pål K. Tønder 
+// Suggested by Pï¿½l K. Tï¿½nder 
 
 void CHyperLink::PositionWindow()
 {
@@ -353,22 +353,6 @@ void CHyperLink::SetDefaultCursor()
     }
 }
 
-LONG CHyperLink::GetRegKey(HKEY key, LPCTSTR subkey, LPTSTR retdata)
-{
-    HKEY hkey;
-    LONG retval = RegOpenKeyEx(key, subkey, 0, KEY_QUERY_VALUE, &hkey);
-
-    if (retval == ERROR_SUCCESS) {
-        long datasize = MAX_PATH;
-        TCHAR data[MAX_PATH];
-        RegQueryValue(hkey, NULL, data, &datasize);
-        lstrcpy(retdata,data);
-        RegCloseKey(hkey);
-    }
-
-    return retval;
-}
-
 void CHyperLink::ReportError(int nError)
 {
     CString str;
@@ -394,38 +378,9 @@ void CHyperLink::ReportError(int nError)
 
 HINSTANCE CHyperLink::GotoURL(LPCTSTR url, int showcmd)
 {
-    TCHAR key[MAX_PATH + MAX_PATH];
-
-    // First try ShellExecute()
-    HINSTANCE result = ShellExecute(NULL, _T("open"), url, NULL,NULL, showcmd);
-
-    // If it failed, get the .htm regkey and lookup the program
+    HINSTANCE result = ShellExecute(NULL, _T("open"), url, NULL, NULL, showcmd);
     if ((UINT)result <= HINSTANCE_ERROR) {
-
-        if (GetRegKey(HKEY_CLASSES_ROOT, _T(".htm"), key) == ERROR_SUCCESS) {
-            lstrcat(key, _T("\\shell\\open\\command"));
-
-            if (GetRegKey(HKEY_CLASSES_ROOT,key,key) == ERROR_SUCCESS) {
-                TCHAR *pos;
-                pos = _tcsstr(key, _T("\"%1\""));
-                if (pos == NULL) {                     // No quotes found
-                    pos = STRSTR(key, _T("%1"));       // Check for %1, without quotes 
-                    if (pos == NULL)                   // No parameter at all...
-                        pos = key+lstrlen(key)-1;
-                    else
-                        *pos = '\0';                   // Remove the parameter
-                }
-                else
-                    *pos = '\0';                       // Remove the parameter
-
-                lstrcat(pos, _T(" "));
-                lstrcat(pos, url);
-				
-				CStringA keyA = CTextConvert::UnicodeToAnsi(key);
-                result = (HINSTANCE)WinExec(keyA, showcmd);
-            }
-        }
+        ReportError((int)result);
     }
-
     return result;
 }

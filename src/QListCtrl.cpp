@@ -1273,8 +1273,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
-		lstrcpyn(m_pchTip, strTipText, nLength - 1);
-		m_pchTip[nLength - 1] = 0;
+		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (WCHAR*)m_pchTip;
 	}
 	else
@@ -1284,7 +1283,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 
 		m_pwchTip = new WCHAR[nLength];
 		_mbstowcsz(m_pwchTip, strTipText, nLength - 1);
-		m_pwchTip[nLength - 1] = 0; // end of text
+		m_pwchTip[nLength - 1] = 0;
 		pTTTW->lpszText = (WCHAR*)m_pwchTip;
 	}
 #else
@@ -1294,8 +1293,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
-		STRNCPY(m_pchTip, strTipText, nLength - 1);
-		m_pchTip[nLength - 1] = 0; // end of text
+		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (LPTSTR)m_pchTip;
 	}
 	else
@@ -1304,8 +1302,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pwchTip;
 
 		m_pwchTip = new WCHAR[nLength];
-		lstrcpyn(m_pwchTip, strTipText, nLength - 1);
-		m_pwchTip[nLength - 1] = 0;
+		_tcsncpy_s(m_pwchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (LPTSTR)m_pwchTip;
 	}
 #endif
@@ -2307,7 +2304,7 @@ void CQListCtrl::CreateSmallFont()
 	lf.lfClipPrecision = CLIP_STROKE_PRECIS;
 	lf.lfQuality = DEFAULT_QUALITY;
 	lf.lfPitchAndFamily = VARIABLE_PITCH | FF_DONTCARE;
-	lstrcpy(lf.lfFaceName, _T("Small Font"));
+	_tcsncpy_s(lf.lfFaceName, LF_FACESIZE, _T("Small Font"), _TRUNCATE);
 
 	m_SmallFont = ::CreateFontIndirect(&lf);
 }

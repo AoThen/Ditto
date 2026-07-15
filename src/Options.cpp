@@ -19,7 +19,7 @@ UINT WritePrivateProfileInt(LPCTSTR lpAppName, LPCTSTR lpKeyName, INT nValue, LP
 	TCHAR	szBuff[25];
 
 	// Format
-	SPRINTF(szBuff, _T("%d"), nValue);
+	_stprintf_s(szBuff, 25, _T("%d"), nValue);
 
 	// Write
 	return WritePrivateProfileString(lpAppName, lpKeyName, szBuff, lpFileName);
@@ -1532,7 +1532,7 @@ BOOL CGetSetOptions::GetFont(LOGFONT &font)
 	font.lfHeight = -13;
 	font.lfWeight = 400;
 	font.lfCharSet = 1;
-	STRCPY(font.lfFaceName, _T("Segoe UI"));
+	STRCPY_S(font.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
 	return TRUE;
 }
 

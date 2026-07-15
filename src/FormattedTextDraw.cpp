@@ -397,7 +397,7 @@ HRESULT CFormattedTextDraw::CharFormatFromHFONT(CHARFORMAT2W* pCF, HFONT hFont)
 	pCF->bPitchAndFamily = lf.lfPitchAndFamily;
 
 #ifdef UNICODE
-	wcscpy(pCF->szFaceName, lf.lfFaceName);
+	_tcscpy_s(pCF->szFaceName, LF_FACESIZE, lf.lfFaceName);
 #else
 	MultiByteToWideChar(CP_ACP, 0, lf.lfFaceName, LF_FACESIZE, pCF->szFaceName, LF_FACESIZE);
 #endif

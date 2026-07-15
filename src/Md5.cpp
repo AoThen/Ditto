@@ -158,11 +158,10 @@ char* CMd5::MD5FinalToString()
 	MD5Final(signature);
 
 	ms8_MD5[0] = 0;
-	char s8_Temp[5];
-	for (int i=0; i<16; i++) 
+	for (int i=0; i<16; i++)
 	{
-		sprintf(s8_Temp, "%02X", signature[i]);
-		strcat(ms8_MD5, s8_Temp);
+		size_t pos = strlen(ms8_MD5);
+		sprintf_s(ms8_MD5 + pos, sizeof(ms8_MD5) - pos, "%02X", signature[i]);
 	}
 
 	return ms8_MD5;

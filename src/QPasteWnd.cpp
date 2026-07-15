@@ -2640,7 +2640,7 @@ void CQPasteWnd::OnMenuExport()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -4404,7 +4404,7 @@ bool CQPasteWnd::DoExportToTextFile()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -5477,7 +5477,7 @@ bool CQPasteWnd::DoExportToBitMapFile()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -5733,7 +5733,7 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 					// pipe is the "end of symbols" marker
 					cs += "|" + CMainTableFunctions::GetDisplayText(CGetSetOptions::m_nLinesPerRow, m_listItems[pItem->iItem].m_Desc);
 
-					lstrcpyn(pItem->pszText, cs, pItem->cchTextMax);
+					_tcsncpy_s(pItem->pszText, pItem->cchTextMax, cs, pItem->cchTextMax - 1);
 					pItem->pszText[pItem->cchTextMax - 1] = '\0';
 
 					//						Log(StrF(_T("DrawItem index %d - "), pItem->iItem));//, pItem->pszText));
@@ -5922,7 +5922,7 @@ void CQPasteWnd::OnGetToolTipText(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		CString cs("no item selected");
 
-		lstrcpyn(pInfo->pszText, cs, pInfo->cchTextMax);
+		_tcsncpy_s(pInfo->pszText, pInfo->cchTextMax, cs, pInfo->cchTextMax - 1);
 		if (cs.GetLength() > pInfo->cchTextMax)
 		{
 			pInfo->pszText[pInfo->cchTextMax - 1] = 0;
@@ -6028,7 +6028,7 @@ void CQPasteWnd::OnGetToolTipText(NMHDR* pNMHDR, LRESULT* pResult)
 		cs += "\r\n\r\n";
 		cs += clipData;
 
-		lstrcpyn(pInfo->pszText, cs, pInfo->cchTextMax);
+		_tcsncpy_s(pInfo->pszText, pInfo->cchTextMax, cs, pInfo->cchTextMax - 1);
 		pInfo->pszText[pInfo->cchTextMax - 1] = '\0';
 	}
 	CATCH_SQLITE_EXCEPTION

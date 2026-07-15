@@ -308,7 +308,7 @@ HGLOBAL CFileRecieve::CreateCF_HDROPBuffer()
 
 	for(int n = 0; n < nFileArraySize; n++)
 	{
-		STRCPY(pCurrent, (LPCTSTR)m_RecievedFiles[n]);
+		_tcscpy_s(pCurrent, m_RecievedFiles[n].GetLength() + 1, (LPCTSTR)m_RecievedFiles[n]);
 
 		LogSendRecieveInfo(StrF(_T("CreateCF_HDROPBuffer adding the file '%s' to local cf_hdrop structure"), pCurrent));
 

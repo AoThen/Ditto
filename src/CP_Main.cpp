@@ -993,7 +993,7 @@ bool CCP_MainApp::ImportClips(HWND hWnd)
 	memset(&szDir, 0, sizeof(szDir));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	FileName.lStructSize = sizeof(FileName);
 	FileName.lpstrTitle = _T("Import Clips");

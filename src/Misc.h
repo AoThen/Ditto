@@ -60,8 +60,9 @@ public:
 	
 #define	FIX_PATH(strPath) \
 { \
-	if (strPath[strlen(strPath)-1] != '\\' && strPath[strlen(strPath)-1] != '/') \
-	strcat(strPath, "\\"); \
+	size_t _len = strlen(strPath); \
+	if (_len > 0 && strPath[_len-1] != '\\' && strPath[_len-1] != '/') \
+		strcat_s(strPath, _len + 2, "\\"); \
 }
 
 #define	FIX_CSTRING_PATH(csPath) \

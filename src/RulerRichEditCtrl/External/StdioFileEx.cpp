@@ -166,7 +166,7 @@ void CStdioFileEx::WriteString(LPCTSTR lpsz)
 		int		nCharsWritten = 0;
 
 		// Copy string to Unicode buffer
-		lstrcpy(pszUnicodeString, lpsz);
+		_tcscpy_s(pszUnicodeString, nChars, lpsz);
 
 		// Get multibyte string
 		nCharsWritten = 
@@ -198,7 +198,7 @@ void CStdioFileEx::WriteString(LPCTSTR lpsz)
 		int		nCharsWritten = 0;
 		
 		// Copy string to multibyte buffer
-		lstrcpy(pszMultiByteString, lpsz);
+		_tcscpy_s(pszMultiByteString, nChars, lpsz);
 
 		nCharsWritten =
 			GetUnicodeStringFromMultiByteString(pszMultiByteString,
