@@ -311,7 +311,7 @@ void COptionCloud::OnBtnEnableEncryption()
 {
 	if (m_csEncryptionPassword.IsEmpty())
 	{
-		MessageBox(_T("Please enter an encryption password."), _T("Enable Encryption"), MB_ICONWARNING);
+		MessageBox(theApp.m_Language.GetString("CloudMsgEnterEncryptionPassword", "Please enter an encryption password."), theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONWARNING);
 		return;
 	}
 

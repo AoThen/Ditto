@@ -326,7 +326,7 @@ void CCopyProperties::OnOK()
 
 				if(CheckGlobalHotKey(clip) == FALSE)
 				{
-					if(MessageBox(_T("Error registering global hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
+					if(MessageBox(theApp.m_Language.GetString("MsgErrorRegisterHotKey", "Error registering global hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
 					{
 						return;
 					}
@@ -334,7 +334,7 @@ void CCopyProperties::OnOK()
 
 				if(CheckMoveToGroupGlobalHotKey(clip) == FALSE)
 				{
-					if(MessageBox(_T("Error registering global move to group hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
+					if(MessageBox(theApp.m_Language.GetString("MsgErrorRegisterMoveToGroupHotKey", "Error registering global move to group hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
 					{
 						return;
 					}

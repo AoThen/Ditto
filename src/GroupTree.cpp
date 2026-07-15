@@ -181,7 +181,7 @@ void CGroupTree::FillTree()
 	DeleteAllItems();
 	m_bSendAllready = false;
 
-	HTREEITEM hItem = InsertItem(_T("-No Group-"), TVI_ROOT);
+	HTREEITEM hItem = InsertItem(theApp.m_Language.GetString("GroupNoGroup", "-No Group-"), TVI_ROOT);
 	SetItemData(hItem, -1);
 
 	SetItemState(hItem, TVIS_EXPANDED, TVIS_EXPANDED);

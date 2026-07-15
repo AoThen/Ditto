@@ -518,6 +518,16 @@
 		<Item English_Text = "At Cursor" ID = "AtCursor">光标处</Item>
 		<Item English_Text = "At Previous Position" ID = "AtPreviousPosition">上次打开的位置</Item>
 		
+		<Item English_Text = "Error Creating Database" ID = "MsgErrorCreatingDatabase">创建数据库时出错</Item>
+		<Item English_Text = "Invalid Database" ID = "MsgInvalidDatabase">数据库无效</Item>
+		<Item English_Text = "Error Opening new database" ID = "MsgErrorOpeningDatabase">打开新数据库时出错</Item>
+		<Item English_Text = "Error registering global hot key\n\nContinue?" ID = "MsgErrorRegisterHotKey">注册全局热键时出错\n\n继续？</Item>
+		<Item English_Text = "Error registering global move to group hot key\n\nContinue?" ID = "MsgErrorRegisterMoveToGroupHotKey">注册"移动到分组"全局热键时出错\n\n继续？</Item>
+		<Item English_Text = "Please enter an encryption password." ID = "CloudMsgEnterEncryptionPassword">请输入加密密码。</Item>
+		<Item English_Text = "Delete selected items?  This cannot be undone!" ID = "MsgDeleteSelectedItems">删除所选项目？此操作无法撤销！</Item>
+		<Item English_Text = "Error Sending data to %s\n\n%s" ID = "MsgErrorSendingData">向 %s 发送数据时出错\n\n%s</Item>
+		<Item English_Text = "-No Group-" ID = "GroupNoGroup">-无分组-</Item>
+		
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">确定</Item>

@@ -2822,7 +2822,7 @@ BOOL CQPasteWnd::SendToFriendbyPos(int nPos, CString override_IP_Host)
 
 			if (SendToFriend(Info) == FALSE)
 			{
-				MessageBox(StrF(_T("Error Sending data to %s\n\n%s"), Info.m_csIP, Info.m_csErrorText), _T("Ditto"), MB_OK | MB_TOPMOST);
+				MessageBox(StrF(theApp.m_Language.GetString("MsgErrorSendingData", "Error Sending data to %s\n\n%s"), Info.m_csIP, Info.m_csErrorText), _T("Ditto"), MB_OK | MB_TOPMOST);
 			}
 			else
 			{

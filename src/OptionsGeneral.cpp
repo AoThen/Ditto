@@ -278,7 +278,7 @@ BOOL COptionsGeneral::OnApply()
 					bOpenNewDatabase = true;
 				}
 				else
-					MessageBox(_T("Error Creating Database"));
+					MessageBox(theApp.m_Language.GetString("MsgErrorCreatingDatabase", "Error Creating Database"));
 			}
 			else
 			{
@@ -289,7 +289,7 @@ BOOL COptionsGeneral::OnApply()
 		{
 			if(ValidDB(resolvedPath) == FALSE)
 			{
-				MessageBox(_T("Invalid Database"), _T("Ditto"), MB_OK);
+				MessageBox(theApp.m_Language.GetString("MsgInvalidDatabase", "Invalid Database"), _T("Ditto"), MB_OK);
 				m_ePath.SetFocus();
 				return FALSE;
 			}
@@ -305,7 +305,7 @@ BOOL COptionsGeneral::OnApply()
 
 			if(OpenDatabase(resolvedPath) == FALSE)
 			{
-				MessageBox(_T("Error Opening new database"), _T("Ditto"), MB_OK);
+				MessageBox(theApp.m_Language.GetString("MsgErrorOpeningDatabase", "Error Opening new database"), _T("Ditto"), MB_OK);
 				m_ePath.SetFocus();
 				return FALSE;
 			}
@@ -397,7 +397,7 @@ void COptionsGeneral::OnGetPath()
 	{
 		if(ValidDB(csPath) == FALSE)
 		{
-			MessageBox(_T("Invalid Database"), _T("Ditto"), MB_OK);
+			MessageBox(theApp.m_Language.GetString("MsgInvalidDatabase", "Invalid Database"), _T("Ditto"), MB_OK);
 			m_ePath.SetFocus();
 		}
 		else
