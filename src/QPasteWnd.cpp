@@ -1469,6 +1469,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 	Log(StrF(_T("Start Fill List - %s"), csSQLSearch));
 
 	m_lstHeader.SetSearchText(csSQLSearch);
+	m_lstHeader.SetPinyinSearch(false);
 
 	{
 		ATL::CCritSecLock csLock(m_CritSection.m_sect);
@@ -1648,6 +1649,8 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 			CPinyinConvert pinyinConv;
 			if (pinyinConv.IsAlphaQuery(std::wstring(csSQLSearch)))
 			{
+				m_lstHeader.SetPinyinSearch(true);
+
 				CString lowSearch = csSQLSearch;
 				lowSearch.MakeLower();
 

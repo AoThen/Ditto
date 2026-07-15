@@ -155,6 +155,8 @@ public:
 	int GetRowHeight() { return m_rowHeight; }
 
 	void SetSearchText(CString text);
+	void SetPinyinSearch(bool bPinyin);
+	int HighlightPinyinText(CString& csText, const CString& searchText, COLORREF highlightColor);
 
 	void SetDpiInfo(CDPI *dpi);
 
@@ -196,6 +198,7 @@ protected:
 	CGdiImageDrawer m_stickyImage;
 	int m_rowHeight;
 	CString m_searchText;
+	bool m_bPinyinSearch;
 	BOOL m_showIfClipWasPasted;
 	CAccels *m_pToolTipActions;
 	CRichEditCtrlEx m_rtfFormater;
