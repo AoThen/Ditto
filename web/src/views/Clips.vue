@@ -6,7 +6,7 @@
       </div>
       <el-input
         v-model="searchQuery"
-        placeholder="搜索剪贴板内容..."
+        placeholder="搜索剪贴板内容...（支持拼音搜索）"
         clearable
         style="width: 300px"
         @clear="handleSearch"

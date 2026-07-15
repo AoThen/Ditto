@@ -24,7 +24,10 @@
 #include "ProcessPaste.h"
 #include "QPasteWnd.h"
 #include "SendMail.h"
+#include "Pinyin_Convert.h"
 #include <algorithm>
+#include <exception>
+#include <string>
 #include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
@@ -1537,6 +1540,8 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 	CString sqlSearch = "";
 
+	CString pinyinBaseFilter = strFilter;
+
 	if (csSQLSearch == "")
 	{
 		m_strSQLSearch = m_bShowStarredClips ? strFilter : _T("");
@@ -1636,6 +1641,71 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 		}
 
 		strFilter += _T(")");
+
+		if (csSQLSearch != _T(""))
+		{
+			CPinyinConvert pinyinConv;
+			if (pinyinConv.IsAlphaQuery(std::wstring(csSQLSearch)))
+			{
+				CString lowSearch = csSQLSearch;
+				lowSearch.MakeLower();
+
+				CString pinyinSql;
+				pinyinSql.Format(_T("SELECT lID, mText FROM Main WHERE %s"), pinyinBaseFilter);
+
+				try
+				{
+					CppSQLite3Query q = theApp.m_db.execQuery(pinyinSql);
+					std::vector<long> pinyinIDs;
+
+					while (!q.eof())
+					{
+						long id = q.getIntField(0);
+						CString mText = q.getStringField(1);
+
+						std::wstring wText(mText.GetString());
+						std::string pinyin = pinyinConv.ConvertToPinyin(wText);
+
+						// Convert pinyin to lowercase for comparison
+						std::string lowPinyin;
+						lowPinyin.resize(pinyin.size());
+						std::transform(pinyin.begin(), pinyin.end(), lowPinyin.begin(), ::tolower);
+
+						CT2A searchA(lowSearch, CP_UTF8);
+						if (lowPinyin.find(std::string(searchA)) != std::string::npos)
+						{
+							pinyinIDs.push_back(id);
+						}
+
+						q.nextRow();
+					}
+
+					if (!pinyinIDs.empty())
+					{
+						CString pinyinFilter = _T(" Main.lID IN (");
+						for (size_t i = 0; i < pinyinIDs.size(); i++)
+						{
+							if (i > 0) pinyinFilter += _T(",");
+							CString idStr;
+							idStr.Format(_T("%ld"), pinyinIDs[i]);
+							pinyinFilter += idStr;
+						}
+						pinyinFilter += _T(")");
+
+						strFilter += _T(" OR ");
+						strFilter += pinyinFilter;
+					}
+				}
+				catch (CppSQLite3Exception& e)
+				{
+					Log(StrF(_T("Pinyin search SQL error: %s"), e.errorMessage()));
+				}
+				catch (std::exception& e)
+				{
+					Log(StrF(_T("Pinyin search error: %S"), e.what()));
+				}
+			}
+		}
 
 		if (strParentFilter.IsEmpty() == FALSE)
 		{

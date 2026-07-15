@@ -11,6 +11,7 @@ import (
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
+	"ditto-cloud-server/internal/utils"
 
 	"gorm.io/gorm"
 )
@@ -91,26 +92,107 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 		return nil, err
 	}
 
-	query := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
-
-	if search != "" {
-		query = query.Where("description LIKE ?", "%"+search+"%")
-	}
+	baseQuery := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
 	if groupID != "" {
-		query = query.Where("group_id = ?", groupID)
+		baseQuery = baseQuery.Where("group_id = ?", groupID)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, err
+	// Step 1: Normal LIKE search
+	var likeClips []model.Clip
+	if search != "" {
+		likeQuery := baseQuery.Where("description LIKE ?", "%"+search+"%")
+		likeQuery.Order(orderClause).Find(&likeClips)
+	} else {
+		baseQuery.Order(orderClause).Find(&likeClips)
 	}
 
-	var clips []model.Clip
-	if err := query.Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips).Error; err != nil {
-		return nil, err
+	// Step 2: Pinyin search (only when search term is pure ASCII letters)
+	isPinyin := search != "" && utils.IsPinyinQuery(search)
+
+	var allMatched []model.Clip
+	seen := make(map[string]bool)
+
+	if !isPinyin {
+		allMatched = likeClips
+	} else {
+		// Add LIKE matches first
+		for _, clip := range likeClips {
+			if !seen[clip.ID] {
+				allMatched = append(allMatched, clip)
+				seen[clip.ID] = true
+			}
+		}
+		// Add pinyin matches
+		lowSearch := strings.ToLower(search)
+		var allClips []model.Clip
+		baseQuery.Find(&allClips)
+		for _, clip := range allClips {
+			if seen[clip.ID] {
+				continue
+			}
+			pinyin := utils.ConvertToPinyin(clip.Description)
+			if strings.Contains(pinyin, lowSearch) {
+				allMatched = append(allMatched, clip)
+				seen[clip.ID] = true
+			}
+		}
+		// Sort merged results
+		sortClips(allMatched, sortBy, sortOrder)
 	}
 
-	// P2 FIX: Batch-load formats instead of N+1 queries
+	// Step 3: Paginate
+	total := int64(len(allMatched))
+	start := (page - 1) * perPage
+	if start >= int(total) {
+		return buildClipListResponse(nil, total, page, perPage)
+	}
+	end := start + perPage
+	if end > int(total) {
+		end = int(total)
+	}
+
+	return buildClipListResponse(allMatched[start:end], total, page, perPage)
+}
+
+func sortClips(clips []model.Clip, sortBy, sortOrder string) {
+	desc := strings.ToUpper(sortOrder) == "DESC"
+	if sortBy == "" || sortBy == "updated_at" {
+		sortBy = "updated_at"
+		desc = true
+	}
+	for i := 0; i < len(clips); i++ {
+		for j := i + 1; j < len(clips); j++ {
+			var less bool
+			switch sortBy {
+			case "created_at":
+				less = clips[i].CreatedAt.Before(clips[j].CreatedAt)
+			case "paste_count":
+				less = clips[i].PasteCount < clips[j].PasteCount
+			case "description":
+				less = clips[i].Description < clips[j].Description
+			default:
+				less = clips[i].UpdatedAt.Before(clips[j].UpdatedAt)
+			}
+			if desc {
+				less = !less
+			}
+			if less {
+				clips[i], clips[j] = clips[j], clips[i]
+			}
+		}
+	}
+}
+
+func buildClipListResponse(clips []model.Clip, total int64, page, perPage int) (*response.PaginatedResponse, error) {
+	if len(clips) == 0 {
+		return &response.PaginatedResponse{
+			Items:   []ClipListItem{},
+			Total:   total,
+			Page:    page,
+			PerPage: perPage,
+		}, nil
+	}
+
 	clipIDs := make([]string, len(clips))
 	groupIDs := make(map[string]struct{})
 	deviceIDs := make(map[string]struct{})
@@ -131,11 +213,9 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 	groupNames := loadGroupNames(groupIDs)
 	deviceNames := loadDeviceNames(deviceIDs)
 
-	// Build response items with format metadata
 	items := make([]ClipListItem, 0, len(clips))
 	for _, clip := range clips {
 		formats := formatsByClip[clip.ID]
-
 		formatMetas := make([]ClipFormatMeta, 0, len(formats))
 		for _, f := range formats {
 			formatMetas = append(formatMetas, ClipFormatMeta{
@@ -143,7 +223,6 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 				DataSize:   len(f.Data),
 			})
 		}
-
 		items = append(items, ClipListItem{
 			ID:          clip.ID,
 			Description: clip.Description,
