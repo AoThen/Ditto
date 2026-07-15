@@ -108,6 +108,25 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ── Web Frontend Tests ─────────────────────────────────────
+  web-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: cd web && npm ci
+
+      - name: Run unit tests
+        run: cd web && npm run test:unit -- --run
+
   # ── Windows Client (C++/MFC) ──────────────────────────────
   client-build-windows:
     runs-on: windows-2022
@@ -131,6 +150,24 @@ jobs:
 
       - name: Build (Release x64)
         run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
+
+  # ── Windows Client Tests (C++/Google Test) ────────────────
+  client-test-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build CloudSync_Test (Release x64)
+        run: msbuild CloudSync_Test\CloudSync_Test.vcxproj /p:Configuration=Release /p:Platform=x64
+
+      - name: Run tests
+        run: CloudSync_Test\x64\Release\CloudSync_Test.exe
 
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:
