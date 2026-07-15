@@ -87,6 +87,7 @@
     <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="TestCrc32.cpp" />
     <ClCompile Include="TestMd5.cpp" />
+    <ClCompile Include="TestEncryption.cpp" />
     <ClCompile Include="TestRegExFilter.cpp" />
     <ClCompile Include="TestRemoveLineFeeds.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
@@ -122,6 +123,12 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\rijndael.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\EncryptDecrypt\Encryption.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\EncryptDecrypt\NewRandom.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\sha2.cpp">
