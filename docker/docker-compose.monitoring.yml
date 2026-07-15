@@ -8,7 +8,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     networks:
       - ditto-net
@@ -23,7 +23,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=your-grafana-password
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ../monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
     networks:
       - ditto-net
 
@@ -44,7 +44,7 @@ services:
     container_name: ditto-logstash
     restart: unless-stopped
     volumes:
-      - ./monitoring/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ../monitoring/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
     networks:
       - ditto-net
 

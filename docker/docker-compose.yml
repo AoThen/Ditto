@@ -3,7 +3,7 @@ version: '3.8'
 services:
   backend:
     build:
-      context: .
+      context: ..
       dockerfile: server/Dockerfile
     container_name: ditto-backend
     restart: unless-stopped
@@ -11,7 +11,7 @@ services:
       - "8080:8080"
     volumes:
       - ditto-data:/app/data
-      - ./server/.env:/app/.env:ro
+      - ../server/.env:/app/.env:ro
     environment:
       - PORT=8080
       - DATABASE_PATH=/app/data/ditto_cloud.db

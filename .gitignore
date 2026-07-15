@@ -97,3 +97,11 @@ Debug/portable
 /x64
 QWEN.md
 # docs/PROJECT_PLAN.md 不再忽略，需要跟踪
+
+# Visual Studio temp files
+*.suo
+*.sdf
+*.opensdf
+*.user
+*.dbm
+*.dbd
