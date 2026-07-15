@@ -158,9 +158,6 @@ func TestWebSocket_BroadcastOnSync(t *testing.T) {
 	clipID := fmt.Sprintf("clip-ws-broadcast-%d", time.Now().UnixNano())
 	pushClipFromDevice(t, server.URL, tokenA, deviceA, clipID, "Broadcast clip from DeviceA")
 
-	// Small delay for broadcast propagation
-	time.Sleep(200 * time.Millisecond)
-
 	// DeviceB should receive the clip_added broadcast
 	connB.SetReadDeadline(time.Now().Add(5 * time.Second))
 	broadcastMsg := readJSONMessage(t, connB)
@@ -222,9 +219,6 @@ func TestWebSocket_NoCrossUserBroadcast(t *testing.T) {
 	// User A pushes a clip
 	clipID := fmt.Sprintf("clip-crossuser-%d", time.Now().UnixNano())
 	pushClipFromDevice(t, server.URL, tokenA, deviceA1, clipID, "Clip from user A")
-
-	// Small delay
-	time.Sleep(200 * time.Millisecond)
 
 	// DeviceB1 should NOT receive any message (set a short read deadline)
 	connB1.SetReadDeadline(time.Now().Add(1 * time.Second))
@@ -313,9 +307,6 @@ func TestWebSocket_MultipleConnections(t *testing.T) {
 	// Client1 pushes a clip via sync
 	clipID := fmt.Sprintf("clip-multi-%d", time.Now().UnixNano())
 	pushClipFromDevice(t, server.URL, token1, device1, clipID, "Multi-client broadcast clip")
-
-	// Small delay for broadcast propagation
-	time.Sleep(200 * time.Millisecond)
 
 	// All 3 clients should receive the clip_added broadcast
 	for i, conn := range connections {

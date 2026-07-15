@@ -29,7 +29,6 @@ func getGroupItems(dataRaw interface{}) ([]interface{}, bool) {
 
 func TestGroups_List_Empty(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -47,7 +46,6 @@ func TestGroups_List_Empty(t *testing.T) {
 
 func TestGroups_CreateAndList(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -72,7 +70,6 @@ func TestGroups_CreateAndList(t *testing.T) {
 
 func TestGroups_CreateWithParent(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -96,7 +93,6 @@ func TestGroups_CreateWithParent(t *testing.T) {
 
 func TestGroups_GetGroup(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -117,7 +113,6 @@ func TestGroups_GetGroup(t *testing.T) {
 
 func TestGroups_GetGroup_NotFound(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -129,7 +124,6 @@ func TestGroups_GetGroup_NotFound(t *testing.T) {
 
 func TestGroups_Update(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -150,7 +144,6 @@ func TestGroups_Update(t *testing.T) {
 
 func TestGroups_MoveClipsToGroup(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -179,7 +172,6 @@ func TestGroups_MoveClipsToGroup(t *testing.T) {
 
 func TestGroups_RemoveClipsFromGroup(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -212,7 +204,6 @@ func TestGroups_RemoveClipsFromGroup(t *testing.T) {
 
 func TestGroups_Delete(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -234,7 +225,6 @@ func TestGroups_Delete(t *testing.T) {
 
 func TestGroups_MoveClips_InvalidGroup(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -245,7 +235,6 @@ func TestGroups_MoveClips_InvalidGroup(t *testing.T) {
 
 func TestGroups_UserIsolation(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	admin := testutil.CreateFirstUser(t, server)
 	userA := testutil.CreateUserViaAdmin(t, server, admin.Token, "groupA", "groupA@example.com", "password123")

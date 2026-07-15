@@ -237,7 +237,6 @@ func TestRateLimiter_ConcurrentAccess(t *testing.T) {
 	rl, cleanup := setupRateLimitTest(t)
 	defer cleanup()
 
-	// Test concurrent access doesn't cause race conditions
 	done := make(chan bool)
 
 	for i := 0; i < 10; i++ {
@@ -252,13 +251,14 @@ func TestRateLimiter_ConcurrentAccess(t *testing.T) {
 		}(i)
 	}
 
-	// Wait for all goroutines
+	timeout := time.After(10 * time.Second)
 	for i := 0; i < 10; i++ {
-		<-done
+		select {
+		case <-done:
+		case <-timeout:
+			t.Fatal("timed out waiting for goroutines — possible deadlock or panic")
+		}
 	}
-
-	// If we get here without panic or deadlock, the test passes
-	assert.True(t, true)
 }
 
 func TestRateLimiter_BanDuration(t *testing.T) {

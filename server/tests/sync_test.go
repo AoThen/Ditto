@@ -87,9 +87,6 @@ func TestSync_PushAndPull(t *testing.T) {
 	assert.Equal(t, 0, code)
 	assert.NotNil(t, data)
 
-	// Small delay to ensure the clip's updated_at is clearly after the since time
-	time.Sleep(200 * time.Millisecond)
-
 	// Device B pulls via sync
 	sinceTime := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
 	pullBody := map[string]interface{}{
@@ -163,9 +160,6 @@ func TestSync_SameDevice(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	require.Equal(t, 0, code)
 
-	// Wait to ensure the clip's updated_at is after the since time
-	time.Sleep(200 * time.Millisecond)
-
 	// Sync again from the same device — should NOT get its own clip back
 	sinceTime := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
 	syncAgain := map[string]interface{}{
@@ -230,9 +224,6 @@ func TestSync_EmptyPush(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	tokenB := getTokenFromLoginResp(t, loginRespB)
 	deviceB := getDeviceIDFromLoginResp(t, loginRespB)
-
-	// Wait to ensure the clip's updated_at is clearly after the since time
-	time.Sleep(200 * time.Millisecond)
 
 	// Device B does an empty pull (no push_clips)
 	sinceTime := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)

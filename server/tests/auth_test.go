@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/tests/testutil"
 
 	"github.com/stretchr/testify/assert"
@@ -204,9 +205,14 @@ func TestAuth_ExpiredToken(t *testing.T) {
 	// First register and login to get a valid token structure
 	testutil.RegisterUser(t, server, "expireuser", "expireuser@example.com", "password123")
 
+	// Look up the actual user ID from the database
+	var dbUser model.User
+	err := testutil.TestDB.Where("username = ?", "expireuser").First(&dbUser).Error
+	require.NoError(t, err)
+
 	// Generate an expired token manually using the same JWT secret
 	// We need to create a token with "exp" in the past
-	token := testutil.GenerateExpiredToken(t, cfg.JWTSecret, 1)
+	token := testutil.GenerateExpiredToken(t, cfg.JWTSecret, dbUser.ID)
 
 	// Try to access a protected endpoint with the expired token
 	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/devices", token)

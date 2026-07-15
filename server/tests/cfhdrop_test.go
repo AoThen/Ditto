@@ -14,7 +14,6 @@ import (
 // TestCFHDROP file paths are synced but actual file contents are NOT
 func TestCFHDROP_SyncsPathsOnly(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -98,7 +97,6 @@ func TestCFHDROP_PathValidation(t *testing.T) {
 // Test that encrypted CF_HDROP paths can be stored and retrieved
 func TestCFHDROP_EncryptedPaths(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -157,7 +155,6 @@ func TestCFHDROP_EncryptedPaths(t *testing.T) {
 // Test CF_HDROP with empty paths array
 func TestCFHDROP_EmptyPaths(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 

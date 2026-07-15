@@ -15,7 +15,6 @@ import (
 // TestCleanup_OldClipsDeleted: clips older than MaxClipAge should be deleted
 func TestCleanup_OldClipsDeleted(t *testing.T) {
 	server, cfg := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	// Shorten cleanup interval for testing
 	cfg.CleanupInterval = 100 * time.Millisecond
@@ -67,10 +66,9 @@ func TestCleanup_OldClipsDeleted(t *testing.T) {
 // TestCleanup_NewClipsKept: clips newer than MaxClipAge should be kept
 func TestCleanup_NewClipsKept(t *testing.T) {
 	server, cfg := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	cfg.CleanupInterval = 100 * time.Millisecond
-	cfg.MaxClipAge = 1 * time.Hour  // Keep clips for 1 hour
+	cfg.MaxClipAge = 1 * time.Hour // Keep clips for 1 hour
 	cfg.MaxClipsPerUser = 1000
 
 	user := testutil.CreateTestUser(t, server)
@@ -112,11 +110,10 @@ func TestCleanup_NewClipsKept(t *testing.T) {
 // TestCleanup_UserLimitEnforced: users exceeding MaxClipsPerUser should have oldest clips removed
 func TestCleanup_UserLimitEnforced(t *testing.T) {
 	server, cfg := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	cfg.CleanupInterval = 100 * time.Millisecond
-	cfg.MaxClipAge = 24 * time.Hour     // Don't delete by age
-	cfg.MaxClipsPerUser = 3             // Limit to 3 clips
+	cfg.MaxClipAge = 24 * time.Hour // Don't delete by age
+	cfg.MaxClipsPerUser = 3         // Limit to 3 clips
 
 	user := testutil.CreateTestUser(t, server)
 

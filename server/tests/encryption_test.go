@@ -209,7 +209,7 @@ func TestEncryption_Persistence(t *testing.T) {
 	_, _ = testutil.AuthPost(t, server, "/api/v1/encryption/setup", user.Token, crypto)
 
 	var settings model.EncryptionSettings
-	err := testutil.TestDB.Where("user_id = ?", getUserIDFromToken(t, user.Token)).First(&settings).Error
+	err := testutil.TestDB.Where("user_id = ?", getUserIDFromToken(t, user)).First(&settings).Error
 	assert.NoError(t, err, "encryption settings should exist in DB")
 	assert.True(t, settings.Enabled, "encryption should be enabled")
 	assert.Equal(t, 32, len(settings.Salt), "salt should be 32 bytes")

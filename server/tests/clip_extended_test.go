@@ -16,7 +16,6 @@ import (
 
 func TestDownloadClip_Success(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -32,7 +31,6 @@ func TestDownloadClip_Success(t *testing.T) {
 
 func TestDownloadClip_DifferentFormat(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -67,7 +65,6 @@ func TestDownloadClip_DifferentFormat(t *testing.T) {
 
 func TestDownloadClip_NotFound(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -77,7 +74,6 @@ func TestDownloadClip_NotFound(t *testing.T) {
 
 func TestListConflictClips_Empty(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -96,14 +92,11 @@ func TestListConflictClips_Empty(t *testing.T) {
 
 func TestGetChanges_PullOnly(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
 	clipID := fmt.Sprintf("clip-chg-%d", time.Now().UnixNano())
 	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "Changes clip", "Changes content")
-
-	time.Sleep(100 * time.Millisecond)
 
 	since := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/clips/changes?since="+since, user.Token)
@@ -118,7 +111,6 @@ func TestGetChanges_PullOnly(t *testing.T) {
 
 func TestGetChanges_EmptySince(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -131,7 +123,6 @@ func TestGetChanges_EmptySince(t *testing.T) {
 
 func TestGetChanges_InvalidSince(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -141,7 +132,6 @@ func TestGetChanges_InvalidSince(t *testing.T) {
 
 func TestResolveConflictClip_InvalidAction(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -152,7 +142,6 @@ func TestResolveConflictClip_InvalidAction(t *testing.T) {
 
 func TestResolveConflictClip_NotFound(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 

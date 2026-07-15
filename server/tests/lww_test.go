@@ -17,7 +17,6 @@ import (
 // The newer clip should win.
 func TestLWW_NewerWins(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	// Register user
 	statusCode, _ := testutil.RegisterUser(t, server, "lwwuser", "lwwuser@example.com", "password123")
@@ -46,9 +45,6 @@ func TestLWW_NewerWins(t *testing.T) {
 	assert.Equal(t, 0, codeA)
 	assert.Equal(t, float64(1), dataA["updated_count"], "device A should push 1 clip")
 
-	// Small delay
-	time.Sleep(100 * time.Millisecond)
-
 	// Device B pushes a NEWER clip (updated_at = now) for the SAME clip ID
 	newTime := time.Now().UTC()
 	pushB := buildSyncRequest(clipID, "Newer content from B", deviceB, newTime)
@@ -59,7 +55,6 @@ func TestLWW_NewerWins(t *testing.T) {
 	assert.Equal(t, float64(1), dataB["updated_count"], "device B should update 1 clip (newer wins)")
 
 	// Device A pulls: should see B's newer content
-	time.Sleep(100 * time.Millisecond)
 	pullA := buildPullRequest(deviceA, time.Now().Add(-2*time.Hour))
 	statusCode, pullBodyA := testutil.AuthPost(t, server, "/api/v1/clips/sync", tokenA, pullA)
 	require.Equal(t, http.StatusOK, statusCode)
@@ -75,7 +70,6 @@ func TestLWW_NewerWins(t *testing.T) {
 // TestLWW_OlderSkipped: device pushes an older version of an existing clip, should be skipped
 func TestLWW_OlderSkipped(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	statusCode, _ := testutil.RegisterUser(t, server, "lwwuser2", "lwwuser2@example.com", "password123")
 	require.Equal(t, http.StatusOK, statusCode)
@@ -110,7 +104,6 @@ func TestLWW_OlderSkipped(t *testing.T) {
 // TestLWW_SameTime: two pushes with same updated_at, second should be skipped (tie-breaking)
 func TestLWW_SameTime(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	statusCode, _ := testutil.RegisterUser(t, server, "lwwuser3", "lwwuser3@example.com", "password123")
 	require.Equal(t, http.StatusOK, statusCode)

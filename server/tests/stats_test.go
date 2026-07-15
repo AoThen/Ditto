@@ -14,7 +14,6 @@ import (
 
 func TestStats_Overview(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -33,7 +32,6 @@ func TestStats_Overview(t *testing.T) {
 
 func TestStats_SyncLogs_Empty(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -52,14 +50,11 @@ func TestStats_SyncLogs_Empty(t *testing.T) {
 
 func TestStats_SyncLogs_AfterSync(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
 	clipID := fmt.Sprintf("clip-stats-%d", time.Now().UnixNano())
 	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "Stats clip", "Stats content")
-
-	time.Sleep(100 * time.Millisecond)
 
 	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/stats/sync-logs", user.Token)
 	assert.Equal(t, http.StatusOK, statusCode)
@@ -76,7 +71,6 @@ func TestStats_SyncLogs_AfterSync(t *testing.T) {
 
 func TestStats_SyncLogs_Pagination(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -95,7 +89,6 @@ func TestStats_SyncLogs_Pagination(t *testing.T) {
 
 func TestStats_SyncLogs_DeviceIDFilter(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -113,7 +106,6 @@ func TestStats_SyncLogs_DeviceIDFilter(t *testing.T) {
 
 func TestStats_SyncLogs_InvalidDeviceID(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
@@ -128,7 +120,6 @@ func TestStats_SyncLogs_InvalidDeviceID(t *testing.T) {
 
 func TestStats_OverviewAfterSync(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
-	defer server.Close()
 
 	user := testutil.CreateTestUser(t, server)
 
