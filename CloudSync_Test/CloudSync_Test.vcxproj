@@ -85,6 +85,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CloudAuthTest.cpp" />
+    <ClCompile Include="TestCrc32.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
     <ClCompile Include="TestWildCardMatch.cpp" />
     <ClCompile Include="TestSHA2.cpp" />
@@ -98,6 +99,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <!-- Compile CloudSync source directly -->
+    <ClCompile Include="..\src\Crc32Dynamic.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\src\CloudSync\CloudAuth.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
