@@ -48,7 +48,7 @@ TEST(CloudAuth_IsLoggedIn, ReturnsFalseWhenNoToken)
 TEST(CloudAuth_IsLoggedIn, ReturnsTrueWhenTokenExists)
 {
 	// Store a token
-	CGetSetOptions::SetCloudDeviceToken(CString("test-device-token-12345"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("test-device-token-12345"));
 	
 	BOOL loggedIn = CCloudAuth::IsLoggedIn();
 	EXPECT_TRUE(loggedIn) << "Should be logged in when token exists";
@@ -57,7 +57,7 @@ TEST(CloudAuth_IsLoggedIn, ReturnsTrueWhenTokenExists)
 TEST(CloudAuth_IsLoggedIn, ReturnsFalseAfterLogout)
 {
 	// Store token first
-	CGetSetOptions::SetCloudDeviceToken(CString("test-token"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("test-token"));
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
 	
 	// Logout
@@ -74,7 +74,7 @@ TEST(CloudAuth_IsLoggedIn, ReturnsFalseAfterLogout)
 TEST(CloudAuth_Logout, ClearsDeviceToken)
 {
 	// Store token first
-	CGetSetOptions::SetCloudDeviceToken(CString("test-token-to-clear"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("test-token-to-clear"));
 	EXPECT_FALSE(CGetSetOptions::GetCloudDeviceToken().IsEmpty());
 	
 	// Logout
@@ -98,7 +98,7 @@ TEST(CloudAuth_Logout, Idempotent)
 TEST(CloudAuth_Logout, ClearsDeviceId)
 {
 	// Store device ID
-	CGetSetOptions::SetCloudDeviceId(CString("test-device-id-12345"));
+	CGetSetOptions::SetCloudDeviceId(CStringA("test-device-id-12345"));
 	
 	// Logout
 	CCloudAuth::Logout();
@@ -231,7 +231,7 @@ TEST(CloudAuth_TokenPersistence, TokenPersistsAcrossCalls)
 {
 	// Manually set token (simulates successful login)
 	CStringA testToken("persisted-token-xyz");
-	CGetSetOptions::SetCloudDeviceToken(CString(testToken));
+	CGetSetOptions::SetCloudDeviceToken(testToken);
 	
 	// Verify token persists
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
@@ -243,7 +243,7 @@ TEST(CloudAuth_TokenPersistence, DeviceIdPersistsAcrossCalls)
 {
 	// Manually set device ID (simulates successful login)
 	CStringA testDeviceId("device-12345");
-	CGetSetOptions::SetCloudDeviceId(CString(testDeviceId));
+	CGetSetOptions::SetCloudDeviceId(testDeviceId);
 	
 	// Verify device ID persists
 	CStringA retrievedDeviceId = CGetSetOptions::GetCloudDeviceId();
@@ -306,8 +306,8 @@ TEST(CloudAuth_Integration, LoginLogoutCycle)
 	EXPECT_FALSE(CCloudAuth::IsLoggedIn());
 	
 	// Simulate login by setting token directly
-	CGetSetOptions::SetCloudDeviceToken(CString("test-token"));
-	CGetSetOptions::SetCloudDeviceId(CString("test-device-id"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("test-token"));
+	CGetSetOptions::SetCloudDeviceId(CStringA("test-device-id"));
 	
 	// Verify logged in
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
@@ -326,7 +326,7 @@ TEST(CloudAuth_Integration, MultipleLoginAttempts)
 	{
 		CString token;
 		token.Format(_T("token-%d"), i);
-		CGetSetOptions::SetCloudDeviceToken(token);
+		CGetSetOptions::SetCloudDeviceToken(CStringA(token));
 		
 		EXPECT_TRUE(CCloudAuth::IsLoggedIn());
 		
@@ -343,7 +343,7 @@ TEST(CloudAuth_Integration, RegisterThenLogin)
 	// In real flow, register may or may not auto-login
 	
 	// Simulate registration with token
-	CGetSetOptions::SetCloudDeviceToken(CString("register-token"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("register-token"));
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
 	
 	// Logout
@@ -351,6 +351,6 @@ TEST(CloudAuth_Integration, RegisterThenLogin)
 	EXPECT_FALSE(CCloudAuth::IsLoggedIn());
 	
 	// Simulate login with different token
-	CGetSetOptions::SetCloudDeviceToken(CString("login-token"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("login-token"));
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
 }
