@@ -64,7 +64,7 @@ public:
 
 // Implementation
 protected:
-    void ReportError(int nError);
+    static void ReportError(int nError);
     void PositionWindow();
     void SetDefaultCursor();
 
