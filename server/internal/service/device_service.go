@@ -18,6 +18,7 @@ type DeviceInfo struct {
 	ID         string `json:"id"`
 	DeviceName string `json:"device_name"`
 	LastSeen   string `json:"last_seen"`
+	CreatedAt  string `json:"created_at"`
 }
 
 func (s *DeviceService) ListByUser(userID uint, page, perPage int) (*response.PaginatedResponse, error) {
@@ -47,6 +48,7 @@ func (s *DeviceService) ListByUser(userID uint, page, perPage int) (*response.Pa
 			ID:         d.ID,
 			DeviceName: d.DeviceName,
 			LastSeen:   d.LastSeen.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:  d.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 

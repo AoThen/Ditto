@@ -10,8 +10,7 @@
       v-loading="loading"
       style="width: 100%; margin-top: 20px"
     >
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="device_id" label="设备标识" width="200" show-overflow-tooltip />
+      <el-table-column prop="id" label="设备ID" width="200" show-overflow-tooltip />
       <el-table-column prop="device_name" label="设备名称" width="200" show-overflow-tooltip />
       <el-table-column prop="last_seen" label="最后在线时间" width="200">
         <template #default="{ row }">
@@ -44,6 +43,16 @@
       </el-table-column>
     </el-table>
 
+    <el-pagination
+      v-if="total > 20"
+      v-model:current-page="currentPage"
+      :page-size="20"
+      :total="total"
+      layout="total, prev, pager, next"
+      style="margin-top: 16px; justify-content: center"
+      @current-change="fetchDevices"
+    />
+
     <el-empty v-if="!loading && deviceList.length === 0" description="暂无设备记录" />
   </div>
 </template>
@@ -58,6 +67,8 @@ import { formatDate } from '@/composables/useFormatDate'
 
 const deviceList = ref([])
 const loading = ref(false)
+const currentPage = ref(1)
+const total = ref(0)
 const userStore = useUserStore()
 
 function isDeviceActive(lastSeen) {
@@ -71,21 +82,24 @@ function isDeviceActive(lastSeen) {
 async function fetchDevices() {
   loading.value = true
   try {
-    const res = await listDevices()
+    const res = await listDevices(currentPage.value, 20)
     if (res.code === 0) {
-      // Mark current device (based on stored token)
       const currentDeviceId = userStore.deviceId
-      deviceList.value = (res.data?.items || res.data || []).map(device => ({
+      const data = res.data
+      deviceList.value = (data?.items || data || []).map(device => ({
         ...device,
-        is_current: device.device_id === currentDeviceId
+        is_current: device.id === currentDeviceId
       }))
+      total.value = data?.total ?? deviceList.value.length
     } else {
       deviceList.value = []
+      total.value = 0
     }
   } catch (err) {
     console.error('Failed to fetch devices:', err)
     ElMessage.error('获取设备列表失败')
     deviceList.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }

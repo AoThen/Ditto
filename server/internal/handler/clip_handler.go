@@ -30,9 +30,15 @@ func (h *ClipHandler) ListClips(c *gin.Context) {
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
 	search := c.Query("search")
 	groupID := c.Query("group_id")
+	sortBy := c.Query("sort_by")
+	sortOrder := c.Query("sort_order")
 
-	result, err := h.service.ListClips(userID, page, perPage, search, groupID)
+	result, err := h.service.ListClips(userID, page, perPage, search, groupID, sortBy, sortOrder)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidSortBy) {
+			response.Error(c, http.StatusBadRequest, 40000, "无效的排序参数")
+			return
+		}
 		log.Printf("[ListClips] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "获取剪贴板列表失败")
 		return
@@ -191,14 +197,17 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 func (h *ClipHandler) ListConflictClips(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	clips, err := h.service.ListConflictClips(userID)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+
+	result, err := h.service.ListConflictClips(userID, page, perPage)
 	if err != nil {
 		log.Printf("[ListConflictClips] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "获取冲突剪贴板失败")
 		return
 	}
 
-	response.Success(c, clips)
+	response.Success(c, result)
 }
 
 // ResolveConflictClip handles POST /api/v1/clips/conflicts/:id/resolve

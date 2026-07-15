@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"ditto-cloud-server/internal/database"
@@ -13,6 +14,8 @@ import (
 
 	"gorm.io/gorm"
 )
+
+var ErrInvalidSortBy = errors.New("无效的排序字段")
 
 // Broadcaster defines the interface for WebSocket broadcast.
 type Broadcaster interface {
@@ -72,7 +75,7 @@ type ClipFormatFull struct {
 }
 
 // ListClips retrieves clips for a user with pagination and optional filters
-func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID string) (*response.PaginatedResponse, error) {
+func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID, sortBy, sortOrder string) (*response.PaginatedResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -81,6 +84,11 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID 
 	}
 	if perPage > 100 {
 		perPage = 100
+	}
+
+	orderClause, err := buildSortClause(sortBy, sortOrder)
+	if err != nil {
+		return nil, err
 	}
 
 	query := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
@@ -98,7 +106,7 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID 
 	}
 
 	var clips []model.Clip
-	if err := query.Order("updated_at DESC").Offset((page - 1) * perPage).Limit(perPage).Find(&clips).Error; err != nil {
+	if err := query.Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips).Error; err != nil {
 		return nil, err
 	}
 
@@ -631,15 +639,83 @@ func LogSyncOperation(userID uint, deviceID, action string, clipCount int, statu
 	database.DB.Create(&log)
 }
 
-// ListConflictClips returns all conflict clips for a user
-func (s *ClipService) ListConflictClips(userID uint) ([]model.Clip, error) {
-	var clips []model.Clip
-	if err := database.DB.Where("user_id = ? AND is_conflict_copy = ?", userID, true).
-		Order("updated_at DESC").
-		Find(&clips).Error; err != nil {
+// ListConflictClips returns paginated conflict clips for a user
+func (s *ClipService) ListConflictClips(userID uint, page, perPage int) (*response.PaginatedResponse, error) {
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	if perPage > 100 {
+		perPage = 100
+	}
+
+	query := database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, true)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
 		return nil, err
 	}
-	return clips, nil
+
+	var clips []model.Clip
+	if err := query.Order("updated_at DESC").Offset((page - 1) * perPage).Limit(perPage).Find(&clips).Error; err != nil {
+		return nil, err
+	}
+
+	clipIDs := make([]string, len(clips))
+	groupIDs := make(map[string]struct{})
+	deviceIDs := make(map[string]struct{})
+	for i, clip := range clips {
+		clipIDs[i] = clip.ID
+		if clip.GroupID != "" {
+			groupIDs[clip.GroupID] = struct{}{}
+		}
+		if clip.DeviceID != "" {
+			deviceIDs[clip.DeviceID] = struct{}{}
+		}
+	}
+	formatsByClip, err := loadFormatsForClips(database.DB, clipIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	groupNames := loadGroupNames(groupIDs)
+	deviceNames := loadDeviceNames(deviceIDs)
+
+	items := make([]ClipListItem, 0, len(clips))
+	for _, clip := range clips {
+		formats := formatsByClip[clip.ID]
+
+		formatMetas := make([]ClipFormatMeta, 0, len(formats))
+		for _, f := range formats {
+			formatMetas = append(formatMetas, ClipFormatMeta{
+				FormatType: f.FormatType,
+				DataSize:   len(f.Data),
+			})
+		}
+
+		items = append(items, ClipListItem{
+			ID:          clip.ID,
+			Description: clip.Description,
+			CRC:         clip.CRC,
+			CreatedAt:   clip.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:   clip.UpdatedAt.UTC().Format(time.RFC3339),
+			GroupID:     clip.GroupID,
+			GroupName:   groupNames[clip.GroupID],
+			DeviceName:  deviceNames[clip.DeviceID],
+			ShortCut:    clip.ShortCut,
+			PasteCount:  clip.PasteCount,
+			Formats:     formatMetas,
+		})
+	}
+
+	return &response.PaginatedResponse{
+		Items:   items,
+		Total:   total,
+		Page:    page,
+		PerPage: perPage,
+	}, nil
 }
 
 // ResolveConflictClip resolves a conflict clip by either accepting it (replacing the winning clip) or discarding it
@@ -748,4 +824,25 @@ func loadDeviceNames(deviceIDs map[string]struct{}) map[string]string {
 		result[d.ID] = d.DeviceName
 	}
 	return result
+}
+
+var allowedSortBy = map[string]bool{
+	"created_at":  true,
+	"updated_at":  true,
+	"paste_count": true,
+	"description": true,
+}
+
+func buildSortClause(sortBy, sortOrder string) (string, error) {
+	if sortBy == "" {
+		return "updated_at DESC", nil
+	}
+	if !allowedSortBy[sortBy] {
+		return "", ErrInvalidSortBy
+	}
+	order := "ASC"
+	if strings.ToUpper(sortOrder) == "DESC" {
+		order = "DESC"
+	}
+	return sortBy + " " + order, nil
 }

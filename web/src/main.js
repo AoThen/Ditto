@@ -26,15 +26,26 @@ const userStore = useUserStore()
 userStore.checkAuthState()
 
 // MEDIUM FIX (M1): Global Vue error handler for render/template errors
-app.config.errorHandler = (err, instance, info) => {
+app.config.errorHandler = async (err, instance, info) => {
   console.error('[Vue Error]', info, err)
+  try {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error('页面渲染异常: ' + (err.message || '未知错误'))
+  } catch (e) {
+    // element-plus might be unavailable during crashes
+  }
 }
 
 // Global unhandled promise rejection handler
-window.addEventListener('unhandledrejection', (event) => {
+window.addEventListener('unhandledrejection', async (event) => {
   console.error('[Unhandled Rejection]', event.reason)
-  // Prevent the default browser error output
   event.preventDefault()
+  try {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error('请求异常: ' + (event.reason?.message || '未知错误'))
+  } catch (e) {
+    // element-plus might be unavailable
+  }
 })
 
 app.mount('#app')

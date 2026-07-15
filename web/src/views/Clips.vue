@@ -46,18 +46,19 @@
       v-loading="loading"
       @selection-change="handleSelectionChange"
       @row-click="handleRowClick"
+      @sort-change="handleSortChange"
       style="width: 100%; margin-top: 16px"
     >
       <el-table-column type="selection" width="55" />
-      <el-table-column prop="description" label="描述" show-overflow-tooltip />
-      <el-table-column prop="paste_count" label="粘贴次数" width="100" />
+      <el-table-column prop="description" label="描述" show-overflow-tooltip sortable="custom" />
+      <el-table-column prop="paste_count" label="粘贴次数" width="100" sortable="custom" />
       <el-table-column prop="group_name" label="分组" width="120">
         <template #default="{ row }">
           <el-tag v-if="row.group_name" size="small">{{ row.group_name }}</el-tag>
           <span v-else class="no-group">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" width="180">
+      <el-table-column prop="created_at" label="创建时间" width="180" sortable="custom">
         <template #default="{ row }">
           {{ formatDate(row.created_at) }}
         </template>
@@ -138,12 +139,19 @@
                 <div v-else-if="isImageFormat(fmt.format_type)" class="image-preview">
                   <el-image
                     v-if="fmt.data"
-                    :src="'data:image/png;base64,' + fmt.data"
+                    :src="'data:' + getImageMime(fmt.format_type) + ';base64,' + fmt.data"
                     fit="contain"
                     style="max-height: 400px;"
-                    :preview-src-list="['data:image/png;base64,' + fmt.data]"
+                    :preview-src-list="['data:' + getImageMime(fmt.format_type) + ';base64,' + fmt.data]"
                   />
-                  <el-alert v-else title="图片数据不可预览" type="info" :closable="false" />
+                  <el-alert v-if="!fmt.data" title="图片数据不可预览" type="info" :closable="false" />
+                  <el-alert
+                    v-if="fmt.data && (fmt.format_type === 8 || fmt.format_type === 17)"
+                    title="此图片为 BMP 格式，部分浏览器可能无法直接预览"
+                    type="warning"
+                    :closable="false"
+                    style="margin-top: 8px"
+                  />
                 </div>
 
                 <!-- File Path Preview -->
@@ -232,6 +240,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        v-if="conflictTotal > 20"
+        v-model:current-page="conflictPage"
+        :page-size="20"
+        :total="conflictTotal"
+        layout="total, prev, pager, next"
+        style="margin-top: 16px; justify-content: center"
+        @current-change="fetchConflictClips"
+      />
       <el-empty v-if="conflictClips.length === 0 && !conflictLoading" description="暂无冲突剪贴板" />
     </el-dialog>
   </div>
@@ -309,10 +326,16 @@ const activeFormatTab = ref(0)
 const deletingId = ref(null)
 const batchDeleting = ref(false)
 
+// Sort state
+const sortBy = ref('')
+const sortOrder = ref('')
+
 // Conflict clips state
 const conflictClips = ref([])
 const conflictLoading = ref(false)
 const conflictDialogVisible = ref(false)
+const conflictPage = ref(1)
+const conflictTotal = ref(0)
 // MEDIUM FIX (M3): Use computed for conflictCount, never assign directly
 const conflictCount = computed(() => conflictClips.value.length)
 const resolvingId = ref(null)
@@ -331,6 +354,14 @@ const groups = ref([])
 let searchTimer = null
 
 // Format type detection
+function getImageMime(formatType) {
+  const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
+  if (type === 50 || type === '50') return 'image/png'
+  if (type === 8 || type === 17 || type === '8' || type === '17') return 'image/bmp'
+  if (type === 'image' || type === 'dib' || type === 'CF_DIB' || type === 'CF_BITMAP') return 'image/bmp'
+  return 'image/png'
+}
+
 function isTextFormat(formatType) {
   const type = typeof formatType === 'string' ? formatType.toLowerCase() : formatType
   return type === 1 || type === 13 || type === 7 ||
@@ -462,6 +493,10 @@ async function fetchClips() {
     if (groupFilter.value) {
       params.group_id = groupFilter.value
     }
+    if (sortBy.value) {
+      params.sort_by = sortBy.value
+      params.sort_order = sortOrder.value
+    }
     const res = await listClips(params)
     // Backend returns code: 0 for success (not 200)
     clipList.value = res.data?.items || res.data || []
@@ -491,6 +526,13 @@ function handleSearchDebounced() {
   searchTimer = setTimeout(() => {
     handleSearch()
   }, 300)
+}
+
+function handleSortChange({ prop, order }) {
+  sortBy.value = prop || ''
+  sortOrder.value = order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : ''
+  currentPage.value = 1
+  fetchClips()
 }
 
 function handleRefresh() {
@@ -609,10 +651,10 @@ async function showConflictDialog() {
 async function fetchConflictClips() {
   conflictLoading.value = true
   try {
-    const res = await listConflictClips()
+    const res = await listConflictClips(conflictPage.value, 20)
     if (res.code === 0) {
-      conflictClips.value = res.data || []
-      // conflictCount auto-updates via computed (M3 fix)
+      conflictClips.value = res.data?.items || res.data || []
+      conflictTotal.value = res.data?.total || 0
     }
   } catch (err) {
     ElMessage.error('获取冲突剪贴板失败: ' + err.message)

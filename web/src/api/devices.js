@@ -1,10 +1,11 @@
 import request from '@/api/request'
 
 // List user's devices
-export function listDevices() {
+export function listDevices(page = 1, perPage = 20) {
   return request({
     url: '/api/v1/devices',
-    method: 'get'
+    method: 'get',
+    params: { page, per_page: perPage }
   })
 }
 
