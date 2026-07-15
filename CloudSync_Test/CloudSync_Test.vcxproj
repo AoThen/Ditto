@@ -86,7 +86,9 @@
   <ItemGroup>
     <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="TestCrc32.cpp" />
+    <ClCompile Include="TestMd5.cpp" />
     <ClCompile Include="TestRegExFilter.cpp" />
+    <ClCompile Include="TestRemoveLineFeeds.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
     <ClCompile Include="TestTextConvert.cpp" />
     <ClCompile Include="TestWildCardMatch.cpp" />
@@ -102,6 +104,9 @@
     </ClCompile>
     <!-- Compile CloudSync source directly -->
     <ClCompile Include="..\src\Crc32Dynamic.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\src\Md5.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\src\CloudSync\CloudAuth.cpp">
@@ -126,6 +131,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\src\RegExFilterHelper.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\Addins\DittoUtil\RemoveLineFeeds.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\Addins\DittoUtil\TextConvert.cpp">
