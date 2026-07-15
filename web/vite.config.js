@@ -22,11 +22,18 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
-            return 'vendor-vue'
-          }
-          if (id.includes('node_modules/element-plus')) {
-            return 'vendor-element'
+          if (id.includes('node_modules')) {
+            if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router') || id.includes('node_modules/pinia')) {
+              return 'vendor-vue'
+            }
+            if (id.includes('node_modules/element-plus')) {
+              return 'vendor-element'
+            }
+            // 其他 node_modules 按包名拆分
+            const match = id.match(/node_modules[\\/](?:@[^\\/]+[\\/])?([^\\/]+)/)
+            if (match) {
+              return `vendor-${match[1].replace('@', '')}`
+            }
           }
         },
       },

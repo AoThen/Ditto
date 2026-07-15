@@ -66,3 +66,11 @@ export function changeEncryptionPassword(data) {
     data
   })
 }
+
+export function batchDeleteClips(ids) {
+  return request({
+    url: '/api/v1/clips/batch-delete',
+    method: 'post',
+    data: { ids }
+  })
+}

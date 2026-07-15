@@ -100,6 +100,17 @@
           <el-descriptions-item label="来源设备">{{ currentClip.source_device || currentClip.device_name || '(未知)' }}</el-descriptions-item>
         </el-descriptions>
 
+        <div style="margin-top: 12px; text-align: right;">
+          <el-button
+            type="primary"
+            size="small"
+            @click="copyToClipboard"
+            :disabled="!hasTextFormat"
+          >
+            <el-icon><CopyDocument /></el-icon> 复制到剪贴板
+          </el-button>
+        </div>
+
         <div class="formats-section" style="margin-top: 20px;">
           <h4>格式数据 ({{ currentClip.formats?.length || 0 }})</h4>
           <el-tabs v-model="activeFormatTab" type="card">
@@ -256,11 +267,11 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listClips, getClip, deleteClip, getChanges } from '@/api/clips'
+import { listClips, getClip, deleteClip, getChanges, batchDeleteClips } from '@/api/clips'
 import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { listGroups, moveClipsToGroup, removeClipsFromGroup } from '@/api/groups'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, ArrowDown } from '@element-plus/icons-vue'
+import { Download, ArrowDown, CopyDocument } from '@element-plus/icons-vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { downloadBlob } from '@/api/request'
 import { formatDate } from '@/composables/useFormatDate'
@@ -349,6 +360,33 @@ const groupMoving = ref(false)
 // Group filter
 const groupFilter = ref('')
 const groups = ref([])
+
+// Clipboard detail helpers
+const hasTextFormat = computed(() => {
+  if (!currentClip.value?.formats) return false
+  return currentClip.value.formats.some(f => isTextFormat(f.format_type))
+})
+
+async function copyToClipboard() {
+  if (!currentClip.value?.formats) return
+  const textFormat = currentClip.value.formats.find(f => isTextFormat(f.format_type))
+  if (!textFormat) return
+  const text = decodeTextData(textFormat)
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    ElMessage.success('已复制到剪贴板')
+  }
+}
 
 // Search debounce timer
 let searchTimer = null
@@ -623,14 +661,8 @@ async function handleBatchDelete() {
     )
     batchDeleting.value = true
     const ids = selectedRows.value.map(row => row.id)
-    const results = await Promise.allSettled(ids.map(id => deleteClip(id)))
-    const successCount = results.filter(r => r.status === 'fulfilled').length
-    const failCount = results.filter(r => r.status === 'rejected').length
-    if (successCount > 0) {
-      ElMessage.success(`成功删除 ${successCount} 个剪贴板${failCount > 0 ? `，${failCount} 个失败` : ''}`)
-    } else {
-      ElMessage.error('批量删除失败')
-    }
+    const res = await batchDeleteClips(ids)
+    ElMessage.success(`成功删除 ${res.data?.deleted || ids.length} 个剪贴板`)
     selectedRows.value = []
     fetchClips()
   } catch (err) {

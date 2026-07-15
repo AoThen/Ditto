@@ -93,26 +93,29 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 		return nil, err
 	}
 
-	baseQuery := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
+	query := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
 	if groupID != "" {
-		baseQuery = baseQuery.Where("group_id = ?", groupID)
+		query = query.Where("group_id = ?", groupID)
 	}
 
-	// Step 1: Determine total count
-	var total int64
-	baseQuery.Count(&total)
-
-	// Step 2: Query with pagination
 	isPinyin := search != "" && utils.IsPinyinQuery(search)
 
+	if search != "" {
+		if isPinyin {
+			query = query.Where("pinyin LIKE ?", "%"+strings.ToLower(search)+"%")
+		} else {
+			query = query.Where("description LIKE ?", "%"+search+"%")
+		}
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, err
+	}
+
 	var clips []model.Clip
-	if search == "" {
-		baseQuery.Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
-	} else if isPinyin {
-		lowSearch := strings.ToLower(search)
-		baseQuery.Where("pinyin LIKE ?", "%"+lowSearch+"%").Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
-	} else {
-		baseQuery.Where("description LIKE ?", "%"+search+"%").Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
+	if err := query.Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips).Error; err != nil {
+		return nil, err
 	}
 
 	return buildClipListResponse(clips, total, page, perPage)
@@ -209,15 +212,12 @@ func buildClipListResponse(clips []model.Clip, total int64, page, perPage int) (
 // GetClip retrieves a single clip with full format data
 func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 	var clip model.Clip
-	if err := database.DB.Where("id = ? AND user_id = ?", clipID, userID).First(&clip).Error; err != nil {
+	if err := database.DB.Preload("Formats").
+		Where("id = ? AND user_id = ?", clipID, userID).
+		First(&clip).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrClipNotFound
 		}
-		return nil, err
-	}
-
-	var formats []model.ClipFormat
-	if err := database.DB.Where("clip_id = ?", clipID).Find(&formats).Error; err != nil {
 		return nil, err
 	}
 
@@ -236,8 +236,8 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 		}
 	}
 
-	formatFulls := make([]ClipFormatFull, 0, len(formats))
-	for _, f := range formats {
+	formatFulls := make([]ClipFormatFull, 0, len(clip.Formats))
+	for _, f := range clip.Formats {
 		formatFulls = append(formatFulls, ClipFormatFull{
 			FormatType: f.FormatType,
 			Data:       base64.StdEncoding.EncodeToString(f.Data),
@@ -337,6 +337,26 @@ func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 	})
 }
 
+// BatchDeleteClips removes multiple clips and their formats for a user
+func (s *ClipService) BatchDeleteClips(userID uint, clipIDs []string) (int64, error) {
+	var deleted int64
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Delete formats for all clips
+		if err := tx.Where("clip_id IN ? AND clip_id IN (SELECT id FROM clips WHERE user_id = ?)", clipIDs, userID).Delete(&model.ClipFormat{}).Error; err != nil {
+			return err
+		}
+
+		// Delete clips
+		result := tx.Where("id IN ? AND user_id = ?", clipIDs, userID).Delete(&model.Clip{})
+		if result.Error != nil {
+			return result.Error
+		}
+		deleted = result.RowsAffected
+		return nil
+	})
+	return deleted, err
+}
+
 // SyncRequest represents the sync API request
 type SyncRequest struct {
 	Since     time.Time      `json:"since"`
@@ -403,6 +423,19 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
 			}
 
+			pushIDs := make([]string, 0, len(req.PushClips))
+			for _, pc := range req.PushClips {
+				pushIDs = append(pushIDs, pc.ID)
+			}
+			var existingClips []model.Clip
+			if err := tx.Where("id IN ? AND user_id = ?", pushIDs, userID).Find(&existingClips).Error; err != nil {
+				return err
+			}
+			existingMap := make(map[string]model.Clip, len(existingClips))
+			for _, c := range existingClips {
+				existingMap[c.ID] = c
+			}
+
 			for _, pc := range req.PushClips {
 				// M7: CRC-based de-duplication - skip if same CRC already exists for this user
 				// But skip de-dup check if CRC is 0 (meaning no CRC was provided by client)
@@ -417,13 +450,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				}
 
 				// Check if clip already exists (upsert by ID)
-				var existing model.Clip
-				err := tx.Where("id = ? AND user_id = ?", pc.ID, userID).First(&existing).Error
-				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-					return err
-				}
+				existing, exists := existingMap[pc.ID]
 
-				if errors.Is(err, gorm.ErrRecordNotFound) {
+				if !exists {
 					// New clip: always create
 					// Use client-provided updated_at if available, otherwise use syncTime
 					clipUpdatedAt := syncTime
@@ -516,7 +545,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 						// Only create conflict copy if the incoming clip has different content
 						if existing.CRC != pc.CRC {
-						conflictClip := model.Clip{
+							conflictClip := model.Clip{
 							ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
 							UserID:         userID,
 							DeviceID:       req.DeviceID,
@@ -889,3 +918,5 @@ func buildSortClause(sortBy, sortOrder string) (string, error) {
 	}
 	return sortBy + " " + order, nil
 }
+
+

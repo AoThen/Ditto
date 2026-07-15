@@ -65,9 +65,15 @@ func (s *CleanupService) runCleanup() {
 		log.Printf("[Cleanup] ERROR hard-deleting old soft-deleted clips: %v", err)
 	}
 
+	// Step 4: Clean up sync_logs older than 30 days
+	deletedLogs, err := s.deleteOldSyncLogs()
+	if err != nil {
+		log.Printf("[Cleanup] ERROR deleting old sync logs: %v", err)
+	}
+
 	elapsed := time.Since(startTime)
-	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) + %d (hard delete) clips in %v",
-		deletedByAge, deletedByLimit, deletedHard, elapsed.Round(time.Millisecond))
+	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) + %d (hard delete) + %d (sync logs) in %v",
+		deletedByAge, deletedByLimit, deletedHard, deletedLogs, elapsed.Round(time.Millisecond))
 }
 
 // deleteOldClips removes clips older than MaxClipAge.
@@ -142,6 +148,22 @@ func (s *CleanupService) batchDeleteClips(clipIDs []string) (int, error) {
 	if result.Error != nil {
 		return 0, result.Error
 	}
+	return int(result.RowsAffected), nil
+}
+
+// deleteOldSyncLogs removes sync_log entries older than 30 days
+func (s *CleanupService) deleteOldSyncLogs() (int, error) {
+	if database.DB == nil {
+		return 0, nil
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -30)
+
+	result := database.DB.Where("synced_at < ?", cutoff).Delete(&model.SyncLog{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
 	return int(result.RowsAffected), nil
 }
 

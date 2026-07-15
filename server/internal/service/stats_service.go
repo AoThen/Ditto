@@ -42,13 +42,19 @@ func (s *StatsService) GetOverview(userID uint) (*OverviewResponse, error) {
 	var totalDevices int64
 	var totalStorage int64
 
-	database.DB.Raw("SELECT COUNT(*) FROM clips WHERE user_id = ? AND deleted_at IS NULL", userID).Scan(&totalClips)
+	if err := database.DB.Raw("SELECT COUNT(*) FROM clips WHERE user_id = ? AND deleted_at IS NULL", userID).Scan(&totalClips).Error; err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	database.DB.Raw("SELECT COUNT(*) FROM clips WHERE user_id = ? AND created_at >= ? AND deleted_at IS NULL", userID, todayStart).Scan(&todayClips)
+	if err := database.DB.Raw("SELECT COUNT(*) FROM clips WHERE user_id = ? AND created_at >= ? AND deleted_at IS NULL", userID, todayStart).Scan(&todayClips).Error; err != nil {
+		return nil, err
+	}
 
-	database.DB.Raw("SELECT COUNT(*) FROM devices WHERE user_id = ?", userID).Scan(&totalDevices)
+	if err := database.DB.Raw("SELECT COUNT(*) FROM devices WHERE user_id = ?", userID).Scan(&totalDevices).Error; err != nil {
+		return nil, err
+	}
 
 	storage, err := s.GetDeviceStats(userID)
 	if err != nil {
@@ -57,14 +63,16 @@ func (s *StatsService) GetOverview(userID uint) (*OverviewResponse, error) {
 	totalStorage = storage
 
 	var trend []DayCount
-	database.DB.Raw(`
+	if err := database.DB.Raw(`
 		SELECT DATE(created_at) as date, COUNT(*) as count
 		FROM clips
 		WHERE user_id = ? AND created_at >= ? AND deleted_at IS NULL
 		GROUP BY DATE(created_at)
 		ORDER BY date DESC
 		LIMIT 7
-	`, userID, time.Now().AddDate(0, 0, -7)).Scan(&trend)
+	`, userID, time.Now().AddDate(0, 0, -7)).Scan(&trend).Error; err != nil {
+		return nil, err
+	}
 
 	if trend == nil {
 		trend = make([]DayCount, 0)

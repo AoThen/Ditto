@@ -12,6 +12,7 @@ let sharedReconnectTimer = null
 let sharedPingTimer = null
 let sharedReconnectAttempts = 0
 const MAX_RECONNECT_DELAY = 30000
+const MAX_RECONNECT_ATTEMPTS = 20
 
 // FIX: Shared consumer counter so all components coordinate properly
 let activeConsumers = 0
@@ -55,11 +56,17 @@ function handleMessage(msg) {
 function scheduleReconnect() {
   if (sharedReconnectTimer) return
 
+  if (sharedReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.log(`[WS] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
+    ElMessage.error('WebSocket 连接失败次数过多，请刷新页面重试')
+    return
+  }
+
   sharedReconnectAttempts++
   const baseDelay = Math.min(1000 * Math.pow(2, sharedReconnectAttempts), MAX_RECONNECT_DELAY)
   const jitter = Math.random() * 1000
   const delay = baseDelay + jitter
-  console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${sharedReconnectAttempts})`)
+  console.log(`[WS] Reconnecting in ${Math.round(delay)}ms (attempt ${sharedReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`)
 
   sharedReconnectTimer = setTimeout(() => {
     sharedReconnectTimer = null

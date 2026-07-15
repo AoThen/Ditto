@@ -191,6 +191,7 @@ func main() {
 		{
 			devices.GET("", deviceHandler.ListDevices)
 			devices.DELETE("/:id", deviceHandler.RemoveDevice)
+			devices.PATCH("/:id", deviceHandler.UpdateDevice)
 		}
 
 		clips := protected.Group("/clips")
@@ -204,6 +205,7 @@ func main() {
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)
 		}
 
 		groups := protected.Group("/groups")

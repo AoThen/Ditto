@@ -16,3 +16,12 @@ export function removeDevice(deviceId) {
     method: 'delete'
   })
 }
+
+// Rename a device
+export function renameDevice(deviceId, deviceName) {
+  return request({
+    url: `/api/v1/devices/${deviceId}`,
+    method: 'patch',
+    data: { device_name: deviceName }
+  })
+}

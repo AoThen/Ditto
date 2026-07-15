@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -91,7 +92,8 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 
 	var req service.SyncRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Sync] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -156,7 +158,8 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 	}
 	since, err := time.Parse(time.RFC3339, sinceStr)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "无效的 since 参数: "+err.Error())
+		log.Printf("[GetChanges] invalid since parameter: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "无效的 since 参数")
 		return
 	}
 
@@ -219,7 +222,8 @@ func (h *ClipHandler) ResolveConflictClip(c *gin.Context) {
 		Action string `json:"action" binding:"required"` // "accept" or "discard"
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[ResolveConflictClip] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -239,4 +243,32 @@ func (h *ClipHandler) ResolveConflictClip(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "冲突已处理", nil)
+}
+
+// BatchDeleteClips handles POST /api/v1/clips/batch-delete
+func (h *ClipHandler) BatchDeleteClips(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req struct {
+		IDs []string `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[BatchDeleteClips] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		response.Error(c, http.StatusBadRequest, 40000, "请至少选择一条记录")
+		return
+	}
+
+	deleted, err := h.service.BatchDeleteClips(userID, req.IDs)
+	if err != nil {
+		log.Printf("[BatchDeleteClips] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "批量删除失败")
+		return
+	}
+
+	response.SuccessWithMessage(c, fmt.Sprintf("成功删除 %d 个剪贴板", deleted), gin.H{"deleted": deleted})
 }

@@ -29,8 +29,16 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120">
+      <el-table-column label="操作" width="200">
         <template #default="{ row }">
+          <el-button
+            type="primary"
+            size="small"
+            plain
+            @click="handleRenameDevice(row)"
+          >
+            重命名
+          </el-button>
           <el-button
             type="danger"
             size="small"
@@ -59,7 +67,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listDevices, removeDevice } from '@/api/devices'
+import { listDevices, removeDevice, renameDevice } from '@/api/devices'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -133,6 +141,30 @@ async function handleRemoveDevice(row) {
     if (err !== 'cancel') {
       console.error('Failed to remove device:', err)
       ElMessage.error('设备移除失败')
+    }
+  }
+}
+
+async function handleRenameDevice(row) {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新的设备名称',
+      '重命名设备',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: row.device_name,
+        inputPattern: /\S+/,
+        inputErrorMessage: '设备名称不能为空',
+      }
+    )
+    await renameDevice(row.id, value)
+    ElMessage.success('设备名称已更新')
+    fetchDevices()
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('Failed to rename device:', err)
+      ElMessage.error('重命名失败')
     }
   }
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"ditto-cloud-server/internal/middleware"
@@ -23,7 +24,8 @@ func (h *EncryptionHandler) SetupEncryption(c *gin.Context) {
 
 	var req service.SetupEncryptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[SetupEncryption] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -73,7 +75,8 @@ func (h *EncryptionHandler) DisableEncryption(c *gin.Context) {
 
 	var req service.DisableEncryptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[DisableEncryption] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -99,7 +102,8 @@ func (h *EncryptionHandler) ChangeEncryptionPassword(c *gin.Context) {
 
 	var req service.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[ChangeEncryptionPassword] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 

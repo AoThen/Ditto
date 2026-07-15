@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
@@ -67,4 +68,20 @@ func (s *DeviceService) RemoveDevice(userID uint, deviceID string) error {
 		}
 		return tx.Where("id = ? AND user_id = ?", deviceID, userID).Delete(&model.Device{}).Error
 	})
+}
+
+func (s *DeviceService) RenameDevice(userID uint, deviceID string, newName string) error {
+	if newName == "" {
+		return errors.New("设备名称不能为空")
+	}
+	result := database.DB.Model(&model.Device{}).
+		Where("id = ? AND user_id = ?", deviceID, userID).
+		Update("device_name", newName)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("设备不存在")
+	}
+	return nil
 }
