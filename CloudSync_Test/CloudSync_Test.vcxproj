@@ -85,6 +85,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="CloudAuthTest.cpp" />
+    <ClCompile Include="TestClipCompare.cpp" />
     <ClCompile Include="TestCrc32.cpp" />
     <ClCompile Include="TestMd5.cpp" />
     <ClCompile Include="TestEncryption.cpp" />
@@ -95,6 +96,7 @@
     <ClCompile Include="TestWildCardMatch.cpp" />
     <ClCompile Include="TestSHA2.cpp" />
     <ClCompile Include="TestSlugify.cpp" />
+    <ClCompile Include="TestConvertRTFToText.cpp" />
     <ClCompile Include="CloudCryptoTest.cpp" />
     <ClCompile Include="CloudEncryptionTest.cpp" />
     <ClCompile Include="CloudKeyExportTest.cpp" />
@@ -105,6 +107,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <!-- Compile CloudSync source directly -->
+    <ClCompile Include="..\src\ClipCompare.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="..\src\Crc32Dynamic.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
@@ -145,6 +150,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\Addins\DittoUtil\TextConvert.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\src\ConvertRTFToText.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
