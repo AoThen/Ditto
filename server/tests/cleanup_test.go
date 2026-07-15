@@ -57,6 +57,7 @@ func TestCleanup_OldClipsDeleted(t *testing.T) {
 
 	// Stop cleanup
 	close(stopCh)
+	cleanupSvc.Wait()
 
 	// Verify old clip was deleted
 	testutil.TestDB.Model(&model.Clip{}).Where("id = ?", "old-clip").Count(&count)
@@ -100,6 +101,7 @@ func TestCleanup_NewClipsKept(t *testing.T) {
 	// Wait for cleanup to run
 	time.Sleep(300 * time.Millisecond)
 	close(stopCh)
+	cleanupSvc.Wait()
 
 	// Verify new clip is still there
 	var count int64
@@ -151,6 +153,7 @@ func TestCleanup_UserLimitEnforced(t *testing.T) {
 	// Wait for cleanup to run
 	time.Sleep(300 * time.Millisecond)
 	close(stopCh)
+	cleanupSvc.Wait()
 
 	// Verify only 3 clips remain (the newest ones)
 	testutil.TestDB.Model(&model.Clip{}).Where("user_id = ?", dbUser.ID).Count(&count)

@@ -40,6 +40,8 @@ jobs:
         run: go mod download
 
       - name: Run tests
+        env:
+          BCRYPT_COST: "4"
         run: go test -v -race -timeout 300s -coverprofile=coverage.out ./...
 
       - name: Upload coverage
