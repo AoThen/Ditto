@@ -18,7 +18,7 @@ const routes = [
     component: () => import('../views/Dashboard.vue'),
     meta: { requiresAuth: true, requiresWs: true },
     children: [
-      { path: '', component: () => import('../views/StatsDashboard.vue') },
+      { path: '', component: () => import('../views/DashboardHome.vue') },
       { path: 'clips', component: () => import('../views/Clips.vue') },
       { path: 'groups', component: () => import('../views/Groups.vue') },
       { path: 'devices', component: () => import('../views/Devices.vue') },

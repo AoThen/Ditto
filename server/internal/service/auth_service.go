@@ -197,6 +197,15 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 	return accessToken, refreshToken, nil
 }
 
+func (s *AuthService) Logout(userID uint, deviceID string) error {
+	var device model.Device
+	if err := database.DB.Where("id = ? AND user_id = ?", deviceID, userID).First(&device).Error; err != nil {
+		return err
+	}
+	device.TokenVersion++
+	return database.DB.Save(&device).Error
+}
+
 func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration, tokenType string, tokenVersion ...int) (string, error) {
 	ver := 0
 	if len(tokenVersion) > 0 {

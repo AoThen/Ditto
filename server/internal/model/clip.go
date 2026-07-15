@@ -23,7 +23,8 @@ type Clip struct {
 	ID             string    `gorm:"primaryKey;size:255" json:"id"`
 	UserID         uint      `gorm:"index:idx_clips_user_group,priority:1;index:idx_clips_user_created,priority:1;index:idx_clips_user_updated,priority:1;not null" json:"user_id"`
 	DeviceID       string    `gorm:"size:255" json:"device_id"`
-	Description    string    `gorm:"type:text" json:"description"`
+	Description    string         `gorm:"type:text" json:"description"`
+	Pinyin         string         `gorm:"type:text;index" json:"-"`
 	CRC            int64     `gorm:"index:idx_clips_user_crc" json:"crc"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `gorm:"index:idx_clips_user_updated,priority:2" json:"updated_at"`

@@ -7,6 +7,17 @@
         </div>
       </template>
 
+      <el-form :inline="true" class="filter-form">
+        <el-form-item label="操作类型">
+          <el-select v-model="filterAction" clearable placeholder="全部操作" @change="fetchLogs">
+            <el-option label="全部" value="" />
+            <el-option label="推送" value="push" />
+            <el-option label="拉取" value="pull" />
+            <el-option label="删除" value="delete" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
       <el-table :data="logs" v-loading="loading" stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="操作" width="100">
@@ -57,13 +68,15 @@ const loading = ref(false)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
+const filterAction = ref('')
 
 async function fetchLogs() {
   loading.value = true
   try {
     const res = await getSyncLogs({
       page: currentPage.value,
-      per_page: pageSize.value
+      per_page: pageSize.value,
+      action: filterAction.value || undefined,
     })
     if (res.code === 0) {
       logs.value = res.data.items || []
@@ -116,6 +129,10 @@ onMounted(() => {
 <style scoped>
 .sync-logs-container {
   padding: 20px;
+}
+
+.filter-form {
+  margin-bottom: 16px;
 }
 
 .card-header {

@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"ditto-cloud-server/internal/config"
+	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/hub"
+	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
 
 	"github.com/gin-gonic/gin"
@@ -20,8 +22,9 @@ type WSHub interface {
 
 // WSJWTClaims mirrors the claims structure used in auth middleware.
 type WSJWTClaims struct {
-	UserID   uint   `json:"user_id"`
-	DeviceID string `json:"device_id"`
+	UserID       uint   `json:"user_id"`
+	DeviceID     string `json:"device_id"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -104,6 +107,16 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 
 	if claims.UserID == 0 {
 		response.Error(c, http.StatusUnauthorized, 40103, "令牌中缺少用户信息")
+		return
+	}
+
+	var device model.Device
+	if err := database.DB.Where("id = ?", claims.DeviceID).First(&device).Error; err != nil {
+		response.Error(c, http.StatusUnauthorized, 40102, "设备不存在")
+		return
+	}
+	if claims.TokenVersion != device.TokenVersion {
+		response.Error(c, http.StatusUnauthorized, 40102, "令牌已过期，请重新登录")
 		return
 	}
 

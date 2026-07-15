@@ -154,8 +154,15 @@ func setAuthCookies(c *gin.Context, accessToken, refreshToken, deviceID string, 
 	})
 }
 
-// Logout clears auth cookies and returns success.
+// Logout invalidates the device token and clears auth cookies.
 func (h *AuthHandler) Logout(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
+
+	if userID != 0 && deviceID != "" {
+		h.service.Logout(userID, deviceID)
+	}
+
 	secure := h.service.IsCookieSecure()
 
 	// Clear auth cookies by setting them with maxAge=0

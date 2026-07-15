@@ -105,6 +105,8 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
 	{
+		protected.POST("/auth/logout", authHandler.Logout)
+
 		devices := protected.Group("/devices")
 		{
 			devices.GET("", deviceHandler.ListDevices)
@@ -247,6 +249,8 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
 	{
+		protected.POST("/auth/logout", authHandler.Logout)
+
 		devices := protected.Group("/devices")
 		{
 			devices.GET("", deviceHandler.ListDevices)
@@ -394,6 +398,8 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
 	{
+		protected.POST("/auth/logout", authHandler.Logout)
+
 		devices := protected.Group("/devices")
 		{
 			devices.GET("", deviceHandler.ListDevices)

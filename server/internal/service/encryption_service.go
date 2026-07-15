@@ -24,6 +24,10 @@ type SetupEncryptionRequest struct {
 	PasswordHint     string `json:"password_hint"`
 }
 
+type DisableEncryptionRequest struct {
+	VerificationHash string `json:"verification_hash" binding:"required"`
+}
+
 type ChangePasswordRequest struct {
 	OldVerificationHash string `json:"old_verification_hash" binding:"required"`
 	NewSalt             string `json:"new_salt" binding:"required"`
@@ -143,7 +147,7 @@ func (s *EncryptionService) GetKeyMaterial(userID uint) (*KeyMaterialResponse, e
 	}, nil
 }
 
-func (s *EncryptionService) DisableEncryption(userID uint) error {
+func (s *EncryptionService) DisableEncryption(userID uint, req *DisableEncryptionRequest) error {
 	var settings model.EncryptionSettings
 	if err := database.DB.Where("user_id = ?", userID).First(&settings).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -153,6 +157,14 @@ func (s *EncryptionService) DisableEncryption(userID uint) error {
 	}
 	if !settings.Enabled {
 		return ErrEncryptionNotSetup
+	}
+
+	newHash, err := base64.StdEncoding.DecodeString(req.VerificationHash)
+	if err != nil {
+		return errors.New("verification_hash 格式无效")
+	}
+	if subtle.ConstantTimeCompare(newHash, settings.VerificationHash) != 1 {
+		return ErrInvalidVerificationHash
 	}
 
 	settings.Enabled = false

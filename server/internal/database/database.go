@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ditto-cloud-server/internal/model"
+	"ditto-cloud-server/internal/utils"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -66,5 +67,28 @@ func Init(dbPath string) error {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
+	BackfillPinyin()
+
 	return nil
+}
+
+// BackfillPinyin populates the pinyin column for existing clips that have empty pinyin.
+func BackfillPinyin() {
+	var count int64
+	DB.Model(&model.Clip{}).Where("pinyin IS NULL OR pinyin = ''").Count(&count)
+	if count == 0 {
+		return
+	}
+	log.Printf("[Backfill] Backfilling pinyin for %d existing clips...", count)
+
+	const batchSize = 100
+	var clips []model.Clip
+	DB.Model(&model.Clip{}).Where("pinyin IS NULL OR pinyin = ''").FindInBatches(&clips, batchSize, func(tx *gorm.DB, batch int) error {
+		for _, clip := range clips {
+			pinyin := utils.ConvertToPinyin(clip.Description)
+			tx.Model(&clip).Update("pinyin", pinyin)
+		}
+		return nil
+	})
+	log.Printf("[Backfill] Pinyin backfill completed")
 }

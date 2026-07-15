@@ -71,10 +71,20 @@ func (h *EncryptionHandler) GetKeyMaterial(c *gin.Context) {
 func (h *EncryptionHandler) DisableEncryption(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	err := h.service.DisableEncryption(userID)
+	var req service.DisableEncryptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		return
+	}
+
+	err := h.service.DisableEncryption(userID, &req)
 	if err != nil {
 		if err == service.ErrEncryptionNotSetup {
 			response.Error(c, http.StatusNotFound, 40401, err.Error())
+			return
+		}
+		if err == service.ErrInvalidVerificationHash {
+			response.Error(c, http.StatusForbidden, 40301, err.Error())
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, 50000, "禁用加密失败: "+err.Error())

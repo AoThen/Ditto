@@ -19,6 +19,7 @@ export const useUserStore = defineStore('user', () => {
         const parsed = JSON.parse(storedUser)
         username.value = parsed?.username || ''
         role.value = parsed?.role || ''
+        deviceId.value = parsed?.device_id || ''
       } catch {
         // ignore
       }

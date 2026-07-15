@@ -59,9 +59,15 @@ func (s *CleanupService) runCleanup() {
 		log.Printf("[Cleanup] ERROR enforcing user limits: %v", err)
 	}
 
+	// Step 3: Hard-delete records soft-deleted more than 7 days ago
+	deletedHard, err := s.hardDeleteOldSoftDeleted()
+	if err != nil {
+		log.Printf("[Cleanup] ERROR hard-deleting old soft-deleted clips: %v", err)
+	}
+
 	elapsed := time.Since(startTime)
-	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) clips in %v",
-		deletedByAge, deletedByLimit, elapsed.Round(time.Millisecond))
+	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) + %d (hard delete) clips in %v",
+		deletedByAge, deletedByLimit, deletedHard, elapsed.Round(time.Millisecond))
 }
 
 // deleteOldClips removes clips older than MaxClipAge.
@@ -92,7 +98,7 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 		Count  int64
 	}
 	var overLimitUsers []UserClipCount
-	if err := database.DB.Table("clips").
+	if err := database.DB.Model(&model.Clip{}).
 		Select("user_id, COUNT(*) as count").
 		Group("user_id").
 		Having("COUNT(*) > ?", s.cfg.MaxClipsPerUser).
@@ -105,7 +111,7 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 		excessCount := uc.Count - int64(s.cfg.MaxClipsPerUser)
 
 		var clipIDs []string
-		if err := database.DB.Table("clips").
+		if err := database.DB.Model(&model.Clip{}).
 			Select("id").
 			Where("user_id = ?", uc.UserID).
 			Order("updated_at ASC").
@@ -136,5 +142,26 @@ func (s *CleanupService) batchDeleteClips(clipIDs []string) (int, error) {
 	if result.Error != nil {
 		return 0, result.Error
 	}
+	return int(result.RowsAffected), nil
+}
+
+func (s *CleanupService) hardDeleteOldSoftDeleted() (int, error) {
+	if database.DB == nil {
+		return 0, nil
+	}
+
+	threshold := time.Now().Add(-7 * 24 * time.Hour)
+
+	// Hard-delete orphan ClipFormat records first
+	database.DB.Where("clip_id NOT IN (SELECT id FROM clips)").Delete(&model.ClipFormat{})
+
+	// Hard-delete clips soft-deleted longer than 7 days ago
+	result := database.DB.Unscoped().
+		Where("deleted_at IS NOT NULL AND deleted_at < ?", threshold).
+		Delete(&model.Clip{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
 	return int(result.RowsAffected), nil
 }

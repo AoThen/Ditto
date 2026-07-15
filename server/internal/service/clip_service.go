@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -97,61 +98,24 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 		baseQuery = baseQuery.Where("group_id = ?", groupID)
 	}
 
-	// Step 1: Normal LIKE search
-	var likeClips []model.Clip
-	if search != "" {
-		likeQuery := baseQuery.Where("description LIKE ?", "%"+search+"%")
-		likeQuery.Order(orderClause).Find(&likeClips)
-	} else {
-		baseQuery.Order(orderClause).Find(&likeClips)
-	}
+	// Step 1: Determine total count
+	var total int64
+	baseQuery.Count(&total)
 
-	// Step 2: Pinyin search (only when search term is pure ASCII letters)
+	// Step 2: Query with pagination
 	isPinyin := search != "" && utils.IsPinyinQuery(search)
 
-	var allMatched []model.Clip
-	seen := make(map[string]bool)
-
-	if !isPinyin {
-		allMatched = likeClips
-	} else {
-		// Add LIKE matches first
-		for _, clip := range likeClips {
-			if !seen[clip.ID] {
-				allMatched = append(allMatched, clip)
-				seen[clip.ID] = true
-			}
-		}
-		// Add pinyin matches
+	var clips []model.Clip
+	if search == "" {
+		baseQuery.Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
+	} else if isPinyin {
 		lowSearch := strings.ToLower(search)
-		var allClips []model.Clip
-		baseQuery.Find(&allClips)
-		for _, clip := range allClips {
-			if seen[clip.ID] {
-				continue
-			}
-			pinyin := utils.ConvertToPinyin(clip.Description)
-			if strings.Contains(pinyin, lowSearch) {
-				allMatched = append(allMatched, clip)
-				seen[clip.ID] = true
-			}
-		}
-		// Sort merged results
-		sortClips(allMatched, sortBy, sortOrder)
+		baseQuery.Where("pinyin LIKE ?", "%"+lowSearch+"%").Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
+	} else {
+		baseQuery.Where("description LIKE ?", "%"+search+"%").Order(orderClause).Offset((page - 1) * perPage).Limit(perPage).Find(&clips)
 	}
 
-	// Step 3: Paginate
-	total := int64(len(allMatched))
-	start := (page - 1) * perPage
-	if start >= int(total) {
-		return buildClipListResponse(nil, total, page, perPage)
-	}
-	end := start + perPage
-	if end > int(total) {
-		end = int(total)
-	}
-
-	return buildClipListResponse(allMatched[start:end], total, page, perPage)
+	return buildClipListResponse(clips, total, page, perPage)
 }
 
 func sortClips(clips []model.Clip, sortBy, sortOrder string) {
@@ -160,27 +124,23 @@ func sortClips(clips []model.Clip, sortBy, sortOrder string) {
 		sortBy = "updated_at"
 		desc = true
 	}
-	for i := 0; i < len(clips); i++ {
-		for j := i + 1; j < len(clips); j++ {
-			var less bool
-			switch sortBy {
-			case "created_at":
-				less = clips[i].CreatedAt.Before(clips[j].CreatedAt)
-			case "paste_count":
-				less = clips[i].PasteCount < clips[j].PasteCount
-			case "description":
-				less = clips[i].Description < clips[j].Description
-			default:
-				less = clips[i].UpdatedAt.Before(clips[j].UpdatedAt)
-			}
-			if desc {
-				less = !less
-			}
-			if less {
-				clips[i], clips[j] = clips[j], clips[i]
-			}
+	sort.SliceStable(clips, func(i, j int) bool {
+		var less bool
+		switch sortBy {
+		case "created_at":
+			less = clips[i].CreatedAt.Before(clips[j].CreatedAt)
+		case "paste_count":
+			less = clips[i].PasteCount < clips[j].PasteCount
+		case "description":
+			less = clips[i].Description < clips[j].Description
+		default:
+			less = clips[i].UpdatedAt.Before(clips[j].UpdatedAt)
 		}
-	}
+		if desc {
+			return !less
+		}
+		return less
+	})
 }
 
 func buildClipListResponse(clips []model.Clip, total int64, page, perPage int) (*response.PaginatedResponse, error) {
@@ -475,6 +435,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						UserID:      userID,
 						DeviceID:    req.DeviceID,
 						Description: pc.Description,
+						Pinyin:      utils.ConvertToPinyin(pc.Description),
 						CRC:         pc.CRC,
 						GroupID:     pc.GroupID,
 						ShortCut:    pc.ShortCut,
@@ -517,6 +478,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						// Incoming clip is newer: update
 						if err := tx.Model(&existing).Updates(map[string]interface{}{
 							"description": pc.Description,
+							"pinyin":      utils.ConvertToPinyin(pc.Description),
 							"crc":         pc.CRC,
 							"group_id":    pc.GroupID,
 							"short_cut":   pc.ShortCut,
@@ -554,20 +516,21 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 						// Only create conflict copy if the incoming clip has different content
 						if existing.CRC != pc.CRC {
-							conflictClip := model.Clip{
-								ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
-								UserID:         userID,
-								DeviceID:       req.DeviceID,
-								Description:    pc.Description,
-								CRC:            pc.CRC,
-								CreatedAt:      pc.UpdatedAt,
-								UpdatedAt:      pc.UpdatedAt,
-								GroupID:        pc.GroupID,
-								ShortCut:       pc.ShortCut,
-								PasteCount:     0,
-								IsConflictCopy: true, // Mark as conflict copy
-								WinClipID:      existing.ID, // Reference to the winning clip
-							}
+						conflictClip := model.Clip{
+							ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
+							UserID:         userID,
+							DeviceID:       req.DeviceID,
+							Description:    pc.Description,
+							Pinyin:         utils.ConvertToPinyin(pc.Description),
+							CRC:            pc.CRC,
+							CreatedAt:      pc.UpdatedAt,
+							UpdatedAt:      pc.UpdatedAt,
+							GroupID:        pc.GroupID,
+							ShortCut:       pc.ShortCut,
+							PasteCount:     0,
+							IsConflictCopy: true,
+							WinClipID:      existing.ID,
+						}
 							if err := tx.Create(&conflictClip).Error; err != nil {
 								// Log but don't fail the sync
 								log.Printf("[Sync] Failed to create conflict copy for clip %s: %v", pc.ID, err)
@@ -825,6 +788,7 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 			// Replace winning clip's content with conflict clip's content
 			if err := database.DB.Model(&winningClip).Updates(map[string]interface{}{
 				"description": conflictClip.Description,
+				"pinyin":      utils.ConvertToPinyin(conflictClip.Description),
 				"updated_at":  conflictClip.UpdatedAt,
 			}).Error; err != nil {
 				return err

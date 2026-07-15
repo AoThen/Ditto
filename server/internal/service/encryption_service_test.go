@@ -227,7 +227,7 @@ func TestEncryptionService_Disable_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = svc.DisableEncryption(userID)
+	err = svc.DisableEncryption(userID, &DisableEncryptionRequest{VerificationHash: vhash})
 	assert.NoError(t, err)
 
 	resp, err := svc.GetEncryptionSalt(userID)
@@ -239,7 +239,7 @@ func TestEncryptionService_Disable_NotSetup(t *testing.T) {
 	svc, userID, cleanup := setupEncryptionServiceTest(t)
 	defer cleanup()
 
-	err := svc.DisableEncryption(userID)
+	err := svc.DisableEncryption(userID, &DisableEncryptionRequest{VerificationHash: "dGVzdA=="})
 	assert.Equal(t, ErrEncryptionNotSetup, err)
 }
 
