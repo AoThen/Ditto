@@ -5,6 +5,7 @@ on:
 
 permissions:
   actions: write
+  contents: write
 
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
