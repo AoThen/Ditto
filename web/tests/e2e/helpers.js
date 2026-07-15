@@ -14,7 +14,7 @@ export async function loginAsNewUser(page) {
     username = `test_user_${Date.now()}`
     password = 'testpass123'
 
-    const regResp = await page.request.post('http://localhost:8080/api/v1/auth/register', {
+    const regResp = await page.request.post('/api/v1/auth/register', {
       data: {
         username,
         email: `${username}@test.com`,
@@ -31,7 +31,7 @@ export async function loginAsNewUser(page) {
   await page.getByRole('button', { name: '登录' }).click()
   await page.waitForURL(/\/dashboard/)
 
-  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices')
+  const devicesResp = await page.request.get('/api/v1/devices')
   const devices = await devicesResp.json()
   const deviceId = devices.data?.[0]?.id
 

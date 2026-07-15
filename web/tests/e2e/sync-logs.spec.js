@@ -5,7 +5,7 @@ test.describe('Sync Logs & Stats', () => {
   test('should get sync logs after sync operation', async ({ page }) => {
     const { deviceId } = await loginAsNewUser(page)
 
-    const syncResp = await page.request.post('http://localhost:8080/api/v1/clips/sync', {
+    const syncResp = await page.request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -21,7 +21,7 @@ test.describe('Sync Logs & Stats', () => {
     })
     expect(syncResp.status()).toBe(200)
 
-    const logsResp = await page.request.get('http://localhost:8080/api/v1/stats/sync-logs')
+    const logsResp = await page.request.get('/api/v1/stats/sync-logs')
     expect(logsResp.status()).toBe(200)
     const logsData = await logsResp.json()
     expect(logsData.code).toBe(0)
@@ -36,7 +36,7 @@ test.describe('Sync Logs & Stats', () => {
   test('should get stats overview', async ({ page }) => {
     await loginAsNewUser(page)
 
-    const statsResp = await page.request.get('http://localhost:8080/api/v1/stats/overview')
+    const statsResp = await page.request.get('/api/v1/stats/overview')
     expect(statsResp.status()).toBe(200)
     const statsData = await statsResp.json()
     expect(statsData.code).toBe(0)
@@ -48,7 +48,7 @@ test.describe('Sync Logs & Stats', () => {
   test('should filter sync logs by device_id', async ({ page }) => {
     const { deviceId } = await loginAsNewUser(page)
 
-    await page.request.post('http://localhost:8080/api/v1/clips/sync', {
+    await page.request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -64,7 +64,7 @@ test.describe('Sync Logs & Stats', () => {
     })
 
     const filteredResp = await page.request.get(
-      `http://localhost:8080/api/v1/stats/sync-logs?device_id=${deviceId}`
+      `/api/v1/stats/sync-logs?device_id=${deviceId}`
     )
     const filteredData = await filteredResp.json()
     expect(filteredData.data.total).toBeGreaterThanOrEqual(1)
@@ -77,7 +77,7 @@ test.describe('Sync Logs & Stats', () => {
   test('should show sync logs in UI (StatsDashboard)', async ({ page }) => {
     const { deviceId } = await loginAsNewUser(page)
 
-    await page.request.post('http://localhost:8080/api/v1/clips/sync', {
+    await page.request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,

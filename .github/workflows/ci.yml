@@ -217,6 +217,8 @@ jobs:
         run: cd web && npx playwright test
         env:
           CI: 'true'
+          # Enable CORS so cross-origin requests from the web dev server are allowed
+          ALLOWED_ORIGINS: http://localhost:5173
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

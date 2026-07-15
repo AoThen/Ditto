@@ -29,7 +29,7 @@ test.describe('Group Management', () => {
   test('should create and delete a group via API', async ({ page, request }) => {
     await loginAsNewUser(page)
 
-    const createResp = await page.request.post('http://localhost:8080/api/v1/groups', {
+    const createResp = await page.request.post('/api/v1/groups', {
       data: {
         name: 'API Test Group',
         description: 'Created via API',
@@ -42,15 +42,15 @@ test.describe('Group Management', () => {
     expect(createData.code).toBe(0)
     const groupId = createData.data.id
 
-    const listResp = await page.request.get('http://localhost:8080/api/v1/groups')
+    const listResp = await page.request.get('/api/v1/groups')
     const listData = await listResp.json()
     const found = listData.data?.some(g => g.id === groupId)
     expect(found).toBe(true)
 
-    const deleteResp = await page.request.delete(`http://localhost:8080/api/v1/groups/${groupId}`)
+    const deleteResp = await page.request.delete(`/api/v1/groups/${groupId}`)
     expect(deleteResp.status()).toBe(200)
 
-    const afterResp = await page.request.get('http://localhost:8080/api/v1/groups')
+    const afterResp = await page.request.get('/api/v1/groups')
     const afterData = await afterResp.json()
     const stillFound = afterData.data?.some(g => g.id === groupId)
     expect(stillFound).toBe(false)
@@ -59,7 +59,7 @@ test.describe('Group Management', () => {
   test('should create parent and child groups', async ({ page }) => {
     await loginAsNewUser(page)
 
-    const parentResp = await page.request.post('http://localhost:8080/api/v1/groups', {
+    const parentResp = await page.request.post('/api/v1/groups', {
       data: {
         name: 'Parent Group',
         description: 'Parent',
@@ -71,7 +71,7 @@ test.describe('Group Management', () => {
     const parentData = await parentResp.json()
     const parentId = parentData.data.id
 
-    const childResp = await page.request.post('http://localhost:8080/api/v1/groups', {
+    const childResp = await page.request.post('/api/v1/groups', {
       data: {
         name: 'Child Group',
         description: 'Child',
@@ -87,12 +87,12 @@ test.describe('Group Management', () => {
   test('should move clips to group via API', async ({ page }) => {
     await loginAsNewUser(page)
 
-    const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices')
+    const devicesResp = await page.request.get('/api/v1/devices')
     const devices = await devicesResp.json()
     const deviceId = devices.data?.[0]?.id
 
     const clipId = `clip-group-${Date.now()}`
-    await page.request.post('http://localhost:8080/api/v1/clips/sync', {
+    await page.request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -107,7 +107,7 @@ test.describe('Group Management', () => {
       }
     })
 
-    const groupResp = await page.request.post('http://localhost:8080/api/v1/groups', {
+    const groupResp = await page.request.post('/api/v1/groups', {
       data: {
         name: 'Move Target',
         description: 'Target for clip move',
@@ -118,12 +118,12 @@ test.describe('Group Management', () => {
     const groupData = await groupResp.json()
     const groupId = groupData.data.id
 
-    const moveResp = await page.request.post(`http://localhost:8080/api/v1/groups/${groupId}/move-clips`, {
+    const moveResp = await page.request.post(`/api/v1/groups/${groupId}/move-clips`, {
       data: { clip_ids: [clipId] }
     })
     expect(moveResp.status()).toBe(200)
 
-    const clipResp = await page.request.get(`http://localhost:8080/api/v1/clips/${clipId}`)
+    const clipResp = await page.request.get(`/api/v1/clips/${clipId}`)
     const clipData = await clipResp.json()
     expect(clipData.data.group_id).toBe(groupId)
   })
