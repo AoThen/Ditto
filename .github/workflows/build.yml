@@ -3,16 +3,15 @@ name: MSBuild
 on:
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: write
-
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
 
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      actions: write
+      contents: write
 
     steps:
       - name: Clean up old workflow runs
