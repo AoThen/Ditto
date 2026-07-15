@@ -1,5 +1,7 @@
 #pragma once
 
+#define HITTEST_RET LRESULT
+
 // stdafx.h : minimal precompiled header for CloudSync tests
 // Includes only what CloudCrypto and CloudKeyExport tests need
 
