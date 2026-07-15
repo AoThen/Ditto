@@ -206,6 +206,7 @@ func main() {
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
 			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)
+			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
 		groups := protected.Group("/groups")

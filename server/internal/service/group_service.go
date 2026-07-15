@@ -212,6 +212,31 @@ func (s *GroupService) CreateGroup(userID uint, req *CreateGroupRequest) (*Group
 		}
 	}
 
+	// Dedup: if a group with same name under same parent exists, return it
+	var existing model.Group
+	parentCheck := ""
+	if req.ParentID != nil && *req.ParentID != "" {
+		parentCheck = *req.ParentID
+	}
+	err := database.DB.Where("user_id = ? AND name = ? AND (parent_id = ? OR (parent_id IS NULL AND ? = ''))",
+		userID, req.Name, parentCheck, parentCheck).First(&existing).Error
+	if err == nil {
+		parentID := ""
+		if existing.ParentID != nil {
+			parentID = *existing.ParentID
+		}
+		return &GroupListItem{
+			ID:          existing.ID,
+			Name:        existing.Name,
+			Description: existing.Description,
+			ParentID:    parentID,
+			ClipOrder:   existing.ClipOrder,
+			CreatedAt:   existing.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:   existing.UpdatedAt.UTC().Format(time.RFC3339),
+			ClipCount:   0,
+		}, nil
+	}
+
 	id := fmt.Sprintf("grp-%s", uuid.New().String()[:8])
 
 	group := model.Group{

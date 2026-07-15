@@ -143,6 +143,7 @@ BEGIN_MESSAGE_MAP(CQPasteWnd, CWndEx)
 	ON_COMMAND(ID_MENU_VIEWGROUPS, OnMenuViewgroups)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_SETTONEVERAUTODELETE, OnMenuQuickpropertiesSettoneverautodelete)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_AUTODELETE, OnMenuQuickpropertiesAutodelete)
+	ON_COMMAND(ID_MENU_DONTSYNC_CLIP, OnToggleDontSync)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_REMOVEHOTKEY, OnMenuQuickpropertiesRemovehotkey)
 	ON_COMMAND(ID_MENU_SENTTO_FRIEND_EIGHT, OnMenuSenttoFriendEight)
 	ON_COMMAND(ID_MENU_SENTTO_FRIEND_ELEVEN, OnMenuSenttoFriendEleven)
@@ -178,6 +179,7 @@ BEGIN_MESSAGE_MAP(CQPasteWnd, CWndEx)
 	ON_UPDATE_COMMAND_UI(ID_MENU_VIEWGROUPS, OnUpdateMenuViewgroups)
 	ON_UPDATE_COMMAND_UI(ID_MENU_PASTEPLAINTEXTONLY, OnUpdateMenuPasteplaintextonly)
 	ON_UPDATE_COMMAND_UI(ID_MENU_DELETE, OnUpdateMenuDelete)
+	ON_UPDATE_COMMAND_UI(ID_MENU_DONTSYNC_CLIP, OnUpdateDontSync)
 	ON_UPDATE_COMMAND_UI(ID_MENU_PROPERTIES, OnUpdateMenuProperties)
 	ON_UPDATE_COMMAND_UI(ID_SPECIALPASTE_POSIXIFY_PATHS, &CQPasteWnd::OnUpdateSpecialPosixifyPaths)
 	ON_COMMAND(ID_QUICKOPTIONS_PROMPTTODELETECLIP, OnPromptToDeleteClip)
@@ -2492,6 +2494,53 @@ void CQPasteWnd::OnMenuQuickpropertiesAutodelete()
 	m_lstHeader.RefreshVisibleRows();
 }
 
+void CQPasteWnd::OnToggleDontSync()
+{
+	CWaitCursor wait;
+	ARRAY IDs;
+	ARRAY Indexs;
+	m_lstHeader.GetSelectionItemData(IDs);
+	m_lstHeader.GetSelectionIndexes(Indexs);
+
+	if (IDs.GetSize() <= 0)
+		return;
+
+	bool isDontSync = false;
+	try
+	{
+		CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), IDs[0]);
+		if (!q.eof())
+			isDontSync = q.getIntField(_T("lDontSync")) > 0;
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	int newVal = isDontSync ? 0 : 1;
+
+	try
+	{
+		CString idsStr;
+		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
+		{
+			CString idStr;
+			idStr.Format(_T("%d"), IDs[i]);
+			if (i > 0) idsStr += _T(",");
+			idsStr += idStr;
+		}
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET lDontSync = %d WHERE lID IN (%s)"), newVal, idsStr);
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	if (newVal == 1)
+	{
+		std::vector<int> localIds;
+		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
+			localIds.push_back(IDs[i]);
+		theApp.m_CloudSyncManager.MarkClipsDontSync(localIds);
+	}
+
+	theApp.RefreshView();
+}
+
 void CQPasteWnd::OnMenuQuickpropertiesRemovehotkey()
 {
 	CWaitCursor wait;
@@ -4362,6 +4411,8 @@ bool CQPasteWnd::DoActionMoveClipToGroup()
 				IDs.MoveTo(nGroup);
 			}
 			FillList();
+
+			theApp.m_CloudSyncManager.TriggerQuickSync();
 		}
 
 		m_bHideWnd = true;
@@ -6467,6 +6518,33 @@ void CQPasteWnd::OnUpdateMenuDelete(CCmdUI* pCmdUI)
 	}
 
 	UpdateMenuShortCut(pCmdUI, ActionEnums::DELETE_SELECTED);
+}
+
+void CQPasteWnd::OnUpdateDontSync(CCmdUI* pCmdUI)
+{
+	if (!pCmdUI->m_pMenu)
+	{
+		return;
+	}
+
+	ARRAY IDs;
+	m_lstHeader.GetSelectionItemData(IDs);
+	if (IDs.GetSize() > 0)
+	{
+		try
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), IDs[0]);
+			if (!q.eof() && q.getIntField(_T("lDontSync")) > 0)
+			{
+				pCmdUI->SetCheck(1);
+			}
+			else
+			{
+				pCmdUI->SetCheck(0);
+			}
+		}
+		CATCH_SQLITE_EXCEPTION
+	}
 }
 
 void CQPasteWnd::OnUpdateMenuProperties(CCmdUI* pCmdUI)

@@ -276,3 +276,31 @@ func (h *ClipHandler) BatchDeleteClips(c *gin.Context) {
 
 	response.SuccessWithMessage(c, fmt.Sprintf("成功删除 %d 个剪贴板", deleted), gin.H{"deleted": deleted})
 }
+
+// BatchMarkDontSync handles POST /api/v1/clips/batch-dont-sync
+func (h *ClipHandler) BatchMarkDontSync(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req struct {
+		IDs []string `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[BatchMarkDontSync] invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		response.Error(c, http.StatusBadRequest, 40000, "请至少选择一条记录")
+		return
+	}
+
+	marked, err := h.service.BatchMarkDontSync(userID, req.IDs)
+	if err != nil {
+		log.Printf("[BatchMarkDontSync] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "操作失败")
+		return
+	}
+
+	response.SuccessWithMessage(c, fmt.Sprintf("成功标记 %d 个剪贴板", marked), gin.H{"marked": marked})
+}

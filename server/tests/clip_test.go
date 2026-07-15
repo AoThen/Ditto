@@ -275,3 +275,57 @@ func parseClipList(t *testing.T, respBody []byte) (code int, items []map[string]
 
 	return code, items, total
 }
+
+// TestBatchMarkDontSync_Success — mark clip as dont-sync, verify formats cleared and dont_sync=true
+func TestBatchMarkDontSync_Success(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	clipID := fmt.Sprintf("clip-dontsync-%d", time.Now().UnixNano())
+	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "To be unsynced", "Secret content")
+
+	// Verify clip has formats
+	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/clips/"+clipID, user.Token)
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data := testutil.ParseResponse(t, respBody)
+	require.Equal(t, 0, code)
+	formats, ok := data["formats"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, formats, 1, "clip should have 1 format before dont-sync")
+
+	// Mark as dont-sync
+	statusCode, respBody = testutil.AuthPost(t, server, "/api/v1/clips/batch-dont-sync", user.Token,
+		map[string]interface{}{"ids": []string{clipID}})
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data = testutil.ParseResponse(t, respBody)
+	require.Equal(t, 0, code)
+	marked, ok := data["marked"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), marked)
+
+	// Verify formats are cleared
+	statusCode, respBody = testutil.AuthGet(t, server, "/api/v1/clips/"+clipID, user.Token)
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data = testutil.ParseResponse(t, respBody)
+	require.Equal(t, 0, code)
+
+	formats, ok = data["formats"].([]interface{})
+	require.True(t, ok)
+	assert.Empty(t, formats, "formats should be cleared after dont-sync")
+
+	// Verify clip still exists (not deleted) by checking it appears in list
+	statusCode, respBody = testutil.AuthGet(t, server, "/api/v1/clips", user.Token)
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data = testutil.ParseResponse(t, respBody)
+	require.Equal(t, 0, code)
+	items, ok := data["items"].([]interface{})
+	require.True(t, ok)
+	found := false
+	for _, item := range items {
+		if m, ok := item.(map[string]interface{}); ok && m["id"] == clipID {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "clip should still exist in list after dont-sync")
+}

@@ -34,6 +34,9 @@ type Clip struct {
 	PasteCount     int       `gorm:"default:0" json:"paste_count"`
 	IsConflictCopy bool      `gorm:"index:idx_clips_user_conflict;default:false" json:"is_conflict_copy"` // LWW losing clip kept for review
 	WinClipID      string    `gorm:"size:255" json:"win_clip_id"` // ID of the winning clip this conflict copy belongs to
+	DontSync       bool      `gorm:"default:false" json:"dont_sync"`
+	ClipOrder      float64   `gorm:"default:0" json:"clip_order"`
+	ClipGroupOrder float64   `gorm:"default:0" json:"clip_group_order"`
 
 	Formats []ClipFormat `gorm:"foreignKey:ClipID;references:ID" json:"-"`
 

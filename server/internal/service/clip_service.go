@@ -64,17 +64,19 @@ type ClipListItem struct {
 
 // ClipDetail represents a full clip with format data (base64-encoded)
 type ClipDetail struct {
-	ID          string           `json:"id"`
-	Description string           `json:"description"`
-	CRC         int64            `json:"crc"`
-	CreatedAt   string           `json:"created_at"`
-	UpdatedAt   string           `json:"updated_at"`
-	GroupID     string           `json:"group_id"`
-	GroupName   string           `json:"group_name"`
-	DeviceName  string           `json:"device_name"`
-	ShortCut    int              `json:"short_cut"`
-	PasteCount  int              `json:"paste_count"`
-	Formats     []ClipFormatFull `json:"formats"`
+	ID             string           `json:"id"`
+	Description    string           `json:"description"`
+	CRC            int64            `json:"crc"`
+	CreatedAt      string           `json:"created_at"`
+	UpdatedAt      string           `json:"updated_at"`
+	GroupID        string           `json:"group_id"`
+	GroupName      string           `json:"group_name"`
+	DeviceName     string           `json:"device_name"`
+	ShortCut       int              `json:"short_cut"`
+	PasteCount     int              `json:"paste_count"`
+	ClipOrder      float64          `json:"clip_order"`
+	ClipGroupOrder float64          `json:"clip_group_order"`
+	Formats        []ClipFormatFull `json:"formats"`
 }
 
 // ClipFormatFull represents format with base64-encoded data
@@ -342,6 +344,35 @@ func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 	})
 }
 
+// BatchMarkDontSync marks clips as dont-sync, clears their formats
+func (s *ClipService) BatchMarkDontSync(userID uint, clipIDs []string) (int64, error) {
+	var marked int64
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// Verify ownership
+		var count int64
+		if err := tx.Model(&model.Clip{}).Where("id IN ? AND user_id = ?", clipIDs, userID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return errors.New("no clips found for user")
+		}
+
+		// Delete formats for these clips (clear content)
+		if err := tx.Where("clip_id IN (SELECT id FROM clips WHERE id IN ? AND user_id = ?)", clipIDs, userID).Delete(&model.ClipFormat{}).Error; err != nil {
+			return err
+		}
+
+		// Set dont_sync=true
+		result := tx.Model(&model.Clip{}).Where("id IN ? AND user_id = ?", clipIDs, userID).Update("dont_sync", true)
+		if result.Error != nil {
+			return result.Error
+		}
+		marked = result.RowsAffected
+		return nil
+	})
+	return marked, err
+}
+
 // BatchDeleteClips removes multiple clips and their formats for a user
 func (s *ClipService) BatchDeleteClips(userID uint, clipIDs []string) (int64, error) {
 	var deleted int64
@@ -376,13 +407,15 @@ const (
 
 // PushClipItem represents a clip being pushed from client
 type PushClipItem struct {
-	ID          string           `json:"id"`
-	Description string           `json:"description"`
-	CRC         int64            `json:"crc"`
-	GroupID     string           `json:"group_id"`
-	ShortCut    int              `json:"short_cut"`
-	UpdatedAt   time.Time        `json:"updated_at"` // For LWW conflict resolution
-	Formats     []PushFormatItem `json:"formats"`
+	ID             string           `json:"id"`
+	Description    string           `json:"description"`
+	CRC            int64            `json:"crc"`
+	GroupID        string           `json:"group_id"`
+	ShortCut       int              `json:"short_cut"`
+	UpdatedAt      time.Time        `json:"updated_at"` // For LWW conflict resolution
+	ClipOrder      float64          `json:"clip_order"`
+	ClipGroupOrder float64          `json:"clip_group_order"`
+	Formats        []PushFormatItem `json:"formats"`
 }
 
 // PushFormatItem represents a format being pushed from client
@@ -400,6 +433,7 @@ type SyncResponse struct {
 	SkippedCount int          `json:"skipped_count"` // LWW: clips skipped due to conflict
 	SyncTime     string       `json:"sync_time"`
 	HasMore      bool         `json:"has_more"` // P9 FIX: true if more clips exist beyond this batch
+	DontSyncIDs  []string     `json:"dont_sync_ids"`
 }
 
 // Sync performs incremental sync for a user with LWW conflict resolution
@@ -509,17 +543,19 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							clipUpdatedAt = pc.UpdatedAt
 						}
 						clip := model.Clip{
-							ID:          pc.ID,
-							UserID:      userID,
-							DeviceID:    req.DeviceID,
-							Description: pc.Description,
-							Pinyin:      utils.ConvertToPinyin(pc.Description),
-							CRC:         pc.CRC,
-							GroupID:     pc.GroupID,
-							ShortCut:    pc.ShortCut,
-							CreatedAt:   clipUpdatedAt,
-							UpdatedAt:   clipUpdatedAt,
-							PasteCount:  0,
+							ID:             pc.ID,
+							UserID:         userID,
+							DeviceID:       req.DeviceID,
+							Description:    pc.Description,
+							Pinyin:         utils.ConvertToPinyin(pc.Description),
+							CRC:            pc.CRC,
+							GroupID:        pc.GroupID,
+							ShortCut:       pc.ShortCut,
+							ClipOrder:      pc.ClipOrder,
+							ClipGroupOrder: pc.ClipGroupOrder,
+							CreatedAt:      clipUpdatedAt,
+							UpdatedAt:      clipUpdatedAt,
+							PasteCount:     0,
 						}
 						if err := tx.Create(&clip).Error; err != nil {
 							return err
@@ -546,12 +582,14 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						if incomingUpdatedAt.After(existing.UpdatedAt) {
 							// Incoming clip is newer: update
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
-								"description": pc.Description,
-								"pinyin":      utils.ConvertToPinyin(pc.Description),
-								"crc":         pc.CRC,
-								"group_id":    pc.GroupID,
-								"short_cut":   pc.ShortCut,
-								"updated_at":  incomingUpdatedAt,
+								"description":      pc.Description,
+								"pinyin":           utils.ConvertToPinyin(pc.Description),
+								"crc":              pc.CRC,
+								"group_id":         pc.GroupID,
+								"short_cut":        pc.ShortCut,
+								"clip_order":       pc.ClipOrder,
+								"clip_group_order": pc.ClipGroupOrder,
+								"updated_at":       incomingUpdatedAt,
 							}).Error; err != nil {
 								return err
 							}
@@ -588,6 +626,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 									UpdatedAt:      pc.UpdatedAt,
 									GroupID:        pc.GroupID,
 									ShortCut:       pc.ShortCut,
+									ClipOrder:      pc.ClipOrder,
+									ClipGroupOrder: pc.ClipGroupOrder,
 									PasteCount:     0,
 									IsConflictCopy: true,
 									WinClipID:      existing.ID,
@@ -692,15 +732,17 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		}
 
 		newClips = append(newClips, ClipDetail{
-			ID:          clip.ID,
-			Description: clip.Description,
-			CRC:         clip.CRC,
-			CreatedAt:   clip.CreatedAt.UTC().Format(time.RFC3339),
-			UpdatedAt:   clip.UpdatedAt.UTC().Format(time.RFC3339),
-			GroupID:     clip.GroupID,
-			ShortCut:    clip.ShortCut,
-			PasteCount:  clip.PasteCount,
-			Formats:     formatFulls,
+			ID:             clip.ID,
+			Description:    clip.Description,
+			CRC:            clip.CRC,
+			CreatedAt:      clip.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:      clip.UpdatedAt.UTC().Format(time.RFC3339),
+			GroupID:        clip.GroupID,
+			ShortCut:       clip.ShortCut,
+			PasteCount:     clip.PasteCount,
+			ClipOrder:      clip.ClipOrder,
+			ClipGroupOrder: clip.ClipGroupOrder,
+			Formats:        formatFulls,
 		})
 	}
 
@@ -720,9 +762,22 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		log.Printf("[Sync] Found %d deleted clips to sync", len(deletedIDs))
 	}
 
+	// Query clips marked dont-sync since 'since' timestamp
+	var dontSyncClips []model.Clip
+	if err := database.DB.Unscoped().Where("user_id = ? AND dont_sync = ? AND updated_at > ? AND device_id != ?",
+		userID, true, req.Since, req.DeviceID).Find(&dontSyncClips).Error; err != nil {
+		log.Printf("[Sync] Error querying dont-sync clips: %v", err)
+	}
+
+	dontSyncIDs := make([]string, 0, len(dontSyncClips))
+	for _, clip := range dontSyncClips {
+		dontSyncIDs = append(dontSyncIDs, clip.ID)
+	}
+
 	return &SyncResponse{
 		NewClips:     newClips,
 		DeletedIDs:   deletedIDs,
+		DontSyncIDs:  dontSyncIDs,
 		UpdatedCount: pushedCount,
 		SkippedCount: skippedCount,
 		SyncTime:     syncTime.UTC().Format(time.RFC3339),

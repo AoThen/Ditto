@@ -124,6 +124,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
 		groups := protected.Group("/groups")
@@ -268,6 +269,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
 		groups := protected.Group("/groups")
@@ -417,6 +419,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
 		groups := protected.Group("/groups")

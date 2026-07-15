@@ -41,9 +41,11 @@ BEGIN_MESSAGE_MAP(CGroupTree, CTreeCtrl)
 	//}}AFX_MSG_MAP
 	ON_COMMAND(ID_MENU_NEWGROUP32896, &CGroupTree::OnMenuNewgroup32896)
 	ON_COMMAND(ID_MENU_DELETEGROUP, &CGroupTree::OnMenuDeletegroup)
+	ON_COMMAND(ID_MENU_DONTSYNC_CLIP, &CGroupTree::OnMenuDontsync)
 	ON_COMMAND(ID_MENU_PROPERTIES32898, &CGroupTree::OnMenuProperties32898)
 	ON_UPDATE_COMMAND_UI(ID_MENU_NEWGROUP32896, &CGroupTree::OnUpdateMenuNewgroup32896)
 	ON_UPDATE_COMMAND_UI(ID_MENU_DELETEGROUP, &CGroupTree::OnUpdateMenuDeletegroup)
+	ON_UPDATE_COMMAND_UI(ID_MENU_DONTSYNC_CLIP, &CGroupTree::OnUpdateMenuDontsync)
 	ON_UPDATE_COMMAND_UI(ID_MENU_PROPERTIES32898, &CGroupTree::OnUpdateMenuProperties32898)
 	ON_WM_INITMENUPOPUP() 
 END_MESSAGE_MAP()
@@ -171,6 +173,54 @@ bool CGroupTree::DoActionClipProperties()
 		}
 	}
 	return false;
+}
+
+bool CGroupTree::DoActionToggleDontSync()
+{
+	HTREEITEM hItem = GetSelectedItem();
+	if (!hItem) return false;
+
+	int groupId = (int)GetItemData(hItem);
+	if (groupId <= 0) return false;
+
+	bool isDontSync = false;
+	try
+	{
+		CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), groupId);
+		if (!q.eof())
+			isDontSync = q.getIntField(_T("lDontSync")) > 0;
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	if (!isDontSync)
+	{
+		CString msg;
+		msg.Format(_T("将同时标记该组下所有子分组和内容为不同步，确定？"));
+		if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
+			return false;
+
+		try
+		{
+			theApp.m_db.execDMLEx(_T("WITH RECURSIVE descendants AS (")
+				_T("SELECT lID, bIsGroup FROM Main WHERE lParentID = %d ")
+				_T("UNION ALL ")
+				_T("SELECT m.lID, m.bIsGroup FROM Main m JOIN descendants d ON m.lParentID = d.lID) ")
+				_T("UPDATE Main SET lDontSync = 1 WHERE lID IN (SELECT lID FROM descendants) OR lID = %d"),
+				groupId, groupId);
+		}
+		CATCH_SQLITE_EXCEPTION
+	}
+	else
+	{
+		try
+		{
+			theApp.m_db.execDMLEx(_T("UPDATE Main SET lDontSync = 0 WHERE lID = %d"), groupId);
+		}
+		CATCH_SQLITE_EXCEPTION
+	}
+
+	theApp.RefreshView();
+	return true;
 }
 
 void CGroupTree::FillTree()
@@ -387,6 +437,11 @@ void CGroupTree::OnMenuDeletegroup()
 	DoAction(ActionEnums::DELETE_SELECTED);
 }
 
+void CGroupTree::OnMenuDontsync()
+{
+	DoActionToggleDontSync();
+}
+
 void CGroupTree::OnMenuProperties32898()
 {
 	DoAction(ActionEnums::CLIP_PROPERTIES);
@@ -400,6 +455,32 @@ void CGroupTree::OnUpdateMenuNewgroup32896(CCmdUI *pCmdUI)
 void CGroupTree::OnUpdateMenuDeletegroup(CCmdUI *pCmdUI)
 {
 	UpdateMenuShortCut(pCmdUI, ActionEnums::DELETE_SELECTED);	
+}
+
+void CGroupTree::OnUpdateMenuDontsync(CCmdUI *pCmdUI)
+{
+	if (!pCmdUI->m_pMenu)
+		return;
+
+	HTREEITEM hItem = GetSelectedItem();
+	if (hItem)
+	{
+		int id = (int)GetItemData(hItem);
+		if (id > 0)
+		{
+			try
+			{
+				CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), id);
+				if (!q.eof() && q.getIntField(_T("lDontSync")) > 0)
+				{
+					pCmdUI->SetCheck(1);
+					return;
+				}
+			}
+			CATCH_SQLITE_EXCEPTION
+		}
+	}
+	pCmdUI->SetCheck(0);
 }
 
 void CGroupTree::OnUpdateMenuProperties32898(CCmdUI *pCmdUI)

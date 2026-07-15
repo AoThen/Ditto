@@ -530,6 +530,7 @@ BEGIN
         BEGIN
             MENUITEM "Never Auto Delete",           32820
             MENUITEM "Auto Delete",                 32821
+            MENUITEM "Dont Sync",                   ID_MENU_DONTSYNC_CLIP
             MENUITEM "Remove Hot Key",              32822
             MENUITEM "Remove Quick Paste",          32856
         END
@@ -606,6 +607,7 @@ BEGIN
     BEGIN
         MENUITEM "New Sub Group",               ID_MENU_NEWGROUP32896
         MENUITEM "Delete Group",                ID_MENU_DELETEGROUP
+        MENUITEM "Dont Sync",                   ID_MENU_DONTSYNC_CLIP
         MENUITEM "Properties",                  ID_MENU_PROPERTIES32898
     END
 END

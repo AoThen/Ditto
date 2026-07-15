@@ -214,6 +214,8 @@ BOOL OpenDatabase(CString dbPath)
 		theApp.m_db.close();
 		theApp.m_db.open(dbPath);
 
+		MigrateDatabaseSchema();
+
 		theApp.m_db.setBusyTimeout(CGetSetOptions::GetDbTimeout());
 		theApp.m_db.SetRegexCaseInsensitive(CGetSetOptions::GetRegexCaseInsensitive());
 
@@ -719,6 +721,8 @@ BOOL CreateDB(CString csFile)
 			_T("mText TEXT, ")
 			_T("lShortCut INTEGER, ")
 			_T("lDontAutoDelete INTEGER, ")
+			_T("lDontSync INTEGER, ")
+			_T("m_Description TEXT, ")
 			_T("CRC INTEGER, ")
 			_T("bIsGroup INTEGER, ")
 			_T("lParentID INTEGER, ")
@@ -1136,6 +1140,34 @@ BOOL EnsureDirectory(CString csPath)
 // 
 // 	return bRet;
 // }
+
+BOOL MigrateDatabaseSchema()
+{
+	try
+	{
+		CppSQLite3Query q = theApp.m_db.execQuery(_T("PRAGMA table_info(Main)"));
+		bool hasDontSync = false;
+		bool hasDescription = false;
+		while (q.eof() == false)
+		{
+			CString colName = q.getStringField(_T("name"));
+			if (colName == _T("lDontSync"))
+				hasDontSync = true;
+			if (colName == _T("m_Description"))
+				hasDescription = true;
+			q.nextRow();
+		}
+
+		if (!hasDontSync)
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN lDontSync INTEGER DEFAULT 0"));
+
+		if (!hasDescription)
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN m_Description TEXT DEFAULT ''"));
+
+		return TRUE;
+	}
+	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
+}
 
 //BOOL CopyUpDatabase()
 //{

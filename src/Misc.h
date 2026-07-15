@@ -173,7 +173,7 @@ __int64 GetLastWriteTime(const CString &csFile);
 #	include <bitset>
 #endif // !defined(_BITSET_)
 
-long NewGroupID(int parentID = 0, CString text = "");
+long NewGroupID(int parentID = 0, CString text = "", CString description = _T(""));
 BOOL DeleteAllIDs();
 BOOL DeleteFormats(int parentID, ARRAY& formatIDs);
 

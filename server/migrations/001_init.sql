@@ -38,7 +38,10 @@ CREATE TABLE IF NOT EXISTS clips (
     short_cut         INTEGER DEFAULT 0,
     paste_count       INTEGER DEFAULT 0,
     is_conflict_copy  INTEGER DEFAULT 0,
-    win_clip_id       TEXT
+    win_clip_id       TEXT,
+    dont_sync         BOOLEAN DEFAULT FALSE,
+    clip_order        REAL DEFAULT 0,
+    clip_group_order  REAL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_clips_user_crc ON clips(user_id, crc);
@@ -46,6 +49,11 @@ CREATE INDEX IF NOT EXISTS idx_clips_user_updated ON clips(user_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_clips_user_group ON clips(user_id, group_id);
 CREATE INDEX IF NOT EXISTS idx_clips_user_created ON clips(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_clips_user_conflict ON clips(user_id, is_conflict_copy);
+
+-- Migration: add dont_sync / clip_order / clip_group_order for existing databases
+ALTER TABLE clips ADD COLUMN dont_sync BOOLEAN DEFAULT FALSE;
+ALTER TABLE clips ADD COLUMN clip_order REAL DEFAULT 0;
+ALTER TABLE clips ADD COLUMN clip_group_order REAL DEFAULT 0;
 
 -- 剪贴板格式表
 CREATE TABLE IF NOT EXISTS clip_formats (

@@ -1,6 +1,7 @@
 #pragma once
 #include <afx.h>
 #include <memory>
+#include <vector>
 #include "../json.hpp"
 #include "../httplib.h"
 
@@ -41,6 +42,18 @@ public:
 
 	// Check if encryption is initialized
 	BOOL IsEncryptionEnabled() const;
+
+	// Mark clips as dont_sync on the server
+	void MarkClipsDontSync(const std::vector<int>& localIds);
+
+	// Notify that a group was deleted locally
+	void OnGroupDeleted(int localGroupId);
+
+	// Trigger a quick sync (fire-and-forget)
+	void TriggerQuickSync();
+
+	// Delete a remote group (used by local delete handler)
+	void DeleteRemoteGroup(const std::string& remoteGroupId);
 
 private:
 	// Ensure HTTP client is created/reused for the current server URL
@@ -84,6 +97,12 @@ private:
 	// Pull changes from cloud
 	void PullChanges();
 
+	// Push local groups to cloud (creates/updates groups on server)
+	void PushGroups();
+
+	// Pull groups from cloud (creates/updates local groups from server)
+	void PullGroups();
+
 	// Initialize encryption from stored key
 	BOOL InitializeEncryption();
 
@@ -120,6 +139,17 @@ private:
 
 	// Look up local clip ID by remote ID; returns -1 if not found
 	int GetLocalIdByRemoteId(const std::string& remoteId);
+
+	// Look up remote clip ID by local ID; returns empty string if not found
+	std::string GetRemoteIdByLocalId(int localId);
+
+	// ---- Remote group ID mapping table ----
+	void EnsureGroupMappingTable();
+	void SaveRemoteGroupIdMapping(int localId, const std::string& remoteId);
+	int GetLocalGroupIdByRemoteId(const std::string& remoteId);
+	std::string GetRemoteGroupIdByLocalId(int localId);
+	void DeleteRemoteGroupIdMapping(int localId);
+	void DeleteRemoteGroupIdMappingByRemote(const std::string& remoteId);
 
 	// ---- Encryption salt change detection (H3) ----
 	// Check if server salt differs from local, notify user if so

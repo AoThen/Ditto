@@ -136,6 +136,8 @@ public:
 	ULONG m_lTotalCopySize;
 	int m_parentId;
 	int m_dontAutoDelete;
+	int m_dontSync;
+	CString m_description;
 	int m_shortCut;
 	BOOL m_bIsGroup;
 	DWORD m_CRC;

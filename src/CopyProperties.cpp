@@ -34,6 +34,7 @@ CCopyProperties::CCopyProperties(long lCopyID, CWnd* pParent, CClip *pMemoryClip
 	m_eDate = _T("");
 	m_lastPasteDate = _T("");
 	m_bNeverAutoDelete = FALSE;
+	m_bDontSync = FALSE;
 	//}}AFX_DATA_INIT
 }
 
@@ -50,6 +51,7 @@ void CCopyProperties::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_DATE, m_eDate);
 	DDX_Text(pDX, IDC_DATE_LAST_USED, m_lastPasteDate);
 	DDX_Check(pDX, IDC_NEVER_AUTO_DELETE, m_bNeverAutoDelete);
+	DDX_Check(pDX, IDC_CHECK_DONTSYNC, m_bDontSync);
 	DDX_Check(pDX, IDC_HOT_KEY_GLOBAL, m_hotKeyGlobal);
 	DDX_Control(pDX, IDC_HOTKEY_MOVE_TO_GROUP, m_MoveToGrouHotKey);
 	DDX_Check(pDX, IDC_HOT_KEY_GLOBAL_MOVE_TO_GROUP, m_moveToGroupHotKeyGlobal);
@@ -157,6 +159,8 @@ void CCopyProperties::LoadDataFromCClip(CClip &Clip)
 	{
 		m_bNeverAutoDelete = FALSE;
 	}
+
+	m_bDontSync = Clip.m_dontSync ? TRUE : FALSE;
 
 	m_hotKeyGlobal = Clip.m_globalShortCut;
 
@@ -346,6 +350,14 @@ void CCopyProperties::OnOK()
 					{    
 						DeleteFormats(m_lCopyID, m_DeletedData);
 					}
+
+					if (m_bDontSync)
+					{
+						std::vector<int> ids;
+						ids.push_back(m_lCopyID);
+						theApp.m_CloudSyncManager.MarkClipsDontSync(ids);
+					}
+					theApp.m_CloudSyncManager.TriggerQuickSync();
 				}
 			}
 		}
@@ -444,6 +456,8 @@ void CCopyProperties::LoadDataIntoCClip(CClip &Clip)
 	{
 		Clip.m_dontAutoDelete = FALSE;
 	}
+
+	Clip.m_dontSync = m_bDontSync ? 1 : 0;
 
 	Clip.m_globalShortCut = m_hotKeyGlobal;
 

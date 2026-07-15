@@ -716,7 +716,7 @@ int GetScreenHeight(void)
 ID based Globals
 \*------------------------------------------------------------------*/
 
-long NewGroupID(int parentID, CString text)
+long NewGroupID(int parentID, CString text, CString description)
 {
 	long lID=0;
 	CTime time;
@@ -731,9 +731,10 @@ long NewGroupID(int parentID, CString text)
 
 		CString cs;
 
-		cs.Format(_T("insert into Main (lDate, mText, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(%d, '%s', %d, 1, %d, -(2147483647), -(2147483647));"),
+		cs.Format(_T("insert into Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(%d, '%s', '%s', %d, 1, %d, -(2147483647), -(2147483647));"),
 							(int)time.GetTime(),
 							text,
+							description,
 							(int)time.GetTime(),
 							parentID);
 

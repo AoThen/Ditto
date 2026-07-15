@@ -393,8 +393,9 @@ protected:
     afx_msg void OnShowGroupsBottom();
     afx_msg void OnShowGroupsTop();
     afx_msg void OnMenuViewgroups();
-    afx_msg void OnMenuQuickpropertiesSettoneverautodelete();
-    afx_msg void OnMenuQuickpropertiesAutodelete();
+afx_msg void OnMenuQuickpropertiesSettoneverautodelete();
+	afx_msg void OnMenuQuickpropertiesAutodelete();
+	afx_msg void OnToggleDontSync();
     afx_msg void OnMenuQuickpropertiesRemovehotkey();
     afx_msg void OnMenuSenttoFriendEight();
     afx_msg void OnMenuSenttoFriendEleven();
@@ -432,6 +433,7 @@ protected:
     afx_msg void OnUpdateMenuViewgroups(CCmdUI *pCmdUI);
     afx_msg void OnUpdateMenuPasteplaintextonly(CCmdUI *pCmdUI);
     afx_msg void OnUpdateMenuDelete(CCmdUI *pCmdUI);
+    afx_msg void OnUpdateDontSync(CCmdUI *pCmdUI);
     afx_msg void OnUpdateMenuProperties(CCmdUI *pCmdUI);
     afx_msg void OnDestroy();
     afx_msg LRESULT OnSearchEnterKeyPressed(WPARAM wParam, LPARAM lParam);

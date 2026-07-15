@@ -352,6 +352,12 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 					db.execDMLEx(_T("UPDATE Main SET lParentID = -1 WHERE lParentID = %d;"), clipId);
 				}
 
+				if (bGroup)
+				{
+					// Notify cloud sync manager about group deletion
+					theApp.m_CloudSyncManager.OnGroupDeleted(clipId);
+				}
+
 				if(sqlIn.GetLength() > 0)
 				{
 					sqlIn += ", ";

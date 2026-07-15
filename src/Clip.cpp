@@ -226,6 +226,8 @@ CClip::CClip() :
 	m_CRC(0),
 	m_parentId(-1),
 	m_dontAutoDelete(FALSE),
+	m_dontSync(FALSE),
+	m_description(_T("")),
 	m_shortCut(0),
 	m_bIsGroup(FALSE),
 	m_param1(0),
@@ -254,9 +256,13 @@ void CClip::Clear()
 	m_CRC = 0;
 	m_parentId = -1;
 	m_dontAutoDelete = FALSE;
+	m_dontSync = FALSE;
+	m_description.Empty();
 	m_shortCut = 0;
 	m_bIsGroup = FALSE;
 	m_csQuickPaste = "";
+	m_clipOrder = 0;
+	m_clipGroupOrder = 0;
 	m_param1 = 0;
 	m_globalShortCut = FALSE;
 	m_moveToGroupShortCut = 0;
@@ -275,11 +281,15 @@ const CClip& CClip::operator=(const CClip &clip)
 	m_CRC = clip.m_CRC;
 	m_parentId = clip.m_parentId;
 	m_dontAutoDelete = clip.m_dontAutoDelete;
+	m_dontSync = clip.m_dontSync;
+	m_description = clip.m_description;
 	m_shortCut = clip.m_shortCut;
 	m_bIsGroup = clip.m_bIsGroup;
 	m_csQuickPaste = clip.m_csQuickPaste;
 	m_moveToGroupShortCut = clip.m_moveToGroupShortCut;
 	m_globalMoveToGroupShortCut = clip.m_globalMoveToGroupShortCut;
+	m_clipOrder = clip.m_clipOrder;
+	m_clipGroupOrder = clip.m_clipGroupOrder;
 
 	INT_PTR nCount = clip.m_Formats.GetSize();
 	
@@ -962,8 +972,8 @@ bool CClip::AddToMainTable()
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
 		CString cs;
-		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lModifiedDate) ")
-						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %lld);"),
+		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate) ")
+						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %d, '%s', %lld);"),
 							m_Time.GetTime(),
 							m_Desc,
 							m_shortCut,
@@ -980,6 +990,8 @@ bool CClip::AddToMainTable()
 							m_stickyClipGroupOrder,
 							m_moveToGroupShortCut,
 							m_globalMoveToGroupShortCut,
+							m_dontSync,
+							m_description,
 							m_Time.GetTime());  // lModifiedDate = creation time for new clips
 
 		theApp.m_db.execDML(cs);
@@ -1016,6 +1028,8 @@ bool CClip::ModifyMainTable()
 			_T("stickyClipGroupOrder = %f, ")
 			_T("MoveToGroupShortCut = %d, ")
 			_T("GlobalMoveToGroupShortCut = %d, ")
+			_T("lDontSync = %d, ")
+			_T("m_Description = '%s', ")
 			_T("lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
 			m_shortCut,
@@ -1030,6 +1044,8 @@ bool CClip::ModifyMainTable()
 			m_stickyClipGroupOrder,
 			m_moveToGroupShortCut,
 			m_globalMoveToGroupShortCut,
+			m_dontSync,
+			m_description,
 			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
@@ -1579,6 +1595,8 @@ BOOL CClip::LoadMainTable(int id)
 			m_CRC = q.getIntField(_T("CRC"));
 			m_parentId = q.getIntField(_T("lParentID"));
 			m_dontAutoDelete = q.getIntField(_T("lDontAutoDelete"));
+			m_dontSync = q.getIntField(_T("lDontSync"));
+			m_description = q.getStringField(_T("m_Description"));
 			m_shortCut = q.getIntField(_T("lShortCut"));
 			m_bIsGroup = q.getIntField(_T("bIsGroup"));
 			m_csQuickPaste = q.getStringField(_T("QuickPasteText"));
