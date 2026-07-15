@@ -36,6 +36,7 @@ BOOL BackupDB(CString dbPath, CString backupPath);
 BOOL RestoreDB(CString backupPath);
 
 void ReOrderStickyClips(int parentID, CppSQLite3DB &db);
+BOOL MigrateDatabaseSchema();
 
 //BOOL CopyDownDatabase();
 //BOOL CopyUpDatabase();
