@@ -3,6 +3,9 @@ name: MSBuild
 on:
   workflow_dispatch:
 
+permissions:
+  actions: write
+
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
 
@@ -11,6 +14,15 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      - name: Clean up old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 1
+          delete_workflow_pattern: ${{ github.workflow }}
+
       - uses: actions/checkout@v4
       
       - name: Generate build number

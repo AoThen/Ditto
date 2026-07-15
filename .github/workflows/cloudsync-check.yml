@@ -3,6 +3,9 @@ name: CloudSync Compilation & Test
 on:
   workflow_dispatch:
 
+permissions:
+  actions: write
+
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
 
@@ -16,6 +19,15 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Clean up old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 1
+          delete_workflow_pattern: ${{ github.workflow }}
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -102,6 +114,15 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Clean up old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 1
+          delete_workflow_pattern: ${{ github.workflow }}
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -172,6 +193,15 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
+      - name: Clean up old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 1
+          delete_workflow_pattern: ${{ github.workflow }}
+
       - name: Check build status
         run: |
           if [ "${{ needs.cloudsync-compile-check.result }}" = "success" ]; then
