@@ -9,7 +9,7 @@ describe('router guards', () => {
 
   beforeEach(async () => {
     userStore = { isLoggedIn: false, role: 'user' }
-    const { useUserStore } = require('@/stores/user')
+    const { useUserStore } = await import('@/stores/user')
     useUserStore.mockReturnValue(userStore)
     router = createRouter({ history: createWebHistory(), routes })
     router.push('/')

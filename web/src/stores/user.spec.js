@@ -7,7 +7,7 @@ describe('user store', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia())
-    document.cookie = ''
+    document.cookie = 'device_id=; max-age=0; path=/'
     localStorage.clear()
     store = useUserStore()
   })
@@ -46,7 +46,7 @@ describe('user store', () => {
 
   it('logout clears all state and dispatches event', () => {
     store.setUserInfo({ username: 'testuser' })
-    document.cookie = 'device_id=dev-123'
+    document.cookie = 'device_id=dev-123; path=/'
 
     const events = []
     window.addEventListener('ws-disconnect', () => events.push('disconnected'))

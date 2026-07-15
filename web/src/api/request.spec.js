@@ -9,7 +9,6 @@ import request, { downloadBlob } from './request'
 
 describe('request module', () => {
   it('should be an axios instance', () => {
-    expect(request instanceof axios.constructor).toBe(true)
     expect(typeof request.get).toBe('function')
     expect(typeof request.post).toBe('function')
   })

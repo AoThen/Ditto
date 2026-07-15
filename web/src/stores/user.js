@@ -27,6 +27,7 @@ export const useUserStore = defineStore('user', () => {
 
   function setUserInfo(info) {
     if (info) {
+      deviceId.value = info.device_id || ''
       username.value = info.username || ''
       role.value = info.role || ''
       localStorage.setItem('userInfo', JSON.stringify(info))

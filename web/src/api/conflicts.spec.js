@@ -22,7 +22,7 @@ describe('conflicts API', () => {
 
   it('listConflictClips should call GET /api/v1/clips/conflicts', async () => {
     await listConflictClips()
-    expect(request).toHaveBeenCalledWith({ url: '/api/v1/clips/conflicts', method: 'get' })
+    expect(request).toHaveBeenCalledWith({ url: '/api/v1/clips/conflicts', method: 'get', params: { page: 1, per_page: 20 } })
   })
 
   it('resolveConflictClip should be a function', () => {

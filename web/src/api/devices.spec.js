@@ -22,7 +22,7 @@ describe('devices API', () => {
 
   it('listDevices should call GET /api/v1/devices', async () => {
     await listDevices()
-    expect(request).toHaveBeenCalledWith({ url: '/api/v1/devices', method: 'get' })
+    expect(request).toHaveBeenCalledWith({ url: '/api/v1/devices', method: 'get', params: { page: 1, per_page: 20 } })
   })
 
   it('removeDevice should be a function', () => {

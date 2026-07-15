@@ -29,6 +29,7 @@ describe('useWebSocket', () => {
     vi.restoreAllMocks()
     setActivePinia(createPinia())
     vi.stubEnv('VITE_WS_URL', '')
+    document.cookie = 'device_id=test-device'
 
     mockWs = createMockWs()
     global.WebSocket = vi.fn(() => mockWs)

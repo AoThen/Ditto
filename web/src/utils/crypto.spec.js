@@ -11,17 +11,13 @@ const mockGetRandomValues = vi.fn()
 beforeEach(() => {
   vi.clearAllMocks()
 
-  global.crypto = {
-    subtle: {
-      importKey: mockImportKey,
-      deriveKey: mockDeriveKey,
-      generateKey: mockGenerateKey,
-      wrapKey: mockWrapKey,
-      unwrapKey: mockUnwrapKey,
-      digest: mockDigest,
-    },
-    getRandomValues: mockGetRandomValues,
-  }
+  vi.spyOn(crypto.subtle, 'importKey').mockImplementation(mockImportKey)
+  vi.spyOn(crypto.subtle, 'deriveKey').mockImplementation(mockDeriveKey)
+  vi.spyOn(crypto.subtle, 'generateKey').mockImplementation(mockGenerateKey)
+  vi.spyOn(crypto.subtle, 'wrapKey').mockImplementation(mockWrapKey)
+  vi.spyOn(crypto.subtle, 'unwrapKey').mockImplementation(mockUnwrapKey)
+  vi.spyOn(crypto.subtle, 'digest').mockImplementation(mockDigest)
+  vi.spyOn(crypto, 'getRandomValues').mockImplementation(mockGetRandomValues)
 
   mockGetRandomValues.mockImplementation((arr) => {
     for (let i = 0; i < arr.length; i++) arr[i] = i
