@@ -85,11 +85,7 @@ test.describe('Group Management', () => {
   })
 
   test('should move clips to group via API', async ({ page }) => {
-    await loginAsNewUser(page)
-
-    const devicesResp = await page.request.get('/api/v1/devices')
-    const devices = await devicesResp.json()
-    const deviceId = devices.data?.[0]?.id
+    const { deviceId } = await loginAsNewUser(page)
 
     const clipId = `clip-group-${Date.now()}`
     await page.request.post('/api/v1/clips/sync', {
