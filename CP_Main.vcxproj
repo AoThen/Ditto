@@ -641,6 +641,7 @@
     <ClCompile Include="src\QListCtrl.cpp" />
     <ClCompile Include="src\QPasteWnd.cpp" />
     <ClCompile Include="src\QPasteWndThread.cpp" />
+    <ClCompile Include="src\Pinyin_Convert.cpp" />
     <ClCompile Include="src\QRCodeViewer.cpp" />
     <ClCompile Include="src\QRCode\bitstream.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -915,6 +916,7 @@
     <ClInclude Include="src\ProgressWnd.h" />
     <ClInclude Include="src\QListCtrl.h" />
     <ClInclude Include="src\QPasteWnd.h" />
+    <ClInclude Include="src\Pinyin_Convert.h" />
     <ClInclude Include="src\QPasteWndThread.h" />
     <ClInclude Include="src\QRCodeViewer.h" />
     <ClInclude Include="src\QRCode\bitstream.h" />
