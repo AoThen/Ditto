@@ -24,6 +24,7 @@ describe('router guards', () => {
 
   it('redirects authenticated user away from /login to /dashboard', async () => {
     userStore.isLoggedIn = true
+    await router.push('/')
     await router.push('/login')
     expect(router.currentRoute.value.path).toBe('/dashboard')
   })
