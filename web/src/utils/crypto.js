@@ -35,9 +35,10 @@ export async function generateDEK() {
 export async function wrapDEK(KEK, DEK) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const wrapped = await crypto.subtle.wrapKey('raw', DEK, KEK, { name: 'AES-GCM', iv })
-  const combined = new Uint8Array(iv.length + wrapped)
+  const wrappedBytes = new Uint8Array(wrapped)
+  const combined = new Uint8Array(iv.length + wrappedBytes.length)
   combined.set(iv)
-  combined.set(new Uint8Array(wrapped), iv.length)
+  combined.set(wrappedBytes, iv.length)
   return bufToBase64(combined)
 }
 

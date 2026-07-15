@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import routes from '@/router'
+import { routes } from '@/router'
 
 vi.mock('@/stores/user', () => ({ useUserStore: vi.fn() }))
 

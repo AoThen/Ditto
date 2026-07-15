@@ -7,7 +7,11 @@ describe('user store', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia())
-    document.cookie = 'device_id=; max-age=0; path=/'
+    document.cookie.split(';').forEach(c => {
+      const eq = c.indexOf('=')
+      const name = eq > -1 ? c.substring(0, eq).trim() : c.trim()
+      if (name) document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    })
     localStorage.clear()
     store = useUserStore()
   })

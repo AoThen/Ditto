@@ -42,7 +42,7 @@ export const useUserStore = defineStore('user', () => {
     username.value = ''
     role.value = ''
     localStorage.removeItem('userInfo')
-    document.cookie = 'device_id=; max-age=0; path=/'
+    document.cookie = 'device_id=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
     window.dispatchEvent(new CustomEvent('ws-disconnect'))
   }
 

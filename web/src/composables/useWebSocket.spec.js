@@ -26,7 +26,7 @@ describe('useWebSocket', () => {
     document.cookie = 'device_id=test-device'
 
     mockWs = createMockWs()
-    const mockWsConstructor = vi.fn(() => mockWs)
+    const mockWsConstructor = vi.fn(function() { return mockWs })
     mockWsConstructor.OPEN = 1
     global.WebSocket = mockWsConstructor
 
@@ -54,7 +54,7 @@ describe('useWebSocket', () => {
     setActivePinia(createPinia())
     vi.stubEnv('VITE_WS_URL', 'https://example.com')
     mockWs = createMockWs()
-    const mockWsConstructor = vi.fn(() => mockWs)
+    const mockWsConstructor = vi.fn(function() { return mockWs })
     mockWsConstructor.OPEN = 1
     global.WebSocket = mockWsConstructor
     mod = await import('@/composables/useWebSocket')

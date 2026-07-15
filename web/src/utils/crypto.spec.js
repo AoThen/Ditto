@@ -36,7 +36,7 @@ describe('deriveKEK', () => {
     const result = await deriveKEK('mypassword', 'c2FsdA==')
 
     expect(mockImportKey).toHaveBeenCalledWith(
-      'raw', expect.any(ArrayBuffer), 'PBKDF2', false, ['deriveKey']
+      'raw', expect.any(Uint8Array), 'PBKDF2', false, ['deriveKey']
     )
     expect(mockDeriveKey).toHaveBeenCalledWith(
       { name: 'PBKDF2', salt: expect.any(Uint8Array), iterations: 100000, hash: 'SHA-256' },
@@ -119,7 +119,7 @@ describe('computeVerificationHash', () => {
 
     const result = await computeVerificationHash('mypassword', 'c2FsdA==')
 
-    expect(mockDigest).toHaveBeenCalledWith('SHA-256', expect.any(ArrayBuffer))
+    expect(mockDigest).toHaveBeenCalledWith('SHA-256', expect.any(Uint8Array))
     expect(typeof result).toBe('string')
     expect(result).toBe(btoa(String.fromCharCode(...hashBytes)))
   })
