@@ -107,14 +107,10 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 		query = query.Where("group_id = ?", groupID)
 	}
 
-	isPinyin := search != "" && utils.IsPinyinQuery(search)
-
 	if search != "" {
-		if isPinyin {
-			query = query.Where("pinyin LIKE ?", "%"+strings.ToLower(search)+"%")
-		} else {
-			query = query.Where("description LIKE ?", "%"+search+"%")
-		}
+		likeDesc := "%" + search + "%"
+		likePinyin := "%" + strings.ToLower(search) + "%"
+		query = query.Where("description LIKE ? OR pinyin LIKE ?", likeDesc, likePinyin)
 	}
 
 	var total int64

@@ -195,7 +195,9 @@ func TestEncryption_Disable(t *testing.T) {
 	crypto := makeTestCrypto()
 	_, _ = testutil.AuthPost(t, server, "/api/v1/encryption/setup", user.Token, crypto)
 
-	statusCode, _ := testutil.AuthPost(t, server, "/api/v1/encryption/disable", user.Token, map[string]string{})
+	statusCode, _ := testutil.AuthPost(t, server, "/api/v1/encryption/disable", user.Token, map[string]string{
+		"verification_hash": crypto["verification_hash"],
+	})
 	assert.Equal(t, http.StatusOK, statusCode)
 }
 

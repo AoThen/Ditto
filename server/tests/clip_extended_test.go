@@ -86,10 +86,10 @@ func TestListConflictClips_Empty(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// ListConflictClips returns data as array directly
+	// ListConflictClips returns data as paginated response
 	var respMap map[string]interface{}
 	json.Unmarshal(respBody, &respMap)
-	items, ok := respMap["data"].([]interface{})
+	items, ok := getGroupItems(respMap["data"])
 	require.True(t, ok)
 	assert.Empty(t, items)
 }
