@@ -1,0 +1,34 @@
+// TestStubs.cpp - Stub implementations for symbols needed by CloudSync_Test
+// These allow the test project to link without pulling in the full Ditto source.
+
+#include "stdafx.h"
+#include "Clip.h"
+#include "Options.h"
+#include "Misc.h"
+
+// -------------------------------------------------------------------
+// CClip stubs
+// -------------------------------------------------------------------
+CClip::CClip() {}
+CClip::~CClip() {}
+bool CClip::LoadFormats(int /*id*/, bool /*bOnlyLoad_CF_TEXT*/, bool /*includeRichTextForTextOnly*/, int /*dataId*/) { return false; }
+CStringW CClip::GetUnicodeTextFormat() { return CStringW(); }
+CStringA CClip::GetCFTextTextFormat() { return CStringA(); }
+BOOL CClip::WriteTextToFile(CString /*path*/, BOOL /*unicode*/, BOOL /*asci*/, BOOL /*rtf*/, BOOL /*forceUnicode*/, BOOL /*utf8*/) { return FALSE; }
+
+// -------------------------------------------------------------------
+// CGetSetOptions stubs (for methods referenced by compiled source files)
+// -------------------------------------------------------------------
+int CGetSetOptions::GetPreferUtf8ForCompare() { return TRUE; }
+CString CGetSetOptions::GetDiffApp() { return CString(); }
+CString CGetSetOptions::ResolvePath(CString path) { return path; }
+CString CGetSetOptions::GetPath(long /*lPathID*/) { return CString(); }
+void CGetSetOptions::SetCloudDeviceId(LPCSTR /*lpszValue*/) {}
+void CGetSetOptions::SetCloudDeviceToken(LPCSTR /*lpszValue*/) {}
+CString CGetSetOptions::GetCopyAppSeparator() { return CString(); }
+
+// -------------------------------------------------------------------
+// log / StrF stubs
+// -------------------------------------------------------------------
+void log(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
+CString StrF(const TCHAR* /*pszFormat*/, ...) { return CString(); }

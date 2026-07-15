@@ -44,9 +44,9 @@ public:
 		return s_deviceToken;
 	}
 
-	static void SetCloudDeviceToken(LPCTSTR lpszValue)
+	static void SetCloudDeviceToken(LPCSTR lpszValue)
 	{
-		s_deviceToken = CStringA(lpszValue);
+		s_deviceToken = lpszValue;
 	}
 
 	static CStringA GetCloudDeviceId()
@@ -54,9 +54,9 @@ public:
 		return s_deviceId;
 	}
 
-	static void SetCloudDeviceId(LPCTSTR lpszValue)
+	static void SetCloudDeviceId(LPCSTR lpszValue)
 	{
-		s_deviceId = CStringA(lpszValue);
+		s_deviceId = lpszValue;
 	}
 
 	static CString GetCloudServerUrl()
