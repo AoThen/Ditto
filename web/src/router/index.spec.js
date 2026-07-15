@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { routes } from '@/router'
+import { routes, beforeEachGuard } from '@/router'
 
 vi.mock('@/stores/user', () => ({ useUserStore: vi.fn() }))
 
@@ -12,6 +12,7 @@ describe('router guards', () => {
     const { useUserStore } = await import('@/stores/user')
     useUserStore.mockReturnValue(userStore)
     router = createRouter({ history: createWebHistory(), routes })
+    router.beforeEach(beforeEachGuard)
     router.push('/')
     await router.isReady()
   })

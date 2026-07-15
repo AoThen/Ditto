@@ -55,7 +55,7 @@ function isAdmin() {
   return userStore.role === 'admin'
 }
 
-router.beforeEach((to, from, next) => {
+export function beforeEachGuard(to, from, next) {
   if (to.meta.requiresAuth && !isAuthenticated()) {
     next('/login')
   } else if (to.path === '/login' && isAuthenticated()) {
@@ -65,7 +65,9 @@ router.beforeEach((to, from, next) => {
   } else {
     next()
   }
-})
+}
+
+router.beforeEach(beforeEachGuard)
 
 export default router
 export { routes }
