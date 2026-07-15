@@ -3,7 +3,7 @@ import { formatDate, formatShortDate } from '@/composables/useFormatDate'
 
 describe('formatDate', () => {
   it('formats a normal date string', () => {
-    expect(formatDate('2025-07-15T10:30:00Z')).toBe('2025-07-15 10:30')
+    expect(formatDate('2025-07-15 10:30:00')).toBe('2025-07-15 10:30')
   })
 
   it('returns "-" for null input', () => {
@@ -23,13 +23,13 @@ describe('formatDate', () => {
   })
 
   it('formats midnight correctly', () => {
-    expect(formatDate('2025-07-15T00:00:00Z')).toBe('2025-07-15 00:00')
+    expect(formatDate('2025-01-01 00:00:00')).toBe('2025-01-01 00:00')
   })
 })
 
 describe('formatShortDate', () => {
   it('formats a normal date string', () => {
-    expect(formatShortDate('2025-07-15T10:30:00Z')).toBe('7/15')
+    expect(formatShortDate('2025-07-15 10:30:00')).toBe('7/15')
   })
 
   it('returns "-" for null input', () => {
@@ -49,10 +49,10 @@ describe('formatShortDate', () => {
   })
 
   it('formats single-digit month and day', () => {
-    expect(formatShortDate('2025-03-05T10:30:00Z')).toBe('3/5')
+    expect(formatShortDate('2025-03-05 10:30:00')).toBe('3/5')
   })
 
   it('formats double-digit month and day', () => {
-    expect(formatShortDate('2025-11-25T10:30:00Z')).toBe('11/25')
+    expect(formatShortDate('2025-11-25 10:30:00')).toBe('11/25')
   })
 })
