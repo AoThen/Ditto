@@ -41,7 +41,7 @@
 		<Item English_Text = "Toggles Always on Top" ID = "32814">总在最前端</Item>
 		<Item English_Text = "Rolls-up Window" ID = "32815">收起窗口</Item>
 		<Item English_Text = "Toggles Always Show Description" ID = "32816">总是显示说明</Item>
-		<Item English_Text = "Always on Top	Ctrl-Space" ID = "32784">总在最前端</Item>
+		<Item English_Text = "Always on Top" ID = "32784">总在最前端</Item>
 		<Item English_Text = "Auto Roll-up" ID = "32791">自动收起</Item>
 		<Item English_Text = "Always Show Description" ID = "32813">总是显示说明</Item>
 		<Item English_Text = "Prompt For New Group Names" ID = "32817">提示命名新建组</Item>
@@ -109,7 +109,7 @@
 		<Item English_Text = "Move To Top" ID = "32908">移至顶部</Item>	
 		<Item English_Text = "Move Up" ID = "32906">上移</Item>	
 		<Item English_Text = "Move Down" ID = "32907">下移</Item>	
-		<Item English_Text = "Export Clip(s) to Image File" ID = "-32902">将剪贴项导出为图像文件</Item>
+		<Item English_Text = "Export Clip(s) to Image File" ID = "32902">将剪贴项导出为图像文件</Item>
 		<Item English_Text = "Export to Google Translate" ID = "32900">导出到谷歌翻译</Item>	
 		
 		<Item English_Text = "Search Options" ID = "-1">搜索选项</Item>	
@@ -216,7 +216,7 @@
 		<Item English_Text = "Multi-Paste clip separator ([LF] = line feed)" ID = "2090">多项粘贴剪贴项分隔符（[LF] = 换行）</Item>
 		
 		//New item added 3/1/11
-		<Item English_Text = "Accepted Copy Applications (seperate by ;)" ID = "2098">接受复制的应用程序（以 ; 分隔）</Item>
+		<Item English_Text = "Accepted Copy Applications (separate by ;)" ID = "2098">接受复制的应用程序（以 ; 分隔）</Item>
 		<Item English_Text = "Include" ID = "2095">包括</Item>
 		<Item English_Text = "Exclude" ID = "2096">排除</Item>
 		
@@ -498,7 +498,7 @@
 		<Item English_Text = "[Always on top]" ID = "top_window">窗口置顶</Item>
 		
 		<Item English_Text = "[Disconnected]" ID = "disconnected">[已断开连接]</Item>
-		<Item English_Text = "Ditto is running minimized, Ditto can be opened by hot keys or by clicking the task tray icon" ID = "StartupMsg">Ditto 正以最小化方式运行，可通过热键或单击任务栏图标打开</Item>
+		<Item English_Text = "Ditto is running minimized, Ditto can be opened by hot keys or by clicking the task tray icon" ID = "StartuMsg">Ditto 正以最小化方式运行，可通过热键或单击任务栏图标打开</Item>
 		<Item English_Text = "There are no results for" ID = "NoSearchResults">没有任何结果</Item>
 		<Item English_Text = "Warning this can take quite a long time and require up to double the hard drive space as your current database size, Continue?" ID = "CompactRepairWarning">警告，这可能需要相当长的时间，并且需要两倍于你当前数据库大小的硬盘空间，是否继续？</Item>
 		<Item English_Text = "Prompt For Name" ID = "prompt_for_name">提示名字</Item>
