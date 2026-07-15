@@ -1,8 +1,7 @@
 name: MSBuild
 
 on:
-  push:
-    branches: [ master ]
+  workflow_dispatch:
 
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
