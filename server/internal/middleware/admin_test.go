@@ -23,7 +23,7 @@ func setupAdminMiddlewareTest(t *testing.T) (normalUserID, adminUserID uint, cle
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	now := time.Now()

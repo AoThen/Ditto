@@ -29,6 +29,10 @@ type Config struct {
 	CookieSecure       bool          // Whether to set Secure flag on cookies
 	TokenExpiryAccess  time.Duration
 	TokenExpiryRefresh time.Duration
+	MaxPushLimit       int           // Maximum clips per push sync request
+	DefaultSyncPullLimit int         // Default pull limit per sync
+	MaxSyncPullLimit   int           // Maximum pull limit per sync
+	SlowThreshold      time.Duration // GORM slow query threshold
 }
 
 // loadOrGenerateJWTSecret handles JWT secret loading with secure auto-generation
@@ -155,6 +159,34 @@ func Load() *Config {
 		log.Printf("[INFO] No TLS cert configured: Secure cookie flag disabled for HTTP")
 	}
 
+	maxPushLimit := 1000
+	if env := os.Getenv("MAX_PUSH_LIMIT"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			maxPushLimit = n
+		}
+	}
+
+	defaultSyncPullLimit := 1000
+	if env := os.Getenv("SYNC_DEFAULT_PULL_LIMIT"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			defaultSyncPullLimit = n
+		}
+	}
+
+	maxSyncPullLimit := 5000
+	if env := os.Getenv("SYNC_MAX_PULL_LIMIT"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			maxSyncPullLimit = n
+		}
+	}
+
+	slowThreshold := 500 * time.Millisecond
+	if env := os.Getenv("DB_SLOW_THRESHOLD"); env != "" {
+		if d, err := time.ParseDuration(env); err == nil {
+			slowThreshold = d
+		}
+	}
+
 	return &Config{
 		Port:               port,
 		DatabasePath:       dbPath,
@@ -167,5 +199,9 @@ func Load() *Config {
 		CookieSecure:       cookieSecure,
 		TokenExpiryAccess:  loadTokenExpiry("JWT_ACCESS_TOKEN_EXPIRY", DefaultTokenExpiryAccess),
 		TokenExpiryRefresh: loadTokenExpiry("JWT_REFRESH_TOKEN_EXPIRY", DefaultTokenExpiryRefresh),
+		MaxPushLimit:        maxPushLimit,
+		DefaultSyncPullLimit: defaultSyncPullLimit,
+		MaxSyncPullLimit:     maxSyncPullLimit,
+		SlowThreshold:        slowThreshold,
 	}
 }

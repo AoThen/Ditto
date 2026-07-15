@@ -28,7 +28,7 @@ func setupAuthMiddlewareTest(t *testing.T) (*config.Config, func()) {
 	tmpFile.Close()
 
 	// Initialize database
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	// Create config

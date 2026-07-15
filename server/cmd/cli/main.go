@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
@@ -23,7 +24,7 @@ func main() {
 		dbPath = "./data/ditto_cloud.db"
 	}
 
-	if err := database.Init(dbPath); err != nil {
+	if err := database.Init(dbPath, 500*time.Millisecond); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 

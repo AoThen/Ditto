@@ -52,14 +52,14 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
-	if err := database.Init(dbPath); err != nil {
+	if err := database.Init(dbPath, 500*time.Millisecond); err != nil {
 		t.Fatalf("failed to init database: %v", err)
 	}
 	TestDB = database.DB
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(nil) // nil broadcaster for tests (no WS needed)
+	clipSvc := service.NewClipService(nil, 1000, 1000, 5000) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()
@@ -200,14 +200,14 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
-	if err := database.Init(dbPath); err != nil {
+	if err := database.Init(dbPath, 500*time.Millisecond); err != nil {
 		t.Fatalf("failed to init database: %v", err)
 	}
 	TestDB = database.DB
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(nil) // nil broadcaster for tests (no WS needed)
+	clipSvc := service.NewClipService(nil, 1000, 1000, 5000) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()
@@ -344,7 +344,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 		TokenExpiryRefresh: config.DefaultTokenExpiryRefresh,
 	}
 
-	if err := database.Init(dbPath); err != nil {
+	if err := database.Init(dbPath, 500*time.Millisecond); err != nil {
 		t.Fatalf("failed to init database: %v", err)
 	}
 	TestDB = database.DB
@@ -355,7 +355,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(h) // hub as broadcaster for real-time push
+	clipSvc := service.NewClipService(h, 1000, 1000, 5000) // hub as broadcaster for real-time push
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()

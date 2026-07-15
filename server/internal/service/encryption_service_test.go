@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os"
 	"testing"
+	"time"
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
@@ -20,7 +21,7 @@ func setupEncryptionServiceTest(t *testing.T) (*EncryptionService, uint, func())
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	user := model.User{

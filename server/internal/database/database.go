@@ -18,7 +18,7 @@ import (
 
 var DB *gorm.DB
 
-func Init(dbPath string) error {
+func Init(dbPath string, slowThreshold time.Duration) error {
 	// Ensure data directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -51,7 +51,7 @@ func Init(dbPath string) error {
 		Logger: logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
 			logger.Config{
-				SlowThreshold:             500 * time.Millisecond,
+				SlowThreshold:             slowThreshold,
 				LogLevel:                  logLevel,
 				IgnoreRecordNotFoundError: true,
 				Colorful:                  false,

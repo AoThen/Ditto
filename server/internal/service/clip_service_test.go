@@ -193,6 +193,9 @@ func TestDeletedClipsSync(t *testing.T) {
 
 // TestPullLimit tests pull limit enforcement
 func TestPullLimit(t *testing.T) {
+	svc, _, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
 	tests := []struct {
 		name        string
 		reqLimit    int
@@ -201,7 +204,7 @@ func TestPullLimit(t *testing.T) {
 		{
 			name:        "no limit specified",
 			reqLimit:    0,
-			expectedLim: DefaultSyncPullLimit,
+			expectedLim: svc.defaultSyncPullLimit,
 		},
 		{
 			name:        "reasonable limit",
@@ -211,7 +214,7 @@ func TestPullLimit(t *testing.T) {
 		{
 			name:        "excessive limit",
 			reqLimit:    10000,
-			expectedLim: MaxSyncPullLimit,
+			expectedLim: svc.maxSyncPullLimit,
 		},
 	}
 
@@ -219,10 +222,10 @@ func TestPullLimit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pullLimit := tt.reqLimit
 			if pullLimit <= 0 {
-				pullLimit = DefaultSyncPullLimit
+				pullLimit = svc.defaultSyncPullLimit
 			}
-			if pullLimit > MaxSyncPullLimit {
-				pullLimit = MaxSyncPullLimit
+			if pullLimit > svc.maxSyncPullLimit {
+				pullLimit = svc.maxSyncPullLimit
 			}
 
 			if pullLimit != tt.expectedLim {
@@ -431,10 +434,10 @@ func setupClipServiceTest(t *testing.T) (*ClipService, uint, string, func()) {
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
-	svc := NewClipService(nil)
+	svc := NewClipService(nil, 1000, 1000, 5000)
 
 	user := model.User{
 		Username:     "clipuser",

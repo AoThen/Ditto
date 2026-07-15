@@ -22,7 +22,7 @@ func setupAuthServiceTest(t *testing.T) (*AuthService, uint, string, func()) {
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	cfg := &config.Config{
@@ -120,7 +120,7 @@ func setupLoginTest(t *testing.T, password string) (*AuthService, uint, func()) 
 	dbPath := tmpFile.Name()
 	tmpFile.Close()
 
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	cfg := &config.Config{
@@ -204,7 +204,7 @@ func TestAuthService_Register(t *testing.T) {
 		defer os.Remove(dbPath + "-shm")
 		defer os.Remove(dbPath + "-wal")
 
-		err = database.Init(dbPath)
+		err = database.Init(dbPath, 500*time.Millisecond)
 		require.NoError(t, err)
 		defer func() { database.DB = nil }()
 
@@ -272,7 +272,7 @@ func TestAuthService_IsFirstUser(t *testing.T) {
 		defer os.Remove(dbPath + "-shm")
 		defer os.Remove(dbPath + "-wal")
 
-		err = database.Init(dbPath)
+		err = database.Init(dbPath, 500*time.Millisecond)
 		require.NoError(t, err)
 		defer func() { database.DB = nil }()
 
@@ -297,7 +297,7 @@ func TestAuthService_RegisterAllowed(t *testing.T) {
 		defer os.Remove(dbPath + "-shm")
 		defer os.Remove(dbPath + "-wal")
 
-		err = database.Init(dbPath)
+		err = database.Init(dbPath, 500*time.Millisecond)
 		require.NoError(t, err)
 		defer func() { database.DB = nil }()
 

@@ -3,6 +3,7 @@ package service
 import (
 	"os"
 	"testing"
+	"time"
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
@@ -22,7 +23,7 @@ func setupGroupServiceTest(t *testing.T) (*GroupService, uint, func()) {
 	tmpFile.Close()
 
 	// Initialize database
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	// Create a test user

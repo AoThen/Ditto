@@ -26,11 +26,19 @@ type Broadcaster interface {
 }
 
 type ClipService struct {
-	broadcaster Broadcaster
+	broadcaster          Broadcaster
+	maxPushLimit         int
+	defaultSyncPullLimit int
+	maxSyncPullLimit     int
 }
 
-func NewClipService(broadcaster Broadcaster) *ClipService {
-	return &ClipService{broadcaster: broadcaster}
+func NewClipService(broadcaster Broadcaster, maxPushLimit, defaultSyncPullLimit, maxSyncPullLimit int) *ClipService {
+	return &ClipService{
+		broadcaster:          broadcaster,
+		maxPushLimit:         maxPushLimit,
+		defaultSyncPullLimit: defaultSyncPullLimit,
+		maxSyncPullLimit:     maxSyncPullLimit,
+	}
 }
 
 // ClipFormatMeta represents format metadata (without actual data) for list responses
@@ -367,10 +375,7 @@ type SyncRequest struct {
 }
 
 const (
-	DefaultSyncPullLimit = 1000
-	MaxSyncPullLimit     = 5000
-	MaxPushLimit         = 1000
-	PushBatchSize        = 100
+	PushBatchSize = 100
 )
 
 // PushClipItem represents a clip being pushed from client
@@ -412,7 +417,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 	if len(req.PushClips) > 0 {
 		// Hard cap to prevent resource exhaustion
-		if len(req.PushClips) > MaxPushLimit {
+		if len(req.PushClips) > s.maxPushLimit {
 			return nil, ErrPushLimitExceeded
 		}
 
@@ -646,10 +651,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	// P9 FIX: Apply pagination limit to prevent memory exhaustion
 	pullLimit := req.Limit
 	if pullLimit <= 0 {
-		pullLimit = DefaultSyncPullLimit
+		pullLimit = s.defaultSyncPullLimit
 	}
-	if pullLimit > MaxSyncPullLimit {
-		pullLimit = MaxSyncPullLimit
+	if pullLimit > s.maxSyncPullLimit {
+		pullLimit = s.maxSyncPullLimit
 	}
 
 	var clips []model.Clip

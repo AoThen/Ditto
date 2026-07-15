@@ -23,7 +23,7 @@ func setupDeviceServiceTest(t *testing.T) (*DeviceService, uint, func()) {
 	tmpFile.Close()
 
 	// Initialize database
-	err = database.Init(dbPath)
+	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
 	// Create a test user

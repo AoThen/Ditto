@@ -98,7 +98,7 @@ func main() {
 	useTLS := tlsCert != "" && tlsKey != ""
 
 	// Initialize database
-	if err := database.Init(cfg.DatabasePath); err != nil {
+	if err := database.Init(cfg.DatabasePath, cfg.SlowThreshold); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
@@ -112,7 +112,7 @@ func main() {
 	// Initialize services
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(h)
+	clipSvc := service.NewClipService(h, cfg.MaxPushLimit, cfg.DefaultSyncPullLimit, cfg.MaxSyncPullLimit)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	rateLimiter := middleware.NewRateLimiter()

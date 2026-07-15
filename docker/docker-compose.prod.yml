@@ -22,6 +22,10 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - MAX_PUSH_LIMIT=${MAX_PUSH_LIMIT:-1000}
+      - SYNC_DEFAULT_PULL_LIMIT=${SYNC_DEFAULT_PULL_LIMIT:-1000}
+      - SYNC_MAX_PULL_LIMIT=${SYNC_MAX_PULL_LIMIT:-5000}
+      - DB_SLOW_THRESHOLD=${DB_SLOW_THRESHOLD:-500ms}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost:8443/health"]
       interval: 30s
