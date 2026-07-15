@@ -2529,3 +2529,38 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 		LogMessage(_T("OnWsMessage: unknown error"));
 	}
 }
+
+void CCloudSyncManager::TriggerQuickSync()
+{
+	EnterCriticalSection(&m_csSync);
+	BOOL bShouldSync = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
+	if (bShouldSync)
+	{
+		m_nActiveQuickSyncThreads++;
+	}
+	LeaveCriticalSection(&m_csSync);
+
+	if (!bShouldSync)
+	{
+		OutputDebugStringA("[CloudSync] TriggerQuickSync: sync not running.\n");
+		return;
+	}
+
+	QuickSyncContext* ctx = new QuickSyncContext;
+	ctx->pManager = this;
+	ctx->pCounter = &m_nActiveQuickSyncThreads;
+	ctx->pCS = &m_csSync;
+
+	CWinThread* pThread = AfxBeginThread(QuickSyncThreadProc, ctx, THREAD_PRIORITY_NORMAL, 0, 0);
+	if (pThread)
+	{
+		OutputDebugStringA("[CloudSync] TriggerQuickSync: spawned quick-push thread.\n");
+	}
+}
+
+void CCloudSyncManager::OnGroupDeleted(int localGroupId)
+{
+	LogMessage(_T("OnGroupDeleted: removing group mapping and triggering quick sync."));
+	DeleteRemoteGroupIdMapping(localGroupId);
+	TriggerQuickSync();
+}
