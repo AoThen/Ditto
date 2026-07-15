@@ -1,16 +1,6 @@
 name: CloudSync Compilation & Test
 
 on:
-  pull_request:
-    branches:
-      - master
-    paths:
-      - 'src/CloudSync/**'
-      - 'CloudSync_Test/**'
-      - 'CP_Main.vcxproj'
-      - 'CP_Main_10.sln'
-      - 'packages.config'
-      - '.github/workflows/cloudsync-check.yml'
   workflow_dispatch:
 
 env:
