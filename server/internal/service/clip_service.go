@@ -18,6 +18,7 @@ import (
 )
 
 var ErrInvalidSortBy = errors.New("无效的排序字段")
+var ErrPushLimitExceeded = errors.New("push clips limit exceeded")
 
 // Broadcaster defines the interface for WebSocket broadcast.
 type Broadcaster interface {
@@ -368,6 +369,8 @@ type SyncRequest struct {
 const (
 	DefaultSyncPullLimit = 1000
 	MaxSyncPullLimit     = 5000
+	MaxPushLimit         = 1000
+	PushBatchSize        = 100
 )
 
 // PushClipItem represents a clip being pushed from client
@@ -406,191 +409,221 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	pushedCount := 0
 	skippedCount := 0
 	pushedClipIDs := make([]string, 0, len(req.PushClips))
+
 	if len(req.PushClips) > 0 {
-		err := database.DB.Transaction(func(tx *gorm.DB) error {
-			// MEDIUM FIX (M7): Build CRC set for existing clips to prevent cross-ID duplicates
-			var existingCRCs map[string]string // crc -> clip_id
-			type crcRecord struct {
-				CRC int64  `gorm:"column:crc"`
-				ID  string `gorm:"column:id"`
-			}
-			var crcRecords []crcRecord
-			if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ?", userID, false).Find(&crcRecords).Error; err != nil {
-				return err
-			}
-			existingCRCs = make(map[string]string, len(crcRecords))
-			for _, r := range crcRecords {
-				existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
-			}
+		// Hard cap to prevent resource exhaustion
+		if len(req.PushClips) > MaxPushLimit {
+			return nil, ErrPushLimitExceeded
+		}
 
-			pushIDs := make([]string, 0, len(req.PushClips))
-			for _, pc := range req.PushClips {
-				pushIDs = append(pushIDs, pc.ID)
-			}
-			var existingClips []model.Clip
-			if err := tx.Where("id IN ? AND user_id = ?", pushIDs, userID).Find(&existingClips).Error; err != nil {
-				return err
-			}
-			existingMap := make(map[string]model.Clip, len(existingClips))
-			for _, c := range existingClips {
-				existingMap[c.ID] = c
-			}
+		// Load CRC set once (read-only, outside transaction for SQLite WAL)
+		type crcRecord struct {
+			CRC int64  `gorm:"column:crc"`
+			ID  string `gorm:"column:id"`
+		}
+		var crcRecords []crcRecord
+		if err := database.DB.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ?", userID, false).Find(&crcRecords).Error; err != nil {
+			return nil, err
+		}
+		existingCRCs := make(map[string]string, len(crcRecords))
+		for _, r := range crcRecords {
+			existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+		}
 
-			for _, pc := range req.PushClips {
-				// M7: CRC-based de-duplication - skip if same CRC already exists for this user
-				// But skip de-dup check if CRC is 0 (meaning no CRC was provided by client)
-				crcKey := fmt.Sprintf("%d", pc.CRC)
-				if pc.CRC != 0 {
-					if existingClipID, exists := existingCRCs[crcKey]; exists {
-						// Same content already exists, skip (treat as duplicate, not conflict)
-						skippedCount++
-						log.Printf("[Sync] CRC duplicate, skipping clip %s (existing: %s)", pc.ID, existingClipID)
-						continue
+		// Pre-processing type: format data decoded outside transaction
+		type preparedFormat struct {
+			FormatType int
+			Data       []byte
+			Encrypted  bool
+		}
+		type preparedItem struct {
+			item    PushClipItem
+			formats []preparedFormat
+		}
+
+		// Process in chunks — each chunk has its own short transaction
+		for start := 0; start < len(req.PushClips); start += PushBatchSize {
+			end := start + PushBatchSize
+			if end > len(req.PushClips) {
+				end = len(req.PushClips)
+			}
+			chunk := req.PushClips[start:end]
+
+			// Pre-decode all format base64 data (CPU work, outside transaction)
+			prepared := make([]preparedItem, 0, len(chunk))
+			for _, pc := range chunk {
+				formats := make([]preparedFormat, 0, len(pc.Formats))
+				for _, pf := range pc.Formats {
+					data, err := base64.StdEncoding.DecodeString(pf.Data)
+					if err != nil {
+						return nil, fmt.Errorf("sync: base64 decode failed for clip %s: %w", pc.ID, err)
 					}
+					formats = append(formats, preparedFormat{
+						FormatType: pf.FormatType,
+						Data:       data,
+						Encrypted:  pf.Encrypted,
+					})
+				}
+				prepared = append(prepared, preparedItem{item: pc, formats: formats})
+			}
+
+			// Per-chunk transaction
+			err := database.DB.Transaction(func(tx *gorm.DB) error {
+				// Load existing clips for this chunk's IDs
+				chunkIDs := make([]string, 0, len(chunk))
+				for _, p := range prepared {
+					chunkIDs = append(chunkIDs, p.item.ID)
+				}
+				var existingClips []model.Clip
+				if err := tx.Where("id IN ? AND user_id = ?", chunkIDs, userID).Find(&existingClips).Error; err != nil {
+					return err
+				}
+				existingMap := make(map[string]model.Clip, len(existingClips))
+				for _, c := range existingClips {
+					existingMap[c.ID] = c
 				}
 
-				// Check if clip already exists (upsert by ID)
-				existing, exists := existingMap[pc.ID]
+				// Accumulate formats for batch insert
+				var batchFormats []model.ClipFormat
 
-				if !exists {
-					// New clip: always create
-					// Use client-provided updated_at if available, otherwise use syncTime
-					clipUpdatedAt := syncTime
-					if !pc.UpdatedAt.IsZero() {
-						clipUpdatedAt = pc.UpdatedAt
-					}
-					clip := model.Clip{
-						ID:          pc.ID,
-						UserID:      userID,
-						DeviceID:    req.DeviceID,
-						Description: pc.Description,
-						Pinyin:      utils.ConvertToPinyin(pc.Description),
-						CRC:         pc.CRC,
-						GroupID:     pc.GroupID,
-						ShortCut:    pc.ShortCut,
-						CreatedAt:   clipUpdatedAt,
-						UpdatedAt:   clipUpdatedAt,
-						PasteCount:  0,
-					}
-					if err := tx.Create(&clip).Error; err != nil {
-						return err
-					}
+				for _, p := range prepared {
+					pc := p.item
 
-					// Create formats for new clip
-					for _, pf := range pc.Formats {
-						data, err := base64.StdEncoding.DecodeString(pf.Data)
-						if err != nil {
-							return err
-						}
-						format := model.ClipFormat{
-							ClipID:     clip.ID,
-							FormatType: pf.FormatType,
-							Data:       data,
-							Encrypted:  pf.Encrypted,
-							CreatedAt:  clipUpdatedAt,
-						}
-						if err := tx.Create(&format).Error; err != nil {
-							return err
+					// CRC-based de-duplication — skip if same CRC already exists
+					crcKey := fmt.Sprintf("%d", pc.CRC)
+					if pc.CRC != 0 {
+						if existingClipID, exists := existingCRCs[crcKey]; exists {
+							skippedCount++
+							log.Printf("[Sync] CRC duplicate, skipping clip %s (existing: %s)", pc.ID, existingClipID)
+							continue
 						}
 					}
 
-					pushedClipIDs = append(pushedClipIDs, clip.ID)
-				} else {
-					// LWW Conflict Resolution: only update if incoming is newer
-					// Compare by client-provided updated_at or server-side syncTime
-					incomingUpdatedAt := existing.UpdatedAt // default: use existing
-					if !pc.UpdatedAt.IsZero() {
-						incomingUpdatedAt = pc.UpdatedAt
-					}
+					existing, exists := existingMap[pc.ID]
 
-					if incomingUpdatedAt.After(existing.UpdatedAt) {
-						// Incoming clip is newer: update
-						if err := tx.Model(&existing).Updates(map[string]interface{}{
-							"description": pc.Description,
-							"pinyin":      utils.ConvertToPinyin(pc.Description),
-							"crc":         pc.CRC,
-							"group_id":    pc.GroupID,
-							"short_cut":   pc.ShortCut,
-							"updated_at":  incomingUpdatedAt,
-						}).Error; err != nil {
+					if !exists {
+						// New clip: always create
+						clipUpdatedAt := syncTime
+						if !pc.UpdatedAt.IsZero() {
+							clipUpdatedAt = pc.UpdatedAt
+						}
+						clip := model.Clip{
+							ID:          pc.ID,
+							UserID:      userID,
+							DeviceID:    req.DeviceID,
+							Description: pc.Description,
+							Pinyin:      utils.ConvertToPinyin(pc.Description),
+							CRC:         pc.CRC,
+							GroupID:     pc.GroupID,
+							ShortCut:    pc.ShortCut,
+							CreatedAt:   clipUpdatedAt,
+							UpdatedAt:   clipUpdatedAt,
+							PasteCount:  0,
+						}
+						if err := tx.Create(&clip).Error; err != nil {
 							return err
 						}
 
-						// Delete existing formats and insert new ones
-						if err := tx.Where("clip_id = ?", existing.ID).Delete(&model.ClipFormat{}).Error; err != nil {
-							return err
-						}
-
-						for _, pf := range pc.Formats {
-							data, err := base64.StdEncoding.DecodeString(pf.Data)
-							if err != nil {
-								return err
-							}
-							format := model.ClipFormat{
-								ClipID:     existing.ID,
+						for _, pf := range p.formats {
+							batchFormats = append(batchFormats, model.ClipFormat{
+								ClipID:     clip.ID,
 								FormatType: pf.FormatType,
-								Data:       data,
+								Data:       pf.Data,
 								Encrypted:  pf.Encrypted,
-								CreatedAt:  incomingUpdatedAt,
-							}
-							if err := tx.Create(&format).Error; err != nil {
+								CreatedAt:  clipUpdatedAt,
+							})
+						}
+
+						pushedClipIDs = append(pushedClipIDs, clip.ID)
+					} else {
+						// LWW Conflict Resolution: only update if incoming is newer
+						incomingUpdatedAt := existing.UpdatedAt
+						if !pc.UpdatedAt.IsZero() {
+							incomingUpdatedAt = pc.UpdatedAt
+						}
+
+						if incomingUpdatedAt.After(existing.UpdatedAt) {
+							// Incoming clip is newer: update
+							if err := tx.Model(&existing).Updates(map[string]interface{}{
+								"description": pc.Description,
+								"pinyin":      utils.ConvertToPinyin(pc.Description),
+								"crc":         pc.CRC,
+								"group_id":    pc.GroupID,
+								"short_cut":   pc.ShortCut,
+								"updated_at":  incomingUpdatedAt,
+							}).Error; err != nil {
 								return err
 							}
-						}
 
-						pushedClipIDs = append(pushedClipIDs, existing.ID)
-					} else {
-						// Existing clip is newer or same: save as conflict copy for review
-						skippedCount++
+							// Delete existing formats and queue new ones
+							if err := tx.Where("clip_id = ?", existing.ID).Delete(&model.ClipFormat{}).Error; err != nil {
+								return err
+							}
 
-						// Only create conflict copy if the incoming clip has different content
-						if existing.CRC != pc.CRC {
-							conflictClip := model.Clip{
-							ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
-							UserID:         userID,
-							DeviceID:       req.DeviceID,
-							Description:    pc.Description,
-							Pinyin:         utils.ConvertToPinyin(pc.Description),
-							CRC:            pc.CRC,
-							CreatedAt:      pc.UpdatedAt,
-							UpdatedAt:      pc.UpdatedAt,
-							GroupID:        pc.GroupID,
-							ShortCut:       pc.ShortCut,
-							PasteCount:     0,
-							IsConflictCopy: true,
-							WinClipID:      existing.ID,
-						}
-							if err := tx.Create(&conflictClip).Error; err != nil {
-								// Log but don't fail the sync
-								log.Printf("[Sync] Failed to create conflict copy for clip %s: %v", pc.ID, err)
-							} else {
-								// Copy formats to conflict clip
-								for _, pf := range pc.Formats {
-									data, err := base64.StdEncoding.DecodeString(pf.Data)
-									if err != nil {
-										continue
+							for _, pf := range p.formats {
+								batchFormats = append(batchFormats, model.ClipFormat{
+									ClipID:     existing.ID,
+									FormatType: pf.FormatType,
+									Data:       pf.Data,
+									Encrypted:  pf.Encrypted,
+									CreatedAt:  incomingUpdatedAt,
+								})
+							}
+
+							pushedClipIDs = append(pushedClipIDs, existing.ID)
+						} else {
+							// Existing clip is newer or same: save as conflict copy for review
+							skippedCount++
+
+							if existing.CRC != pc.CRC {
+								conflictClip := model.Clip{
+									ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
+									UserID:         userID,
+									DeviceID:       req.DeviceID,
+									Description:    pc.Description,
+									Pinyin:         utils.ConvertToPinyin(pc.Description),
+									CRC:            pc.CRC,
+									CreatedAt:      pc.UpdatedAt,
+									UpdatedAt:      pc.UpdatedAt,
+									GroupID:        pc.GroupID,
+									ShortCut:       pc.ShortCut,
+									PasteCount:     0,
+									IsConflictCopy: true,
+									WinClipID:      existing.ID,
+								}
+								if err := tx.Create(&conflictClip).Error; err != nil {
+									log.Printf("[Sync] Failed to create conflict copy for clip %s: %v", pc.ID, err)
+								} else {
+									for _, pf := range p.formats {
+										batchFormats = append(batchFormats, model.ClipFormat{
+											ClipID:     conflictClip.ID,
+											FormatType: pf.FormatType,
+											Data:       pf.Data,
+											Encrypted:  pf.Encrypted,
+											CreatedAt:  pc.UpdatedAt,
+										})
 									}
-									format := model.ClipFormat{
-										ClipID:     conflictClip.ID,
-										FormatType: pf.FormatType,
-										Data:       data,
-										Encrypted:  pf.Encrypted,
-										CreatedAt:  pc.UpdatedAt,
-									}
-									tx.Create(&format)
 								}
 							}
+							continue
 						}
-						continue
+					}
+
+					pushedCount++
+				}
+
+				// Batch insert all accumulated formats
+				if len(batchFormats) > 0 {
+					if err := tx.CreateInBatches(&batchFormats, 100).Error; err != nil {
+						return err
 					}
 				}
 
-				pushedCount++
+				return nil
+			})
+			if err != nil {
+				return nil, err
 			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
 		}
 	}
 
@@ -871,6 +904,7 @@ func loadGroupNames(groupIDs map[string]struct{}) map[string]string {
 	}
 	var groups []model.Group
 	if err := database.DB.Select("id, name").Where("id IN ?", ids).Find(&groups).Error; err != nil {
+		log.Printf("[loadGroupNames] DB error: %v", err)
 		return result
 	}
 	for _, g := range groups {
@@ -890,6 +924,7 @@ func loadDeviceNames(deviceIDs map[string]struct{}) map[string]string {
 	}
 	var devices []model.Device
 	if err := database.DB.Select("id, device_name").Where("id IN ?", ids).Find(&devices).Error; err != nil {
+		log.Printf("[loadDeviceNames] DB error: %v", err)
 		return result
 	}
 	for _, d := range devices {

@@ -104,6 +104,10 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 
 	result, err := h.service.Sync(userID, &req, deviceID)
 	if err != nil {
+		if errors.Is(err, service.ErrPushLimitExceeded) {
+			response.Error(c, http.StatusRequestEntityTooLarge, 41300, "同步数据量过大，请分批提交")
+			return
+		}
 		service.LogSyncOperation(userID, req.DeviceID, "push", 0, "failed", err.Error())
 		log.Printf("[Sync] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "同步失败")

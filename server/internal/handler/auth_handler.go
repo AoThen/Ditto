@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"ditto-cloud-server/internal/middleware"
@@ -31,7 +32,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Register] bind json error: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -43,7 +45,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		case service.ErrEmailExists:
 			response.Error(c, http.StatusBadRequest, 40002, "邮箱已被注册")
 		default:
-			response.Error(c, http.StatusInternalServerError, 50000, "注册失败: "+err.Error())
+			log.Printf("[Register] error: %v", err)
+			response.Error(c, http.StatusInternalServerError, 50000, "注册失败")
 		}
 		return
 	}
@@ -54,7 +57,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Login] bind json error: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -72,7 +76,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			h.rateLimiter.RecordLoginFailure(c.ClientIP(), req.Username)
 			response.Error(c, http.StatusUnauthorized, 40101, "用户名或密码错误")
 		default:
-			response.Error(c, http.StatusInternalServerError, 50000, "登录失败: "+err.Error())
+			log.Printf("[Login] error: %v", err)
+			response.Error(c, http.StatusInternalServerError, 50000, "登录失败")
 		}
 		return
 	}
@@ -99,7 +104,8 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	newToken, refreshToken, err := h.service.RefreshDeviceToken(userID, deviceID)
 	if err != nil {
-		response.Error(c, http.StatusUnauthorized, 40101, "Token 刷新失败: "+err.Error())
+		log.Printf("[Refresh] error: %v", err)
+		response.Error(c, http.StatusUnauthorized, 40101, "Token 刷新失败")
 		return
 	}
 

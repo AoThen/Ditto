@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/utils"
@@ -47,7 +48,16 @@ func Init(dbPath string) error {
 	log.Printf("[Database] GORM log level set")
 
 	DB, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             500 * time.Millisecond,
+				LogLevel:                  logLevel,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  false,
+				ParameterizedQueries:      true,
+			},
+		),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to connect database: %w", err)
