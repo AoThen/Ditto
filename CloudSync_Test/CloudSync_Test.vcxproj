@@ -86,6 +86,7 @@
   <ItemGroup>
     <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
+    <ClCompile Include="TestSHA2.cpp" />
     <ClCompile Include="CloudCryptoTest.cpp" />
     <ClCompile Include="CloudEncryptionTest.cpp" />
     <ClCompile Include="CloudKeyExportTest.cpp" />
@@ -109,6 +110,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\rijndael.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\EncryptDecrypt\sha2.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
