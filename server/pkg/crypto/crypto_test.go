@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,6 +97,10 @@ func TestHashPassword_EmptyPassword(t *testing.T) {
 }
 
 func TestBcryptCost_DefaultValue(t *testing.T) {
+	// If BCRYPT_COST is explicitly set, the default value is overridden
+	if os.Getenv("BCRYPT_COST") != "" {
+		t.Skip("BCRYPT_COST env var set, skipping default value check")
+	}
 	// BcryptCost should be at least 10 for security
 	assert.GreaterOrEqual(t, BcryptCost, 10)
 	// And not too high to avoid performance issues

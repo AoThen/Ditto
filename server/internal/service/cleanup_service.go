@@ -2,7 +2,6 @@ package service
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"ditto-cloud-server/internal/config"
@@ -12,13 +11,13 @@ import (
 
 // CleanupService handles periodic removal of old clips.
 type CleanupService struct {
-	cfg *config.Config
-	wg  sync.WaitGroup
+	cfg    *config.Config
+	doneCh chan struct{}
 }
 
 // NewCleanupService creates a new cleanup service.
 func NewCleanupService(cfg *config.Config) *CleanupService {
-	return &CleanupService{cfg: cfg}
+	return &CleanupService{cfg: cfg, doneCh: make(chan struct{})}
 }
 
 // Start begins the background cleanup goroutine.
@@ -28,8 +27,7 @@ func (s *CleanupService) Start(stopCh <-chan struct{}) {
 	log.Printf("[Cleanup] Starting cleanup service: interval=%v, maxAge=%v, maxClips=%d",
 		s.cfg.CleanupInterval, s.cfg.MaxClipAge, s.cfg.MaxClipsPerUser)
 
-	s.wg.Add(1)
-	defer s.wg.Done()
+	defer close(s.doneCh)
 
 	ticker := time.NewTicker(s.cfg.CleanupInterval)
 	defer ticker.Stop()
@@ -50,7 +48,7 @@ func (s *CleanupService) Start(stopCh <-chan struct{}) {
 
 // Wait blocks until the cleanup goroutine has exited.
 func (s *CleanupService) Wait() {
-	s.wg.Wait()
+	<-s.doneCh
 }
 
 // runCleanup performs one cleanup cycle.
