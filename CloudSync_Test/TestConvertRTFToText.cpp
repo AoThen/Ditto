@@ -10,15 +10,18 @@ TEST(ConvertRTFToText, ConstructAndDestroy)
 
 TEST(ConvertRTFToText, DISABLED_SimpleRtfToText)
 {
-    GTEST_SKIP() << "需要 Windows MFC 窗口环境";
+    // 需要 Windows MFC 窗口环境（googletest 1.8 无 GTEST_SKIP，已 DISABLED_）
+    SUCCEED();
 }
 
 TEST(ConvertRTFToText, DISABLED_PlainTextPassThrough)
 {
-    GTEST_SKIP() << "需要 Windows MFC 窗口环境";
+    // 需要 Windows MFC 窗口环境（googletest 1.8 无 GTEST_SKIP，已 DISABLED_）
+    SUCCEED();
 }
 
 TEST(ConvertRTFToText, DISABLED_EmptyString)
 {
-    GTEST_SKIP() << "需要 Windows MFC 窗口环境";
+    // 需要 Windows MFC 窗口环境（googletest 1.8 无 GTEST_SKIP，已 DISABLED_）
+    SUCCEED();
 }

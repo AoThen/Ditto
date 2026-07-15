@@ -12,7 +12,7 @@ TEST(Crc32, EmptyData)
 TEST(Crc32, KnownVector)
 {
 	CCrc32Dynamic crc;
-	const BYTE data[] = "hello";
+	BYTE data[] = { 'h','e','l','l','o',0 };
 	DWORD result = 0;
 	crc.GenerateCrc32(data, 5, result);
 	EXPECT_EQ(result, 0x3610A686u);

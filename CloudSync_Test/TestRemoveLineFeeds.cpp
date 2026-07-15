@@ -15,5 +15,6 @@ TEST(RemoveLineFeeds, DISABLED_FullIntegrationTest)
     // 2. 设置 CF_TEXT / CF_UNICODETEXT 格式数据
     // 3. 调用 RemoveLineFeeds
     // 4. 验证换行符已被移除
-    GTEST_SKIP() << "需要 mock IClip/IClipFormats 接口";
+    // 需要 mock IClip/IClipFormats 接口（googletest 1.8 无 GTEST_SKIP，已 DISABLED_）
+    SUCCEED();
 }
