@@ -50,7 +50,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_UNICODE;UNICODE;CLOUDSYNC_TEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Addins\DittoUtil;$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -70,7 +70,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_UNICODE;UNICODE;CLOUDSYNC_TEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Addins\DittoUtil;$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -87,6 +87,7 @@
     <ClCompile Include="CloudAuthTest.cpp" />
     <ClCompile Include="TestCrc32.cpp" />
     <ClCompile Include="TestRijndael.cpp" />
+    <ClCompile Include="TestTextConvert.cpp" />
     <ClCompile Include="TestWildCardMatch.cpp" />
     <ClCompile Include="TestSHA2.cpp" />
     <ClCompile Include="CloudCryptoTest.cpp" />
@@ -121,6 +122,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\src\WildCardMatch.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\Addins\DittoUtil\TextConvert.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
