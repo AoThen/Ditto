@@ -499,7 +499,7 @@ func TestListClips_Success(t *testing.T) {
 		require.NoError(t, database.DB.Create(&clip).Error)
 	}
 
-	resp, err := svc.ListClips(userID, 1, 20, "", "")
+	resp, err := svc.ListClips(userID, 1, 20, "", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(3), resp.Total)
 	assert.Len(t, resp.Items.([]ClipListItem), 3)
@@ -518,12 +518,12 @@ func TestListClips_WithSearch(t *testing.T) {
 	}
 	require.NoError(t, database.DB.Create(&clip2).Error)
 
-	resp, err := svc.ListClips(userID, 1, 20, "unique", "")
+	resp, err := svc.ListClips(userID, 1, 20, "unique", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), resp.Total)
 	assert.Len(t, resp.Items.([]ClipListItem), 1)
 
-	resp, err = svc.ListClips(userID, 1, 20, "nonexistent", "")
+	resp, err = svc.ListClips(userID, 1, 20, "nonexistent", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), resp.Total)
 }
@@ -534,7 +534,7 @@ func TestListClips_Empty(t *testing.T) {
 
 	require.NoError(t, database.DB.Delete(&model.Clip{}, "user_id = ?", userID).Error)
 
-	resp, err := svc.ListClips(userID, 1, 20, "", "")
+	resp, err := svc.ListClips(userID, 1, 20, "", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), resp.Total)
 	assert.Len(t, resp.Items.([]ClipListItem), 0)
@@ -555,7 +555,7 @@ func TestListClips_Pagination(t *testing.T) {
 		require.NoError(t, database.DB.Create(&clip).Error)
 	}
 
-	resp, err := svc.ListClips(userID, 1, 2, "", "")
+	resp, err := svc.ListClips(userID, 1, 2, "", "", "", "")
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), resp.Total)
 	assert.Len(t, resp.Items.([]ClipListItem), 2)
@@ -715,11 +715,11 @@ func TestListConflictClips_WithConflicts(t *testing.T) {
 	}
 	require.NoError(t, database.DB.Create(&conflictClip).Error)
 
-	clips, err := svc.ListConflictClips(userID)
+	clips, err := svc.ListConflictClips(userID, 1, 20)
 	require.NoError(t, err)
-	assert.Len(t, clips, 1)
-	assert.Equal(t, "conflict-clip-1", clips[0].ID)
-	assert.True(t, clips[0].IsConflictCopy)
+	items := clips.Items.([]ClipListItem)
+	assert.Len(t, items, 1)
+	assert.Equal(t, "conflict-clip-1", items[0].ID)
 }
 
 func TestResolveConflictClip_Accept(t *testing.T) {

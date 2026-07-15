@@ -1,31 +1,5 @@
-// Test clip management: list, search, delete
 import { test, expect } from '@playwright/test'
-
-// Helper: login as new user (cookies handled automatically)
-async function loginAsNewUser(page) {
-  const timestamp = Date.now()
-  const username = `clip_user_${timestamp}`
-
-  await page.goto('/register')
-  await page.getByPlaceholder('请输入用户名').fill(username)
-  await page.getByPlaceholder('请输入邮箱地址').fill(`${username}@test.com`)
-  await page.getByPlaceholder('请输入密码').fill('testpass123')
-  await page.getByPlaceholder('请再次输入密码').fill('testpass123')
-  await page.getByRole('button', { name: '注册' }).click()
-  await page.waitForURL('/login')
-
-  await page.getByPlaceholder('请输入用户名').fill(username)
-  await page.getByPlaceholder('请输入密码').fill('testpass123')
-  await page.getByRole('button', { name: '登录' }).click()
-  await page.waitForURL(/\/dashboard/)
-
-  // Get device_id via API (cookies shared automatically)
-  const devicesResp = await page.request.get('http://localhost:8080/api/v1/devices')
-  const devices = await devicesResp.json()
-  const deviceId = devices.data?.[0]?.id
-
-  return { username, deviceId }
-}
+import { loginAsNewUser } from './helpers'
 
 test.describe('Clip Management', () => {
   test('should show empty clip list after login', async ({ page }) => {
