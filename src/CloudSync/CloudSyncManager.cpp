@@ -912,11 +912,16 @@ void CCloudSyncManager::PullChanges()
 	{
 		LogMessage(_T("PullChanges: checking for changes from other devices..."));
 
-		// Build since timestamp as RFC3339
+		// Build since timestamp as RFC3339 (thread-safe read)
+		time_t lastSync;
+		EnterCriticalSection(&m_csSync);
+		lastSync = m_lastSyncTime;
+		LeaveCriticalSection(&m_csSync);
+
 		CStringA sinceStr;
-		if (m_lastSyncTime > 0)
+		if (lastSync > 0)
 		{
-			CTime sinceTime((time_t)m_lastSyncTime);
+			CTime sinceTime((time_t)lastSync);
 			sinceStr.Format("%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
 				sinceTime.GetYear(), sinceTime.GetMonth(), sinceTime.GetDay(),
 				sinceTime.GetHour(), sinceTime.GetMinute(), sinceTime.GetSecond());
