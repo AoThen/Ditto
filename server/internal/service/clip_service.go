@@ -529,19 +529,18 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				for _, p := range prepared {
 					pc := p.item
 
-					// CRC-based de-duplication — skip if same CRC already exists
-					crcKey := fmt.Sprintf("%d", pc.CRC)
-					if pc.CRC != 0 {
-						if existingClipID, exists := existingCRCs[crcKey]; exists {
-							skippedCount++
-							log.Printf("[Sync] CRC duplicate, skipping clip %s (existing: %s)", pc.ID, existingClipID)
-							continue
-						}
-					}
-
 					existing, exists := existingMap[pc.ID]
 
 					if !exists {
+						// CRC-based de-duplication for new clips — skip if same CRC already exists
+						crcKey := fmt.Sprintf("%d", pc.CRC)
+						if pc.CRC != 0 {
+							if _, exists := existingCRCs[crcKey]; exists {
+								skippedCount++
+								continue
+							}
+						}
+
 						// New clip: always create with server time
 						clipUpdatedAt := syncTime
 						clip := model.Clip{
