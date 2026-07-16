@@ -324,7 +324,7 @@ async function handleLogout() {
       confirmButtonText: '确定', cancelButtonText: '取消', type: 'info',
     })
     try {
-      await axios.post('/api/v1/auth/logout')
+      await axios.post('/api/v1/auth/logout', {}, { withCredentials: true })
     } catch (e) {
       // ignore
     }

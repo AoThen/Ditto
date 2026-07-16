@@ -1,11 +1,13 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/pkg/crypto"
+	"gorm.io/gorm"
 )
 
 type UserService struct{}
@@ -15,30 +17,37 @@ func NewUserService() *UserService {
 }
 
 func (s *UserService) CreateUser(username, email, password string) (*model.User, error) {
-	var existing model.User
-	if err := database.DB.Where("username = ?", username).First(&existing).Error; err == nil {
-		return nil, errors.New("用户名已存在")
-	}
+	var user model.User
 
-	if err := database.DB.Where("email = ?", email).First(&existing).Error; err == nil {
-		return nil, errors.New("邮箱已被注册")
-	}
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var existing model.User
+		if err := tx.Where("username = ?", username).First(&existing).Error; err == nil {
+			return errors.New("用户名已存在")
+		}
+		if err := tx.Where("email = ?", email).First(&existing).Error; err == nil {
+			return errors.New("邮箱已被注册")
+		}
 
-	hashedPassword, err := crypto.HashPassword(password)
+		hashedPassword, err := crypto.HashPassword(password)
+		if err != nil {
+			return err
+		}
+
+		role := "user"
+
+		user = model.User{
+			Username:     username,
+			Email:        email,
+			PasswordHash: hashedPassword,
+			Role:         role,
+			IsActive:     true,
+		}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
-		return nil, err
-	}
-
-	role := "user"
-
-	user := model.User{
-		Username:     username,
-		Email:        email,
-		PasswordHash: hashedPassword,
-		Role:         role,
-		IsActive:     true,
-	}
-	if err := database.DB.Create(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

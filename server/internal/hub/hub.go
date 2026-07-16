@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -71,10 +72,14 @@ type Hub struct {
 
 	// backend 是外部消息总线接口，默认使用 localBackend（内存实现）
 	backend Backend
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // New creates a new Hub instance.
 func New(backend ...Backend) *Hub {
+	ctx, cancel := context.WithCancel(context.Background())
 	b := Backend(&localBackend{done: make(chan struct{})})
 	if len(backend) > 0 && backend[0] != nil {
 		b = backend[0]
@@ -85,6 +90,8 @@ func New(backend ...Backend) *Hub {
 		unregister: make(chan *Client),
 		done:       make(chan struct{}),
 		backend:    b,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 }
 
@@ -230,9 +237,18 @@ func (h *Hub) BroadcastToOthers(userID int64, excludeConn interface{}, msgType s
 		}
 	}
 
+	h.wg.Add(1)
 	go func() {
+		defer h.wg.Done()
 		jsonMsg, _ := json.Marshal(msg)
-		_ = h.backend.Publish(userID, jsonMsg)
+		ch := make(chan error, 1)
+		go func() {
+			ch <- h.backend.Publish(userID, jsonMsg)
+		}()
+		select {
+		case <-ch:
+		case <-h.ctx.Done():
+		}
 	}()
 }
 
@@ -288,6 +304,7 @@ func (h *Hub) closeAll() {
 
 // Shutdown gracefully shuts down the hub.
 func (h *Hub) Shutdown() {
+	h.cancel()
 	close(h.done)
 	h.backend.Close()
 	h.wg.Wait()
