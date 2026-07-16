@@ -39,7 +39,7 @@
         <el-table-column prop="error" label="错误信息" min-width="200" show-overflow-tooltip />
         <el-table-column prop="synced_at" label="时间" width="180">
           <template #default="{ row }">
-            {{ formatTime(row.synced_at) }}
+            {{ formatDateTime(row.synced_at) }}
           </template>
         </el-table-column>
       </el-table>
@@ -62,6 +62,7 @@
 import { ref, onMounted } from 'vue'
 import { getSyncLogs } from '@/api/stats'
 import { ElMessage } from 'element-plus'
+import { formatDateTime } from '@/composables/useFormatDate'
 
 const logs = ref([])
 const loading = ref(false)
@@ -88,19 +89,6 @@ async function fetchLogs() {
   } finally {
     loading.value = false
   }
-}
-
-function formatTime(timeStr) {
-  if (!timeStr) return '-'
-  const date = new Date(timeStr)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
 }
 
 function getActionTagType(action) {

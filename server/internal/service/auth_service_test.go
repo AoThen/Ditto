@@ -337,7 +337,8 @@ func TestAuthService_ResetPassword(t *testing.T) {
 }
 
 func TestAuthService_GenerateDeviceID(t *testing.T) {
-	deviceID := generateDeviceID(1, "MyDevice")
+	deviceID, err := generateDeviceID(1, "MyDevice")
+	assert.NoError(t, err)
 
-	assert.Equal(t, "dev-1-MyDevice", deviceID)
+	assert.Equal(t, "dev-1-TXlEZXZpY2U", deviceID)
 }

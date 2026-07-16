@@ -74,3 +74,11 @@ export function batchDeleteClips(ids) {
     data: { ids }
   })
 }
+
+export function batchMarkDontSync(ids) {
+  return request({
+    url: '/api/v1/clips/batch-dont-sync',
+    method: 'post',
+    data: { ids }
+  })
+}

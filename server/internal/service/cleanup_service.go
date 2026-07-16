@@ -7,6 +7,7 @@ import (
 	"ditto-cloud-server/internal/config"
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+	"gorm.io/gorm"
 )
 
 // CleanupService handles periodic removal of old clips.
@@ -150,13 +151,19 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 }
 
 func (s *CleanupService) batchDeleteClips(clipIDs []string) (int, error) {
-	database.DB.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{})
-
-	result := database.DB.Where("id IN ?", clipIDs).Delete(&model.Clip{})
-	if result.Error != nil {
-		return 0, result.Error
-	}
-	return int(result.RowsAffected), nil
+	var total int
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
+			return err
+		}
+		result := tx.Where("id IN ?", clipIDs).Delete(&model.Clip{})
+		if result.Error != nil {
+			return result.Error
+		}
+		total = int(result.RowsAffected)
+		return nil
+	})
+	return total, err
 }
 
 // deleteOldSyncLogs removes sync_log entries older than 30 days

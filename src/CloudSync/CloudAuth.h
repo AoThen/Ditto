@@ -6,7 +6,7 @@ namespace httplib { class Client; }
 
 struct LoginResult
 {
-	BOOL success;
+	BOOL success = FALSE; // default-initialized to avoid undefined-behavior reads
 	CString deviceToken;
 	CString deviceId;
 	CString error;

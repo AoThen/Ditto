@@ -82,7 +82,7 @@ type ClipDetail struct {
 // ClipFormatFull represents format with base64-encoded data
 type ClipFormatFull struct {
 	FormatType int    `json:"format_type"`
-	Data       string `json:"data"`
+	Data       string `json:"data,omitempty"`
 	DataSize   int    `json:"data_size"`
 	Encrypted  bool   `json:"encrypted"` // true if data is E2E encrypted
 }
@@ -444,6 +444,11 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	pushedCount := 0
 	skippedCount := 0
 	pushedClipIDs := make([]string, 0, len(req.PushClips))
+	type pushedClipInfo struct {
+		ID          string
+		Description string
+	}
+	pushedClips := make([]pushedClipInfo, 0, len(req.PushClips))
 
 	if len(req.PushClips) > 0 {
 		// Hard cap to prevent resource exhaustion
@@ -572,6 +577,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						}
 
 						pushedClipIDs = append(pushedClipIDs, clip.ID)
+						pushedClips = append(pushedClips, pushedClipInfo{
+							ID:          clip.ID,
+							Description: pc.Description,
+						})
 					} else {
 						// LWW Conflict Resolution: only update if incoming is newer
 						incomingUpdatedAt := existing.UpdatedAt
@@ -610,6 +619,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							}
 
 							pushedClipIDs = append(pushedClipIDs, existing.ID)
+							pushedClips = append(pushedClips, pushedClipInfo{
+								ID:          existing.ID,
+								Description: pc.Description,
+							})
 						} else {
 							// Existing clip is newer or same: save as conflict copy for review
 							skippedCount++
@@ -669,17 +682,13 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	// Step 1.5: Broadcast to other devices of the same user (real-time push)
-	if s.broadcaster != nil && len(pushedClipIDs) > 0 {
-		for _, clipID := range pushedClipIDs {
-			// Find the clip to get description
-			var clip model.Clip
-			if err := database.DB.Where("id = ?", clipID).First(&clip).Error; err == nil {
-				s.broadcaster.BroadcastToOthers(int64(userID), nil, "clip_added", map[string]interface{}{
-					"clip_id":     clipID,
-					"device_id":   req.DeviceID,
-					"description": clip.Description,
-				})
-			}
+	if s.broadcaster != nil && len(pushedClips) > 0 {
+		for _, pc := range pushedClips {
+			s.broadcaster.BroadcastToOthers(int64(userID), nil, "clip_added", map[string]interface{}{
+				"clip_id":     pc.ID,
+				"device_id":   req.DeviceID,
+				"description": pc.Description,
+			})
 		}
 	}
 
@@ -725,7 +734,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		for _, f := range formats {
 			formatFulls = append(formatFulls, ClipFormatFull{
 				FormatType: f.FormatType,
-				Data:       base64.StdEncoding.EncodeToString(f.Data),
+				// Data:       base64.StdEncoding.EncodeToString(f.Data),
 				DataSize:   len(f.Data),
 				Encrypted:  f.Encrypted,
 			})

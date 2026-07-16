@@ -32,7 +32,7 @@
         <el-table-column prop="clip_count" label="剪贴板数量" width="120" align="center" />
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
-            {{ formatTime(row.created_at) }}
+            {{ formatDateTime(row.created_at) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -86,6 +86,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Folder, Document } from '@element-plus/icons-vue'
 import { listGroups, createGroup, updateGroup, deleteGroup } from '@/api/groups'
+import { formatDateTime } from '@/composables/useFormatDate'
 
 const groups = ref([])
 const searchText = ref('')
@@ -134,11 +135,6 @@ const parentGroupOptions = computed(() => {
   }
   return flatten(groups.value).filter(g => !isEdit.value || g.id !== form.value.id)
 })
-
-function formatTime(timeStr) {
-  if (!timeStr) return '-'
-  return new Date(timeStr).toLocaleString('zh-CN')
-}
 
 async function fetchGroups() {
   try {

@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -22,6 +23,25 @@ const (
 	maxMessageSize = 512
 )
 
+// Backend 定义了 Hub 的外部消息总线接口
+type Backend interface {
+	Publish(userID int64, message []byte) error
+	Subscribe(userID int64) error
+	Unsubscribe(userID int64) error
+	Receive() (int64, []byte, error)
+	Close() error
+}
+
+type localBackend struct{}
+
+func (b *localBackend) Publish(userID int64, message []byte) error { return nil }
+func (b *localBackend) Subscribe(userID int64) error              { return nil }
+func (b *localBackend) Unsubscribe(userID int64) error            { return nil }
+func (b *localBackend) Receive() (int64, []byte, error) {
+	select {}
+}
+func (b *localBackend) Close() error { return nil }
+
 // Hub manages all WebSocket connections, grouped by user ID.
 type Hub struct {
 	// Registered clients per user: userID -> map of *Client
@@ -41,15 +61,23 @@ type Hub struct {
 
 	// wg tracks all running goroutines for graceful shutdown
 	wg sync.WaitGroup
+
+	// backend 是外部消息总线接口，默认使用 localBackend（内存实现）
+	backend Backend
 }
 
 // New creates a new Hub instance.
-func New() *Hub {
+func New(backend ...Backend) *Hub {
+	b := Backend(&localBackend{})
+	if len(backend) > 0 && backend[0] != nil {
+		b = backend[0]
+	}
 	return &Hub{
 		clients:    make(map[int64]map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		done:       make(chan struct{}),
+		backend:    b,
 	}
 }
 
@@ -64,6 +92,31 @@ func (h *Hub) runLoop() {
 
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
+
+	h.wg.Add(1)
+	go func() {
+		defer h.wg.Done()
+		for {
+			userID, data, err := h.backend.Receive()
+			if err != nil {
+				return
+			}
+			var msg map[string]interface{}
+			if err := json.Unmarshal(data, &msg); err != nil {
+				continue
+			}
+			h.mu.RLock()
+			if conns, ok := h.clients[userID]; ok {
+				for client := range conns {
+					select {
+					case client.send <- msg:
+					default:
+					}
+				}
+			}
+			h.mu.RUnlock()
+		}
+	}()
 
 	for {
 		select {
@@ -169,6 +222,11 @@ func (h *Hub) BroadcastToOthers(userID int64, excludeConn interface{}, msgType s
 			log.Printf("[ws] send channel full for user_id=%d (broadcast to others), skipping", userID)
 		}
 	}
+
+	go func() {
+		jsonMsg, _ := json.Marshal(msg)
+		_ = h.backend.Publish(userID, jsonMsg)
+	}()
 }
 
 // broadcastPingToAll sends a ping heartbeat to all connected clients.
@@ -179,15 +237,18 @@ func (h *Hub) broadcastPingToAll() {
 	}
 
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	for userID, conns := range h.clients {
+	targets := make([]*Client, 0)
+	for _, conns := range h.clients {
 		for client := range conns {
-			select {
-			case client.send <- msg:
-			default:
-				log.Printf("[ws] ping send failed for user_id=%d", userID)
-			}
+			targets = append(targets, client)
+		}
+	}
+	h.mu.RUnlock()
+
+	for _, client := range targets {
+		select {
+		case client.send <- msg:
+		default:
 		}
 	}
 }

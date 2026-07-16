@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -13,12 +14,66 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
 
+// DataStore 定义了数据库操作接口，便于测试 mock
+type DataStore interface {
+	Create(value interface{}) *gorm.DB
+	First(dest interface{}, conds ...interface{}) *gorm.DB
+	Last(dest interface{}, conds ...interface{}) *gorm.DB
+	Where(query interface{}, args ...interface{}) *gorm.DB
+	Model(value interface{}) *gorm.DB
+	Select(query interface{}, args ...interface{}) *gorm.DB
+	Joins(query string, args ...interface{}) *gorm.DB
+	Raw(sql string, values ...interface{}) *gorm.DB
+	Exec(sql string, values ...interface{}) *gorm.DB
+	Save(value interface{}) *gorm.DB
+	Delete(value interface{}, conds ...interface{}) *gorm.DB
+	Transaction(fc func(tx *gorm.DB) error, opts ...*sql.TxOptions) error
+	Table(name string, args ...interface{}) *gorm.DB
+	Order(value interface{}) *gorm.DB
+	Limit(limit int) *gorm.DB
+	Offset(offset int) *gorm.DB
+	Count(count *int64) *gorm.DB
+	Find(dest interface{}, conds ...interface{}) *gorm.DB
+	Pluck(column string, value interface{}) *gorm.DB
+	Scopes(funcs ...func(*gorm.DB) *gorm.DB) *gorm.DB
+	Preload(query string, args ...interface{}) *gorm.DB
+	Clauses(conds ...clause.Expression) *gorm.DB
+	Update(column string, value interface{}) *gorm.DB
+	Updates(values interface{}) *gorm.DB
+	Session(config *gorm.Session) *gorm.DB
+	Unscoped() *gorm.DB
+	Debug() *gorm.DB
+	Distinct(args ...interface{}) *gorm.DB
+	Group(name string) *gorm.DB
+	Having(query interface{}, args ...interface{}) *gorm.DB
+	Scan(dest interface{}) *gorm.DB
+}
+
+// SetDB 允许在测试中注入 mock 数据库
+func SetDB(db *gorm.DB) {
+	DB = db
+}
+
 func Init(dbPath string, slowThreshold time.Duration) error {
+	driver := os.Getenv("DB_DRIVER")
+	if driver == "" {
+		driver = "sqlite"
+	}
+	switch driver {
+	case "postgres", "postgresql":
+		return InitPostgres(dbPath, slowThreshold)
+	default:
+		return InitSQLite(dbPath, slowThreshold)
+	}
+}
+
+func InitSQLite(dbPath string, slowThreshold time.Duration) error {
 	// Ensure data directory exists
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -73,12 +128,32 @@ func Init(dbPath string, slowThreshold time.Duration) error {
 		&model.SyncLog{},
 		&model.RateLimitRecord{},
 		&model.EncryptionSettings{},
+		&model.Migration{},
 	); err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
+	if err := recordMigrationVersion(DB); err != nil {
+		return fmt.Errorf("failed to record migration version: %w", err)
+	}
+
 	BackfillPinyin()
 
+	return nil
+}
+
+func InitPostgres(dsn string, slowThreshold time.Duration) error {
+	return fmt.Errorf("PostgreSQL 驱动需要在 go.mod 中添加 gorm.io/driver/postgres")
+}
+
+func recordMigrationVersion(db *gorm.DB) error {
+	if db.Migrator().HasTable(&model.Migration{}) {
+		var count int64
+		db.Model(&model.Migration{}).Count(&count)
+		if count == 0 {
+			return db.Create(&model.Migration{Version: "000001_init", AppliedAt: time.Now()}).Error
+		}
+	}
 	return nil
 }
 

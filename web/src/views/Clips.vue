@@ -39,6 +39,9 @@
       <el-button type="danger" :disabled="!selectedRows.length || batchDeleting" :loading="batchDeleting" @click="handleBatchDelete">
         删除选中 ({{ selectedRows.length }})
       </el-button>
+      <el-button type="warning" :disabled="!selectedRows.length" @click="handleBatchMarkDontSync">
+        标记不同步
+      </el-button>
     </div>
 
     <el-table
@@ -267,7 +270,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listClips, getClip, deleteClip, getChanges, batchDeleteClips } from '@/api/clips'
+import { listClips, getClip, deleteClip, getChanges, batchDeleteClips, batchMarkDontSync } from '@/api/clips'
 import { listConflictClips, resolveConflictClip } from '@/api/conflicts'
 import { listGroups, moveClipsToGroup, removeClipsFromGroup } from '@/api/groups'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -672,6 +675,26 @@ async function handleBatchDelete() {
     }
   } finally {
     batchDeleting.value = false
+  }
+}
+
+async function handleBatchMarkDontSync() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(
+      `确定将选中的 ${selectedRows.value.length} 个剪贴板标记为不同步？`,
+      '确认标记',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    const ids = selectedRows.value.map(row => row.id)
+    await batchMarkDontSync(ids)
+    ElMessage.success('标记成功')
+    selectedRows.value = []
+    fetchClips()
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('标记失败: ' + (err.message || '未知错误'))
+    }
   }
 }
 

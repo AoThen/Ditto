@@ -68,7 +68,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.service.Login(&req, c.GetHeader("X-Device-Name"))
+	deviceName := c.GetHeader("X-Device-Name")
+	if deviceName == "" {
+		deviceName = "unknown"
+	}
+	resp, err := h.service.Login(&req, deviceName)
 	if err != nil {
 		switch err {
 		case service.ErrInvalidCreds:
@@ -148,14 +152,14 @@ func setAuthCookies(c *gin.Context, accessToken, refreshToken, deviceID string, 
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Device ID cookie (readable by JS for display purposes only)
+	// Device ID cookie
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "device_id",
 		Value:    deviceID,
 		MaxAge:   accessMaxAge,
 		Path:     "/",
 		Secure:   secure,
-		HttpOnly: false,
+		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -179,7 +183,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		Name: "refresh_token", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name: "device_id", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: false, SameSite: http.SameSiteLaxMode,
+		Name: "device_id", MaxAge: -1, Path: "/", Secure: secure, HttpOnly: true, SameSite: http.SameSiteLaxMode,
 	})
 	response.SuccessWithMessage(c, "已退出登录", nil)
 }

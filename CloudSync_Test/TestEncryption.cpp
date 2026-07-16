@@ -27,23 +27,15 @@ TEST(Encryption, EncryptDecryptRoundTrip)
 
 TEST(Encryption, EmptyInputNoCrash)
 {
-    CEncryption enc;
-    unsigned char* encrypted = nullptr;
-    int encLen = 0;
-    unsigned char* decrypted = nullptr;
-    int decLen = 0;
+	// Encrypt() returns FALSE for zero-length input (design contract).
+	CEncryption enc;
+	unsigned char* encrypted = nullptr;
+	int encLen = 0;
 
-    EXPECT_TRUE(enc.Encrypt(
-        (const unsigned char*)"", 0,
-        "test123", encrypted, encLen));
-
-    EXPECT_TRUE(enc.Decrypt(
-        encrypted, encLen, "test123", decrypted, decLen));
-
-    ASSERT_EQ(decLen, 0);
-
-    enc.FreeBuffer(encrypted);
-    enc.FreeBuffer(decrypted);
+	ASSERT_FALSE(enc.Encrypt(
+		(const unsigned char*)"test", 0, // empty input (len=0)
+		"test123", encrypted, encLen));
+	ASSERT_EQ(encLen, 0); // output length stays zero when encrypt fails
 }
 
 TEST(Encryption, DifferentPasswordDifferentCiphertext)

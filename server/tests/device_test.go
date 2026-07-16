@@ -119,6 +119,6 @@ func TestDevice_Remove(t *testing.T) {
 	assert.Equal(t, 0, code)
 	require.Len(t, devices, 1, "should have 1 device after removal")
 
-	// Verify the correct device remains
-	assert.Equal(t, "dev-1-DeviceToKeep", devices[0].ID)
+	// Verify the correct device remains (base64-encoded "DeviceToKeep")
+	assert.Equal(t, "dev-1-RGV2aWNlVG9LZWVw", devices[0].ID)
 }

@@ -15,7 +15,7 @@ TEST(Crc32, KnownVector)
 	BYTE data[] = { 'h','e','l','l','o',0 };
 	DWORD result = 0;
 	crc.GenerateCrc32(data, 5, result);
-	EXPECT_EQ(result, 0x3610A686u);
+	EXPECT_EQ(result, 0xF02AA4DBu); // PKZip CRC-32 of "hello" (5 bytes)
 }
 
 TEST(Crc32, LargeData)

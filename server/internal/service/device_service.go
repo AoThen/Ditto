@@ -71,12 +71,13 @@ func (s *DeviceService) RemoveDevice(userID uint, deviceID string) error {
 }
 
 func (s *DeviceService) RenameDevice(userID uint, deviceID string, newName string) error {
-	if newName == "" {
-		return errors.New("设备名称不能为空")
+	safeName, err := sanitizeDeviceName(newName)
+	if err != nil {
+		return err
 	}
 	result := database.DB.Model(&model.Device{}).
 		Where("id = ? AND user_id = ?", deviceID, userID).
-		Update("device_name", newName)
+		Update("device_name", safeName)
 	if result.Error != nil {
 		return result.Error
 	}

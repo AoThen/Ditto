@@ -6,7 +6,7 @@ TEST(Md5, EmptyString)
 {
 	CMd5 md5;
 	char* result = md5.CalcMD5FromString("", 0);
-	EXPECT_STREQ(result, "d41d8cd98f00b204e9800998ecf8427e");
+	EXPECT_STREQ(result, "D41D8CD98F00B204E9800998ECF8427E"); // CMd5::CalcMD5FromString outputs uppercase hex
 	md5.FreeBuffer();
 }
 
@@ -14,7 +14,7 @@ TEST(Md5, Hello)
 {
 	CMd5 md5;
 	char* result = md5.CalcMD5FromString("hello", 5);
-	EXPECT_STREQ(result, "5d41402abc4b2a76b9719d911017c592");
+	EXPECT_STREQ(result, "5D41402ABC4B2A76B9719D911017C592"); // uppercase hex
 	md5.FreeBuffer();
 }
 
@@ -23,7 +23,7 @@ TEST(Md5, QuickBrownFox)
 	CMd5 md5;
 	const char* input = "The quick brown fox jumps over the lazy dog";
 	char* result = md5.CalcMD5FromString(input, (int)strlen(input));
-	EXPECT_STREQ(result, "9e107d9d372bb6826bd81d3542a419d6");
+	EXPECT_STREQ(result, "9E107D9D372BB6826BD81D3542A419D6"); // uppercase hex
 	md5.FreeBuffer();
 }
 

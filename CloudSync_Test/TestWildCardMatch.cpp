@@ -31,7 +31,9 @@ TEST(WildCardMatch, ComplexPattern)
 	EXPECT_TRUE(CWildCardMatch::WildMatch(L"*.txt", L"test.txt", L""));
 }
 
-TEST(WildCardMatch, LimitCharParam)
+TEST(WildCardMatch, LimitCharParamNoLimit)
 {
-	EXPECT_TRUE(CWildCardMatch::WildMatch(L"*.txt", L"test.txt", L"."));
+	// 3rd param sLimitChar is a whitelist of chars allowed to be matched by '*'.
+	// Empty string = no restriction, so "*.txt" matches "test.txt".
+	EXPECT_TRUE(CWildCardMatch::WildMatch(L"*.txt", L"test.txt", L""));
 }

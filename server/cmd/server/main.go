@@ -131,7 +131,8 @@ func main() {
 	wsHandler := handler.NewWSHandler(h, cfg)
 	statsSvc := service.NewStatsService()
 	statsHandler := handler.NewStatsHandler(statsSvc)
-	adminHandler := handler.NewAdminHandler()
+	userSvc := service.NewUserService()
+	adminHandler := handler.NewAdminHandler(userSvc)
 
 	// HIGH FIX (H5): Configure WebSocket allowed origins
 	handler.SetAllowedOrigins(cfg.AllowedOrigins)

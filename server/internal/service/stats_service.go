@@ -15,7 +15,7 @@ func NewStatsService() *StatsService {
 func (s *StatsService) GetDeviceStats(userID uint) (int64, error) {
 	var totalStorage int64
 	err := database.DB.Raw(
-		`SELECT COALESCE(SUM(LENGTH(data)), 0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ? AND deleted_at IS NULL)`,
+		`SELECT COALESCE(SUM(LENGTH(cf.data)), 0) FROM clip_formats cf INNER JOIN clips c ON c.id = cf.clip_id WHERE c.user_id = ? AND c.deleted_at IS NULL`,
 		userID,
 	).Scan(&totalStorage).Error
 	return totalStorage, err

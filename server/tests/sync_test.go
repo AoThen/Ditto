@@ -109,17 +109,16 @@ func TestSync_PushAndPull(t *testing.T) {
 	assert.Equal(t, clipID, receivedClip["id"])
 	assert.Equal(t, "Clip from DeviceA", receivedClip["description"])
 
-	// Verify formats are included with base64 data
+	// Verify formats are included (without base64 data in sync response — #14 fix)
 	formats, ok := receivedClip["formats"].([]interface{})
 	require.True(t, ok)
 	require.Len(t, formats, 1)
 
 	format := formats[0].(map[string]interface{})
 	assert.Equal(t, float64(13), format["format_type"])
-	dataStr, _ := format["data"].(string)
-	decoded, err := base64.StdEncoding.DecodeString(dataStr)
-	require.NoError(t, err)
-	assert.Equal(t, "Synced content", string(decoded))
+	// Sync response no longer includes binary data (omitempty after #14 fix)
+	_, dataPresent := format["data"]
+	assert.False(t, dataPresent, "sync response should not include format data (omitempty)")
 }
 
 // TestSync_SameDevice — device A syncs, should NOT get its own clips back

@@ -65,7 +65,8 @@ TEST(CloudSyncManager_HDROP_Extract, SingleFilePath)
 TEST(CloudSyncManager_HDROP_Extract, MultipleFilesSeparatedByNull)
 {
 	// Test extracting multiple file paths separated by null characters
-	std::string hdropData = "C:\\file1.txt\0C:\\file2.txt\0C:\\file3.txt\0";
+	// Use explicit length constructor because default std::string truncates at first '\0'
+	std::string hdropData("C:\\file1.txt\0C:\\file2.txt\0C:\\file3.txt\0", 39);
 	
 	// Simulate extraction (simplified - real code parses DROPFILES structure)
 	json paths = json::array();

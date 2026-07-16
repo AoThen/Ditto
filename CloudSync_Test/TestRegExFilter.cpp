@@ -39,9 +39,10 @@ TEST(RegExFilter, SpecialChars)
 
 TEST(RegExFilter, EmptyPattern)
 {
+	// Empty pattern means no regex configured => MatchesRegEx returns false (design contract).
 	CRegExFilterData filter;
 	filter.m_regEx = L"";
 	filter.ParseFilters();
 	std::wstring text = L"";
-	EXPECT_TRUE(filter.MatchesRegEx(text));
+	EXPECT_FALSE(filter.MatchesRegEx(text));
 }

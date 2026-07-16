@@ -71,7 +71,8 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
-	adminHandler := handler.NewAdminHandler()
+	userSvc := service.NewUserService()
+	adminHandler := handler.NewAdminHandler(userSvc)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -220,7 +221,8 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	encryptionHandler := handler.NewEncryptionHandler(encryptionSvc)
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
-	adminHandler := handler.NewAdminHandler()
+	userSvc := service.NewUserService()
+	adminHandler := handler.NewAdminHandler(userSvc)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -370,7 +372,8 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	groupHandler := handler.NewGroupHandler(groupSvc)
 	statsHandler := handler.NewStatsHandler(statsSvc)
 	wsHandler := handler.NewWSHandler(h, cfg)
-	adminHandler := handler.NewAdminHandler()
+	userSvc := service.NewUserService()
+	adminHandler := handler.NewAdminHandler(userSvc)
 
 	r := gin.New()
 	r.Use(gin.Recovery())

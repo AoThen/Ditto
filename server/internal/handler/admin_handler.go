@@ -1,22 +1,21 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 
-	"ditto-cloud-server/internal/database"
-	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
-	"ditto-cloud-server/pkg/crypto"
+	"ditto-cloud-server/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-type AdminHandler struct{}
+type AdminHandler struct {
+	userService *service.UserService
+}
 
-func NewAdminHandler() *AdminHandler {
-	return &AdminHandler{}
+func NewAdminHandler(userService *service.UserService) *AdminHandler {
+	return &AdminHandler{userService: userService}
 }
 
 type CreateUserRequest struct {
@@ -43,35 +42,16 @@ func (h *AdminHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	// Check if username exists
-	var existing model.User
-	if err := database.DB.Where("username = ?", req.Username).First(&existing).Error; err == nil {
-		response.Error(c, http.StatusBadRequest, 40001, "用户名已存在")
-		return
-	}
-
-	// Check if email exists
-	if err := database.DB.Where("email = ?", req.Email).First(&existing).Error; err == nil {
-		response.Error(c, http.StatusBadRequest, 40002, "邮箱已被注册")
-		return
-	}
-
-	hashedPassword, err := crypto.HashPassword(req.Password)
+	user, err := h.userService.CreateUser(req.Username, req.Email, req.Password)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "密码加密失败")
-		return
-	}
-
-	user := model.User{
-		Username:     req.Username,
-		Email:        req.Email,
-		PasswordHash: hashedPassword,
-		Role:         "user",
-		IsActive:     true,
-	}
-
-	if err := database.DB.Create(&user).Error; err != nil {
-		log.Printf("[CreateUser] error: %v", err)
+		if err.Error() == "用户名已存在" {
+			response.Error(c, http.StatusBadRequest, 40001, err.Error())
+			return
+		}
+		if err.Error() == "邮箱已被注册" {
+			response.Error(c, http.StatusBadRequest, 40002, err.Error())
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, 50000, "创建用户失败")
 		return
 	}
@@ -93,34 +73,8 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	search := c.Query("search")
 
-	var total int64
-	query := database.DB.Model(&model.User{})
-	if search != "" {
-		like := "%" + search + "%"
-		query = query.Where("username LIKE ? OR email LIKE ?", like, like)
-	}
-	query.Count(&total)
-
-	var users []struct {
-		model.User
-		DeviceCount int64 `json:"device_count"`
-	}
-
-	offset := (page - 1) * perPage
-	rows := database.DB.Model(&model.User{}).
-		Select("users.*, COALESCE(dc.device_count, 0) as device_count").
-		Joins("LEFT JOIN (SELECT user_id, COUNT(*) as device_count FROM devices GROUP BY user_id) dc ON dc.user_id = users.id").
-		Order("users.id DESC").
-		Limit(perPage).
-		Offset(offset)
-
-	if search != "" {
-		like := "%" + search + "%"
-		rows = rows.Where("users.username LIKE ? OR users.email LIKE ?", like, like)
-	}
-
-	if err := rows.Find(&users).Error; err != nil {
-		log.Printf("[ListUsers] error: %v", err)
+	users, total, err := h.userService.ListUsers(search, page, perPage)
+	if err != nil {
 		response.Error(c, http.StatusInternalServerError, 50000, "查询用户列表失败")
 		return
 	}
@@ -140,14 +94,13 @@ func (h *AdminHandler) GetUser(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	user, err := h.userService.GetUser(uint(id))
+	if err != nil {
 		response.Error(c, http.StatusNotFound, 40400, "用户不存在")
 		return
 	}
 
-	var deviceCount int64
-	database.DB.Model(&model.Device{}).Where("user_id = ?", user.ID).Count(&deviceCount)
+	deviceCount, _ := h.userService.GetDeviceCount(user.ID)
 
 	response.Success(c, gin.H{
 		"id":           user.ID,
@@ -174,8 +127,7 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := h.userService.CheckUserExists(uint(id)); err != nil {
 		response.Error(c, http.StatusNotFound, 40400, "用户不存在")
 		return
 	}
@@ -183,22 +135,18 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 	updates := map[string]interface{}{}
 
 	if req.Email != nil {
-		// Check email uniqueness
-		var existing model.User
-		if err := database.DB.Where("email = ? AND id != ?", *req.Email, id).First(&existing).Error; err == nil {
-			response.Error(c, http.StatusBadRequest, 40002, "邮箱已被其他用户使用")
+		if err := h.userService.CheckEmailTakenByOther(*req.Email, uint(id)); err != nil {
+			response.Error(c, http.StatusBadRequest, 40002, err.Error())
 			return
 		}
 		updates["email"] = *req.Email
 	}
 
 	if req.Password != nil {
-		hashedPassword, err := crypto.HashPassword(*req.Password)
-		if err != nil {
+		if err := h.userService.ResetPassword(uint(id), *req.Password); err != nil {
 			response.Error(c, http.StatusInternalServerError, 50000, "密码加密失败")
 			return
 		}
-		updates["password_hash"] = hashedPassword
 	}
 
 	if req.IsActive != nil {
@@ -215,8 +163,7 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 	}
 
 	if len(updates) > 0 {
-		if err := database.DB.Model(&user).Updates(updates).Error; err != nil {
-			log.Printf("[UpdateUser] error: %v", err)
+		if err := h.userService.UpdateUser(uint(id), updates); err != nil {
 			response.Error(c, http.StatusInternalServerError, 50000, "更新用户失败")
 			return
 		}
@@ -232,42 +179,12 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := database.DB.First(&user, id).Error; err != nil {
-		response.Error(c, http.StatusNotFound, 40400, "用户不存在")
-		return
-	}
-
-	// Prevent deleting the last admin
-	var adminCount int64
-	database.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount)
-	if user.Role == "admin" && adminCount <= 1 {
-		response.Error(c, http.StatusBadRequest, 40003, "无法删除最后一个管理员账号")
-		return
-	}
-
-	// Hard delete: delete all related data first, then user
-	// Delete clip formats (via clips), clips, groups, devices, sync logs, encryption settings
-	tx := database.DB.Begin()
-
-	// Find all clips belonging to this user
-	var clipIDs []uint
-	tx.Model(&model.Clip{}).Where("user_id = ?", user.ID).Pluck("id", &clipIDs)
-
-	if len(clipIDs) > 0 {
-		tx.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{})
-		tx.Delete(&model.Clip{}, clipIDs)
-	}
-
-	tx.Where("user_id = ?", user.ID).Delete(&model.Device{})
-	tx.Where("user_id = ?", user.ID).Delete(&model.Group{})
-	tx.Where("user_id = ?", user.ID).Delete(&model.SyncLog{})
-	tx.Where("user_id = ?", user.ID).Delete(&model.EncryptionSettings{})
-	tx.Delete(&user)
-
-	if err := tx.Commit().Error; err != nil {
-		log.Printf("[DeleteUser] error: %v", err)
-		response.Error(c, http.StatusInternalServerError, 50000, "删除用户失败")
+	if err := h.userService.DeleteUser(uint(id)); err != nil {
+		if err.Error() == "无法删除最后一个管理员账号" {
+			response.Error(c, http.StatusBadRequest, 40003, err.Error())
+			return
+		}
+		response.Error(c, http.StatusNotFound, 40400, err.Error())
 		return
 	}
 
@@ -287,20 +204,12 @@ func (h *AdminHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := h.userService.CheckUserExists(uint(id)); err != nil {
 		response.Error(c, http.StatusNotFound, 40400, "用户不存在")
 		return
 	}
 
-	hashedPassword, err := crypto.HashPassword(req.Password)
-	if err != nil {
-		response.Error(c, http.StatusInternalServerError, 50000, "密码加密失败")
-		return
-	}
-
-	if err := database.DB.Model(&user).Update("password_hash", hashedPassword).Error; err != nil {
-		log.Printf("[ResetPassword] error: %v", err)
+	if err := h.userService.ResetPassword(uint(id), req.Password); err != nil {
 		response.Error(c, http.StatusInternalServerError, 50000, "重置密码失败")
 		return
 	}
