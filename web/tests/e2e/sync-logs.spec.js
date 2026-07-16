@@ -58,7 +58,7 @@ test.describe('Sync Logs & Stats', () => {
           crc: 44444,
           group_id: '',
           short_cut: 0,
-          formats: [{ format_type: 13, data: 'filter' }]
+          formats: [{ format_type: 13, data: 'ZmlsdGVy' }]
         }]
       }
     })
@@ -87,7 +87,7 @@ test.describe('Sync Logs & Stats', () => {
           crc: 55555,
           group_id: '',
           short_cut: 0,
-          formats: [{ format_type: 13, data: 'uiTest' }]
+          formats: [{ format_type: 13, data: 'dWlUZXN0' }]
         }]
       }
     })

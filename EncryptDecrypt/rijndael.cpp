@@ -1397,14 +1397,22 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 		}
 	}
 
-	while(r <= (int)m_uRounds)
+	// Generate remaining expanded key columns.
+	// total_cols = 4*(Nr+1), already written = columns_written, need total_cols - columns_written more.
+	// The old bound r<=m_uRounds was wrong for AES-192 (ran 12 iterations, needed 8),
+	// and also wrong for AES-256 (ran 14 iterations, needed 8).
+	// We track columns_written directly since r doesn't advance uniformly
+	// (sometimes +1, sometimes +2 per inner-loop round boundary).
+	int totalCols = 4 * ((int)m_uRounds + 1);
+	int columnsWritten = 0;
+	while(columnsWritten < totalCols)
 	{
 		tempKey[0][0] ^= S[tempKey[uKeyColumns-1][1]];
 		tempKey[0][1] ^= S[tempKey[uKeyColumns-1][2]];
 		tempKey[0][2] ^= S[tempKey[uKeyColumns-1][3]];
 		tempKey[0][3] ^= S[tempKey[uKeyColumns-1][0]];
 		tempKey[0][0] ^= rcon[rconpointer++];
-
+	
 		if (uKeyColumns != 8)
 		{
 			for(j = 1; j < uKeyColumns; j++)
@@ -1425,9 +1433,9 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 				*((RD_UINT32*)tempKey[j]) ^= *((RD_UINT32*)tempKey[j-1]);
 			}
 		}
-		for(j = 0; (j < uKeyColumns) && (r <= (int)m_uRounds); )
+		for(j = 0; j < uKeyColumns; )
 		{
-			for(; (j < uKeyColumns) && (t < 4); j++, t++)
+			for(; (j < uKeyColumns) && (t < 4) && (columnsWritten < totalCols); j++, t++, columnsWritten++)
 			{
 				*((RD_UINT32*)m_expandedKey[r][t]) = *((RD_UINT32*)tempKey[j]);
 			}
@@ -1439,6 +1447,7 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 		}
 	}
 }
+
 
 void Rijndael::keyEncToDec()
 {

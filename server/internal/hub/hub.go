@@ -2,6 +2,7 @@ package hub
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -32,15 +33,21 @@ type Backend interface {
 	Close() error
 }
 
-type localBackend struct{}
+type localBackend struct {
+	done chan struct{}
+}
 
 func (b *localBackend) Publish(userID int64, message []byte) error { return nil }
 func (b *localBackend) Subscribe(userID int64) error              { return nil }
 func (b *localBackend) Unsubscribe(userID int64) error            { return nil }
 func (b *localBackend) Receive() (int64, []byte, error) {
-	select {}
+	<-b.done
+	return 0, nil, errors.New("hub closed")
 }
-func (b *localBackend) Close() error { return nil }
+func (b *localBackend) Close() error {
+	close(b.done)
+	return nil
+}
 
 // Hub manages all WebSocket connections, grouped by user ID.
 type Hub struct {
@@ -68,7 +75,7 @@ type Hub struct {
 
 // New creates a new Hub instance.
 func New(backend ...Backend) *Hub {
-	b := Backend(&localBackend{})
+	b := Backend(&localBackend{done: make(chan struct{})})
 	if len(backend) > 0 && backend[0] != nil {
 		b = backend[0]
 	}
@@ -282,6 +289,7 @@ func (h *Hub) closeAll() {
 // Shutdown gracefully shuts down the hub.
 func (h *Hub) Shutdown() {
 	close(h.done)
+	h.backend.Close()
 	h.wg.Wait()
 	log.Println("[ws] hub shut down")
 }

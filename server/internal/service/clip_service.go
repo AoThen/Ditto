@@ -734,7 +734,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		for _, f := range formats {
 			formatFulls = append(formatFulls, ClipFormatFull{
 				FormatType: f.FormatType,
-				// Data:       base64.StdEncoding.EncodeToString(f.Data),
+				Data:       base64.StdEncoding.EncodeToString(f.Data),
 				DataSize:   len(f.Data),
 				Encrypted:  f.Encrypted,
 			})
