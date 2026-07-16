@@ -73,7 +73,7 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 		// Encrypt
 		std::vector<BYTE> tag;
 		std::vector<BYTE> ct = AesGcmEncrypt(m_aesKey, iv, pt, tag);
-		if (ct.empty())
+		if (tag.empty())
 		{
 			CLOUD_CRYPTO_TRACE("[CloudCrypto] Encrypt: AesGcmEncrypt failed. pt.size()=%zu\n", pt.size());
 			return CStringA("");
@@ -442,7 +442,7 @@ std::vector<BYTE> CCloudCrypto::PBKDF2(
 	int iterations,
 	int dkLen)
 {
-	if (password.empty() || salt.empty() || iterations <= 0 || dkLen <= 0)
+	if (salt.empty() || iterations <= 0 || dkLen <= 0)
 		return std::vector<BYTE>();
 
 	// hLen = 32 (SHA-256 output size)

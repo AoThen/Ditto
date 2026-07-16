@@ -576,10 +576,6 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 	}
 
 	CStringA result = CCloudCrypto::Decrypt(encryptedBase64);
-	if (result.IsEmpty() && !encryptedBase64.IsEmpty())
-	{
-		return encryptedBase64;
-	}
 	return result;
 }
 
