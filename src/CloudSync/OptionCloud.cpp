@@ -193,6 +193,14 @@ BOOL COptionCloud::OnInitDialog()
 
 	UpdateData(FALSE);
 
+	// Check if encryption needs recovery (DEK lost at startup)
+	// This handles the case where WM_CLOUD_AUTH_REQUIRED(997) was posted
+	// before this property page was created and thus never delivered.
+	if (CGetSetOptions::GetCloudEncryptionNeedsRecovery() && m_bEnabled)
+	{
+		PostMessage(WM_CLOUD_AUTH_REQUIRED, 997, 0);
+	}
+
 	return TRUE;  // return TRUE unless you set the focus to a control
 }
 
@@ -337,8 +345,23 @@ void COptionCloud::OnBtnEnableEncryption()
 		{
 			m_bEncryptionEnabled = TRUE;
 			m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncryptionEnabledSalt", "Encryption enabled (Salt: %s...)"), result.salt.Left(16));
-			MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabled", "Encryption has been enabled. Your data will be encrypted before syncing."),
-			           theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONINFORMATION);
+
+			// Restart sync with new encryption key (safe even if sync was never started)
+			if (!theApp.m_CloudSyncManager.ReinitializeSync())
+			{
+				OutputDebugStringA("[OptionCloud] ReinitializeSync failed after encryption setup.\n");
+
+				MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabledNoSync",
+					"Encryption has been enabled, but cloud sync could not be started.\n\n"
+					"Please check your login status and try again."),
+					theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONWARNING);
+			}
+			else
+			{
+				MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabled",
+					"Encryption has been enabled. Your data will be encrypted before syncing."),
+					theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONINFORMATION);
+			}
 		}
 		else
 		{
@@ -650,6 +673,37 @@ msg = theApp.m_Language.GetString("CloudMsgEncryptionFailed",
 		if (pSheet != nullptr)
 		{
 			pSheet->SetActivePage(this);
+		}
+	}
+	else if (statusCode == 997)
+	{
+		// Encryption key (DEK) lost or corrupted — offer recovery
+		CString msg = theApp.m_Language.GetString("CloudMsgEncryptionKeyLost",
+			_T("Encryption key is missing or corrupted!\n\n"
+			   "Your clipboard encryption key (DEK) could not be loaded.\n"
+			   "Cloud sync has been stopped to prevent data loss.\n\n"
+			   "Do you want to re-setup encryption now?\n"
+			   "WARNING: Previously encrypted clips on the server will\n"
+			   "become unreadable and will be skipped during sync.\n\n"
+			   "- Click Yes to enter a new encryption password and restore sync\n"
+			   "- Click No to keep sync stopped (you can re-enable later in settings)"));
+
+		CString title = theApp.m_Language.GetString("CloudTitleEncryptionKeyLost",
+			_T("Cloud Sync - Encryption Key Lost"));
+
+		int ret = MessageBox(msg, title, MB_ICONERROR | MB_YESNO);
+
+		// Clear the persistent recovery flag regardless of choice
+		CGetSetOptions::SetCloudEncryptionNeedsRecovery(FALSE);
+
+		if (ret == IDYES)
+		{
+			// Open this property page to show encryption settings
+			CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());
+			if (pSheet != nullptr)
+			{
+				pSheet->SetActivePage(this);
+			}
 		}
 	}
 	

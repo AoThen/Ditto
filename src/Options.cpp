@@ -1721,6 +1721,16 @@ void CGetSetOptions::SetCloudSyncEncryptionEnabled(BOOL bValue)
 	SetProfileLong("CloudSyncEncryptionEnabled", bValue);
 }
 
+BOOL CGetSetOptions::GetCloudEncryptionNeedsRecovery()
+{
+	return GetProfileLong("CloudEncryptionNeedsRecovery", 0);
+}
+
+void CGetSetOptions::SetCloudEncryptionNeedsRecovery(BOOL bValue)
+{
+	SetProfileLong("CloudEncryptionNeedsRecovery", bValue);
+}
+
 __int64 CGetSetOptions::GetCloudLastSyncTime()
 {
 	CString csValue = GetProfileString("CloudLastSyncTime", _T("0"));

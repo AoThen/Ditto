@@ -298,6 +298,8 @@ public:
 	static void     SetCloudEncryptionSalt(LPCTSTR lpszValue);
 	static BOOL     GetCloudSyncEncryptionEnabled();
 	static void     SetCloudSyncEncryptionEnabled(BOOL bValue);
+	static BOOL     GetCloudEncryptionNeedsRecovery();
+	static void     SetCloudEncryptionNeedsRecovery(BOOL bValue);
 	static __int64  GetCloudLastSyncTime();
 	static void     SetCloudLastSyncTime(__int64 value);
 	static CString  GetCloudKeyFilePath();

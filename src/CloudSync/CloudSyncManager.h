@@ -28,6 +28,9 @@ public:
 	// Initialize: read config, start background thread
 	BOOL Initialize();
 
+	// Reinitialize: clean stop and full restart (used after encryption re-setup)
+	BOOL ReinitializeSync();
+
 	// Stop sync and cleanup thread
 	void Stop();
 
@@ -106,13 +109,13 @@ private:
 	static UINT ForceSyncThreadProc(LPVOID pParam);
 
 	// Push local clips to cloud
-	void PushNewClips(BOOL bForce = FALSE);
+	BOOL PushNewClips(BOOL bForce = FALSE);
 
 	// Pull changes from cloud
 	void PullChanges();
 
 	// Push local groups to cloud (creates/updates groups on server)
-	void PushGroups();
+	std::vector<std::string> PushGroups();
 
 	// Pull groups from cloud (creates/updates local groups from server)
 	void PullGroups();

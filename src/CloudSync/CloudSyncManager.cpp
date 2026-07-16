@@ -135,6 +135,10 @@ BOOL CCloudSyncManager::Initialize()
 		{
 			// User has encryption enabled but initialization failed — abort
 			LogMessage(_T("CRITICAL: Encryption is enabled but failed to initialize. Aborting sync initialization."));
+
+			// Set persistent flag so OptionCloud can show recovery prompt even if 997 message is lost
+			CGetSetOptions::SetCloudEncryptionNeedsRecovery(TRUE);
+
 			CWnd* pMainWnd = AfxGetMainWnd();
 			if (pMainWnd != nullptr)
 			{
@@ -197,6 +201,20 @@ BOOL CCloudSyncManager::Initialize()
 
 	LogMessage(_T("Initialized successfully."));
 	return TRUE;
+}
+
+BOOL CCloudSyncManager::ReinitializeSync()
+{
+	LogMessage(_T("ReinitializeSync: stopping and restarting sync..."));
+
+	// Stop cleans up events, sync thread, WS thread (safe even if nothing was created)
+	Stop();
+
+	// Reset crypto flag so InitializeEncryption re-reads from registry
+	m_cryptoInitialized = FALSE;
+
+	// Re-run full init — reads settings, creates events, thread, WS
+	return Initialize();
 }
 
 void CCloudSyncManager::Stop()
@@ -320,8 +338,15 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 		// Check force upload flag (one-shot, auto-reset)
 		BOOL bForce = InterlockedExchange(&pThis->m_forceOverrideRemote, 0) == 1;
 
-		pThis->PushGroups();
-		pThis->PushNewClips(bForce);
+		auto newGroupIds = pThis->PushGroups();
+		if (!pThis->PushNewClips(bForce))
+		{
+			// PushNewClips failed - rollback newly created groups
+			for (const auto& gid : newGroupIds)
+			{
+				pThis->DeleteRemoteGroup(gid);
+			}
+		}
 	}
 	else
 	{
@@ -340,6 +365,7 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 
 void CCloudSyncManager::TriggerSync()
 {
+	PushGroups();
 	PushNewClips();
 	PullChanges();
 }
@@ -371,8 +397,8 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 		return 1;
 
 	LogMessage(_T("ForceSyncThreadProc: running pull changes with override..."));
-	pThis->PullChanges();
 	pThis->PullGroups();
+	pThis->PullChanges();
 	LogMessage(_T("ForceSyncThreadProc: force download complete."));
 
 	// Decrement active thread counter so Stop() can complete
@@ -560,7 +586,6 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	}
 	catch (...)
 	{
-		// Silent fail
 	}
 	return FALSE;
 }
@@ -613,10 +638,10 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 				pThis->PushNewClips();
 			}
 
-			// Pull changes
-			pThis->PullChanges();
-			// After pulling changes, pull groups so local groups are created before clip group_id mapping
+			// Pull groups first so group_id mappings exist before clip import
 			pThis->PullGroups();
+			// Then pull changes (clips can now resolve group_id to local parentId)
+			pThis->PullChanges();
 		}
 		catch (const std::exception& e)
 		{
@@ -626,7 +651,6 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		}
 		catch (...)
 		{
-			LogMessage(_T("Unknown sync error."));
 		}
 	}
 
@@ -634,7 +658,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 	return 0;
 }
 
-void CCloudSyncManager::PushNewClips(BOOL bForce)
+BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 {
 	try
 	{
@@ -654,13 +678,13 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 		if (!GetLocalClipsSince(sinceTime, clipsArray))
 		{
 			LogMessage(_T("PushNewClips: failed to enumerate local clips."));
-			return;
+			return FALSE;
 		}
 
 		if (clipsArray.empty())
 		{
 			LogMessage(_T("PushNewClips: no clips to push."));
-			return;
+			return TRUE;
 		}
 
 		// Build sync request JSON matching server's PushClipItem schema:
@@ -701,7 +725,7 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 		if (!res)
 		{
 			LogMessage(_T("PushNewClips: failed to connect to server"));
-			return;
+			return FALSE;
 		}
 
 		// Handle authentication errors (401/403) - trigger re-auth flow
@@ -721,7 +745,7 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 			}
 			
 			LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
-			return;
+			return FALSE;
 		}
 
 		if (res->status == 200)
@@ -736,7 +760,7 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 					CString msg;
 					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
 					LogMessage(msg);
-					return;
+					return FALSE;
 				}
 
 				// Extract from data envelope
@@ -756,12 +780,14 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 				CString msg;
 				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
 				LogMessage(msg);
+				return TRUE;
 			}
 			catch (const json::parse_error& e)
 			{
 				CString err;
 				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
 				LogMessage(err);
+				return FALSE;
 			}
 		}
 		else
@@ -769,6 +795,7 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 			CString err;
 			err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
 			LogMessage(err);
+			return FALSE;
 		}
 	}
 	catch (const std::exception& e)
@@ -776,10 +803,12 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 		CString err;
 		err.Format(_T("PushNewClips error: %hs"), e.what());
 		LogMessage(err);
+		return FALSE;
 	}
 	catch (...)
 	{
 		LogMessage(_T("PushNewClips: unknown error"));
+		return FALSE;
 	}
 }
 
@@ -851,9 +880,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudSync] Exception in ExtractFilePathsFromHDROP.\n");
 	}
-
 	return paths;
 }
 
@@ -2139,8 +2166,9 @@ void CCloudSyncManager::DeleteRemoteGroupIdMappingByRemote(const std::string& re
 // ---------------------------------------------------------------------------
 // PushGroups: Push local groups to cloud (creates/updates groups on server)
 // ---------------------------------------------------------------------------
-void CCloudSyncManager::PushGroups()
+std::vector<std::string> CCloudSyncManager::PushGroups()
 {
+	std::vector<std::string> newGroupIds;
 	EnsureHttpClient();
 	try
 	{
@@ -2182,6 +2210,7 @@ void CCloudSyncManager::PushGroups()
 						if (resp.contains("data") && resp["data"].contains("id"))
 						{
 							SaveRemoteGroupIdMapping(localId, resp["data"]["id"].get<std::string>());
+							newGroupIds.push_back(resp["data"]["id"].get<std::string>());
 						}
 					}
 					catch (...) {}
@@ -2199,6 +2228,7 @@ void CCloudSyncManager::PushGroups()
 	catch (...)
 	{
 	}
+	return newGroupIds;
 }
 
 // ---------------------------------------------------------------------------
