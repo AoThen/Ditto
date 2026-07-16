@@ -44,7 +44,7 @@ test.describe('Group Management', () => {
 
     const listResp = await page.request.get('/api/v1/groups')
     const listData = await listResp.json()
-    const found = listData.data?.some(g => g.id === groupId)
+    const found = listData.data?.items?.some(g => g.id === groupId)
     expect(found).toBe(true)
 
     const deleteResp = await page.request.delete(`/api/v1/groups/${groupId}`)
@@ -52,7 +52,7 @@ test.describe('Group Management', () => {
 
     const afterResp = await page.request.get('/api/v1/groups')
     const afterData = await afterResp.json()
-    const stillFound = afterData.data?.some(g => g.id === groupId)
+    const stillFound = afterData.data?.items?.some(g => g.id === groupId)
     expect(stillFound).toBe(false)
   })
 
