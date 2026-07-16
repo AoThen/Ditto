@@ -1535,7 +1535,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				// (Content is same per CRC match, so no need to update formats)
 				CSingleLock lockDb(&m_csDb, TRUE);
 				CString csUpdateSQL;
-				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld WHERE lID = %d"),
+				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld, lDontSync = 0 WHERE lID = %d"),
 				                   (__int64)remoteUpdatedAt, existingId);
 				theApp.m_db.execDML(csUpdateSQL);
 

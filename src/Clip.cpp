@@ -1063,7 +1063,7 @@ bool CClip::ModifyDescription()
 	{
 		m_Desc.Replace(_T("'"), _T("''"));
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld ")
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld, lDontSync = 0 ")
 			_T("WHERE lID = %d;"),
 			m_Desc,
 			CTime::GetCurrentTime().GetTime(),  // Update modification time
@@ -2128,12 +2128,12 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		AddToDataTable();
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d, lModifiedDate = %lld WHERE lID = %d"), CRC, CTime::GetCurrentTime().GetTime(), m_id);
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d, lModifiedDate = %lld, lDontSync = 0 WHERE lID = %d"), CRC, CTime::GetCurrentTime().GetTime(), m_id);
 
 		if (bUpdateDesc)
 		{
 			m_Desc.Replace(_T("'"), _T("''"));
-			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, CTime::GetCurrentTime().GetTime(), m_id);
+			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld, lDontSync = 0 WHERE lID = %d"), m_Desc, CTime::GetCurrentTime().GetTime(), m_id);
 		}
 
 		bRet = true;
