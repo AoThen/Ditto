@@ -302,6 +302,10 @@ public:
 	static void     SetCloudEncryptionNeedsRecovery(BOOL bValue);
 	static __int64  GetCloudLastSyncTime();
 	static void     SetCloudLastSyncTime(__int64 value);
+	static BOOL     GetCloudInitialPushDone();
+	static void     SetCloudInitialPushDone(BOOL bValue);
+	static __int64  GetCloudInitialPushOffset();
+	static void     SetCloudInitialPushOffset(__int64 value);
 	static CString  GetCloudKeyFilePath();
 	static void     SetCloudKeyFilePath(LPCTSTR lpszValue);
 	static CString  GetCloudLastUsername();

@@ -135,8 +135,10 @@ private:
 	// Filter out CF_HDROP formats that contain actual file data (sync paths only)
 	static BOOL FilterHDROPForSync(nlohmann::json& formats);
 
-	// Enumerate local clips modified since lastSyncTime
-	BOOL GetLocalClipsSince(time_t sinceTime, nlohmann::json& clipsArray);
+	// Enumerate a single page of local clips modified since lastSyncTime
+	BOOL GetLocalClipsSince(time_t sinceTime, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore);
+
+	static const int CLOUD_PUSH_BATCH_SIZE;
 
 	// Load formats for a specific clip
 	BOOL LoadClipFormats(int clipId, nlohmann::json& formatsArray);

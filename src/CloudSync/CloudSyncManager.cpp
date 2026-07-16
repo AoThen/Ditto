@@ -12,6 +12,8 @@
 
 using json = nlohmann::json;
 
+const int CCloudSyncManager::CLOUD_PUSH_BATCH_SIZE = 200;
+
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
 {
@@ -673,130 +675,151 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 		lastSync = m_lastSyncTime;
 		LeaveCriticalSection(&m_csSync);
 
-		json clipsArray;
-		time_t sinceTime = bForce ? 0 : lastSync;
-		if (!GetLocalClipsSince(sinceTime, clipsArray))
-		{
-			LogMessage(_T("PushNewClips: failed to enumerate local clips."));
-			return FALSE;
-		}
+		BOOL bFirstPush = !CGetSetOptions::GetCloudInitialPushDone();
+		int offset = bFirstPush ? (int)CGetSetOptions::GetCloudInitialPushOffset() : 0;
+		time_t sinceTime = bForce ? 0 : (bFirstPush ? 0 : lastSync);
 
-		if (clipsArray.empty())
+		bool hasMore = true;
+		do
 		{
-			LogMessage(_T("PushNewClips: no clips to push."));
-			return TRUE;
-		}
-
-		// Build sync request JSON matching server's PushClipItem schema:
-	 // Server expects: { since, device_id, push_clips: [{ id, description, crc,
-		// group_id, short_cut, updated_at, formats: [{format_type, data}] }] }
-		json syncReq;
-		if (lastSync > 0)
-		{
-			// Format as RFC3339: "2025-01-01T00:00:00Z"
-			SYSTEMTIME st;
-			FILETIME ft;
-			ULARGE_INTEGER uli;
-			uli.QuadPart = ((ULONGLONG)lastSync * 10000000ULL) + 116444736000000000ULL;
-			ft.dwLowDateTime = uli.LowPart;
-			ft.dwHighDateTime = uli.HighPart;
-			FileTimeToSystemTime(&ft, &st);
-			char timeBuf[32];
-			sprintf_s(timeBuf, "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
-			          st.wYear, st.wMonth, st.wDay,
-			          st.wHour, st.wMinute, st.wSecond);
-			syncReq["since"] = std::string(timeBuf);
-		}
-		else
-		{
-			syncReq["since"] = "1970-01-01T00:00:00Z";
-		}
-
-		syncReq["device_id"] = std::string(m_deviceId);
-		if (bForce)
-			syncReq["force"] = true;
-		syncReq["push_clips"] = clipsArray;
-
-		// Send to server
-		EnsureHttpClient();
-
-		std::string bodyStr = syncReq.dump();
-		auto res = m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json");
-		if (!res)
-		{
-			LogMessage(_T("PushNewClips: failed to connect to server"));
-			return FALSE;
-		}
-
-		// Handle authentication errors (401/403) - trigger re-auth flow
-		if (res->status == 401 || res->status == 403)
-		{
-			LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
-			
-			// Clear stored credentials
-			CCloudAuth::Logout();
-			
-			// Notify user via main window (post message to avoid blocking sync thread)
-			CWnd* pMainWnd = AfxGetMainWnd();
-			if (pMainWnd != nullptr)
+			json page;
+			bool pageHasMore = false;
+			if (!GetLocalClipsSince(sinceTime, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
 			{
-				// Post custom message with 401 status code
-				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
+				LogMessage(_T("PushNewClips: failed to enumerate local clips."));
+				return FALSE;
 			}
-			
-			LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
-			return FALSE;
-		}
 
-		if (res->status == 200)
-		{
-			try
+			// Set hasMore before the empty-page break so the first-push completion
+			// flag is set correctly when the final (empty) page is reached.
+			hasMore = pageHasMore;
+
+			if (page.empty())
 			{
-				json responseJson = json::parse(res->body);
+				break;
+			}
 
-				// Server wraps response in { code: 0, data: { ... } }
-				if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
+			// Build sync request JSON matching server's PushClipItem schema:
+		 // Server expects: { since, device_id, push_clips: [{ id, description, crc,
+			// group_id, short_cut, updated_at, formats: [{format_type, data}] }] }
+			json syncReq;
+			if (sinceTime > 0)
+			{
+				// Format as RFC3339: "2025-01-01T00:00:00Z"
+				SYSTEMTIME st;
+				FILETIME ft;
+				ULARGE_INTEGER uli;
+				uli.QuadPart = ((ULONGLONG)lastSync * 10000000ULL) + 116444736000000000ULL;
+				ft.dwLowDateTime = uli.LowPart;
+				ft.dwHighDateTime = uli.HighPart;
+				FileTimeToSystemTime(&ft, &st);
+				char timeBuf[32];
+				sprintf_s(timeBuf, "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
+				          st.wYear, st.wMonth, st.wDay,
+				          st.wHour, st.wMinute, st.wSecond);
+				syncReq["since"] = std::string(timeBuf);
+			}
+			else
+			{
+				syncReq["since"] = "1970-01-01T00:00:00Z";
+			}
+
+			syncReq["device_id"] = std::string(m_deviceId);
+			if (bForce)
+				syncReq["force"] = true;
+			syncReq["push_clips"] = page;
+
+			// Send to server
+			EnsureHttpClient();
+
+			std::string bodyStr = syncReq.dump();
+			auto res = m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json");
+			if (!res)
+			{
+				LogMessage(_T("PushNewClips: failed to connect to server"));
+				return FALSE;
+			}
+
+			// Handle authentication errors (401/403) - trigger re-auth flow
+			if (res->status == 401 || res->status == 403)
+			{
+				LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
+
+				// Clear stored credentials
+				CCloudAuth::Logout();
+
+				// Notify user via main window (post message to avoid blocking sync thread)
+				CWnd* pMainWnd = AfxGetMainWnd();
+				if (pMainWnd != nullptr)
 				{
+					// Post custom message with 401 status code
+					::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
+				}
+
+				LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
+				return FALSE;
+			}
+
+			if (res->status == 200)
+			{
+				try
+				{
+					json responseJson = json::parse(res->body);
+
+					// Server wraps response in { code: 0, data: { ... } }
+					if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
+					{
+						CString msg;
+						msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
+						LogMessage(msg);
+						return FALSE;
+					}
+
+					// Extract from data envelope
+					const json* dataNode = nullptr;
+					if (responseJson.contains("data") && responseJson["data"].is_object())
+					{
+						dataNode = &responseJson["data"];
+					}
+					else
+					{
+						dataNode = &responseJson; // Fallback: use top-level if no data wrapper
+					}
+
+					int syncedCount = dataNode->value("updated_count", 0);
+					int skippedCount = dataNode->value("skipped_count", 0);
+
 					CString msg;
-					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
+					msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
 					LogMessage(msg);
+				}
+				catch (const json::parse_error& e)
+				{
+					CString err;
+					err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
+					LogMessage(err);
 					return FALSE;
 				}
-
-				// Extract from data envelope
-				const json* dataNode = nullptr;
-				if (responseJson.contains("data") && responseJson["data"].is_object())
-				{
-					dataNode = &responseJson["data"];
-				}
-				else
-				{
-					dataNode = &responseJson; // Fallback: use top-level if no data wrapper
-				}
-
-				int syncedCount = dataNode->value("updated_count", 0);
-				int skippedCount = dataNode->value("skipped_count", 0);
-
-				CString msg;
-				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
-				LogMessage(msg);
-				return TRUE;
 			}
-			catch (const json::parse_error& e)
+			else
 			{
 				CString err;
-				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
+				err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
 				LogMessage(err);
 				return FALSE;
 			}
-		}
-		else
+
+			offset += (int)page.size();
+			if (bFirstPush)
+				CGetSetOptions::SetCloudInitialPushOffset(offset);
+		} while (hasMore);
+
+		if (bFirstPush && !hasMore)
 		{
-			CString err;
-			err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
-			LogMessage(err);
-			return FALSE;
+			CGetSetOptions::SetCloudInitialPushDone(TRUE);
+			CGetSetOptions::SetCloudInitialPushOffset(0);
 		}
+		return TRUE;
 	}
 	catch (const std::exception& e)
 	{
@@ -1210,133 +1233,121 @@ void CCloudSyncManager::PullChanges()
 // Produces JSON matching server's PushClipItem schema:
 //   { id, description, crc, group_id, short_cut, updated_at, formats: [{format_type, data}] }
 // ---------------------------------------------------------------------------
-BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, nlohmann::json& clipsArray)
+BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore)
 {
 	clipsArray = nlohmann::json::array();
+	hasMore = false;
 
 	try
 	{
-		// Paginate through clips with LIMIT 100 OFFSET
-		int offset = 0;
-		bool hasMore = true;
-
-		do
+		CString csSQL;
+		if (sinceTime > 0)
 		{
-			CString csSQL;
-			if (sinceTime > 0)
-			{
-csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
+ csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 			             _T("clipOrder, clipGroupOrder, stickyClipOrder, lShortCut, globalShortCut, ")
 			             _T("lDontAutoDelete, lDontSync, m_Description, lastPasteDate, lModifiedDate ")
 			             _T("FROM Main WHERE lModifiedDate > %lld AND bIsGroup = 0 AND lDontSync = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT 100 OFFSET %d"), sinceTime, offset);
-			}
-			else
-			{
-csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
+			             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"), sinceTime, limit, offset);
+		}
+		else
+		{
+ csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 			             _T("clipOrder, clipGroupOrder, stickyClipOrder, lShortCut, globalShortCut, ")
 			             _T("lDontAutoDelete, lDontSync, m_Description, lastPasteDate, lModifiedDate ")
 			             _T("FROM Main WHERE bIsGroup = 0 AND lDontSync = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT 100 OFFSET %d"), offset);
-			}
+			             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"), limit, offset);
+		}
 
-			CSingleLock lockDb(&m_csDb, TRUE);
-			CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+		CSingleLock lockDb(&m_csDb, TRUE);
+		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
-			int pageCount = 0;
-			while (q.eof() == false)
+		int pageCount = 0;
+		while (q.eof() == false)
+		{
+			int clipId = q.getIntField(_T("lID"));
+			time_t lDate = (time_t)q.getInt64Field(_T("lDate"));
+			CString desc = q.getStringField(_T("mText"));
+			DWORD crc = (DWORD)q.getIntField(_T("CRC"));
+			time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
+
+			json clipJson;
+
+			// Use existing remote ID mapping if available, otherwise generate a UUID
+			// to avoid cross-device ID collisions (local auto-increment IDs are not globally unique)
+			std::string remoteClipId = GetRemoteIdByLocalId(clipId);
+			if (remoteClipId.empty())
 			{
-				int clipId = q.getIntField(_T("lID"));
-				time_t lDate = (time_t)q.getInt64Field(_T("lDate"));
-				CString desc = q.getStringField(_T("mText"));
-				DWORD crc = (DWORD)q.getIntField(_T("CRC"));
-				time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
-
-				json clipJson;
-
-				// Use existing remote ID mapping if available, otherwise generate a UUID
-				// to avoid cross-device ID collisions (local auto-increment IDs are not globally unique)
-				std::string remoteClipId = GetRemoteIdByLocalId(clipId);
-				if (remoteClipId.empty())
-				{
-					remoteClipId = CStringToStdString(NewGuidString());
-				}
-				clipJson["id"] = remoteClipId;
-				SaveRemoteIdMapping(clipId, remoteClipId);
-				clipJson["description"] = CStringToStdString(desc);
-				clipJson["crc"] = static_cast<int64_t>(crc);
-				clipJson["group_id"] = "";
-				int localParentId = q.getIntField(_T("lParentID"));
-				if (localParentId > 0)
-				{
-					std::string remoteGroupId = GetRemoteGroupIdByLocalId(localParentId);
-					if (!remoteGroupId.empty())
-						clipJson["group_id"] = remoteGroupId;
-				}
-				clipJson["short_cut"] = q.getIntField(_T("lShortCut"));
-				clipJson["clip_order"] = q.getFloatField(_T("clipOrder"));
-				clipJson["clip_group_order"] = q.getFloatField(_T("clipGroupOrder"));
-
-				time_t updatedAt = (modDate > 0) ? modDate : lDate;
-				if (updatedAt > 0)
-				{
-					struct tm gmtm;
-					gmtime_s(&gmtm, &updatedAt);
-					char timeBuf[32];
-					strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
-					clipJson["updated_at"] = std::string(timeBuf);
-				}
-
-				json formatsArray;
-				if (LoadClipFormats(clipId, formatsArray))
-				{
-					FilterHDROPForSync(formatsArray);
-
-					json serverFormats;
-					for (const auto& fmt : formatsArray)
-					{
-						json serverFmt;
-						serverFmt["format_type"] = fmt.value("format_type", 0);
-						serverFmt["data"] = fmt.value("data", "");
-						serverFormats.push_back(serverFmt);
-					}
-					clipJson["formats"] = serverFormats;
-
-					if (m_cryptoInitialized && !serverFormats.empty())
-					{
-						if (!EncryptClipFormats(clipJson["formats"]))
-						{
-							CString msg;
-							msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
-							LogMessage(msg);
-							q.nextRow();
-							continue;
-						}
-					}
-				}
-				else
-				{
-					clipJson["formats"] = json::array();
-				}
-
-				clipsArray.push_back(clipJson);
-				pageCount++;
-
-				q.nextRow();
+				remoteClipId = CStringToStdString(NewGuidString());
 			}
-			lockDb.Unlock();
+			clipJson["id"] = remoteClipId;
+			SaveRemoteIdMapping(clipId, remoteClipId);
+			clipJson["description"] = CStringToStdString(desc);
+			clipJson["crc"] = static_cast<int64_t>(crc);
+			clipJson["group_id"] = "";
+			int localParentId = q.getIntField(_T("lParentID"));
+			if (localParentId > 0)
+			{
+				std::string remoteGroupId = GetRemoteGroupIdByLocalId(localParentId);
+				if (!remoteGroupId.empty())
+					clipJson["group_id"] = remoteGroupId;
+			}
+			clipJson["short_cut"] = q.getIntField(_T("lShortCut"));
+			clipJson["clip_order"] = q.getFloatField(_T("clipOrder"));
+			clipJson["clip_group_order"] = q.getFloatField(_T("clipGroupOrder"));
 
-			offset += 100;
-			hasMore = (pageCount >= 100);
+			time_t updatedAt = (modDate > 0) ? modDate : lDate;
+			if (updatedAt > 0)
+			{
+				struct tm gmtm;
+				gmtime_s(&gmtm, &updatedAt);
+				char timeBuf[32];
+				strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
+				clipJson["updated_at"] = std::string(timeBuf);
+			}
 
-			CString msg;
-			msg.Format(_T("GetLocalClipsSince: page offset=%d, got %d clips"), offset - 100, pageCount);
-			LogMessage(msg);
+			json formatsArray;
+			if (LoadClipFormats(clipId, formatsArray))
+			{
+				FilterHDROPForSync(formatsArray);
 
-		} while (hasMore);
+				json serverFormats;
+				for (const auto& fmt : formatsArray)
+				{
+					json serverFmt;
+					serverFmt["format_type"] = fmt.value("format_type", 0);
+					serverFmt["data"] = fmt.value("data", "");
+					serverFormats.push_back(serverFmt);
+				}
+				clipJson["formats"] = serverFormats;
+
+				if (m_cryptoInitialized && !serverFormats.empty())
+				{
+					if (!EncryptClipFormats(clipJson["formats"]))
+					{
+						CString msg;
+						msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
+						LogMessage(msg);
+						q.nextRow();
+						continue;
+					}
+				}
+			}
+			else
+			{
+				clipJson["formats"] = json::array();
+			}
+
+			clipsArray.push_back(clipJson);
+			pageCount++;
+
+			q.nextRow();
+		}
+		lockDb.Unlock();
+
+		hasMore = (pageCount >= limit);
 
 		CString msg;
-		msg.Format(_T("GetLocalClipsSince: total %d clips to sync"), (int)clipsArray.size());
+		msg.Format(_T("GetLocalClipsSince: page offset=%d, got %d clips"), offset, pageCount);
 		LogMessage(msg);
 
 		return TRUE;

@@ -1744,6 +1744,32 @@ void CGetSetOptions::SetCloudLastSyncTime(__int64 value)
 	SetProfileString("CloudLastSyncTime", csValue);
 }
 
+BOOL CGetSetOptions::GetCloudInitialPushDone()
+{
+	CString csValue = GetProfileString("CloudInitialPushDone", _T("0"));
+	return _ttoi(csValue) != 0;
+}
+
+void CGetSetOptions::SetCloudInitialPushDone(BOOL bValue)
+{
+	CString csValue;
+	csValue.Format(_T("%d"), bValue ? 1 : 0);
+	SetProfileString("CloudInitialPushDone", csValue);
+}
+
+__int64 CGetSetOptions::GetCloudInitialPushOffset()
+{
+	CString csValue = GetProfileString("CloudInitialPushOffset", _T("0"));
+	return _ttoi64(csValue);
+}
+
+void CGetSetOptions::SetCloudInitialPushOffset(__int64 value)
+{
+	CString csValue;
+	csValue.Format(_T("%lld"), value);
+	SetProfileString("CloudInitialPushOffset", csValue);
+}
+
 CString CGetSetOptions::GetCloudKeyFilePath()
 {
 	return GetProfileString("CloudKeyFilePath", _T(""));
