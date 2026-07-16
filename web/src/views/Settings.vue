@@ -141,7 +141,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getEncryptionSalt, getKeyMaterial, setupEncryption, disableEncryption, changeEncryptionPassword } from '@/api/clips'
-import { deriveKEK, generateDEK, wrapDEK, unwrapDEK, computeVerificationHash } from '@/utils/crypto'
+import { deriveKEK, generateDEK, wrapDEK, unwrapDEK, computeVerificationHash, bufToBase64 } from '@/utils/crypto'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import axios from 'axios'
@@ -287,7 +287,7 @@ async function handleChangePassword() {
     const DEK = await unwrapDEK(oldKEK, oldWrappedDEK)
 
     const newSaltBytes = crypto.getRandomValues(new Uint8Array(32))
-    const newSaltB64 = btoa(String.fromCharCode(...newSaltBytes))
+    const newSaltB64 = bufToBase64(newSaltBytes)
 
     const newKEK = await deriveKEK(newPassword.value, newSaltB64)
     const newWrappedDEK = await wrapDEK(newKEK, DEK)

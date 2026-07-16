@@ -191,7 +191,7 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 	}
 
 	var device model.Device
-	if err := database.DB.Where("id = ?", deviceID).First(&device).Error; err != nil {
+	if err := database.DB.Where("id = ? AND user_id = ?", deviceID, userID).First(&device).Error; err != nil {
 		return "", "", errors.New("设备不存在")
 	}
 

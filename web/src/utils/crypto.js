@@ -4,8 +4,13 @@ function strToBuf(s) {
   return new TextEncoder().encode(s)
 }
 
-function bufToBase64(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+export function bufToBase64(buf) {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
 }
 
 function base64ToBuf(b64) {

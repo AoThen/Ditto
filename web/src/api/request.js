@@ -49,6 +49,9 @@ request.interceptors.request.use(
 // Response interceptor: handle errors
 request.interceptors.response.use(
   (response) => {
+    if (response.config.__rawResponse) {
+      return response
+    }
     return response.data
   },
   async (error) => {
@@ -149,7 +152,7 @@ export async function downloadBlob(url, options = {}) {
     const response = await request.get(url, {
       params,
       responseType,
-      // Return full response object (not just data)
+      __rawResponse: true,
       validateStatus: (status) => status < 500,
     })
 

@@ -115,14 +115,6 @@ func (s *UserService) DeleteUser(id uint) error {
 		return err
 	}
 
-	adminCount, err := s.CountUsersByRole("admin")
-	if err != nil {
-		return err
-	}
-	if user.Role == "admin" && adminCount <= 1 {
-		return errors.New("无法删除最后一个管理员账号")
-	}
-
 	tx := database.DB.Begin()
 	defer func() {
 		if r := recover(); r != nil {
@@ -131,8 +123,24 @@ func (s *UserService) DeleteUser(id uint) error {
 		}
 	}()
 
-	var clipIDs []uint
-	if err := tx.Model(&model.Clip{}).Where("user_id = ?", user.ID).Pluck("id", &clipIDs).Error; err != nil {
+	// Re-query user inside transaction to avoid TOCTOU
+	var txUser model.User
+	if err := tx.First(&txUser, id).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	var adminCount int64
+	if err := tx.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	if txUser.Role == "admin" && adminCount <= 1 {
+		tx.Rollback()
+		return errors.New("无法删除最后一个管理员账号")
+	}
+
+	var clipIDs []string
+	if err := tx.Model(&model.Clip{}).Where("user_id = ?", txUser.ID).Pluck("id", &clipIDs).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -148,23 +156,23 @@ func (s *UserService) DeleteUser(id uint) error {
 		}
 	}
 
-	if err := tx.Where("user_id = ?", user.ID).Delete(&model.Device{}).Error; err != nil {
+	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Device{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	if err := tx.Where("user_id = ?", user.ID).Delete(&model.Group{}).Error; err != nil {
+	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Group{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	if err := tx.Where("user_id = ?", user.ID).Delete(&model.SyncLog{}).Error; err != nil {
+	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.SyncLog{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	if err := tx.Where("user_id = ?", user.ID).Delete(&model.EncryptionSettings{}).Error; err != nil {
+	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.EncryptionSettings{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	if err := tx.Delete(&user).Error; err != nil {
+	if err := tx.Delete(&txUser).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
