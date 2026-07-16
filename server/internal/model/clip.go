@@ -21,14 +21,14 @@ const (
 
 type Clip struct {
 	ID             string    `gorm:"primaryKey;size:255" json:"id"`
-	UserID         uint      `gorm:"index:idx_clips_user_group,priority:1;index:idx_clips_user_created,priority:1;index:idx_clips_user_updated,priority:1;not null" json:"user_id"`
+	UserID         uint      `gorm:"index:idx_clips_user_group,priority:1;index:idx_clips_user_created,priority:1;index:idx_clips_user_updated,priority:1;index:idx_clips_user_deleted,priority:1;not null" json:"user_id"`
 	DeviceID       string    `gorm:"size:255;index" json:"device_id"`
 	Description    string         `gorm:"type:text" json:"description"`
 	Pinyin         string         `gorm:"type:text;index" json:"-"`
 	CRC            int64     `gorm:"index:idx_clips_user_crc" json:"crc"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `gorm:"index:idx_clips_user_updated,priority:2" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"` // Soft delete for sync
+	DeletedAt      gorm.DeletedAt `gorm:"index;index:idx_clips_user_deleted,priority:2" json:"-"` // Soft delete for sync
 	GroupID        string    `gorm:"size:255;index:idx_clips_user_group,priority:2" json:"group_id"`
 	ShortCut       int       `gorm:"default:0" json:"short_cut"`
 	PasteCount     int       `gorm:"default:0" json:"paste_count"`

@@ -25,8 +25,8 @@ func NewCleanupService(cfg *config.Config) *CleanupService {
 // It runs at the configured interval and removes clips older than MaxClipAge
 // and enforces MaxClipsPerUser limit.
 func (s *CleanupService) Start(stopCh <-chan struct{}) {
-	log.Printf("[Cleanup] Starting cleanup service: interval=%v, maxAge=%v, maxClips=%d",
-		s.cfg.CleanupInterval, s.cfg.MaxClipAge, s.cfg.MaxClipsPerUser)
+	log.Printf("[Cleanup] Starting cleanup service: interval=%v, maxAge=%v, maxClips=%d, softDeleteRetention=%v",
+		s.cfg.CleanupInterval, s.cfg.MaxClipAge, s.cfg.MaxClipsPerUser, s.cfg.SoftDeleteRetention)
 
 	defer close(s.doneCh)
 
@@ -68,7 +68,7 @@ func (s *CleanupService) runCleanup() {
 		log.Printf("[Cleanup] ERROR enforcing user limits: %v", err)
 	}
 
-	// Step 3: Hard-delete records soft-deleted more than 7 days ago
+	// Step 3: Hard-delete records soft-deleted longer than configured retention
 	deletedHard, err := s.hardDeleteOldSoftDeleted()
 	if err != nil {
 		log.Printf("[Cleanup] ERROR hard-deleting old soft-deleted clips: %v", err)
@@ -187,12 +187,12 @@ func (s *CleanupService) hardDeleteOldSoftDeleted() (int, error) {
 		return 0, nil
 	}
 
-	threshold := time.Now().Add(-7 * 24 * time.Hour)
+	threshold := time.Now().Add(-s.cfg.SoftDeleteRetention)
 
 	// Hard-delete orphan ClipFormat records first
 	database.DB.Where("clip_id NOT IN (SELECT id FROM clips)").Delete(&model.ClipFormat{})
 
-	// Hard-delete clips soft-deleted longer than 7 days ago
+	// Hard-delete clips soft-deleted longer than configured retention
 	result := database.DB.Unscoped().
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", threshold).
 		Delete(&model.Clip{})

@@ -25,6 +25,7 @@ type Config struct {
 	CleanupInterval    time.Duration // How often to run cleanup
 	MaxClipAge         time.Duration // Maximum age of clips before removal
 	MaxClipsPerUser    int           // Maximum clips per user
+	SoftDeleteRetention time.Duration // How long to keep soft-deleted records before hard-delete
 	AllowedOrigins     []string      // CORS + WebSocket allowed origins
 	CookieSecure       bool          // Whether to set Secure flag on cookies
 	TokenExpiryAccess  time.Duration
@@ -187,6 +188,13 @@ func Load() *Config {
 		}
 	}
 
+	softDeleteRetention := 90 * 24 * time.Hour // Default: 90 days
+	if env := os.Getenv("SOFT_DELETE_RETENTION"); env != "" {
+		if d, err := time.ParseDuration(env); err == nil {
+			softDeleteRetention = d
+		}
+	}
+
 	return &Config{
 		Port:               port,
 		DatabasePath:       dbPath,
@@ -200,8 +208,9 @@ func Load() *Config {
 		TokenExpiryAccess:  loadTokenExpiry("JWT_ACCESS_TOKEN_EXPIRY", DefaultTokenExpiryAccess),
 		TokenExpiryRefresh: loadTokenExpiry("JWT_REFRESH_TOKEN_EXPIRY", DefaultTokenExpiryRefresh),
 		MaxPushLimit:        maxPushLimit,
-		DefaultSyncPullLimit: defaultSyncPullLimit,
-		MaxSyncPullLimit:     maxSyncPullLimit,
-		SlowThreshold:        slowThreshold,
+		DefaultSyncPullLimit:  defaultSyncPullLimit,
+		MaxSyncPullLimit:      maxSyncPullLimit,
+		SlowThreshold:         slowThreshold,
+		SoftDeleteRetention:   softDeleteRetention,
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // setupCleanupServiceTest creates an isolated test environment for CleanupService tests
@@ -29,13 +30,14 @@ func setupCleanupServiceTest(t *testing.T) (*CleanupService, func()) {
 
 	// Create config
 	cfg := &config.Config{
-		Port:            "0",
-		DatabasePath:    dbPath,
-		JWTSecret:       "test-jwt-secret-key",
-		StartTime:       time.Now(),
-		CleanupInterval: 1 * time.Hour,
-		MaxClipAge:      24 * time.Hour,
-		MaxClipsPerUser: 10,
+		Port:                 "0",
+		DatabasePath:         dbPath,
+		JWTSecret:            "test-jwt-secret-key",
+		StartTime:            time.Now(),
+		CleanupInterval:      1 * time.Hour,
+		MaxClipAge:           24 * time.Hour,
+		MaxClipsPerUser:      10,
+		SoftDeleteRetention:  7 * 24 * time.Hour,
 	}
 
 	// Create service
@@ -76,13 +78,15 @@ func createTestUserAndDevice(t *testing.T) (uint, string) {
 
 func TestNewCleanupService(t *testing.T) {
 	cfg := &config.Config{
-		CleanupInterval: 1 * time.Hour,
-		MaxClipAge:      24 * time.Hour,
-		MaxClipsPerUser: 10,
+		CleanupInterval:      1 * time.Hour,
+		MaxClipAge:           24 * time.Hour,
+		MaxClipsPerUser:      10,
+		SoftDeleteRetention:  7 * 24 * time.Hour,
 	}
 	svc := NewCleanupService(cfg)
 	assert.NotNil(t, svc)
 	assert.Equal(t, cfg, svc.cfg)
+	assert.Equal(t, 7*24*time.Hour, svc.cfg.SoftDeleteRetention)
 }
 
 func TestCleanupService_DeleteOldClips_Success(t *testing.T) {
@@ -333,4 +337,91 @@ func TestCleanupService_EnforceUserLimits_KeepsNewest(t *testing.T) {
 		database.DB.Model(&model.Clip{}).Where("id = ?", clips[i].ID).Select("count(*) > 0").Find(&exists)
 		assert.True(t, exists, "Clip %d should be kept", i)
 	}
+}
+
+func TestCleanupService_HardDeleteOldSoftDeleted_BeforeThreshold(t *testing.T) {
+	svc, cleanup := setupCleanupServiceTest(t)
+	defer cleanup()
+
+	userID, deviceID := createTestUserAndDevice(t)
+
+	// Create a clip soft-deleted longer than threshold (8 days ago)
+	oldDeleted := model.Clip{
+		ID:          "old-deleted",
+		UserID:      userID,
+		DeviceID:    deviceID,
+		Description: "Old Deleted",
+		CRC:         12345,
+		UpdatedAt:   time.Now().Add(-10 * 24 * time.Hour),
+		DeletedAt:   gorm.DeletedAt{Time: time.Now().Add(-8 * 24 * time.Hour), Valid: true},
+	}
+	require.NoError(t, database.DB.Create(&oldDeleted).Error)
+
+	// Create a clip soft-deleted within threshold (1 day ago)
+	recentDeleted := model.Clip{
+		ID:          "recent-deleted",
+		UserID:      userID,
+		DeviceID:    deviceID,
+		Description: "Recent Deleted",
+		CRC:         12346,
+		UpdatedAt:   time.Now().Add(-2 * 24 * time.Hour),
+		DeletedAt:   gorm.DeletedAt{Time: time.Now().Add(-24 * time.Hour), Valid: true},
+	}
+	require.NoError(t, database.DB.Create(&recentDeleted).Error)
+
+	// Run hard delete
+	deleted, err := svc.hardDeleteOldSoftDeleted()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, deleted)
+
+	// Verify old soft-deleted clip is hard-deleted
+	var oldExists bool
+	database.DB.Unscoped().Model(&model.Clip{}).Where("id = ?", oldDeleted.ID).Select("count(*) > 0").Find(&oldExists)
+	assert.False(t, oldExists, "Old soft-deleted clip should be hard-deleted")
+
+	// Verify recent soft-deleted clip still exists
+	var recentExists bool
+	database.DB.Unscoped().Model(&model.Clip{}).Where("id = ?", recentDeleted.ID).Select("count(*) > 0").Find(&recentExists)
+	assert.True(t, recentExists, "Recent soft-deleted clip should still exist")
+}
+
+func TestCleanupService_HardDeleteOldSoftDeleted_NoRecords(t *testing.T) {
+	svc, cleanup := setupCleanupServiceTest(t)
+	defer cleanup()
+
+	// No clips at all
+	deleted, err := svc.hardDeleteOldSoftDeleted()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, deleted)
+}
+
+func TestCleanupService_HardDeleteOldSoftDeleted_OnlyActiveClips(t *testing.T) {
+	svc, cleanup := setupCleanupServiceTest(t)
+	defer cleanup()
+
+	userID, deviceID := createTestUserAndDevice(t)
+
+	// Create active (non-deleted) clips
+	clip := model.Clip{
+		ID:          "active-clip",
+		UserID:      userID,
+		DeviceID:    deviceID,
+		Description: "Active Clip",
+		CRC:         12345,
+		UpdatedAt:   time.Now().Add(-1 * time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&clip).Error)
+
+	// DeletedAt is nil, should NOT be hard-deleted
+	deleted, err := svc.hardDeleteOldSoftDeleted()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, deleted)
+
+	// Verify active clip still exists
+	var exists bool
+	database.DB.Unscoped().Model(&model.Clip{}).Where("id = ?", clip.ID).Select("count(*) > 0").Find(&exists)
+	assert.True(t, exists, "Active clip should still exist")
 }
