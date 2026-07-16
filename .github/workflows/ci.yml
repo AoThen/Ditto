@@ -166,7 +166,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build CloudSync_Test (Release x64)
-        run: msbuild CloudSync_Test\CloudSync_Test.vcxproj /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64
 
       - name: Run tests
         run: CloudSync_Test\x64\Release\CloudSync_Test.exe
