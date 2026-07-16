@@ -1050,6 +1050,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 // ---------------------------------------------------------------------------
 BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 {
+	BOOL bFound = FALSE;
 	try
 	{
 		for (auto& format : formats)
@@ -1075,7 +1076,8 @@ BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 				msg.Format(_T("CF_HDROP filtered: %d file paths (contents NOT synced)"), (int)filePaths.size());
 				LogMessage(msg);
 
-return TRUE;
+				bFound = TRUE;
+				break;
 			}
 		}
 	}
@@ -1090,7 +1092,7 @@ return TRUE;
 		LogMessage(_T("FilterHDROPForSync: unknown error"));
 	}
 
-	return FALSE;
+	return bFound;
 }
 
 void CCloudSyncManager::PullChanges()

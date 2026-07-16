@@ -1671,16 +1671,6 @@ void CGetSetOptions::SetCloudSyncEnabled(BOOL bValue)
 	SetProfileLong("CloudSyncEnabled", bValue);
 }
 
-BOOL CGetSetOptions::GetCloudAutoSync()
-{
-	return GetProfileLong("CloudAutoSync", TRUE);
-}
-
-void CGetSetOptions::SetCloudAutoSync(BOOL bValue)
-{
-	SetProfileLong("CloudAutoSync", bValue);
-}
-
 BOOL CGetSetOptions::GetCloudPushOnCopy()
 {
 	return GetProfileLong("CloudPushOnCopy", TRUE);

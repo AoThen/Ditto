@@ -476,7 +476,9 @@ HKEY_CURRENT_USER\Software\Ditto\
   ├── CloudDeviceToken        (字符串) - 设备 Token
   ├── CloudDeviceId           (字符串) - 设备 ID
   ├── CloudSyncEnabled        (DWORD)  - 是否启用同步
-  ├── CloudAutoSync           (DWORD)  - 是否自动同步
+  ├── CloudPushOnCopy         (DWORD)  - 复制后立即推送
+  ├── CloudPeriodicSync       (DWORD)  - 定时同步
+  ├── CloudSyncInterval       (DWORD)  - 同步间隔(秒, 5-300)
   ├── CloudEncryptionKey      (字符串) - 加密密钥 (Base64)
   ├── CloudEncryptionSalt     (字符串) - 加密 Salt (Base64)
   ├── CloudLastSyncTime       (字符串) - 最后同步时间 (Unix 时间戳)

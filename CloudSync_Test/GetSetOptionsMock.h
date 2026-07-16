@@ -79,16 +79,6 @@ public:
 		s_cloudSyncEnabled = bValue;
 	}
 
-	static BOOL GetCloudAutoSync()
-	{
-		return s_cloudAutoSync;
-	}
-
-	static void SetCloudAutoSync(BOOL bValue)
-	{
-		s_cloudAutoSync = bValue;
-	}
-
 	static CString GetCloudDeviceName()
 	{
 		return s_deviceName;
@@ -118,7 +108,6 @@ public:
 		s_deviceToken.Empty();
 		s_deviceId.Empty();
 		s_serverUrl.Empty();
-		s_cloudAutoSync = FALSE;
 		s_deviceName.Empty();
 		s_lastSyncTime = 0;
 	}
@@ -130,7 +119,6 @@ private:
 	static CStringA s_deviceToken;
 	static CStringA s_deviceId;
 	static CString s_serverUrl;
-	static BOOL s_cloudAutoSync;
 	static CString s_deviceName;
 	static __int64 s_lastSyncTime;
 };
@@ -142,6 +130,5 @@ inline BOOL CGetSetOptions::s_cloudSyncEnabled = FALSE;
 inline CStringA CGetSetOptions::s_deviceToken;
 inline CStringA CGetSetOptions::s_deviceId;
 inline CString CGetSetOptions::s_serverUrl;
-inline BOOL CGetSetOptions::s_cloudAutoSync = FALSE;
 inline CString CGetSetOptions::s_deviceName;
 inline __int64 CGetSetOptions::s_lastSyncTime = 0;

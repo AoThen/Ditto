@@ -288,8 +288,6 @@ public:
 	static void     SetCloudDeviceId(LPCSTR lpszValue);
 	static BOOL     GetCloudSyncEnabled();
 	static void     SetCloudSyncEnabled(BOOL bValue);
-	static BOOL     GetCloudAutoSync();
-	static void     SetCloudAutoSync(BOOL bValue);
 	static BOOL     GetCloudPushOnCopy();
 	static void     SetCloudPushOnCopy(BOOL bValue);
 	static BOOL     GetCloudPeriodicSync();
