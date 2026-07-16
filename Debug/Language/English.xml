@@ -430,6 +430,19 @@
 		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged"></Item>
 		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed"></Item>
 		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed"></Item>
+		<Item English_Text = "Syncing..." ID = "CloudStatusSyncing"></Item>
+		<Item English_Text = "Error: %s" ID = "CloudStatusError"></Item>
+		<Item English_Text = "Last sync: %s \u2713" ID = "CloudStatusLastSync"></Item>
+		<Item English_Text = "Never synced" ID = "CloudStatusNeverSynced"></Item>
+		<Item English_Text = "Force Sync" ID = "CloudTitleForceSync"></Item>
+		<Item English_Text = "Force download has been triggered.\nCloud clips will replace local clips." ID = "CloudForceDownloadMsg"></Item>
+		<Item English_Text = "Force upload has been triggered.\nLocal clips are being pushed to the cloud." ID = "CloudForceUploadMsg"></Item>
+		<Item English_Text = "Please log in first before re-entering encryption password." ID = "CloudMsgLoginRequired"></Item>
+		<Item English_Text = "Cloud Sync - Re-enter Encryption Password" ID = "CloudTitleReEnterPassword"></Item>
+		<Item English_Text = "The encryption password has changed on another device.\n\nPlease enter the new encryption password to continue syncing:" ID = "CloudPromptReEnterPassword"></Item>
+		<Item English_Text = "Password verified successfully!\n\nCloud sync will now resume with the updated encryption key." ID = "CloudMsgPasswordVerified"></Item>
+		<Item English_Text = "Encryption key is missing or corrupted!\n\nYour clipboard encryption key (DEK) could not be loaded.\nCloud sync has been stopped to prevent data loss.\n\nDo you want to re-setup encryption now?\nWARNING: Previously encrypted clips on the server will become unreadable and will be skipped during sync.\n\n- Click Yes to enter a new encryption password and restore sync\n- Click No to keep sync stopped (you can re-enable later in settings)" ID = "CloudMsgEncryptionKeyLost"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Key Lost" ID = "CloudTitleEncryptionKeyLost"></Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database"></Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao"></Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format"></Item>
@@ -560,7 +573,6 @@
 		<Item English_Text = "Cloud Sync" ID = "-1" PropertyPage = "true"></Item>
 		<Item English_Text = "Cloud Sync Settings" ID = "2224"></Item>
 		<Item English_Text = "Enable Cloud Sync" ID = "2201"></Item>
-		<Item English_Text = "Auto Sync" ID = "2202"></Item>
 		<Item English_Text = "Server URL" ID = "2216"></Item>
 		<Item English_Text = "Username" ID = "2217"></Item>
 		<Item English_Text = "Password" ID = "2218"></Item>
@@ -577,6 +589,13 @@
 		<Item English_Text = "Key File Path" ID = "2223"></Item>
 		<Item English_Text = "Export Key" ID = "2213"></Item>
 		<Item English_Text = "Import Key" ID = "2214"></Item>
+		<Item English_Text = "Force Sync" ID = "2227"></Item>
+		<Item English_Text = "Force Download from Cloud" ID = "2228"></Item>
+		<Item English_Text = "Force Upload to Cloud" ID = "2229"></Item>
+		<Item English_Text = "Sync new clips on copy" ID = "2230"></Item>
+		<Item English_Text = "Periodic sync" ID = "2231"></Item>
+		<Item English_Text = "every" ID = "2233"></Item>
+		<Item English_Text = "Sync Status:" ID = "2235"></Item>
 	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773"></Item>

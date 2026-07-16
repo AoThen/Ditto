@@ -430,6 +430,19 @@
 		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged">云端同步 - 加密密码已变更</Item>
 		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed">加密初始化失败！\n\n警告：剪贴板数据将不会被加密。\n\n可能原因：\n- 未设置加密密码\n- 未导入密钥文件\n- 加密服务不可用\n\n请在云端同步设置中重新启用加密以保护数据。</Item>
 		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed">云端同步 - 加密失败</Item>
+		<Item English_Text = "Syncing..." ID = "CloudStatusSyncing">正在同步…</Item>
+		<Item English_Text = "Error: %s" ID = "CloudStatusError">错误：%s</Item>
+		<Item English_Text = "Last sync: %s \u2713" ID = "CloudStatusLastSync">上次同步：%s \u2713</Item>
+		<Item English_Text = "Never synced" ID = "CloudStatusNeverSynced">从未同步</Item>
+		<Item English_Text = "Force Sync" ID = "CloudTitleForceSync">强制同步</Item>
+		<Item English_Text = "Force download has been triggered.\nCloud clips will replace local clips." ID = "CloudForceDownloadMsg">已触发强制下载。\n云端剪贴项将替换本地剪贴项。</Item>
+		<Item English_Text = "Force upload has been triggered.\nLocal clips are being pushed to the cloud." ID = "CloudForceUploadMsg">已触发强制上传。\n本地剪贴项正在推送到云端。</Item>
+		<Item English_Text = "Please log in first before re-entering encryption password." ID = "CloudMsgLoginRequired">请先登录后再重新输入加密密码。</Item>
+		<Item English_Text = "Cloud Sync - Re-enter Encryption Password" ID = "CloudTitleReEnterPassword">云端同步 - 重新输入加密密码</Item>
+		<Item English_Text = "The encryption password has changed on another device.\n\nPlease enter the new encryption password to continue syncing:" ID = "CloudPromptReEnterPassword">加密密码已在其他设备上更改。\n\n请输入新的加密密码以继续同步：</Item>
+		<Item English_Text = "Password verified successfully!\n\nCloud sync will now resume with the updated encryption key." ID = "CloudMsgPasswordVerified">密码验证成功！\n\n云端同步将使用更新后的加密密钥恢复。</Item>
+		<Item English_Text = "Encryption key is missing or corrupted!\n\nYour clipboard encryption key (DEK) could not be loaded.\nCloud sync has been stopped to prevent data loss.\n\nDo you want to re-setup encryption now?\nWARNING: Previously encrypted clips on the server will become unreadable and will be skipped during sync.\n\n- Click Yes to enter a new encryption password and restore sync\n- Click No to keep sync stopped (you can re-enable later in settings)" ID = "CloudMsgEncryptionKeyLost">加密密钥丢失或损坏！\n\n无法加载剪贴板加密密钥（DEK）。\n云端同步已停止，以防数据丢失。\n\n是否现在重新设置加密？\n警告：服务器上先前加密的剪贴项将变得不可读，同步时将跳过。\n\n- 点击"是"输入新的加密密码并恢复同步\n- 点击"否"保持同步停止（可在设置中稍后重新启用）</Item>
+		<Item English_Text = "Cloud Sync - Encryption Key Lost" ID = "CloudTitleEncryptionKeyLost">云端同步 - 加密密钥丢失</Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database">打开数据库时出错。</Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao">无法初始化 DAO/Jet 数据库引擎。\n选择 '是' 将从 http://ditto-cp.sourceforge.net/dao_setup.exe 下载 DAO。\n\n安装 DAO 后请重新启动 Ditto。</Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format">无法识别的数据库格式</Item>
@@ -560,7 +573,7 @@
 		<Item English_Text = "Cloud Sync" ID = "-1">云端同步</Item>
 		<Item English_Text = "Cloud Sync Settings" ID = "2224">云端同步设置</Item>
 		<Item English_Text = "Enable Cloud Sync" ID = "2201">启用云端同步</Item>
-		<Item English_Text = "Auto Sync" ID = "2202">自动同步</Item>
+		
 		<Item English_Text = "Server URL" ID = "2216">服务器地址</Item>
 		<Item English_Text = "Username" ID = "2217">用户名</Item>
 		<Item English_Text = "Password" ID = "2218">密码</Item>
@@ -577,6 +590,13 @@
 		<Item English_Text = "Key File Path" ID = "2223">密钥文件路径</Item>
 		<Item English_Text = "Export Key" ID = "2213">导出密钥</Item>
 		<Item English_Text = "Import Key" ID = "2214">导入密钥</Item>
+		<Item English_Text = "Force Sync" ID = "2227">强制同步</Item>
+		<Item English_Text = "Force Download from Cloud" ID = "2228">从云端强制下载</Item>
+		<Item English_Text = "Force Upload to Cloud" ID = "2229">向云端强制上传</Item>
+		<Item English_Text = "Sync new clips on copy" ID = "2230">复制时同步新剪贴项</Item>
+		<Item English_Text = "Periodic sync" ID = "2231">定期同步</Item>
+		<Item English_Text = "every" ID = "2233">每</Item>
+		<Item English_Text = "Sync Status:" ID = "2235">同步状态：</Item>
 	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773">显示快速粘贴</Item>
