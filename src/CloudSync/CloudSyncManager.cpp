@@ -2828,7 +2828,18 @@ void CCloudSyncManager::StartWebSocket()
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::StopWebSocket()
 {
-	// 先设置停止事件通知 WS 线程退出
+	// Force-close WS connection to interrupt blocking read() in WS thread
+	EnterCriticalSection(&m_csWsClient);
+	if (m_pWsClient != nullptr)
+	{
+		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
+		if (wsClient->is_open())
+		{
+			wsClient->close(httplib::ws::CloseStatus::Normal, "Shutdown");
+		}
+	}
+	LeaveCriticalSection(&m_csWsClient);
+
 	if (m_pWsThread != nullptr)
 	{
 		// m_hStopEvent is already set by Stop(), WS thread will see it
@@ -2846,7 +2857,7 @@ void CCloudSyncManager::StopWebSocket()
 		m_pWsThread = nullptr;
 	}
 
-	// 线程已退出，安全清理 WS client
+	// Thread has exited, safely clean up WS client
 	EnterCriticalSection(&m_csWsClient);
 	if (m_pWsClient != nullptr)
 	{
