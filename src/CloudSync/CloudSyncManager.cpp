@@ -9,6 +9,7 @@
 #include "../Clip.h"
 #include "../sqlite/CppSQLite3.h"
 #include "../CP_Main.h"
+#include <set>
 
 using json = nlohmann::json;
 
@@ -2567,11 +2568,7 @@ void CCloudSyncManager::PullGroups()
 	EnsureHttpClient();
 	try
 	{
-		// Clear mapping table for full rebuild
-		{
-			CSingleLock lockDb(&m_csDb, TRUE);
-			theApp.m_db.execDML(_T("DELETE FROM CloudGroupMap"));
-		}
+		std::set<std::string> seenRemoteIds;
 
 		int page = 1;
 		bool hasMore = true;
@@ -2599,6 +2596,8 @@ void CCloudSyncManager::PullGroups()
 					std::string description = item["description"].value("", "");
 
 					if (remoteId.empty()) continue;
+
+					seenRemoteIds.insert(remoteId);
 
 					int localId = GetLocalGroupIdByRemoteId(remoteId);
 
@@ -2661,6 +2660,26 @@ void CCloudSyncManager::PullGroups()
 				page++;
 			}
 			catch (...) { break; }
+		}
+
+		// 清理已不在服务端存在的群组映射
+		{
+			CSingleLock lockDb(&m_csDb, TRUE);
+			CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT remote_id, local_id FROM CloudGroupMap"));
+			while (!q.eof())
+			{
+				std::string remoteId = q.getStringField(_T("remote_id"), "");
+				int localId = q.getIntField(_T("local_id"));
+				if (!remoteId.empty() && seenRemoteIds.find(remoteId) == seenRemoteIds.end())
+				{
+					CString csSQL;
+					csSQL.Format(_T("DELETE FROM Main WHERE lID = %d AND bIsGroup = 1"), localId);
+					theApp.m_db.execDML(csSQL);
+					csSQL.Format(_T("DELETE FROM CloudGroupMap WHERE remote_id = '%hs'"), remoteId.c_str());
+					theApp.m_db.execDML(csSQL);
+				}
+				q.nextRow();
+			}
 		}
 	}
 	catch (...)
