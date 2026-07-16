@@ -38,13 +38,22 @@ protected:
 	}
 };
 
+class CloudSyncManager_HDROP_Extract : public CloudSyncManagerTest {};
+class CloudSyncManager_HDROP_Filter : public CloudSyncManagerTest {};
+class CloudSyncManager_EncryptionGate : public CloudSyncManagerTest {};
+class CloudSyncManager_ClipFormats : public CloudSyncManagerTest {};
+class CloudSyncManager_Sync : public CloudSyncManagerTest {};
+class CloudSyncManager_Errors : public CloudSyncManagerTest {};
+class CloudSyncManager_ThreadSafety : public CloudSyncManagerTest {};
+class CloudSyncManager_Integration : public CloudSyncManagerTest {};
+
 // ============================================================================
 // HDROP File Path Extraction Tests
 // These tests verify the ExtractFilePathsFromHDROP logic that extracts
 // file paths from CF_HDROP format data for sync metadata
 // ============================================================================
 
-TEST(CloudSyncManager_HDROP_Extract, SingleFilePath)
+TEST_F(CloudSyncManager_HDROP_Extract, SingleFilePath)
 {
 	// Test extracting a single file path
 	json hdropFormat;
@@ -62,7 +71,7 @@ TEST(CloudSyncManager_HDROP_Extract, SingleFilePath)
 	EXPECT_EQ(paths[0], "C:\\test\\file1.txt");
 }
 
-TEST(CloudSyncManager_HDROP_Extract, MultipleFilesSeparatedByNull)
+TEST_F(CloudSyncManager_HDROP_Extract, MultipleFilesSeparatedByNull)
 {
 	// Test extracting multiple file paths separated by null characters
 	// Use explicit length constructor because default std::string truncates at first '\0'
@@ -88,7 +97,7 @@ TEST(CloudSyncManager_HDROP_Extract, MultipleFilesSeparatedByNull)
 	EXPECT_EQ(paths[2], "C:\\file3.txt");
 }
 
-TEST(CloudSyncManager_HDROP_Extract, EmptyData)
+TEST_F(CloudSyncManager_HDROP_Extract, EmptyData)
 {
 	// Test extraction from empty data
 	json hdropFormat;
@@ -98,7 +107,7 @@ TEST(CloudSyncManager_HDROP_Extract, EmptyData)
 	EXPECT_TRUE(dataStr.empty());
 }
 
-TEST(CloudSyncManager_HDROP_Extract, UnicodePaths)
+TEST_F(CloudSyncManager_HDROP_Extract, UnicodePaths)
 {
 	// Test extraction with Unicode file paths
 	json hdropFormat;
@@ -123,7 +132,7 @@ TEST(CloudSyncManager_HDROP_Extract, UnicodePaths)
 // from being synced to the cloud. Only file paths should be synced.
 // ============================================================================
 
-TEST(CloudSyncManager_HDROP_Filter, FiltersHDROPFormat)
+TEST_F(CloudSyncManager_HDROP_Filter, FiltersHDROPFormat)
 {
 	// Create a formats array with CF_HDROP (format_type=15)
 	json formats = json::array();
@@ -173,7 +182,7 @@ TEST(CloudSyncManager_HDROP_Filter, FiltersHDROPFormat)
 	EXPECT_EQ(parsedData["paths"][0], "C:\\test\\file1.txt");
 }
 
-TEST(CloudSyncManager_HDROP_Filter, NonHDROPNotFiltered)
+TEST_F(CloudSyncManager_HDROP_Filter, NonHDROPNotFiltered)
 {
 	// Create formats without CF_HDROP
 	json formats = json::array();
@@ -201,7 +210,7 @@ TEST(CloudSyncManager_HDROP_Filter, NonHDROPNotFiltered)
 	EXPECT_FALSE(formats[0].contains("is_file_ref"));
 }
 
-TEST(CloudSyncManager_HDROP_Filter, EmptyFormatsArray)
+TEST_F(CloudSyncManager_HDROP_Filter, EmptyFormatsArray)
 {
 	json formats = json::array();
 	
@@ -218,7 +227,7 @@ TEST(CloudSyncManager_HDROP_Filter, EmptyFormatsArray)
 	EXPECT_FALSE(foundHDROP);
 }
 
-TEST(CloudSyncManager_HDROP_Filter, MultipleFormatsOnlyHDROPFiltered)
+TEST_F(CloudSyncManager_HDROP_Filter, MultipleFormatsOnlyHDROPFiltered)
 {
 	json formats = json::array();
 	
@@ -272,7 +281,7 @@ TEST(CloudSyncManager_HDROP_Filter, MultipleFormatsOnlyHDROPFiltered)
 // plaintext is NEVER synced when encryption is not initialized.
 // ============================================================================
 
-TEST(CloudSyncManager_EncryptionGate, EncryptWhenNotInitializedReturnsEmpty)
+TEST_F(CloudSyncManager_EncryptionGate, EncryptWhenNotInitializedReturnsEmpty)
 {
 	// SECURITY CRITICAL: If crypto is not initialized, encryption must return empty
 	// to prevent accidental plaintext sync to the cloud
@@ -284,7 +293,7 @@ TEST(CloudSyncManager_EncryptionGate, EncryptWhenNotInitializedReturnsEmpty)
 	EXPECT_TRUE(encrypted.IsEmpty()) << "SECURITY: Encrypt returned non-empty when not initialized!";
 }
 
-TEST(CloudSyncManager_EncryptionGate, EncryptWhenInitializedSucceeds)
+TEST_F(CloudSyncManager_EncryptionGate, EncryptWhenInitializedSucceeds)
 {
 	// Setup: Initialize crypto with a valid key
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -302,7 +311,7 @@ TEST(CloudSyncManager_EncryptionGate, EncryptWhenInitializedSucceeds)
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST(CloudSyncManager_EncryptionGate, DecryptWhenNotInitializedReturnsEmpty)
+TEST_F(CloudSyncManager_EncryptionGate, DecryptWhenNotInitializedReturnsEmpty)
 {
 	// When crypto is not initialized, decryption must return empty
 	CStringA encryptedData("dGVzdA=="); // base64
@@ -312,7 +321,7 @@ TEST(CloudSyncManager_EncryptionGate, DecryptWhenNotInitializedReturnsEmpty)
 	EXPECT_TRUE(decrypted.IsEmpty());
 }
 
-TEST(CloudSyncManager_EncryptionGate, HDROPNeverEncrypted)
+TEST_F(CloudSyncManager_EncryptionGate, HDROPNeverEncrypted)
 {
 	// SECURITY CRITICAL: HDROP formats (file references) should NEVER be encrypted
 	// Only file paths are synced, not file contents
@@ -410,7 +419,7 @@ static BOOL TestDecryptClipFormats(nlohmann::json& formats)
 	return TRUE;
 }
 
-TEST(CloudSyncManager_ClipFormats, EncryptClipFormatsLogic)
+TEST_F(CloudSyncManager_ClipFormats, EncryptClipFormatsLogic)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -441,7 +450,7 @@ TEST(CloudSyncManager_ClipFormats, EncryptClipFormatsLogic)
 	EXPECT_NE(formats[0]["data"].get<std::string>(), "Hello, CloudSync!");
 }
 
-TEST(CloudSyncManager_ClipFormats, DecryptClipFormatsLogic)
+TEST_F(CloudSyncManager_ClipFormats, DecryptClipFormatsLogic)
 {
 	// Setup crypto and create encrypted formats
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -467,7 +476,7 @@ TEST(CloudSyncManager_ClipFormats, DecryptClipFormatsLogic)
 	EXPECT_EQ(formats[0]["encrypted"], false);
 }
 
-TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringEncryption)
+TEST_F(CloudSyncManager_ClipFormats, HDROPSkippedDuringEncryption)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -490,7 +499,7 @@ TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringEncryption)
 	EXPECT_EQ(formats[0]["data"].get<std::string>(), "C:\\file.txt");
 }
 
-TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringDecryption)
+TEST_F(CloudSyncManager_ClipFormats, HDROPSkippedDuringDecryption)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -517,7 +526,7 @@ TEST(CloudSyncManager_ClipFormats, HDROPSkippedDuringDecryption)
 // These tests verify the actual encryption/decryption of clipboard formats
 // ============================================================================
 
-TEST(CloudSyncManager_ClipFormats, EncryptDecryptRoundtrip)
+TEST_F(CloudSyncManager_ClipFormats, EncryptDecryptRoundtrip)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -597,7 +606,7 @@ TEST(CloudSyncManager_ClipFormats, EncryptDecryptRoundtrip)
 	EXPECT_EQ(formats[1]["data"].get<std::string>(), "你好世界");
 }
 
-TEST(CloudSyncManager_ClipFormats, MixedEncryptedAndPlain)
+TEST_F(CloudSyncManager_ClipFormats, MixedEncryptedAndPlain)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -614,7 +623,9 @@ TEST(CloudSyncManager_ClipFormats, MixedEncryptedAndPlain)
 	
 	json encryptedFormat;
 	encryptedFormat["format_type"] = 2;
-	encryptedFormat["data"] = "Already encrypted";
+	CStringA realCt = CCloudCrypto::Encrypt(CStringA("Already encrypted"));
+	ASSERT_FALSE(realCt.IsEmpty());
+	encryptedFormat["data"] = realCt.GetString();
 	encryptedFormat["encrypted"] = true;
 	formats.push_back(encryptedFormat);
 
@@ -658,7 +669,7 @@ TEST(CloudSyncManager_ClipFormats, MixedEncryptedAndPlain)
 // Sync Logic Tests
 // ============================================================================
 
-TEST(CloudSyncManager_Sync, BuildSyncRequestWithTimestamp)
+TEST_F(CloudSyncManager_Sync, BuildSyncRequestWithTimestamp)
 {
 	// Test building sync request JSON with timestamp
 	time_t lastSyncTime = 1700000000; // Nov 14, 2023
@@ -694,7 +705,7 @@ TEST(CloudSyncManager_Sync, BuildSyncRequestWithTimestamp)
 	EXPECT_TRUE(syncReq["push_clips"].is_array());
 }
 
-TEST(CloudSyncManager_Sync, BuildSyncRequestFirstSync)
+TEST_F(CloudSyncManager_Sync, BuildSyncRequestFirstSync)
 {
 	// Test first sync (no lastSyncTime)
 	time_t lastSyncTime = 0;
@@ -716,7 +727,7 @@ TEST(CloudSyncManager_Sync, BuildSyncRequestFirstSync)
 	EXPECT_EQ(syncReq["since"], "1970-01-01T00:00:00Z");
 }
 
-TEST(CloudSyncManager_Sync, ClipsArrayStructure)
+TEST_F(CloudSyncManager_Sync, ClipsArrayStructure)
 {
 	// Test clip JSON structure
 	json clipsArray = json::array();
@@ -755,7 +766,7 @@ TEST(CloudSyncManager_Sync, ClipsArrayStructure)
 // Error Handling Tests
 // ============================================================================
 
-TEST(CloudSyncManager_Errors, EmptyClipData)
+TEST_F(CloudSyncManager_Errors, EmptyClipData)
 {
 	// Test handling clips with empty data
 	json clip;
@@ -777,7 +788,7 @@ TEST(CloudSyncManager_Errors, EmptyClipData)
 	});
 }
 
-TEST(CloudSyncManager_Errors, MalformedFormatData)
+TEST_F(CloudSyncManager_Errors, MalformedFormatData)
 {
 	// Test handling malformed format data
 	json formats = json::array();
@@ -792,7 +803,7 @@ TEST(CloudSyncManager_Errors, MalformedFormatData)
 	EXPECT_TRUE(formats[0]["data"].get<std::string>().empty());
 }
 
-TEST(CloudSyncManager_Errors, InvalidFormatType)
+TEST_F(CloudSyncManager_Errors, InvalidFormatType)
 {
 	// Test handling invalid format type
 	json format;
@@ -811,7 +822,7 @@ TEST(CloudSyncManager_Errors, InvalidFormatType)
 // Thread Safety Tests
 // ============================================================================
 
-TEST(CloudSyncManager_ThreadSafety, ConcurrentAccessToLastSyncTime)
+TEST_F(CloudSyncManager_ThreadSafety, ConcurrentAccessToLastSyncTime)
 {
 	// Test thread-safe read/write of lastSyncTime
 	time_t lastSyncTime = 1700000000;
@@ -837,7 +848,7 @@ TEST(CloudSyncManager_ThreadSafety, ConcurrentAccessToLastSyncTime)
 	DeleteCriticalSection(&cs);
 }
 
-TEST(CloudSyncManager_ThreadSafety, QuickSyncThreadCounter)
+TEST_F(CloudSyncManager_ThreadSafety, QuickSyncThreadCounter)
 {
 	// Test thread counter increment/decrement
 	LONG activeThreads = 0;
@@ -871,7 +882,7 @@ TEST(CloudSyncManager_ThreadSafety, QuickSyncThreadCounter)
 // Integration Tests
 // ============================================================================
 
-TEST(CloudSyncManager_Integration, FullEncryptAndSyncFlow)
+TEST_F(CloudSyncManager_Integration, FullEncryptAndSyncFlow)
 {
 	// Setup crypto
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);

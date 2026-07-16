@@ -37,12 +37,19 @@ protected:
 	}
 };
 
+class CloudEncryption_Setup : public CloudEncryptionTest {};
+class CloudEncryption_Status : public CloudEncryptionTest {};
+class CloudEncryption_StoredKey : public CloudEncryptionTest {};
+class CloudEncryption_ClipData : public CloudEncryptionTest {};
+class CloudEncryption_Ready : public CloudEncryptionTest {};
+class CloudEncryption_Integration : public CloudEncryptionTest {};
+
 // ============================================================================
 // Setup Encryption Tests
 // These tests simulate the SetupEncryption flow without network calls
 // ============================================================================
 
-TEST(CloudEncryption_Setup, SuccessfulEncryptionSetup)
+TEST_F(CloudEncryption_Setup, SuccessfulEncryptionSetup)
 {
 	// Simulate the SetupEncryption flow:
 	// 1. Generate a salt (would normally come from server)
@@ -76,7 +83,7 @@ TEST(CloudEncryption_Setup, SuccessfulEncryptionSetup)
 	EXPECT_FALSE(CGetSetOptions::GetCloudEncryptionKey().IsEmpty());
 }
 
-TEST(CloudEncryption_Setup, WeakPasswordStillWorks)
+TEST_F(CloudEncryption_Setup, WeakPasswordStillWorks)
 {
 	// Test that weak passwords are accepted (user responsibility)
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -89,7 +96,7 @@ TEST(CloudEncryption_Setup, WeakPasswordStillWorks)
 	EXPECT_TRUE(initOk);
 }
 
-TEST(CloudEncryption_Setup, UnicodePassword)
+TEST_F(CloudEncryption_Setup, UnicodePassword)
 {
 	// Test password with Unicode characters
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -105,7 +112,7 @@ TEST(CloudEncryption_Setup, UnicodePassword)
 	EXPECT_TRUE(initOk);
 }
 
-TEST(CloudEncryption_Setup, EmptyPasswordFails)
+TEST_F(CloudEncryption_Setup, EmptyPasswordFails)
 {
 	// Test that empty password produces a key (but shouldn't be used)
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -117,7 +124,7 @@ TEST(CloudEncryption_Setup, EmptyPasswordFails)
 	EXPECT_EQ(key.size(), 32);
 }
 
-TEST(CloudEncryption_Setup, DifferentSaltsProduceDifferentKeys)
+TEST_F(CloudEncryption_Setup, DifferentSaltsProduceDifferentKeys)
 {
 	// Test that different salts produce different keys
 	std::vector<BYTE> salt1 = CCloudCrypto::RandomBytes(16);
@@ -132,7 +139,7 @@ TEST(CloudEncryption_Setup, DifferentSaltsProduceDifferentKeys)
 	EXPECT_NE(0, memcmp(key1.data(), key2.data(), 32));
 }
 
-TEST(CloudEncryption_Setup, DifferentIterationsProduceDifferentKeys)
+TEST_F(CloudEncryption_Setup, DifferentIterationsProduceDifferentKeys)
 {
 	// Test that different iteration counts produce different keys
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -149,7 +156,7 @@ TEST(CloudEncryption_Setup, DifferentIterationsProduceDifferentKeys)
 // Encryption Status Tests
 // ============================================================================
 
-TEST(CloudEncryption_Status, EncryptionEnabled)
+TEST_F(CloudEncryption_Status, EncryptionEnabled)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -164,14 +171,14 @@ TEST(CloudEncryption_Status, EncryptionEnabled)
 	EXPECT_TRUE(ready);
 }
 
-TEST(CloudEncryption_Status, EncryptionDisabled)
+TEST_F(CloudEncryption_Status, EncryptionDisabled)
 {
 	// Check default state
 	BOOL ready = CCloudEncryption::IsEncryptionReady();
 	EXPECT_FALSE(ready);
 }
 
-TEST(CloudEncryption_Status, KeyExists)
+TEST_F(CloudEncryption_Status, KeyExists)
 {
 	// Setup with valid key
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -185,7 +192,7 @@ TEST(CloudEncryption_Status, KeyExists)
 	EXPECT_FALSE(storedKey.IsEmpty());
 }
 
-TEST(CloudEncryption_Status, KeyDoesNotExist)
+TEST_F(CloudEncryption_Status, KeyDoesNotExist)
 {
 	// Check default state
 	CString key = CGetSetOptions::GetCloudEncryptionKey();
@@ -196,7 +203,7 @@ TEST(CloudEncryption_Status, KeyDoesNotExist)
 // Initialize Crypto From Stored Key Tests
 // ============================================================================
 
-TEST(CloudEncryption_StoredKey, ValidStoredKey)
+TEST_F(CloudEncryption_StoredKey, ValidStoredKey)
 {
 	// Generate and store a valid key
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -213,7 +220,7 @@ TEST(CloudEncryption_StoredKey, ValidStoredKey)
 	EXPECT_TRUE(initOk);
 }
 
-TEST(CloudEncryption_StoredKey, InvalidKeySize)
+TEST_F(CloudEncryption_StoredKey, InvalidKeySize)
 {
 	// Store key with wrong size
 	std::vector<BYTE> wrongKey = CCloudCrypto::RandomBytes(16); // Wrong size
@@ -231,7 +238,7 @@ TEST(CloudEncryption_StoredKey, InvalidKeySize)
 	EXPECT_FALSE(initOk);
 }
 
-TEST(CloudEncryption_StoredKey, EmptyStoredKey)
+TEST_F(CloudEncryption_StoredKey, EmptyStoredKey)
 {
 	// No key stored
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
@@ -246,7 +253,7 @@ TEST(CloudEncryption_StoredKey, EmptyStoredKey)
 	EXPECT_TRUE(storedKey.empty());
 }
 
-TEST(CloudEncryption_StoredKey, CorruptedStoredKey)
+TEST_F(CloudEncryption_StoredKey, CorruptedStoredKey)
 {
 	// Store corrupted key (invalid base64)
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
@@ -262,7 +269,7 @@ TEST(CloudEncryption_StoredKey, CorruptedStoredKey)
 	EXPECT_FALSE(isValid); // Should not be valid
 }
 
-TEST(CloudEncryption_StoredKey, NoStoredKey)
+TEST_F(CloudEncryption_StoredKey, NoStoredKey)
 {
 	// Don't store any key
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
@@ -280,7 +287,7 @@ TEST(CloudEncryption_StoredKey, NoStoredKey)
 // Encrypt Clip Data Tests - Using ACTUAL CCloudEncryption::EncryptClipData()
 // ============================================================================
 
-TEST(CloudEncryption_ClipData, EncryptWhenReady)
+TEST_F(CloudEncryption_ClipData, EncryptWhenReady)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -299,7 +306,7 @@ TEST(CloudEncryption_ClipData, EncryptWhenReady)
 	EXPECT_NE(encrypted, plaintext);
 }
 
-TEST(CloudEncryption_ClipData, EncryptWhenNotReady_ReturnsEmpty)
+TEST_F(CloudEncryption_ClipData, EncryptWhenNotReady_ReturnsEmpty)
 {
 	// SECURITY CRITICAL: Don't initialize crypto
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
@@ -312,7 +319,7 @@ TEST(CloudEncryption_ClipData, EncryptWhenNotReady_ReturnsEmpty)
 	EXPECT_TRUE(encrypted.IsEmpty()) << "SECURITY: EncryptClipData returned non-empty when not ready!";
 }
 
-TEST(CloudEncryption_ClipData, EncryptEmptyData)
+TEST_F(CloudEncryption_ClipData, EncryptEmptyData)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -329,7 +336,7 @@ TEST(CloudEncryption_ClipData, EncryptEmptyData)
 	EXPECT_FALSE(encrypted.IsEmpty());
 }
 
-TEST(CloudEncryption_ClipData, EncryptBinaryData)
+TEST_F(CloudEncryption_ClipData, EncryptBinaryData)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -357,7 +364,7 @@ TEST(CloudEncryption_ClipData, EncryptBinaryData)
 	EXPECT_EQ(0, memcmp(decrypted.GetString(), binaryData.data(), 256));
 }
 
-TEST(CloudEncryption_ClipData, EncryptLargeData)
+TEST_F(CloudEncryption_ClipData, EncryptLargeData)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -384,7 +391,7 @@ TEST(CloudEncryption_ClipData, EncryptLargeData)
 // Decrypt Clip Data Tests - Using ACTUAL CCloudEncryption::DecryptClipData()
 // ============================================================================
 
-TEST(CloudEncryption_ClipData, DecryptWhenReady)
+TEST_F(CloudEncryption_ClipData, DecryptWhenReady)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -403,7 +410,7 @@ TEST(CloudEncryption_ClipData, DecryptWhenReady)
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsAsIs)
+TEST_F(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsAsIs)
 {
 	// Don't initialize crypto
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
@@ -417,7 +424,7 @@ TEST(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsAsIs)
 	EXPECT_EQ(decrypted, encryptedData);
 }
 
-TEST(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
+TEST_F(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -444,7 +451,7 @@ TEST(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
 	EXPECT_TRUE(decrypted.IsEmpty()) << "Decryption should fail for tampered data";
 }
 
-TEST(CloudEncryption_ClipData, DecryptWrongKey_ReturnsEmpty)
+TEST_F(CloudEncryption_ClipData, DecryptWrongKey_ReturnsEmpty)
 {
 	// Encrypt with one key
 	std::vector<BYTE> key1 = CCloudCrypto::RandomBytes(32);
@@ -467,7 +474,7 @@ TEST(CloudEncryption_ClipData, DecryptWrongKey_ReturnsEmpty)
 	EXPECT_TRUE(decrypted.IsEmpty()) << "Decryption should fail with wrong key";
 }
 
-TEST(CloudEncryption_ClipData, DecryptEmptyInput)
+TEST_F(CloudEncryption_ClipData, DecryptEmptyInput)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -483,7 +490,7 @@ TEST(CloudEncryption_ClipData, DecryptEmptyInput)
 	EXPECT_TRUE(decrypted.IsEmpty());
 }
 
-TEST(CloudEncryption_ClipData, DecryptInvalidBase64_ReturnsEmpty)
+TEST_F(CloudEncryption_ClipData, DecryptInvalidBase64_ReturnsEmpty)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -503,7 +510,7 @@ TEST(CloudEncryption_ClipData, DecryptInvalidBase64_ReturnsEmpty)
 // Is Encryption Ready Tests
 // ============================================================================
 
-TEST(CloudEncryption_Ready, ReadyWhenEnabled)
+TEST_F(CloudEncryption_Ready, ReadyWhenEnabled)
 {
 	// Enable encryption
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
@@ -513,7 +520,7 @@ TEST(CloudEncryption_Ready, ReadyWhenEnabled)
 	EXPECT_TRUE(ready);
 }
 
-TEST(CloudEncryption_Ready, NotReadyWhenDisabled)
+TEST_F(CloudEncryption_Ready, NotReadyWhenDisabled)
 {
 	// Disable encryption
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
@@ -523,7 +530,7 @@ TEST(CloudEncryption_Ready, NotReadyWhenDisabled)
 	EXPECT_FALSE(ready);
 }
 
-TEST(CloudEncryption_Ready, NotReadyByDefault)
+TEST_F(CloudEncryption_Ready, NotReadyByDefault)
 {
 	// Default state should be not ready
 	BOOL ready = CCloudEncryption::IsEncryptionReady();
@@ -534,7 +541,7 @@ TEST(CloudEncryption_Ready, NotReadyByDefault)
 // Integration Tests
 // ============================================================================
 
-TEST(CloudEncryption_Integration, FullSetupEncryptDecryptCycle)
+TEST_F(CloudEncryption_Integration, FullSetupEncryptDecryptCycle)
 {
 	// 1. Generate salt
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -563,7 +570,7 @@ TEST(CloudEncryption_Integration, FullSetupEncryptDecryptCycle)
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST(CloudEncryption_Integration, MultipleClipsWithSameKey)
+TEST_F(CloudEncryption_Integration, MultipleClipsWithSameKey)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
@@ -596,7 +603,7 @@ TEST(CloudEncryption_Integration, MultipleClipsWithSameKey)
 	}
 }
 
-TEST(CloudEncryption_Integration, PasswordChangeRequiresReencrypt)
+TEST_F(CloudEncryption_Integration, PasswordChangeRequiresReencrypt)
 {
 	// Setup with password 1
 	std::vector<BYTE> salt = CCloudCrypto::RandomBytes(16);
@@ -631,7 +638,7 @@ TEST(CloudEncryption_Integration, PasswordChangeRequiresReencrypt)
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST(CloudEncryption_Integration, ClipboardTextRoundtrip)
+TEST_F(CloudEncryption_Integration, ClipboardTextRoundtrip)
 {
 	// Setup encryption
 	std::vector<BYTE> key = CCloudCrypto::RandomBytes(32);
