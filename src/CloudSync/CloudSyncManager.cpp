@@ -70,17 +70,21 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_nActiveQuickSyncThreads(0)
 	, m_bFirstPushInProgress(0)
 	, m_pWsClient(nullptr)
+	, m_lastPushTime(0)
 	, m_wsReconnectDelay(1000)
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
+	, m_lastSyncSuccessTime(0)
 {
 	InitializeCriticalSection(&m_csSync);
+	InitializeCriticalSection(&m_csStatus);
 }
 
 CCloudSyncManager::~CCloudSyncManager()
 {
 	Stop();
 	DeleteCriticalSection(&m_csSync);
+	DeleteCriticalSection(&m_csStatus);
 }
 
 BOOL CCloudSyncManager::Initialize()
@@ -289,6 +293,12 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 {
 	UNREFERENCED_PARAMETER(pClip);
 
+	if (!CGetSetOptions::GetCloudPushOnCopy())
+	{
+		LogMessage(_T("Clip added - push on copy disabled, skipping quick sync."));
+		return;
+	}
+
 	// Trigger an immediate sync when a new clip is added
 	// This ensures the new clip is pushed to the cloud quickly
 	LogMessage(_T("Clip added - triggering cloud sync."));
@@ -354,6 +364,18 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 			{
 				pThis->DeleteRemoteGroup(gid);
 			}
+			EnterCriticalSection(&pThis->m_csStatus);
+			pThis->m_csSyncStatus = _T("Error");
+			pThis->m_csLastError = _T("Quick push failed");
+			LeaveCriticalSection(&pThis->m_csStatus);
+		}
+		else
+		{
+			EnterCriticalSection(&pThis->m_csStatus);
+			pThis->m_csSyncStatus = _T("");
+			pThis->m_csLastError = _T("");
+			pThis->m_lastSyncSuccessTime = time(nullptr);
+			LeaveCriticalSection(&pThis->m_csStatus);
 		}
 	}
 	else
@@ -409,6 +431,12 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 	pThis->PullChanges();
 	LogMessage(_T("ForceSyncThreadProc: force download complete."));
 
+	EnterCriticalSection(&pThis->m_csStatus);
+	pThis->m_csSyncStatus = _T("");
+	pThis->m_csLastError = _T("");
+	pThis->m_lastSyncSuccessTime = time(nullptr);
+	LeaveCriticalSection(&pThis->m_csStatus);
+
 	// Decrement active thread counter so Stop() can complete
 	EnterCriticalSection(&pThis->m_csSync);
 	pThis->m_nActiveQuickSyncThreads--;
@@ -425,6 +453,38 @@ BOOL CCloudSyncManager::IsLoggedIn() const
 BOOL CCloudSyncManager::IsEncryptionEnabled() const
 {
 	return m_cryptoInitialized;
+}
+
+CString CCloudSyncManager::GetSyncStatus() const
+{
+	EnterCriticalSection(&m_csStatus);
+	CString ret = m_csSyncStatus;
+	LeaveCriticalSection(&m_csStatus);
+	return ret;
+}
+
+CString CCloudSyncManager::GetLastError() const
+{
+	EnterCriticalSection(&m_csStatus);
+	CString ret = m_csLastError;
+	LeaveCriticalSection(&m_csStatus);
+	return ret;
+}
+
+time_t CCloudSyncManager::GetLastSyncSuccessTime() const
+{
+	EnterCriticalSection(&m_csStatus);
+	time_t ret = m_lastSyncSuccessTime;
+	LeaveCriticalSection(&m_csStatus);
+	return ret;
+}
+
+BOOL CCloudSyncManager::HasSyncedBefore() const
+{
+	EnterCriticalSection(&m_csStatus);
+	BOOL ret = (m_lastSyncSuccessTime > 0);
+	LeaveCriticalSection(&m_csStatus);
+	return ret;
 }
 
 // ---------------------------------------------------------------------------
@@ -612,8 +672,13 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 
 	while (true)
 	{
-		// Wait for stop event, WS trigger, or timeout (30 second sync interval)
-		DWORD dwResult = WaitForMultipleObjects(2, waitHandles, FALSE, 30000);
+		// Read settings each iteration (allows live config change)
+		BOOL bPeriodicSync = CGetSetOptions::GetCloudPeriodicSync();
+		int nInterval = CGetSetOptions::GetCloudSyncInterval();
+		DWORD dwTimeout = bPeriodicSync ? (DWORD)(nInterval * 1000) : INFINITE;
+
+		// Wait for stop event, WS trigger, or sync interval timeout
+		DWORD dwResult = WaitForMultipleObjects(2, waitHandles, FALSE, dwTimeout);
 		if (dwResult == WAIT_OBJECT_0)
 		{
 			// Stop event was signaled
@@ -627,13 +692,14 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 			LogMessage(_T("Sync triggered by WebSocket event."));
 		}
 
-		// Check if auto sync is enabled
-		if (!CGetSetOptions::GetCloudAutoSync())
-		{
+		// If periodic sync is off and this was a timeout (not WS trigger), skip
+		if (!bPeriodicSync && dwResult == WAIT_TIMEOUT)
 			continue;
-		}
 
-		// Sync interval elapsed or WS triggered, perform sync
+		EnterCriticalSection(&pThis->m_csStatus);
+		pThis->m_csSyncStatus = _T("Syncing...");
+		LeaveCriticalSection(&pThis->m_csStatus);
+
 		try
 		{
 			pThis->CheckAndNotifyEncryptionChange();
@@ -641,24 +707,36 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 			// Push groups first (so group_id mappings exist before clip push)
 			pThis->PushGroups();
 
-			if (CGetSetOptions::GetCloudAutoSync())
-			{
-				pThis->PushNewClips();
-			}
+			pThis->PushNewClips();
 
 			// Pull groups first so group_id mappings exist before clip import
 			pThis->PullGroups();
 			// Then pull changes (clips can now resolve group_id to local parentId)
 			pThis->PullChanges();
+
+			EnterCriticalSection(&pThis->m_csStatus);
+			pThis->m_csSyncStatus = _T("");
+			pThis->m_csLastError = _T("");
+			pThis->m_lastSyncSuccessTime = time(nullptr);
+			LeaveCriticalSection(&pThis->m_csStatus);
 		}
 		catch (const std::exception& e)
 		{
 			CString err;
 			err.Format(_T("Sync error: %hs"), e.what());
 			LogMessage(err);
+			EnterCriticalSection(&pThis->m_csStatus);
+			pThis->m_csSyncStatus = _T("Error");
+			pThis->m_csLastError = err;
+			LeaveCriticalSection(&pThis->m_csStatus);
 		}
 		catch (...)
 		{
+			LogMessage(_T("Sync unknown error"));
+			EnterCriticalSection(&pThis->m_csStatus);
+			pThis->m_csSyncStatus = _T("Error");
+			pThis->m_csLastError = _T("Unknown sync error");
+			LeaveCriticalSection(&pThis->m_csStatus);
 		}
 	}
 
@@ -731,6 +809,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			if (!GetLocalClipsSince(sinceTime, upperBound, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
 			{
 				LogMessage(_T("PushNewClips: failed to enumerate local clips."));
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = _T("Push: failed to enumerate local clips");
+				LeaveCriticalSection(&m_csStatus);
 				bResult = FALSE; goto cleanup;
 			}
 
@@ -774,12 +855,18 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			if (!res)
 			{
 				LogMessage(_T("PushNewClips: failed to connect to server"));
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = _T("Push: failed to connect to server");
+				LeaveCriticalSection(&m_csStatus);
 				bResult = FALSE; goto cleanup;
 			}
 
 			if (res->status == 401 || res->status == 403)
 			{
 				LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = _T("Push: authentication failed");
+				LeaveCriticalSection(&m_csStatus);
 				CCloudAuth::Logout();
 				CWnd* pMainWnd = AfxGetMainWnd();
 				if (pMainWnd != nullptr)
@@ -793,6 +880,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				CString err;
 				err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
 				LogMessage(err);
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = err;
+				LeaveCriticalSection(&m_csStatus);
 				bResult = FALSE; goto cleanup;
 			}
 
@@ -804,6 +894,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 					CString msg;
 					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
 					LogMessage(msg);
+					EnterCriticalSection(&m_csStatus);
+					m_csLastError = msg;
+					LeaveCriticalSection(&m_csStatus);
 					bResult = FALSE; goto cleanup;
 				}
 				const json* dataNode = nullptr;
@@ -822,6 +915,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				CString err;
 				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
 				LogMessage(err);
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = err;
+				LeaveCriticalSection(&m_csStatus);
 				bResult = FALSE; goto cleanup;
 			}
 
@@ -856,11 +952,17 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 		CString err;
 		err.Format(_T("PushNewClips error: %hs"), e.what());
 		LogMessage(err);
+		EnterCriticalSection(&m_csStatus);
+		m_csLastError = err;
+		LeaveCriticalSection(&m_csStatus);
 		bResult = FALSE;
 	}
 	catch (...)
 	{
 		LogMessage(_T("PushNewClips: unknown error"));
+		EnterCriticalSection(&m_csStatus);
+		m_csLastError = _T("Push: unknown error");
+		LeaveCriticalSection(&m_csStatus);
 		bResult = FALSE;
 	}
 
@@ -1026,6 +1128,9 @@ void CCloudSyncManager::PullChanges()
 		if (!res)
 		{
 			LogMessage(_T("PullChanges: failed to connect to server"));
+			EnterCriticalSection(&m_csStatus);
+			m_csLastError = _T("Pull: failed to connect to server");
+			LeaveCriticalSection(&m_csStatus);
 			return;
 		}
 
@@ -1033,6 +1138,9 @@ void CCloudSyncManager::PullChanges()
 		if (res->status == 401 || res->status == 403)
 		{
 			LogMessage(_T("PullChanges: token expired or invalid, clearing token for re-auth."));
+			EnterCriticalSection(&m_csStatus);
+			m_csLastError = _T("Pull: authentication failed");
+			LeaveCriticalSection(&m_csStatus);
 			
 			// Clear stored credentials
 			CCloudAuth::Logout();
@@ -1054,6 +1162,9 @@ void CCloudSyncManager::PullChanges()
 			CString err;
 			err.Format(_T("PullChanges: server returned HTTP %d"), res->status);
 			LogMessage(err);
+			EnterCriticalSection(&m_csStatus);
+			m_csLastError = err;
+			LeaveCriticalSection(&m_csStatus);
 			return;
 		}
 
@@ -1068,6 +1179,9 @@ void CCloudSyncManager::PullChanges()
 				CString msg;
 				msg.Format(_T("PullChanges: server error code %d"), responseJson["code"].get<int>());
 				LogMessage(msg);
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = msg;
+				LeaveCriticalSection(&m_csStatus);
 				return;
 			}
 
@@ -1249,6 +1363,9 @@ void CCloudSyncManager::PullChanges()
 			CString err;
 			err.Format(_T("PullChanges: JSON parse error: %hs"), e.what());
 			LogMessage(err);
+			EnterCriticalSection(&m_csStatus);
+			m_csLastError = err;
+			LeaveCriticalSection(&m_csStatus);
 		}
 	}
 	catch (const std::exception& e)
@@ -1256,10 +1373,16 @@ void CCloudSyncManager::PullChanges()
 		CString err;
 		err.Format(_T("PullChanges error: %hs"), e.what());
 		LogMessage(err);
+		EnterCriticalSection(&m_csStatus);
+		m_csLastError = err;
+		LeaveCriticalSection(&m_csStatus);
 	}
 	catch (...)
 	{
 		LogMessage(_T("PullChanges: unknown error"));
+		EnterCriticalSection(&m_csStatus);
+		m_csLastError = _T("Pull: unknown error");
+		LeaveCriticalSection(&m_csStatus);
 	}
 }
 

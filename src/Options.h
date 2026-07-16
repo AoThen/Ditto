@@ -290,6 +290,12 @@ public:
 	static void     SetCloudSyncEnabled(BOOL bValue);
 	static BOOL     GetCloudAutoSync();
 	static void     SetCloudAutoSync(BOOL bValue);
+	static BOOL     GetCloudPushOnCopy();
+	static void     SetCloudPushOnCopy(BOOL bValue);
+	static BOOL     GetCloudPeriodicSync();
+	static void     SetCloudPeriodicSync(BOOL bValue);
+	static int      GetCloudSyncInterval();
+	static void     SetCloudSyncInterval(int nSeconds);
 	static CString  GetCloudDeviceName();
 	static void     SetCloudDeviceName(LPCTSTR lpszValue);
 	static CString  GetCloudEncryptionKey();

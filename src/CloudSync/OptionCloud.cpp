@@ -78,7 +78,10 @@ IMPLEMENT_DYNCREATE(COptionCloud, CPropertyPage)
 COptionCloud::COptionCloud()
 	: CPropertyPage(COptionCloud::IDD)
 	, m_bEnabled(FALSE)
-	, m_bAutoSync(TRUE)
+	, m_bPushOnCopy(TRUE)
+	, m_bPeriodicSync(TRUE)
+	, m_csSyncInterval(_T("30"))
+	, m_csSyncStatus(_T(""))
 	, m_csServerUrl(_T("https://localhost:8080"))
 	, m_csUsername(_T(""))
 	, m_csPassword(_T(""))
@@ -86,6 +89,7 @@ COptionCloud::COptionCloud()
 	, m_csEncryptionPassword(_T(""))
 	, m_csEncryptionStatus(_T(""))
 	, m_bEncryptionEnabled(FALSE)
+	, m_nStatusTimer(0)
 {
 	m_csTitle = theApp.m_Language.GetString("CloudSyncTitle", "Cloud Sync");
 	m_psp.pszTitle = m_csTitle;
@@ -100,7 +104,10 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 {
 	CPropertyPage::DoDataExchange(pDX);
 	DDX_Check(pDX, IDC_CLOUD_ENABLE, m_bEnabled);
-	DDX_Check(pDX, IDC_CLOUD_AUTO_SYNC, m_bAutoSync);
+	DDX_Check(pDX, IDC_CLOUD_PUSH_ON_COPY, m_bPushOnCopy);
+	DDX_Check(pDX, IDC_CLOUD_PERIODIC_SYNC, m_bPeriodicSync);
+	DDX_Text(pDX, IDC_CLOUD_SYNC_INTERVAL, m_csSyncInterval);
+	DDX_Text(pDX, IDC_CLOUD_SYNC_STATUS, m_csSyncStatus);
 	DDX_Text(pDX, IDC_CLOUD_SERVER_URL, m_csServerUrl);
 	DDX_Text(pDX, IDC_CLOUD_USERNAME, m_csUsername);
 	DDX_Text(pDX, IDC_CLOUD_PASSWORD, m_csPassword);
@@ -112,6 +119,7 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 }
 
 BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
+	ON_WM_TIMER()
 	ON_BN_CLICKED(IDC_CLOUD_BTN_LOGIN, &COptionCloud::OnBtnLogin)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_REGISTER, &COptionCloud::OnBtnRegister)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_ENABLE_ENCRYPTION, &COptionCloud::OnBtnEnableEncryption)
@@ -132,7 +140,10 @@ BOOL COptionCloud::OnInitDialog()
 
 	// Load saved values from CGetSetOptions
 	m_bEnabled = CGetSetOptions::GetCloudSyncEnabled();
-	m_bAutoSync = CGetSetOptions::GetCloudAutoSync();
+	m_bPushOnCopy = CGetSetOptions::GetCloudPushOnCopy();
+	m_bPeriodicSync = CGetSetOptions::GetCloudPeriodicSync();
+	m_csSyncInterval.Format(_T("%d"), CGetSetOptions::GetCloudSyncInterval());
+	m_nStatusTimer = 0;
 	m_csServerUrl = CGetSetOptions::GetCloudServerUrl();
 	if (m_csServerUrl.IsEmpty())
 	{
@@ -202,6 +213,8 @@ BOOL COptionCloud::OnInitDialog()
 		PostMessage(WM_CLOUD_AUTH_REQUIRED, 997, 0);
 	}
 
+	RefreshSyncStatus();
+
 	return TRUE;  // return TRUE unless you set the focus to a control
 }
 
@@ -217,7 +230,13 @@ BOOL COptionCloud::OnApply()
 
 	// Save values via CGetSetOptions
 	CGetSetOptions::SetCloudSyncEnabled(m_bEnabled);
-	CGetSetOptions::SetCloudAutoSync(m_bAutoSync);
+	CGetSetOptions::SetCloudPushOnCopy(m_bPushOnCopy);
+	CGetSetOptions::SetCloudPeriodicSync(m_bPeriodicSync);
+	int nInterval = _ttoi(m_csSyncInterval);
+	if (nInterval < 5) nInterval = 5;
+	if (nInterval > 300) nInterval = 300;
+	CGetSetOptions::SetCloudSyncInterval(nInterval);
+	m_csSyncInterval.Format(_T("%d"), nInterval);
 	CGetSetOptions::SetCloudServerUrl(m_csServerUrl);
 	CGetSetOptions::SetCloudLastUsername(m_csUsername);
 	if (!m_csKeyFilePath.IsEmpty())
@@ -228,11 +247,81 @@ BOOL COptionCloud::OnApply()
 	// Re-initialize sync if settings changed
 	if (m_bEnabled)
 	{
-		// Reinitialize with new settings
-		theApp.m_CloudSyncManager.Initialize();
+		// ReinitializeSync handles Stop + Initialize (safe when already running)
+		theApp.m_CloudSyncManager.ReinitializeSync();
+	}
+	else
+	{
+		theApp.m_CloudSyncManager.Stop();
 	}
 
 	return CPropertyPage::OnApply();
+}
+
+BOOL COptionCloud::OnSetActive()
+{
+	BOOL bResult = CPropertyPage::OnSetActive();
+	if (bResult)
+	{
+		m_nStatusTimer = SetTimer(1, 5000, NULL);
+		RefreshSyncStatus();
+	}
+	return bResult;
+}
+
+BOOL COptionCloud::OnKillActive()
+{
+	if (m_nStatusTimer)
+	{
+		KillTimer(m_nStatusTimer);
+		m_nStatusTimer = 0;
+	}
+	return CPropertyPage::OnKillActive();
+}
+
+void COptionCloud::OnTimer(UINT_PTR nIDEvent)
+{
+	if (nIDEvent == 1)
+		RefreshSyncStatus();
+	CPropertyPage::OnTimer(nIDEvent);
+}
+
+void COptionCloud::RefreshSyncStatus()
+{
+	CCloudSyncManager& mgr = theApp.m_CloudSyncManager;
+	CString csNew;
+
+	if (!m_bEnabled || CGetSetOptions::GetCloudDeviceToken().IsEmpty())
+	{
+		csNew = _T("");
+	}
+	else if (mgr.GetSyncStatus() == _T("Syncing..."))
+	{
+		csNew = theApp.m_Language.GetString("CloudStatusSyncing", _T("Syncing..."));
+	}
+	else if (mgr.GetSyncStatus() == _T("Error"))
+	{
+		CString err = mgr.GetLastError();
+		if (err.IsEmpty())
+			err = _T("Unknown error");
+		csNew.Format(theApp.m_Language.GetString("CloudStatusError", _T("Error: %s")), err);
+	}
+	else if (mgr.HasSyncedBefore())
+	{
+		CTime t(mgr.GetLastSyncSuccessTime());
+		csNew.Format(theApp.m_Language.GetString("CloudStatusLastSync", _T("Last sync: %s \u2713")),
+			t.Format(_T("%H:%M:%S")));
+	}
+	else
+	{
+		csNew = theApp.m_Language.GetString("CloudStatusNeverSynced", _T("Never synced"));
+	}
+
+	if (csNew != m_csSyncStatus)
+	{
+		m_csSyncStatus = csNew;
+		UpdateData(FALSE);
+	}
 }
 
 void COptionCloud::OnBtnLogin()

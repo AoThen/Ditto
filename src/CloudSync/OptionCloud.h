@@ -6,7 +6,12 @@
 
 // Control IDs for cloud sync dialog
 #define IDC_CLOUD_ENABLE        2201
-#define IDC_CLOUD_AUTO_SYNC     2202
+#define IDC_CLOUD_PUSH_ON_COPY  2230
+#define IDC_CLOUD_PERIODIC_SYNC 2231
+#define IDC_CLOUD_SYNC_INTERVAL 2232
+#define IDC_CLOUD_STATIC_INTERVAL_LBL 2233
+#define IDC_CLOUD_SYNC_STATUS   2234
+#define IDC_CLOUD_STATIC_SYNC_STAT 2235
 #define IDC_CLOUD_SERVER_URL    2203
 #define IDC_CLOUD_USERNAME      2204
 #define IDC_CLOUD_PASSWORD      2205
@@ -55,7 +60,10 @@ public:
 
 	// Control variables (will be wired to resource later)
 	BOOL    m_bEnabled;
-	BOOL    m_bAutoSync;
+	BOOL    m_bPushOnCopy;
+	BOOL    m_bPeriodicSync;
+	CString m_csSyncInterval;
+	CString m_csSyncStatus;
 	CString m_csServerUrl;
 	CString m_csUsername;
 	CString m_csPassword;
@@ -64,15 +72,21 @@ public:
 	CString m_csEncryptionStatus;
 	BOOL    m_bEncryptionEnabled;
 	CString m_csKeyFilePath;
+	UINT_PTR m_nStatusTimer;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
 	virtual BOOL OnInitDialog();
 	virtual BOOL OnApply();
+	virtual BOOL OnSetActive();
+	virtual BOOL OnKillActive();
 
 	CString m_csTitle;
 
 	DECLARE_MESSAGE_MAP()
+
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	void RefreshSyncStatus();
 
 	afx_msg void OnBtnLogin();
 	afx_msg void OnBtnRegister();

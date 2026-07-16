@@ -46,6 +46,12 @@ public:
 	// Check if encryption is initialized
 	BOOL IsEncryptionEnabled() const;
 
+	// Sync status accessors
+	CString   GetSyncStatus() const;
+	CString   GetLastError() const;
+	time_t    GetLastSyncSuccessTime() const;
+	BOOL      HasSyncedBefore() const;
+
 	// Mark clips as dont_sync on the server
 	void MarkClipsDontSync(const std::vector<int>& localIds);
 
@@ -97,6 +103,12 @@ private:
 
 	// Critical section for thread-safe access to theApp.m_db from sync thread
 	CCriticalSection m_csDb;
+
+	// Thread-safe sync status (protected by m_csStatus)
+	CString           m_csSyncStatus;
+	CString           m_csLastError;
+	time_t            m_lastSyncSuccessTime;
+	mutable CRITICAL_SECTION m_csStatus;
 
 	// Background sync thread proc
 	static UINT SyncThreadProc(LPVOID pParam);

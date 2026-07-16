@@ -1681,6 +1681,41 @@ void CGetSetOptions::SetCloudAutoSync(BOOL bValue)
 	SetProfileLong("CloudAutoSync", bValue);
 }
 
+BOOL CGetSetOptions::GetCloudPushOnCopy()
+{
+	return GetProfileLong("CloudPushOnCopy", TRUE);
+}
+
+void CGetSetOptions::SetCloudPushOnCopy(BOOL bValue)
+{
+	SetProfileLong("CloudPushOnCopy", bValue);
+}
+
+BOOL CGetSetOptions::GetCloudPeriodicSync()
+{
+	return GetProfileLong("CloudPeriodicSync", TRUE);
+}
+
+void CGetSetOptions::SetCloudPeriodicSync(BOOL bValue)
+{
+	SetProfileLong("CloudPeriodicSync", bValue);
+}
+
+int CGetSetOptions::GetCloudSyncInterval()
+{
+	int val = (int)GetProfileLong("CloudSyncInterval", 30);
+	if (val < 5) val = 5;
+	if (val > 300) val = 300;
+	return val;
+}
+
+void CGetSetOptions::SetCloudSyncInterval(int nSeconds)
+{
+	if (nSeconds < 5) nSeconds = 5;
+	if (nSeconds > 300) nSeconds = 300;
+	SetProfileLong("CloudSyncInterval", nSeconds);
+}
+
 CString CGetSetOptions::GetCloudDeviceName()
 {
 	return GetProfileString("CloudDeviceName", _T(""));
