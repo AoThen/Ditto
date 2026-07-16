@@ -118,6 +118,8 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_TEST_ENCRYPTION, &COptionCloud::OnBtnTestEncryption)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_EXPORT_KEY, &COptionCloud::OnBtnExportKey)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_IMPORT_KEY, &COptionCloud::OnBtnImportKey)
+	ON_BN_CLICKED(IDC_CLOUD_FORCE_DOWNLOAD, &COptionCloud::OnBtnForceDownload)
+	ON_BN_CLICKED(IDC_CLOUD_FORCE_UPLOAD, &COptionCloud::OnBtnForceUpload)
 	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
 END_MESSAGE_MAP()
 
@@ -545,6 +547,32 @@ void COptionCloud::OnBtnImportKey()
 	}
 
 	UpdateData(FALSE);
+}
+
+// ---------------------------------------------------------------------------
+// OnBtnForceDownload: one-shot force download from cloud, overwrite local
+// ---------------------------------------------------------------------------
+void COptionCloud::OnBtnForceDownload()
+{
+	theApp.m_CloudSyncManager.ForceDownloadAll();
+	MessageBox(
+		theApp.m_Language.GetString("CloudForceDownloadMsg",
+			_T("Force download has been triggered.\nCloud clips will replace local clips.")),
+		theApp.m_Language.GetString("CloudTitleForceSync", _T("Force Sync")),
+		MB_ICONINFORMATION);
+}
+
+// ---------------------------------------------------------------------------
+// OnBtnForceUpload: one-shot force upload to cloud, overwrite remote
+// ---------------------------------------------------------------------------
+void COptionCloud::OnBtnForceUpload()
+{
+	theApp.m_CloudSyncManager.ForceUploadAll();
+	MessageBox(
+		theApp.m_Language.GetString("CloudForceUploadMsg",
+			_T("Force upload has been triggered.\nLocal clips are being pushed to the cloud.")),
+		theApp.m_Language.GetString("CloudTitleForceSync", _T("Force Sync")),
+		MB_ICONINFORMATION);
 }
 
 // ---------------------------------------------------------------------------

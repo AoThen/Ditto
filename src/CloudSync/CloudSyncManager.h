@@ -139,7 +139,7 @@ private:
 	BOOL LoadClipFormats(int clipId, nlohmann::json& formatsArray);
 
 	// Merge a remote clip into local database (returns new/updated clip ID)
-	int MergeRemoteClipToLocal(const nlohmann::json& remoteClip);
+	int MergeRemoteClipToLocal(const nlohmann::json& remoteClip, BOOL bForce = FALSE);
 
 	// Delete a clip from local database (for sync deletions)
 	BOOL DeleteLocalClip(int clipId);

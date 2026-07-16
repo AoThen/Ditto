@@ -347,6 +347,12 @@ void CCloudSyncManager::TriggerSync()
 void CCloudSyncManager::ForceDownloadAll()
 {
 	LogMessage(_T("ForceDownloadAll: starting forced download from cloud..."));
+
+	// Track in active thread counter so Stop() waits for completion
+	EnterCriticalSection(&m_csSync);
+	m_nActiveQuickSyncThreads++;
+	LeaveCriticalSection(&m_csSync);
+
 	InterlockedExchange(&m_forceOverrideLocal, 1);
 	AfxBeginThread(ForceSyncThreadProc, this);
 }
@@ -368,6 +374,12 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 	pThis->PullChanges();
 	pThis->PullGroups();
 	LogMessage(_T("ForceSyncThreadProc: force download complete."));
+
+	// Decrement active thread counter so Stop() can complete
+	EnterCriticalSection(&pThis->m_csSync);
+	pThis->m_nActiveQuickSyncThreads--;
+	LeaveCriticalSection(&pThis->m_csSync);
+
 	return 0;
 }
 
@@ -1032,8 +1044,12 @@ void CCloudSyncManager::PullChanges()
 
 			// Process each new clip
 			int mergedCount = 0;
+			BOOL bForce = FALSE;
 			if (hasClips)
 			{
+				// Read force-override-local flag once for all clips in this pull cycle
+				bForce = InterlockedExchange(&m_forceOverrideLocal, 0) == 1;
+
 				for (const auto& clip : *clipsNode)
 				{
 					// Decrypt formats if encryption is enabled
@@ -1050,7 +1066,7 @@ void CCloudSyncManager::PullChanges()
 					}
 
 					// Merge clip into local database with LWW conflict resolution
-					int newId = MergeRemoteClipToLocal(clip);
+					int newId = MergeRemoteClipToLocal(clip, bForce);
 					if (newId > 0)
 					{
 						mergedCount++;
@@ -1440,7 +1456,7 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 // LWW: If local clip has newer updated_at, skip. If remote is newer, update.
 // Returns the new/updated clip ID, or -1 on error
 // ---------------------------------------------------------------------------
-int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
+int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, BOOL bForce)
 {
 	try
 	{
@@ -1450,9 +1466,6 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		int64_t crc64 = remoteClip.value("crc", (int64_t)0);
 		DWORD crc = static_cast<DWORD>(crc64);
 		int shortcut = remoteClip.value("short_cut", 0);
-
-		// Check force override local flag (one-shot, auto-reset by InterlockedExchange)
-		BOOL bForce = InterlockedExchange(&m_forceOverrideLocal, 0) == 1;
 
 		// Parse remote updated_at timestamp for LWW comparison
 		time_t remoteUpdatedAt = 0;
@@ -1511,7 +1524,6 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				int deletedId = existingId;
 				DeleteLocalClip(existingId);
 				existingId = -1;
-				SaveRemoteIdMapping(deletedId, serverIdStr);
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: force override, deleting clip %d to replace with remote"), deletedId);
 				LogMessage(msg);
