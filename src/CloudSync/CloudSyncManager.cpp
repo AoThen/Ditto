@@ -41,6 +41,7 @@ static void LogMessage(const CString& msg)
 
 void CCloudSyncManager::EnsureHttpClient()
 {
+	EnterCriticalSection(&m_csHttpClient);
 	CStringA serverUrlA(m_serverUrl);
 	std::string url = serverUrlA.GetString();
 	if (!m_httpClient || m_httpClientUrl != m_serverUrl)
@@ -54,6 +55,7 @@ void CCloudSyncManager::EnsureHttpClient()
 		});
 		m_httpClientUrl = m_serverUrl;
 	}
+	LeaveCriticalSection(&m_csHttpClient);
 }
 
 BOOL CCloudSyncManager::IsEncryptionExpected()
@@ -80,6 +82,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_lastSyncSuccessTime(0)
 {
 	InitializeCriticalSection(&m_csSync);
+	InitializeCriticalSection(&m_csHttpClient);
 	InitializeCriticalSection(&m_csStatus);
 }
 
@@ -87,6 +90,7 @@ CCloudSyncManager::~CCloudSyncManager()
 {
 	Stop();
 	DeleteCriticalSection(&m_csSync);
+	DeleteCriticalSection(&m_csHttpClient);
 	DeleteCriticalSection(&m_csStatus);
 }
 
