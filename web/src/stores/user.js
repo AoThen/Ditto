@@ -20,6 +20,7 @@ export const useUserStore = defineStore('user', () => {
         username.value = parsed?.username || ''
         role.value = parsed?.role || ''
         deviceId.value = parsed?.device_id || ''
+        isLoggedIn.value = true
       } catch {
         // ignore
       }
