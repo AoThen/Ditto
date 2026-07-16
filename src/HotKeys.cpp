@@ -4,6 +4,7 @@
 #include "Misc.h"
 #include "SendKeys.h"
 #include "Accels.h"
+#include "CP_Main.h"
 
 CHotKeys g_HotKeys;
 
@@ -446,7 +447,7 @@ void CHotKeys::RegisterAll(bool bMsgOnError)
 		pHotKey = ElementAt(i);
 		if(!pHotKey->Register() && pHotKey->m_Key > 0)
 		{
-			str =  "Error Registering ";
+			str = theApp.m_Language.GetString("HotKeyRegError", "Error Registering ");
 			str += pHotKey->GetName();
 			Log(str);
 			if(bMsgOnError)
@@ -465,7 +466,7 @@ void CHotKeys::UnregisterAll(bool bMsgOnError, bool bOnShowDitto)
 		pHotKey = ElementAt(i);
 		if(!pHotKey->Unregister(bOnShowDitto))
 		{
-			str = "Error Unregistering ";
+			str = theApp.m_Language.GetString("HotKeyUnregError", "Error Unregistering ");
 			str += pHotKey->GetName();
 			Log(str);
 			if(bMsgOnError)

@@ -38,7 +38,7 @@ int CDittoPopupWindow::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	m_progressWnd.SetRange(0, 100);
 
-	SetWindowText(_T("Running Ditto Updates"));
+	SetWindowText(theApp.m_Language.GetString("UpdatesWindowTitle", _T("Running Ditto Updates")));
 
 	//m_textLabel.SetWindowText(_T("test"));
 

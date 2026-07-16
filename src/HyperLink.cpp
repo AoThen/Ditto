@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "HyperLink.h"
 #include "..\Shared\TextConvert.h"
+#include "CP_Main.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -357,22 +358,22 @@ void CHyperLink::ReportError(int nError)
 {
     CString str;
     switch (nError) {
-        case 0:                       str = "The operating system is out\nof memory or resources."; break;
-        case SE_ERR_PNF:              str = "The specified path was not found."; break;
-        case SE_ERR_FNF:              str = "The specified file was not found."; break;
-        case ERROR_BAD_FORMAT:        str = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)."; break;
-        case SE_ERR_ACCESSDENIED:     str = "The operating system denied\naccess to the specified file."; break;
-        case SE_ERR_ASSOCINCOMPLETE:  str = "The filename association is\nincomplete or invalid."; break;
-        case SE_ERR_DDEBUSY:          str = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed."; break;
-        case SE_ERR_DDEFAIL:          str = "The DDE transaction failed."; break;
-        case SE_ERR_DDETIMEOUT:       str = "The DDE transaction could not\nbe completed because the request timed out."; break;
-        case SE_ERR_DLLNOTFOUND:      str = "The specified dynamic-link library was not found."; break;
-        case SE_ERR_NOASSOC:          str = "There is no application associated\nwith the given filename extension."; break;
-        case SE_ERR_OOM:              str = "There was not enough memory to complete the operation."; break;
-        case SE_ERR_SHARE:            str = "A sharing violation occurred. ";
-        default:                      str.Format(_T("Unknown Error (%d) occurred."), nError); break;
+        case 0:                       str = theApp.m_Language.GetString("HyperlinkErrorOsOom", "The operating system is out\nof memory or resources."); break;
+        case SE_ERR_PNF:              str = theApp.m_Language.GetString("HyperlinkErrorPNF", "The specified path was not found."); break;
+        case SE_ERR_FNF:              str = theApp.m_Language.GetString("HyperlinkErrorFNF", "The specified file was not found."); break;
+        case ERROR_BAD_FORMAT:        str = theApp.m_Language.GetString("HyperlinkErrorBadFormat", "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)."); break;
+        case SE_ERR_ACCESSDENIED:     str = theApp.m_Language.GetString("HyperlinkErrorAccessDenied", "The operating system denied\naccess to the specified file."); break;
+        case SE_ERR_ASSOCINCOMPLETE:  str = theApp.m_Language.GetString("HyperlinkErrorAssocIncomplete", "The filename association is\nincomplete or invalid."); break;
+        case SE_ERR_DDEBUSY:          str = theApp.m_Language.GetString("HyperlinkErrorDdeBusy", "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed."); break;
+        case SE_ERR_DDEFAIL:          str = theApp.m_Language.GetString("HyperlinkErrorDdeFail", "The DDE transaction failed."); break;
+        case SE_ERR_DDETIMEOUT:       str = theApp.m_Language.GetString("HyperlinkErrorDdeTimeout", "The DDE transaction could not\nbe completed because the request timed out."); break;
+        case SE_ERR_DLLNOTFOUND:      str = theApp.m_Language.GetString("HyperlinkErrorDllNotFound", "The specified dynamic-link library was not found."); break;
+        case SE_ERR_NOASSOC:          str = theApp.m_Language.GetString("HyperlinkErrorNoAssoc", "There is no application associated\nwith the given filename extension."); break;
+        case SE_ERR_OOM:              str = theApp.m_Language.GetString("HyperlinkErrorOom", "There was not enough memory to complete the operation."); break;
+        case SE_ERR_SHARE:            str = theApp.m_Language.GetString("HyperlinkErrorShare", "A sharing violation occurred. ");
+        default:                      str.Format(theApp.m_Language.GetString("HyperlinkErrorUnknown", _T("Unknown Error (%d) occurred.")), nError); break;
     }
-    str = "Unable to open hyperlink:\n\n" + str;
+    str = theApp.m_Language.GetString("HyperlinkErrorPrefix", "Unable to open hyperlink:\n\n") + str;
     AfxMessageBox(str, MB_ICONEXCLAMATION | MB_OK);
 }
 

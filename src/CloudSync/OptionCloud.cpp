@@ -448,7 +448,7 @@ void COptionCloud::OnBtnEnableEncryption()
 		else
 		{
 			m_csEncryptionStatus = result.error;
-			MessageBox(result.error, _T("Enable Encryption"), MB_ICONERROR);
+			MessageBox(result.error, theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONERROR);
 		}
 	}
 	catch (const std::exception& e)
@@ -724,8 +724,8 @@ msg = theApp.m_Language.GetString("CloudMsgAccessDenied",
 		CStringA token = CGetSetOptions::GetCloudDeviceToken();
 		if (token.IsEmpty())
 		{
-			MessageBox(theApp.m_Language.GetString("CloudMsgLoginRequired", "Please log in first before re-entering encryption password."),
-				_T("Encryption Password Changed"), MB_ICONWARNING);
+MessageBox(theApp.m_Language.GetString("CloudMsgLoginRequired", "Please log in first before re-entering encryption password."),
+			theApp.m_Language.GetString("CloudTitleEncryptionChanged", "Cloud Sync - Encryption Password Changed"), MB_ICONWARNING);
 			return 0;
 		}
 

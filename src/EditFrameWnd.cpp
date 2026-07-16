@@ -71,7 +71,7 @@ int CEditFrameWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	m_crIcon.SetRect(-2, -15, 15, 0);
 
-	SetWindowText(_T("Ditto Editor"));
+	SetWindowText(theApp.m_Language.GetString("EditorWindowTitle", _T("Ditto Editor")));
 
 	return 0;
 }

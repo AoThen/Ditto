@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "ProgressWnd.h"
+#include "CP_Main.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -42,8 +43,8 @@ void CProgressWnd::CommonConstruct()
     m_nMinValue      = 0;
     m_nMaxValue      = 100;
 
-    m_strTitle       = _T("Progress");
-    m_strCancelLabel = _T(" Cancel ");
+    m_strTitle       = theApp.m_Language.GetString("ProgressWindowTitle", _T("Progress"));
+    m_strCancelLabel = theApp.m_Language.GetString("ProgressCancelLabel", _T(" Cancel "));
     m_bCancelled     = FALSE;
     m_bModal         = FALSE;
 

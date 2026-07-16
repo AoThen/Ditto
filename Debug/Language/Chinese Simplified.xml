@@ -64,10 +64,10 @@
 		<Item English_Text = "Never Auto Delete" ID = "32820">禁止自动删除</Item>
 		<Item English_Text = "Auto Delete" ID = "32821">自动删除</Item>
 		<Item English_Text = "Remove Hot Key" ID = "32822">移除热键</Item>
-		<Item English_Text = "Options..." ID = "32805">&O 选项...</Item>
+		<Item English_Text = "Options..." ID = "32805">选项...</Item>
 		<Item English_Text = "Help" ID = "32842">H 帮助</Item>
 		<Item English_Text = "Disconnect from Clipboard" ID = "32775">断开剪贴板连接</Item>
-		<Item English_Text = "Exit Program" ID = "32806">&X 退出程序</Item>
+		<Item English_Text = "Exit Program" ID = "32806">退出程序</Item>
 		
 		//New strings added in 3.6 6-9-06
 		<Item English_Text = "Prompt to Delete Clip" ID = "32852">删除剪贴项时提示</Item>	
@@ -121,7 +121,7 @@
 		<Item English_Text = "Wildcard Search" ID = "32903">通配符搜索</Item>	
 		<Item English_Text = "Show text for first ten copy hot keys" ID = "32923">显示前十个复制热键的文本</Item>	
 		<Item English_Text = "Show indicator a clip has been pasted" ID = "32924">显示已粘贴剪贴项标志</Item>	
-		<Item English_Text = "Global Hot Keys" ID = "32933">&G 全局热键</Item>	
+		<Item English_Text = "Global Hot Keys" ID = "32933">全局热键</Item>	
 		<Item English_Text = "Delete Clip Data" ID = "32934">删除剪贴数据</Item>	
 		<Item English_Text = "Import Clip(s)" ID = "32935">导入剪贴项</Item>	
 		<Item English_Text = "New Clip" ID = "32937">新建剪贴项</Item>	
@@ -528,6 +528,28 @@
 		<Item English_Text = "Error Sending data to %s\n\n%s" ID = "MsgErrorSendingData">向 %s 发送数据时出错\n\n%s</Item>
 		<Item English_Text = "-No Group-" ID = "GroupNoGroup">-无分组-</Item>
 		
+		<Item English_Text = "Error Registering " ID = "HotKeyRegError">注册热键时出错 </Item>
+		<Item English_Text = "Error Unregistering " ID = "HotKeyUnregError">注销热键时出错 </Item>
+		<Item English_Text = "Unable to open hyperlink:\n\n" ID = "HyperlinkErrorPrefix">无法打开超链接：\n\n</Item>
+		<Item English_Text = "Unknown Error (%d) occurred." ID = "HyperlinkErrorUnknown">发生未知错误 (%d)。</Item>
+		<Item English_Text = "The operating system is out\nof memory or resources." ID = "HyperlinkErrorOsOom">操作系统内存或资源不足。</Item>
+		<Item English_Text = "The specified path was not found." ID = "HyperlinkErrorPNF">指定的路径未找到。</Item>
+		<Item English_Text = "The specified file was not found." ID = "HyperlinkErrorFNF">指定的文件未找到。</Item>
+		<Item English_Text = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)." ID = "HyperlinkErrorBadFormat">.EXE 文件无效（非 Win32 .EXE 或 .EXE 映像错误）。</Item>
+		<Item English_Text = "The operating system denied\naccess to the specified file." ID = "HyperlinkErrorAccessDenied">操作系统拒绝访问指定的文件。</Item>
+		<Item English_Text = "The filename association is\nincomplete or invalid." ID = "HyperlinkErrorAssocIncomplete">文件关联不完整或无效。</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed." ID = "HyperlinkErrorDdeBusy">由于其他 DDE 事务正在处理，\nDDE 事务无法完成。</Item>
+		<Item English_Text = "The DDE transaction failed." ID = "HyperlinkErrorDdeFail">DDE 事务失败。</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because the request timed out." ID = "HyperlinkErrorDdeTimeout">由于请求超时，DDE 事务无法完成。</Item>
+		<Item English_Text = "The specified dynamic-link library was not found." ID = "HyperlinkErrorDllNotFound">指定的动态链接库未找到。</Item>
+		<Item English_Text = "There is no application associated\nwith the given filename extension." ID = "HyperlinkErrorNoAssoc">没有应用程序与给定的文件扩展名关联。</Item>
+		<Item English_Text = "There was not enough memory to complete the operation." ID = "HyperlinkErrorOom">没有足够的内存完成操作。</Item>
+		<Item English_Text = "A sharing violation occurred. " ID = "HyperlinkErrorShare">发生共享冲突。 </Item>
+		<Item English_Text = "Progress" ID = "ProgressWindowTitle">进度</Item>
+		<Item English_Text = " Cancel " ID = "ProgressCancelLabel"> 取消 </Item>
+		<Item English_Text = "Options" ID = "OptionsWindowTitle">选项</Item>
+		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle">Ditto 编辑器</Item>
+		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle">正在运行 Ditto 更新</Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">确定</Item>
