@@ -294,9 +294,14 @@ BOOL CClipIDs::CopyTo(int parentId)
 
 		theApp.m_db.execDML(_T("commit transaction;"));
 	}
-	CATCH_SQLITE_EXCEPTION
+	catch (CppSQLite3Exception& e)
+	{
+		theApp.m_db.execDML(_T("ROLLBACK;"));
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+	}
 		
-	return TRUE;
+	return FALSE;
 }
 
 BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)

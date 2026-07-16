@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <exception>
 #include <string>
-#include "PinyinConvertCache.h"
+
 #include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
@@ -1656,82 +1656,10 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 				CString lowSearch = csSQLSearch;
 				lowSearch.MakeLower();
 
-				CString pinyinSql;
-				pinyinSql.Format(_T("SELECT lID, mText FROM Main WHERE %s"), pinyinBaseFilter);
-
-				try
-				{
-					CppSQLite3Query q = theApp.m_db.execQuery(pinyinSql);
-					std::vector<long> pinyinIDs;
-
-					CT2A searchA(lowSearch, CP_UTF8);
-					std::string searchStr(searchA);
-					static CPinyinConvertCache s_pinyinCache;
-
-					while (!q.eof())
-					{
-						long id = q.getIntField(0);
-						CString mText = q.getStringField(1);
-						std::wstring wText(mText.GetString());
-
-						std::string pinyin, abbr;
-						auto* cached = s_pinyinCache.Get(id);
-						if (cached)
-						{
-							pinyin = cached->first;
-							abbr = cached->second;
-						}
-						else
-						{
-							pinyin = pinyinConv.ConvertToPinyin(wText);
-							abbr = pinyinConv.ConvertToAbbreviation(wText);
-							s_pinyinCache.Put(id, { pinyin, abbr });
-						}
-
-						std::string lowPinyin;
-						lowPinyin.resize(pinyin.size());
-						std::transform(pinyin.begin(), pinyin.end(), lowPinyin.begin(), ::tolower);
-
-						bool matched = lowPinyin.find(searchStr) != std::string::npos;
-
-						if (!matched)
-						{
-							std::string lowAbbr;
-							lowAbbr.resize(abbr.size());
-							std::transform(abbr.begin(), abbr.end(), lowAbbr.begin(), ::tolower);
-							matched = lowAbbr.find(searchStr) != std::string::npos;
-						}
-
-						if (matched)
-							pinyinIDs.push_back(id);
-
-						q.nextRow();
-					}
-
-					if (!pinyinIDs.empty())
-					{
-						CString pinyinFilter = _T(" Main.lID IN (");
-						for (size_t i = 0; i < pinyinIDs.size(); i++)
-						{
-							if (i > 0) pinyinFilter += _T(",");
-							CString idStr;
-							idStr.Format(_T("%ld"), pinyinIDs[i]);
-							pinyinFilter += idStr;
-						}
-						pinyinFilter += _T(")");
-
-						strFilter += _T(" OR ");
-						strFilter += pinyinFilter;
-					}
-				}
-				catch (CppSQLite3Exception& e)
-				{
-					Log(StrF(_T("Pinyin search SQL error: %s"), e.errorMessage()));
-				}
-				catch (std::exception& e)
-				{
-					Log(StrF(_T("Pinyin search error: %S"), e.what()));
-				}
+				CString pinyinLike;
+				pinyinLike.Format(_T(" OR Main.pinyin LIKE '%%%s%%' OR Main.pinyinAbbr LIKE '%%%s%%'"),
+					lowSearch, lowSearch);
+				strFilter += pinyinLike;
 			}
 		}
 

@@ -16,6 +16,7 @@
 #include "DittoChaiScript.h"
 #include "ImageHelper.h"
 #include "CloudSync/CloudSyncManager.h"
+#include "Pinyin_Convert.h"
 
 #include <Mmsystem.h>
 #include <memory>
@@ -968,12 +969,19 @@ bool CClip::AddToMainTable()
 {
 	try
 	{
+		std::wstring wDesc(m_Desc.GetString());
+		CPinyinConvert conv;
+		std::string pinyin = conv.ConvertToPinyin(wDesc);
+		std::string abbr = conv.ConvertToAbbreviation(wDesc);
+		CA2T pinyinT(pinyin.c_str(), CP_UTF8);
+		CA2T abbrT(abbr.c_str(), CP_UTF8);
+
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
 		CString cs;
-		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate) ")
-						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %d, '%s', %lld);"),
+		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate, pinyin, pinyinAbbr) ")
+						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %d, '%s', %lld, '%s', '%s');"),
 							m_Time.GetTime(),
 							m_Desc,
 							m_shortCut,
@@ -992,7 +1000,9 @@ bool CClip::AddToMainTable()
 							m_globalMoveToGroupShortCut,
 							m_dontSync,
 							m_description,
-							m_Time.GetTime());  // lModifiedDate = creation time for new clips
+							m_Time.GetTime(),
+							pinyinT,
+							abbrT);
 
 		theApp.m_db.execDML(cs);
 
@@ -1013,6 +1023,13 @@ bool CClip::ModifyMainTable()
 	bool bRet = false;
 	try
 	{
+		std::wstring wDesc(m_Desc.GetString());
+		CPinyinConvert conv;
+		std::string pinyin = conv.ConvertToPinyin(wDesc);
+		std::string abbr = conv.ConvertToAbbreviation(wDesc);
+		CA2T pinyinT(pinyin.c_str(), CP_UTF8);
+		CA2T abbrT(abbr.c_str(), CP_UTF8);
+
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
@@ -1030,6 +1047,8 @@ bool CClip::ModifyMainTable()
 			_T("GlobalMoveToGroupShortCut = %d, ")
 			_T("lDontSync = %d, ")
 			_T("m_Description = '%s', ")
+			_T("pinyin = '%s', ")
+			_T("pinyinAbbr = '%s', ")
 			_T("lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
 			m_shortCut,
@@ -1046,6 +1065,8 @@ bool CClip::ModifyMainTable()
 			m_globalMoveToGroupShortCut,
 			m_dontSync,
 			m_description,
+			pinyinT,
+			abbrT,
 			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
@@ -1061,11 +1082,20 @@ bool CClip::ModifyDescription()
 	bool bRet = false;
 	try
 	{
+		std::wstring wDesc(m_Desc.GetString());
+		CPinyinConvert conv;
+		std::string pinyin = conv.ConvertToPinyin(wDesc);
+		std::string abbr = conv.ConvertToAbbreviation(wDesc);
+		CA2T pinyinT(pinyin.c_str(), CP_UTF8);
+		CA2T abbrT(abbr.c_str(), CP_UTF8);
+
 		m_Desc.Replace(_T("'"), _T("''"));
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld ")
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
 			m_Desc,
+			pinyinT,
+			abbrT,
 			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
@@ -1953,7 +1983,13 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 
 		theApp.m_db.execDML(_T("commit transaction;"));
 	}
-	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
+	catch (CppSQLite3Exception& e)
+	{
+		theApp.m_db.execDML(_T("ROLLBACK;"));
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+		return false;
+	}
 
 	return TRUE;
 }
@@ -2132,8 +2168,15 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		if (bUpdateDesc)
 		{
+			std::wstring wDesc(m_Desc.GetString());
+			CPinyinConvert conv;
+			std::string pinyin = conv.ConvertToPinyin(wDesc);
+			std::string abbr = conv.ConvertToAbbreviation(wDesc);
+			CA2T pinyinT(pinyin.c_str(), CP_UTF8);
+			CA2T abbrT(abbr.c_str(), CP_UTF8);
+
 			m_Desc.Replace(_T("'"), _T("''"));
-			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, CTime::GetCurrentTime().GetTime(), m_id);
+			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, pinyinT, abbrT, CTime::GetCurrentTime().GetTime(), m_id);
 		}
 
 		bRet = true;

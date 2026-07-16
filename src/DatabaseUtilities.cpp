@@ -216,6 +216,12 @@ BOOL OpenDatabase(CString dbPath)
 
 		MigrateDatabaseSchema();
 
+		if (!theApp.m_databaseOnNetworkShare)
+		{
+			theApp.m_db.execDML(_T("PRAGMA journal_mode=WAL;"));
+			theApp.m_db.execDML(_T("PRAGMA synchronous=NORMAL;"));
+		}
+
 		theApp.m_db.setBusyTimeout(CGetSetOptions::GetDbTimeout());
 		theApp.m_db.SetRegexCaseInsensitive(CGetSetOptions::GetRegexCaseInsensitive());
 
@@ -485,6 +491,17 @@ BOOL ValidDB(CString csPath, BOOL bUpgrade)
 			db.execDML(_T("UPDATE Main SET lModifiedDate = lDate WHERE lModifiedDate IS NULL"));
 
 			e.errorCode();
+		}
+
+		try
+		{
+			db.execQuery(_T("SELECT pinyin FROM Main"));
+		}
+		catch (CppSQLite3Exception& e)
+		{
+			e.errorCode();
+			db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyin TEXT DEFAULT ''"));
+			db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyinAbbr TEXT DEFAULT ''"));
 		}
 
 		db.execDML(_T("DROP INDEX IF EXISTS Main_NoGroup"));

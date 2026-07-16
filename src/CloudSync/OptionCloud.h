@@ -48,6 +48,9 @@
 #define IDC_CLOUD_FORCE_DOWNLOAD       2228
 #define IDC_CLOUD_FORCE_UPLOAD         2229
 
+// Rebuild pinyin index
+#define IDC_REBUILD_PINYIN  2236
+
 class COptionCloud : public CPropertyPage
 {
 	DECLARE_DYNCREATE(COptionCloud)
@@ -96,6 +99,7 @@ protected:
 	afx_msg void OnBtnImportKey();
 	afx_msg void OnBtnForceDownload();
 	afx_msg void OnBtnForceUpload();
+	afx_msg void OnRebuildPinyinIndex();
 
 	// Handler for cloud authentication required message
 	afx_msg LRESULT OnCloudAuthRequired(WPARAM wParam, LPARAM lParam);

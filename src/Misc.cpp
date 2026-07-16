@@ -1699,6 +1699,7 @@ BOOL BackupDbPrompt(HWND hwnd)
 
 		CString dbPath = CGetSetOptions::GetDBPath();
 		CString backupPath(ofn.lpstrFile);
+		theApp.m_db.execDML(_T("PRAGMA wal_checkpoint(TRUNCATE);"));
 		ret = BackupDB(dbPath, backupPath);
 	}
 

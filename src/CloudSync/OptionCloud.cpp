@@ -9,6 +9,7 @@
 #include "../json.hpp"
 #include "../Options.h"
 #include "../CP_Main.h"
+#include "Pinyin_Convert.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -128,6 +129,7 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_BTN_IMPORT_KEY, &COptionCloud::OnBtnImportKey)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_DOWNLOAD, &COptionCloud::OnBtnForceDownload)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_UPLOAD, &COptionCloud::OnBtnForceUpload)
+	ON_BN_CLICKED(IDC_REBUILD_PINYIN, &COptionCloud::OnRebuildPinyinIndex)
 	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
 	ON_MESSAGE(WM_CLOUD_REINIT_SYNC, &COptionCloud::OnReinitSync)
 END_MESSAGE_MAP()
@@ -678,6 +680,47 @@ void COptionCloud::OnBtnForceUpload()
 			_T("Force upload has been triggered.\nLocal clips are being pushed to the cloud.")),
 		theApp.m_Language.GetString("CloudTitleForceSync", _T("Force Sync")),
 		MB_ICONINFORMATION);
+}
+
+// ---------------------------------------------------------------------------
+// OnRebuildPinyinIndex: rebuild pinyin search index for all clips
+// ---------------------------------------------------------------------------
+void COptionCloud::OnRebuildPinyinIndex()
+{
+	if (AfxMessageBox(_T("Rebuild pinyin search index for all clips?"), MB_YESNO) != IDYES)
+		return;
+
+	CPinyinConvert conv;
+	CWaitCursor wait;
+
+	CppSQLite3Query q = theApp.m_db.execQuery(
+		_T("SELECT lID, mText FROM Main WHERE pinyin IS NULL OR pinyin = ''"));
+
+	int batch = 0;
+	theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
+	while (!q.eof())
+	{
+		long id = q.getIntField(0);
+		CString mText = q.getStringField(1);
+		std::wstring wText(mText.GetString());
+		std::string pinyin = conv.ConvertToPinyin(wText);
+		std::string abbr = conv.ConvertToAbbreviation(wText);
+		CA2T pinyinT(pinyin.c_str(), CP_UTF8);
+		CA2T abbrT(abbr.c_str(), CP_UTF8);
+		theApp.m_db.execDMLEx(
+			_T("UPDATE Main SET pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
+			pinyinT, abbrT, id);
+
+		if (++batch % 100 == 0) {
+			theApp.m_db.execDML(_T("COMMIT; BEGIN TRANSACTION;"));
+		}
+		q.nextRow();
+	}
+	theApp.m_db.execDML(_T("COMMIT;"));
+
+	CString msg;
+	msg.Format(_T("Pinyin index rebuilt. %d entries processed."), batch);
+	AfxMessageBox(msg);
 }
 
 // ---------------------------------------------------------------------------
