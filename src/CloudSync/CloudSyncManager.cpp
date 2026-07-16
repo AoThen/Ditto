@@ -1190,7 +1190,16 @@ csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 				time_t modDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 
 				json clipJson;
-				clipJson["id"] = std::to_string(clipId);
+
+				// Use existing remote ID mapping if available, otherwise generate a UUID
+				// to avoid cross-device ID collisions (local auto-increment IDs are not globally unique)
+				std::string remoteClipId = GetRemoteIdByLocalId(clipId);
+				if (remoteClipId.empty())
+				{
+					remoteClipId = CStringToStdString(NewGuidString());
+				}
+				clipJson["id"] = remoteClipId;
+				SaveRemoteIdMapping(clipId, remoteClipId);
 				clipJson["description"] = CStringToStdString(desc);
 				clipJson["crc"] = static_cast<int64_t>(crc);
 				clipJson["group_id"] = "";
@@ -1204,8 +1213,6 @@ csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
 				clipJson["short_cut"] = q.getIntField(_T("lShortCut"));
 				clipJson["clip_order"] = q.getFloatField(_T("clipOrder"));
 				clipJson["clip_group_order"] = q.getFloatField(_T("clipGroupOrder"));
-
-				SaveRemoteIdMapping(clipId, std::to_string(clipId));
 
 				time_t updatedAt = (modDate > 0) ? modDate : lDate;
 				if (updatedAt > 0)
