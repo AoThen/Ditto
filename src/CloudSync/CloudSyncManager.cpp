@@ -2296,6 +2296,44 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 }
 
 // ---------------------------------------------------------------------------
+// DeleteRemoteClips: Notify server to soft-delete clips by remote ID
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
+{
+	if (localClipIds.empty()) return;
+	EnsureHttpClient();
+
+	std::vector<std::string> remoteIds;
+	for (int localId : localClipIds)
+	{
+		std::string remoteId = GetRemoteIdByLocalId(localId);
+		if (!remoteId.empty())
+			remoteIds.push_back(remoteId);
+	}
+
+	if (remoteIds.empty()) return;
+
+	nlohmann::json body;
+	body["ids"] = remoteIds;
+
+	auto res = m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json");
+	if (res && (res->status == 200 || res->status == 404))
+	{
+		for (int localId : localClipIds)
+		{
+			try
+			{
+				CSingleLock lockDb(&m_csDb, TRUE);
+				CString csSQL;
+				csSQL.Format(_T("DELETE FROM CloudClipMap WHERE local_id = %d"), localId);
+				theApp.m_db.execDML(csSQL);
+			}
+			catch (...) { }
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // BuildWsUrl: Convert HTTP(S) server URL to WebSocket URL (H4)
 // ---------------------------------------------------------------------------
 CString CCloudSyncManager::BuildWsUrl()

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "CP_Main.h"
 #include "ClipIds.h"
+#include <vector>
 #include "tinyxml\tinyxml.h"
 #include "..\Shared\TextConvert.h"
 #include "Clip_ImportExport.h"
@@ -308,6 +309,8 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	INT_PTR count = GetSize();
 	int batchCount = 25;
 
+	std::vector<int> remoteDeleteIds;
+
 	Log(StrF(_T("Begin delete clips, Count: %d from Window: %d"), count, fromClipWindow));
 	
 	if(count <= 0)
@@ -357,6 +360,10 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 					// Notify cloud sync manager about group deletion
 					theApp.m_CloudSyncManager.OnGroupDeleted(clipId);
 				}
+				else
+				{
+					remoteDeleteIds.push_back(clipId);
+				}
 
 				if(sqlIn.GetLength() > 0)
 				{
@@ -404,6 +411,12 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
 	
+	// Notify server about deleted non-group clips for cross-device sync
+	if (!remoteDeleteIds.empty())
+	{
+		theApp.m_CloudSyncManager.DeleteRemoteClips(remoteDeleteIds);
+	}
+
 	Log(StrF(_T("End delete clips, Count: %d"), count));
 
 	return bRet;

@@ -55,6 +55,9 @@ public:
 	// Delete a remote group (used by local delete handler)
 	void DeleteRemoteGroup(const std::string& remoteGroupId);
 
+	// Delete remote clips by local ID (notifies server for cross-device sync)
+	void DeleteRemoteClips(const std::vector<int>& localIds);
+
 private:
 	// Ensure HTTP client is created/reused for the current server URL
 	void EnsureHttpClient();
