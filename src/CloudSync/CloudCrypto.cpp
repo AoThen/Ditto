@@ -208,12 +208,9 @@ CStringA CCloudCrypto::Base64Encode(const std::vector<BYTE>& data)
 		result.ReleaseBuffer(0);
 		return CStringA("");
 	}
-	// CryptBinaryToStringA includes a trailing newline even with NOCRLF
-	result.ReleaseBuffer(dwLen - 1); // trim null terminator
-	if (!result.IsEmpty() && result[result.GetLength() - 1] == '\n')
-	{
-		result.ReleaseBuffer(result.GetLength() - 1); // trim trailing newline
-	}
+	// On success with a non-NULL buffer, dwLen is the character count WITHOUT
+	// the terminating NULL. With CRYPT_STRING_NOCRLF no newline is appended.
+	result.ReleaseBuffer(dwLen);
 	return result;
 }
 
@@ -293,15 +290,19 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		return std::vector<BYTE>();
 	}
 
-	// Prepare authenticated cipher mode info for GCM
+	// Prepare authenticated cipher mode info for GCM.
+	// For GCM, the authentication tag is written to a caller-supplied pbTag
+	// buffer (NOT appended to the ciphertext output). The ciphertext output
+	// has the same length as the plaintext.
+	std::vector<BYTE> tagBuf(16); // AES-GCM tag is 16 bytes
 	BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
 	BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
 	authInfo.pbNonce = const_cast<PUCHAR>(iv.data());
 	authInfo.cbNonce = static_cast<ULONG>(iv.size());
-	// Note: For encryption, BCryptEncrypt appends the tag to the output buffer.
-	// We don't need to allocate pbTag here - the tag will be at the end of ciphertext.
+	authInfo.pbTag = tagBuf.data();
+	authInfo.cbTag = static_cast<ULONG>(tagBuf.size());
 
-	// First call to get ciphertext size (includes tag for GCM mode)
+	// First call to get ciphertext size (equals plaintext size for GCM)
 	status = BCryptEncrypt(hKey,
 		const_cast<PUCHAR>(plaintext.data()), static_cast<ULONG>(plaintext.size()),
 		&authInfo, nullptr, 0, nullptr, 0, &cbData, 0);
@@ -313,36 +314,23 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		return std::vector<BYTE>();
 	}
 
-	// Allocate output buffer (BCryptEncrypt includes tag in cbData for GCM)
-	std::vector<BYTE> output(cbData);
+	// Allocate output buffer for the ciphertext (tag goes to tagBuf separately)
+	std::vector<BYTE> ciphertext(cbData);
 	status = BCryptEncrypt(hKey,
 		const_cast<PUCHAR>(plaintext.data()), static_cast<ULONG>(plaintext.size()),
 		&authInfo, nullptr, 0,
-		output.data(), static_cast<ULONG>(output.size()), &cbData, 0);
+		ciphertext.empty() ? nullptr : ciphertext.data(), static_cast<ULONG>(ciphertext.size()), &cbData, 0);
 	if (!BCRYPT_SUCCESS(status))
 	{
 		CLOUD_CRYPTO_TRACE("[AesGcmEncrypt] BCryptEncrypt(actual) failed: 0x%08X\n", status);
-		output.clear();
 		BCryptDestroyKey(hKey);
 		BCryptCloseAlgorithmProvider(hAlg, 0);
-		return output;
+		return std::vector<BYTE>();
 	}
-	output.resize(cbData);
+	ciphertext.resize(cbData);
 
-	// For GCM mode, the tag is appended to the end of the ciphertext output
-	// Extract the tag (last 16 bytes) and separate it from ciphertext
-	if (cbData < 16)
-	{
-		CLOUD_CRYPTO_TRACE("[AesGcmEncrypt] BCryptEncrypt output too short: %lu bytes\n", cbData);
-		output.clear();
-		BCryptDestroyKey(hKey);
-		BCryptCloseAlgorithmProvider(hAlg, 0);
-		return output;
-	}
-	
-	std::vector<BYTE> ciphertext;
-	outTag.assign(output.end() - 16, output.end());
-	ciphertext.assign(output.begin(), output.end() - 16);
+	// The authentication tag was written to tagBuf by BCryptEncrypt.
+	outTag = tagBuf;
 
 	BCryptDestroyKey(hKey);
 	BCryptCloseAlgorithmProvider(hAlg, 0);
