@@ -102,7 +102,7 @@ private:
 	CString   m_httpClientUrl; // Cached URL to detect server URL changes
 
 	// Critical section for thread-safe access to theApp.m_db from sync thread
-	CCriticalSection m_csDb;
+	mutable CCriticalSection m_csDb;
 
 	// Thread-safe sync status (protected by m_csStatus)
 	CString           m_csSyncStatus;
