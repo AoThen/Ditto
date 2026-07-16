@@ -565,6 +565,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						if err := tx.Create(&clip).Error; err != nil {
 							return err
 						}
+						if pc.CRC != 0 {
+							existingCRCs[crcKey] = clip.ID
+						}
 
 						for _, pf := range p.formats {
 							batchFormats = append(batchFormats, model.ClipFormat{

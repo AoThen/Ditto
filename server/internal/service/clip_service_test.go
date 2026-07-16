@@ -677,6 +677,35 @@ func TestSync_PushNewClip(t *testing.T) {
 	assert.Equal(t, int64(1), count)
 }
 
+func TestSync_CRCDedupSameBatch(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	data := base64.StdEncoding.EncodeToString([]byte("dup content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID: "dup-a", Description: "First", CRC: 99999, UpdatedAt: time.Now(),
+				Formats: []PushFormatItem{{FormatType: 1, Data: data, Encrypted: false}},
+			},
+			{
+				ID: "dup-b", Description: "Second", CRC: 99999, UpdatedAt: time.Now(),
+				Formats: []PushFormatItem{{FormatType: 1, Data: data, Encrypted: false}},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	var count int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND crc = ?", userID, 99999).Count(&count)
+	assert.Equal(t, int64(1), count)
+}
+
 func TestSync_PullChanges(t *testing.T) {
 	svc, userID, _, cleanup := setupClipServiceTest(t)
 	defer cleanup()
