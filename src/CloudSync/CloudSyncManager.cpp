@@ -753,30 +753,6 @@ void CCloudSyncManager::PushNewClips(BOOL bForce)
 				int syncedCount = dataNode->value("updated_count", 0);
 				int skippedCount = dataNode->value("skipped_count", 0);
 
-				// Update last sync time from server's sync_time (more accurate than local time)
-				if (dataNode->contains("sync_time"))
-				{
-					std::string syncTimeStr = (*dataNode)["sync_time"].get<std::string>();
-					SYSTEMTIME st = {};
-					if (sscanf_s(syncTimeStr.c_str(), "%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
-						&st.wYear, &st.wMonth, &st.wDay,
-						&st.wHour, &st.wMinute, &st.wSecond) == 6)
-					{
-						FILETIME ft;
-						SystemTimeToFileTime(&st, &ft);
-						ULARGE_INTEGER uli;
-						uli.LowPart = ft.dwLowDateTime;
-						uli.HighPart = ft.dwHighDateTime;
-						// FILETIME epoch offset: 116444736000000000 (100ns intervals since 1601)
-						time_t serverTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
-
-						EnterCriticalSection(&m_csSync);
-						m_lastSyncTime = serverTime;
-						LeaveCriticalSection(&m_csSync);
-						CGetSetOptions::SetCloudLastSyncTime((__int64)serverTime);
-					}
-				}
-
 				CString msg;
 				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
 				LogMessage(msg);
