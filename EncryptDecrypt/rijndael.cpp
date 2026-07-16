@@ -1398,13 +1398,12 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 	}
 
 	// Generate remaining expanded key columns.
-	// total_cols = 4*(Nr+1), already written = columns_written, need total_cols - columns_written more.
-	// The old bound r<=m_uRounds was wrong for AES-192 (ran 12 iterations, needed 8),
-	// and also wrong for AES-256 (ran 14 iterations, needed 8).
-	// We track columns_written directly since r doesn't advance uniformly
-	// (sometimes +1, sometimes +2 per inner-loop round boundary).
+	// totalCols = 4*(Nr+1) is the full expanded key size.
+	// r/t carry over from the first loop, which already wrote uKeyColumns columns,
+	// so columnsWritten must start at uKeyColumns (not 0) to avoid over-writing
+	// and letting r overrun m_expandedKey's bound of 15 rows.
 	int totalCols = 4 * ((int)m_uRounds + 1);
-	int columnsWritten = 0;
+	int columnsWritten = uKeyColumns;
 	while(columnsWritten < totalCols)
 	{
 		tempKey[0][0] ^= S[tempKey[uKeyColumns-1][1]];
