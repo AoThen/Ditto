@@ -1397,21 +1397,14 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 		}
 	}
 
-	// Generate remaining expanded key columns.
-	// totalCols = 4*(Nr+1) is the full expanded key size.
-	// r/t carry over from the first loop, which already wrote uKeyColumns columns,
-	// so columnsWritten must start at uKeyColumns (not 0) to avoid over-writing
-	// and letting r overrun m_expandedKey's bound of 15 rows.
-	int totalCols = 4 * ((int)m_uRounds + 1);
-	int columnsWritten = uKeyColumns;
-	while(columnsWritten < totalCols)
+	while(r <= (int)m_uRounds)
 	{
 		tempKey[0][0] ^= S[tempKey[uKeyColumns-1][1]];
 		tempKey[0][1] ^= S[tempKey[uKeyColumns-1][2]];
 		tempKey[0][2] ^= S[tempKey[uKeyColumns-1][3]];
 		tempKey[0][3] ^= S[tempKey[uKeyColumns-1][0]];
 		tempKey[0][0] ^= rcon[rconpointer++];
-	
+
 		if (uKeyColumns != 8)
 		{
 			for(j = 1; j < uKeyColumns; j++)
@@ -1432,9 +1425,9 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 				*((RD_UINT32*)tempKey[j]) ^= *((RD_UINT32*)tempKey[j-1]);
 			}
 		}
-		for(j = 0; j < uKeyColumns; )
+		for(j = 0; (j < uKeyColumns) && (r <= (int)m_uRounds); )
 		{
-			for(; (j < uKeyColumns) && (t < 4) && (columnsWritten < totalCols); j++, t++, columnsWritten++)
+			for(; (j < uKeyColumns) && (t < 4); j++, t++)
 			{
 				*((RD_UINT32*)m_expandedKey[r][t]) = *((RD_UINT32*)tempKey[j]);
 			}
