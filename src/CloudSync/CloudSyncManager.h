@@ -58,6 +58,10 @@ public:
 	// Delete remote clips by local ID (notifies server for cross-device sync)
 	void DeleteRemoteClips(const std::vector<int>& localIds);
 
+	// One-shot force sync operations
+	void ForceDownloadAll();
+	void ForceUploadAll();
+
 private:
 	// Ensure HTTP client is created/reused for the current server URL
 	void EnsureHttpClient();
@@ -78,6 +82,10 @@ private:
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
 	int       m_wsReconnectDelay; // Exponential backoff for WS reconnection
 
+	// Atomic flags for one-shot force sync operations
+	LONG      m_forceOverrideLocal;  // Set before ForceDownload, read&reset in MergeRemoteClipToLocal
+	LONG      m_forceOverrideRemote; // Set before ForceUpload, read&reset in QuickSyncThreadProc
+
 	// Reusable HTTP client (httplib::Client) for all REST API calls
 	std::unique_ptr<httplib::Client> m_httpClient;
 	CString   m_httpClientUrl; // Cached URL to detect server URL changes
@@ -94,8 +102,11 @@ private:
 	// Quick sync thread proc (fire-and-forget)
 	static UINT QuickSyncThreadProc(LPVOID pParam);
 
+	// Force download thread proc (one-shot)
+	static UINT ForceSyncThreadProc(LPVOID pParam);
+
 	// Push local clips to cloud
-	void PushNewClips();
+	void PushNewClips(BOOL bForce = FALSE);
 
 	// Pull changes from cloud
 	void PullChanges();

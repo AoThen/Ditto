@@ -68,6 +68,8 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_nActiveQuickSyncThreads(0)
 	, m_pWsClient(nullptr)
 	, m_wsReconnectDelay(1000)
+	, m_forceOverrideLocal(0)
+	, m_forceOverrideRemote(0)
 {
 	InitializeCriticalSection(&m_csSync);
 }
@@ -314,8 +316,12 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 	{
 		// Release the lock before doing actual work (long-running)
 		LeaveCriticalSection(ctx->pCS);
+
+		// Check force upload flag (one-shot, auto-reset)
+		BOOL bForce = InterlockedExchange(&pThis->m_forceOverrideRemote, 0) == 1;
+
 		pThis->PushGroups();
-		pThis->PushNewClips();
+		pThis->PushNewClips(bForce);
 	}
 	else
 	{
@@ -336,6 +342,33 @@ void CCloudSyncManager::TriggerSync()
 {
 	PushNewClips();
 	PullChanges();
+}
+
+void CCloudSyncManager::ForceDownloadAll()
+{
+	LogMessage(_T("ForceDownloadAll: starting forced download from cloud..."));
+	InterlockedExchange(&m_forceOverrideLocal, 1);
+	AfxBeginThread(ForceSyncThreadProc, this);
+}
+
+void CCloudSyncManager::ForceUploadAll()
+{
+	LogMessage(_T("ForceUploadAll: starting forced upload to cloud..."));
+	InterlockedExchange(&m_forceOverrideRemote, 1);
+	TriggerQuickSync();
+}
+
+UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
+{
+	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
+	if (!pThis)
+		return 1;
+
+	LogMessage(_T("ForceSyncThreadProc: running pull changes with override..."));
+	pThis->PullChanges();
+	pThis->PullGroups();
+	LogMessage(_T("ForceSyncThreadProc: force download complete."));
+	return 0;
 }
 
 BOOL CCloudSyncManager::IsLoggedIn() const
@@ -589,11 +622,14 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 	return 0;
 }
 
-void CCloudSyncManager::PushNewClips()
+void CCloudSyncManager::PushNewClips(BOOL bForce)
 {
 	try
 	{
-		LogMessage(_T("PushNewClips: checking for new/modified clips since last sync..."));
+		if (bForce)
+			LogMessage(_T("PushNewClips: FORCE mode - pushing ALL local clips..."));
+		else
+			LogMessage(_T("PushNewClips: checking for new/modified clips since last sync..."));
 
 		// Enumerate local clips modified since last sync (thread-safe read)
 		time_t lastSync;
@@ -602,7 +638,8 @@ void CCloudSyncManager::PushNewClips()
 		LeaveCriticalSection(&m_csSync);
 
 		json clipsArray;
-		if (!GetLocalClipsSince(lastSync, clipsArray))
+		time_t sinceTime = bForce ? 0 : lastSync;
+		if (!GetLocalClipsSince(sinceTime, clipsArray))
 		{
 			LogMessage(_T("PushNewClips: failed to enumerate local clips."));
 			return;
@@ -610,7 +647,7 @@ void CCloudSyncManager::PushNewClips()
 
 		if (clipsArray.empty())
 		{
-			LogMessage(_T("PushNewClips: no new clips to push."));
+			LogMessage(_T("PushNewClips: no clips to push."));
 			return;
 		}
 
@@ -640,6 +677,8 @@ void CCloudSyncManager::PushNewClips()
 		}
 
 		syncReq["device_id"] = std::string(m_deviceId);
+		if (bForce)
+			syncReq["force"] = true;
 		syncReq["push_clips"] = clipsArray;
 
 		// Send to server
@@ -1412,6 +1451,9 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		DWORD crc = static_cast<DWORD>(crc64);
 		int shortcut = remoteClip.value("short_cut", 0);
 
+		// Check force override local flag (one-shot, auto-reset by InterlockedExchange)
+		BOOL bForce = InterlockedExchange(&m_forceOverrideLocal, 0) == 1;
+
 		// Parse remote updated_at timestamp for LWW comparison
 		time_t remoteUpdatedAt = 0;
 		if (remoteClip.contains("updated_at"))
@@ -1463,8 +1505,19 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 		if (existingId > 0)
 		{
 			// Clip with same content (CRC) already exists locally
-			// LWW: If remote is significantly newer, update the local clip
-			if (remoteUpdatedAt > localModDate)
+			if (bForce)
+			{
+				// Force mode: unconditionally replace local with remote
+				int deletedId = existingId;
+				DeleteLocalClip(existingId);
+				existingId = -1;
+				SaveRemoteIdMapping(deletedId, serverIdStr);
+				CString msg;
+				msg.Format(_T("MergeRemoteClipToLocal: force override, deleting clip %d to replace with remote"), deletedId);
+				LogMessage(msg);
+				// Do NOT return - fall through to create new clip with remote content
+			}
+			else if (remoteUpdatedAt > localModDate)
 			{
 				// Remote clip is newer - update local clip's modification time
 				// (Content is same per CRC match, so no need to update formats)
@@ -1477,6 +1530,8 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: clip %d exists, remote newer (CRC match), updated timestamp"), existingId);
 				LogMessage(msg);
+				SaveRemoteIdMapping(existingId, serverIdStr);
+				return existingId;
 			}
 			else
 			{
@@ -1485,9 +1540,9 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 				msg.Format(_T("MergeRemoteClipToLocal: duplicate clip (CRC=%d, local=%lld, remote=%lld), skipping (LWW: local wins)"),
 				           crc, (long long)localModDate, (long long)remoteUpdatedAt);
 				LogMessage(msg);
+				SaveRemoteIdMapping(existingId, serverIdStr);
+				return existingId;
 			}
-			SaveRemoteIdMapping(existingId, serverIdStr);
-			return existingId;
 		}
 
 		// No CRC match - check if description matches (fallback for clips without CRC)
@@ -1510,9 +1565,14 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip)
 					localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 					DWORD localCRC = (DWORD)q.getIntField(_T("CRC"));
 
+					if (bForce)
+					{
+						// Force mode: unconditionally replace this clip
+						existingId = descMatchId;
+					}
 					// Same description but different CRC -> different content
 					// LWW: only skip if local is same age or newer
-					if (remoteUpdatedAt <= localModDate)
+					else if (remoteUpdatedAt <= localModDate)
 					{
 						time_t timeDiff = localModDate - remoteUpdatedAt;
 						if (timeDiff <= 1 && localCRC != crc)

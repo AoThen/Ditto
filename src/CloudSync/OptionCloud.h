@@ -38,6 +38,11 @@
 #define IDC_CLOUD_GRP_ENCRYPTION       2225
 #define IDC_CLOUD_GRP_KEY_FILE         2226
 
+// Force sync control IDs
+#define IDC_CLOUD_GRP_FORCE            2227
+#define IDC_CLOUD_FORCE_DOWNLOAD       2228
+#define IDC_CLOUD_FORCE_UPLOAD         2229
+
 class COptionCloud : public CPropertyPage
 {
 	DECLARE_DYNCREATE(COptionCloud)
@@ -75,7 +80,9 @@ protected:
 	afx_msg void OnBtnTestEncryption();
 	afx_msg void OnBtnExportKey();
 	afx_msg void OnBtnImportKey();
-	
+	afx_msg void OnBtnForceDownload();
+	afx_msg void OnBtnForceUpload();
+
 	// Handler for cloud authentication required message
 	afx_msg LRESULT OnCloudAuthRequired(WPARAM wParam, LPARAM lParam);
 };

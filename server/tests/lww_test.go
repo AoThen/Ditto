@@ -38,16 +38,16 @@ func TestLWW_NewerWins(t *testing.T) {
 
 	// Device A pushes an OLD clip (updated_at = 1 hour ago)
 	oldTime := time.Now().Add(-time.Hour).UTC()
-	pushA := buildSyncRequest(clipID, "Old content from A", deviceA, oldTime)
+	pushA := buildSyncRequest(clipID, "Old content from A", deviceA, oldTime, 12345)
 	statusCode, bodyA := testutil.AuthPost(t, server, "/api/v1/clips/sync", tokenA, pushA)
 	require.Equal(t, http.StatusOK, statusCode)
 	codeA, _, dataA := testutil.ParseResponse(t, bodyA)
 	assert.Equal(t, 0, codeA)
 	assert.Equal(t, float64(1), dataA["updated_count"], "device A should push 1 clip")
 
-	// Device B pushes a NEWER clip (updated_at = now) for the SAME clip ID
+	// Device B pushes a NEWER clip (different content, different CRC) for the SAME clip ID
 	newTime := time.Now().UTC()
-	pushB := buildSyncRequest(clipID, "Newer content from B", deviceB, newTime)
+	pushB := buildSyncRequest(clipID, "Newer content from B", deviceB, newTime, 67890)
 	statusCode, bodyB := testutil.AuthPost(t, server, "/api/v1/clips/sync", tokenB, pushB)
 	require.Equal(t, http.StatusOK, statusCode)
 	codeB, _, dataB := testutil.ParseResponse(t, bodyB)
@@ -148,7 +148,11 @@ func getDeviceID(t *testing.T, respBody []byte) string {
 	return data["device_id"].(string)
 }
 
-func buildSyncRequest(clipID, description, deviceID string, updatedAt time.Time) map[string]interface{} {
+func buildSyncRequest(clipID, description, deviceID string, updatedAt time.Time, crc ...int64) map[string]interface{} {
+	crcValue := int64(0)
+	if len(crc) > 0 {
+		crcValue = crc[0]
+	}
 	return map[string]interface{}{
 		"since":     "1970-01-01T00:00:00Z",
 		"device_id": deviceID,
@@ -156,7 +160,7 @@ func buildSyncRequest(clipID, description, deviceID string, updatedAt time.Time)
 			{
 				"id":          clipID,
 				"description": description,
-				"crc":         0,
+				"crc":         crcValue,
 				"group_id":    "",
 				"short_cut":   0,
 				"updated_at":  updatedAt.Format(time.RFC3339),
