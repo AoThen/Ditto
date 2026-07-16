@@ -51,6 +51,12 @@ public:
 		const CString& newPassword
 	);
 
+	static EncryptionSetupResult ReVerifyPassword(
+		const CString& serverUrl,
+		const CString& deviceToken,
+		const CString& password
+	);
+
 	static BOOL CheckSaltChanged(
 		const CString& serverUrl,
 		const CString& deviceToken

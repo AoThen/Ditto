@@ -46,7 +46,7 @@ protected:
 			CRect(15, yPos, rcClient.right - 15, yPos + 40), this, 1001);
 		yPos += 45;
 
-		m_wndEdit.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+		m_wndEdit.Create(WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_PASSWORD,
 			CRect(15, yPos, rcClient.right - 15, yPos + 22), this, 1002);
 		m_wndEdit.SetWindowText(m_csInput);
 		yPos += 30;
@@ -631,20 +631,44 @@ msg = theApp.m_Language.GetString("CloudMsgAccessDenied",
 	}
 	else if (statusCode == 998)
 	{
-		// Encryption password changed on another device
-msg = theApp.m_Language.GetString("CloudMsgEncryptionChanged",
-			"Encryption password has changed!\n\n"
-			"Your encryption password has been modified on another device.\n"
-			"Please enter the new encryption password to continue syncing.\n\n"
-			"Click OK to open encryption settings.");
-
-		MessageBox(msg, theApp.m_Language.GetString("CloudTitleEncryptionChanged", "Cloud Sync - Encryption Password Changed"), MB_ICONWARNING | MB_OK);
-		
-		// Open this property page to show encryption settings
-		CPropertySheet* pSheet = static_cast<CPropertySheet*>(GetParent());
-		if (pSheet != nullptr)
+		// Encryption password changed on another device — auto-prompt for re-verification
+		CStringA token = CGetSetOptions::GetCloudDeviceToken();
+		if (token.IsEmpty())
 		{
-			pSheet->SetActivePage(this);
+			MessageBox(theApp.m_Language.GetString("CloudMsgLoginRequired", "Please log in first before re-entering encryption password."),
+				_T("Encryption Password Changed"), MB_ICONWARNING);
+			return 0;
+		}
+
+		CInputBox dlg;
+		dlg.m_csTitle = theApp.m_Language.GetString("CloudTitleReEnterPassword",
+			_T("Encryption Password Required"));
+		dlg.m_csPrompt = theApp.m_Language.GetString("CloudPromptReEnterPassword",
+			_T("The encryption password has changed on another device.\n\n"
+			   "Please enter the new encryption password to continue syncing:"));
+		dlg.m_csInput = _T("");
+		if (dlg.DoModal() != IDOK || dlg.m_csInput.IsEmpty())
+			return 0;
+
+		CString password = dlg.m_csInput;
+
+		EncryptionSetupResult result = CCloudEncryption::ReVerifyPassword(
+			m_csServerUrl, CString(token), password);
+
+		if (result.success)
+		{
+			MessageBox(theApp.m_Language.GetString("CloudMsgPasswordVerified",
+				_T("Password verified successfully!\n\nCloud sync will now resume with the updated encryption key.")),
+				theApp.m_Language.GetString("CloudTitleEncryptionChanged", _T("Encryption Password Changed")),
+				MB_ICONINFORMATION);
+
+			PostMessage(WM_CLOUD_REINIT_SYNC, 0, 0);
+		}
+		else
+		{
+			MessageBox(result.error,
+				theApp.m_Language.GetString("CloudTitleEncryptionChanged", _T("Encryption Password Changed")),
+				MB_ICONERROR);
 		}
 	}
 	else if (statusCode == 999)

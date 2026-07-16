@@ -379,6 +379,103 @@ ChangePasswordResult CCloudEncryption::ChangeEncryptionPassword(
 	return result;
 }
 
+// ---------------------------------------------------------------------------
+// ReVerifyPassword: Verify password by fetching key-material from server,
+// deriving KEK, and unwrapping DEK. Used when salt changes on server
+// (password changed on another device). On success, stores DEK and new salt locally.
+// ---------------------------------------------------------------------------
+EncryptionSetupResult CCloudEncryption::ReVerifyPassword(
+	const CString& serverUrl,
+	const CString& deviceToken,
+	const CString& password)
+{
+	EncryptionSetupResult result = {};
+	result.success = FALSE;
+
+	try
+	{
+		EnsureHttpClient(serverUrl, deviceToken);
+		if (!m_httpClient)
+		{
+			result.error = _T("Failed to create HTTP client");
+			return result;
+		}
+
+		auto keyRes = m_httpClient->Get("/api/v1/encryption/key-material");
+		if (!keyRes)
+		{
+			result.error = _T("Failed to connect to server (network error)");
+			return result;
+		}
+
+		if (keyRes->status != 200)
+		{
+			try
+			{
+				auto errJson = json::parse(keyRes->body);
+				if (errJson.contains("message"))
+					result.error = StdStringToCString(errJson["message"].get<std::string>());
+				else
+					result.error.Format(_T("Server returned HTTP %d"), keyRes->status);
+			}
+			catch (...)
+			{
+				result.error.Format(_T("Server returned HTTP %d"), keyRes->status);
+			}
+			return result;
+		}
+
+		auto keyJson = json::parse(keyRes->body);
+		if (!keyJson.contains("data") || !keyJson["data"].contains("wrapped_dek") || !keyJson["data"].contains("salt"))
+		{
+			result.error = _T("Invalid server response: missing key material");
+			return result;
+		}
+
+		CStringA wrappedDEKB64(keyJson["data"]["wrapped_dek"].get<std::string>().c_str());
+		CStringA serverSaltB64(keyJson["data"]["salt"].get<std::string>().c_str());
+
+		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(serverSaltB64);
+
+		CT2A passwordUtf8(password, CP_UTF8);
+		CStringA passwordA(passwordUtf8);
+		std::vector<BYTE> kek = CCloudCrypto::DeriveKey(passwordA, saltBytes, 100000);
+
+		std::vector<BYTE> dek = CCloudCrypto::UnwrapKey(kek, wrappedDEKB64);
+		if (dek.empty())
+		{
+			result.error = _T("Password verification failed. Please enter the correct encryption password.");
+			return result;
+		}
+
+		if (!CCloudCrypto::Initialize(dek))
+		{
+			result.error = _T("Failed to initialize crypto with recovered key");
+			return result;
+		}
+
+		CStringA dekB64 = CCloudCrypto::Base64Encode(dek);
+		CGetSetOptions::SetCloudEncryptionKey(CString(dekB64));
+
+		CString serverSalt = StdStringToCString(keyJson["data"]["salt"].get<std::string>());
+		CGetSetOptions::SetCloudEncryptionSalt(serverSalt);
+
+		result.salt = serverSalt;
+		result.encryptionEnabled = TRUE;
+		result.success = TRUE;
+	}
+	catch (const json::parse_error& e)
+	{
+		result.error.Format(_T("JSON parse error: %hs"), e.what());
+	}
+	catch (const std::exception& e)
+	{
+		result.error.Format(_T("Error: %hs"), e.what());
+	}
+
+	return result;
+}
+
 BOOL CCloudEncryption::CheckSaltChanged(
 	const CString& serverUrl,
 	const CString& deviceToken)
