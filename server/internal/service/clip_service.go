@@ -542,11 +542,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					existing, exists := existingMap[pc.ID]
 
 					if !exists {
-						// New clip: always create
+						// New clip: always create with server time
 						clipUpdatedAt := syncTime
-						if !pc.UpdatedAt.IsZero() {
-							clipUpdatedAt = pc.UpdatedAt
-						}
 						clip := model.Clip{
 							ID:             pc.ID,
 							UserID:         userID,
@@ -585,14 +582,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							Description: pc.Description,
 						})
 					} else {
-						// LWW Conflict Resolution: only update if incoming is newer
-						incomingUpdatedAt := existing.UpdatedAt
-						if !pc.UpdatedAt.IsZero() {
-							incomingUpdatedAt = pc.UpdatedAt
-						}
-
-						if incomingUpdatedAt.After(existing.UpdatedAt) {
-							// Incoming clip is newer: update
+						// Content-based conflict resolution: update if CRC differs
+						if pc.CRC != existing.CRC {
+							// Content changed: update with server time
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
 								"description":      pc.Description,
 								"pinyin":           utils.ConvertToPinyin(pc.Description),
@@ -601,7 +593,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								"short_cut":        pc.ShortCut,
 								"clip_order":       pc.ClipOrder,
 								"clip_group_order": pc.ClipGroupOrder,
-								"updated_at":       incomingUpdatedAt,
+								"updated_at":       syncTime,
 							}).Error; err != nil {
 								return err
 							}
@@ -617,7 +609,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 									FormatType: pf.FormatType,
 									Data:       pf.Data,
 									Encrypted:  pf.Encrypted,
-									CreatedAt:  incomingUpdatedAt,
+									CreatedAt:  syncTime,
 								})
 							}
 
@@ -627,41 +619,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								Description: pc.Description,
 							})
 						} else {
-							// Existing clip is newer or same: save as conflict copy for review
+							// Same content: skip
 							skippedCount++
-
-							if existing.CRC != pc.CRC {
-								conflictClip := model.Clip{
-									ID:             fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID),
-									UserID:         userID,
-									DeviceID:       req.DeviceID,
-									Description:    pc.Description,
-									Pinyin:         utils.ConvertToPinyin(pc.Description),
-									CRC:            pc.CRC,
-									CreatedAt:      pc.UpdatedAt,
-									UpdatedAt:      pc.UpdatedAt,
-									GroupID:        pc.GroupID,
-									ShortCut:       pc.ShortCut,
-									ClipOrder:      pc.ClipOrder,
-									ClipGroupOrder: pc.ClipGroupOrder,
-									PasteCount:     0,
-									IsConflictCopy: true,
-									WinClipID:      existing.ID,
-								}
-								if err := tx.Create(&conflictClip).Error; err != nil {
-									log.Printf("[Sync] Failed to create conflict copy for clip %s: %v", pc.ID, err)
-								} else {
-									for _, pf := range p.formats {
-										batchFormats = append(batchFormats, model.ClipFormat{
-											ClipID:     conflictClip.ID,
-											FormatType: pf.FormatType,
-											Data:       pf.Data,
-											Encrypted:  pf.Encrypted,
-											CreatedAt:  pc.UpdatedAt,
-										})
-									}
-								}
-							}
 							continue
 						}
 					}
