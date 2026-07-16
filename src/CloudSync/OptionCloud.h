@@ -108,7 +108,4 @@ protected:
 	afx_msg LRESULT OnReinitSync(WPARAM wParam, LPARAM lParam);
 };
 
-// Custom window message for async ReinitializeSync (deferred from button handler)
-#ifndef WM_CLOUD_REINIT_SYNC
-#define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
-#endif
+

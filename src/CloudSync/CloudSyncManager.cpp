@@ -323,8 +323,9 @@ UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 			return 0;
 		}
 
-		LogMessage(CString(_T("EncryptionRetryThreadProc: attempt ")) +
-			CString::FromInt(attempt) + _T("/") + CString::FromInt(maxRetries));
+		CString msg;
+		msg.Format(_T("EncryptionRetryThreadProc: attempt %d/%d"), attempt, maxRetries);
+		LogMessage(msg);
 
 		if (pThis->InitializeEncryption())
 		{
@@ -346,8 +347,9 @@ UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 		LogMessage(_T("EncryptionRetryThreadProc: attempt failed, will retry"));
 	}
 
-	LogMessage(_T("EncryptionRetryThreadProc: all ") +
-		CString::FromInt(maxRetries) + _T(" attempts exhausted, giving up"));
+	CString msg;
+	msg.Format(_T("EncryptionRetryThreadProc: all %d attempts exhausted, giving up"), maxRetries);
+	LogMessage(msg);
 	return 1;
 }
 

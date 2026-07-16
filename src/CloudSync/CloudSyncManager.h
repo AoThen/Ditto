@@ -12,6 +12,11 @@
 #define WM_CLOUD_AUTH_REQUIRED (WM_USER + 1001)
 #endif
 
+// Custom Windows message for deferred ReinitializeSync (avoid UI thread blocking)
+#ifndef WM_CLOUD_REINIT_SYNC
+#define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
+#endif
+
 // Context for fire-and-forget quick sync threads
 struct QuickSyncContext {
 	void* pManager;            // CCloudSyncManager*

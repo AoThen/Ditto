@@ -9,7 +9,7 @@
 #include "../json.hpp"
 #include "../Options.h"
 #include "../CP_Main.h"
-#include "Pinyin_Convert.h"
+#include "../Pinyin_Convert.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -705,11 +705,11 @@ void COptionCloud::OnRebuildPinyinIndex()
 		std::wstring wText(mText.GetString());
 		std::string pinyin = conv.ConvertToPinyin(wText);
 		std::string abbr = conv.ConvertToAbbreviation(wText);
-		CA2T pinyinT(pinyin.c_str(), CP_UTF8);
-		CA2T abbrT(abbr.c_str(), CP_UTF8);
+		CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
+		CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
 		theApp.m_db.execDMLEx(
 			_T("UPDATE Main SET pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
-			pinyinT, abbrT, id);
+			pinyinW, abbrW, id);
 
 		if (++batch % 100 == 0) {
 			theApp.m_db.execDML(_T("COMMIT; BEGIN TRANSACTION;"));
