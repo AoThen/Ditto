@@ -456,7 +456,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			return nil, ErrPushLimitExceeded
 		}
 
-		// Load CRC set once (read-only, outside transaction for SQLite WAL)
+		// Collect CRCs from the push request; DB query moved inside transaction
 		type crcRecord struct {
 			CRC int64  `gorm:"column:crc"`
 			ID  string `gorm:"column:id"`
@@ -469,20 +469,6 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			}
 		}
 		existingCRCs := make(map[string]string)
-		if len(crcSet) > 0 {
-			crcValues := make([]int64, 0, len(crcSet))
-			for c := range crcSet {
-				crcValues = append(crcValues, c)
-			}
-			var crcRecords []crcRecord
-			if err := database.DB.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ? AND crc IN ?", userID, false, crcValues).Find(&crcRecords).Error; err != nil {
-				return nil, err
-			}
-			existingCRCs = make(map[string]string, len(crcRecords))
-			for _, r := range crcRecords {
-				existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
-			}
-		}
 
 		// Pre-processing type: format data decoded outside transaction
 		type preparedFormat struct {
@@ -495,34 +481,49 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			formats []preparedFormat
 		}
 
-		// Process in chunks — each chunk has its own short transaction
-		for start := 0; start < len(req.PushClips); start += PushBatchSize {
-			end := start + PushBatchSize
-			if end > len(req.PushClips) {
-				end = len(req.PushClips)
-			}
-			chunk := req.PushClips[start:end]
-
-			// Pre-decode all format base64 data (CPU work, outside transaction)
-			prepared := make([]preparedItem, 0, len(chunk))
-			for _, pc := range chunk {
-				formats := make([]preparedFormat, 0, len(pc.Formats))
-				for _, pf := range pc.Formats {
-					data, err := base64.StdEncoding.DecodeString(pf.Data)
-					if err != nil {
-						return nil, fmt.Errorf("sync: base64 decode failed for clip %s: %w", pc.ID, err)
-					}
-					formats = append(formats, preparedFormat{
-						FormatType: pf.FormatType,
-						Data:       data,
-						Encrypted:  pf.Encrypted,
-					})
+		// Single transaction for all chunks — atomicity guarantee
+		err := database.DB.Transaction(func(tx *gorm.DB) error {
+			// Load existing CRCs for deduplication inside the transaction
+			if len(crcSet) > 0 {
+				crcValues := make([]int64, 0, len(crcSet))
+				for c := range crcSet {
+					crcValues = append(crcValues, c)
 				}
-				prepared = append(prepared, preparedItem{item: pc, formats: formats})
+				var crcRecords []crcRecord
+				if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ? AND crc IN ?", userID, false, crcValues).Find(&crcRecords).Error; err != nil {
+					return err
+				}
+				existingCRCs = make(map[string]string, len(crcRecords))
+				for _, r := range crcRecords {
+					existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+				}
 			}
 
-			// Per-chunk transaction
-			err := database.DB.Transaction(func(tx *gorm.DB) error {
+			for start := 0; start < len(req.PushClips); start += PushBatchSize {
+				end := start + PushBatchSize
+				if end > len(req.PushClips) {
+					end = len(req.PushClips)
+				}
+				chunk := req.PushClips[start:end]
+
+				// Pre-decode all format base64 data
+				prepared := make([]preparedItem, 0, len(chunk))
+				for _, pc := range chunk {
+					formats := make([]preparedFormat, 0, len(pc.Formats))
+					for _, pf := range pc.Formats {
+						data, err := base64.StdEncoding.DecodeString(pf.Data)
+						if err != nil {
+							return fmt.Errorf("sync: base64 decode failed for clip %s: %w", pc.ID, err)
+						}
+						formats = append(formats, preparedFormat{
+							FormatType: pf.FormatType,
+							Data:       data,
+							Encrypted:  pf.Encrypted,
+						})
+					}
+					prepared = append(prepared, preparedItem{item: pc, formats: formats})
+				}
+
 				// Load existing clips for this chunk's IDs
 				chunkIDs := make([]string, 0, len(chunk))
 				for _, p := range prepared {
@@ -681,12 +682,12 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						return err
 					}
 				}
-
-				return nil
-			})
-			if err != nil {
-				return nil, err
 			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 
