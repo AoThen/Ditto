@@ -303,6 +303,7 @@ TEST(CloudAuth_ErrorHandling, UnicodeCredentials)
 TEST(CloudAuth_Integration, LoginLogoutCycle)
 {
 	// Start logged out
+	CCloudAuth::Logout();
 	EXPECT_FALSE(CCloudAuth::IsLoggedIn());
 	
 	// Simulate login by setting token directly
