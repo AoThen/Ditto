@@ -2028,15 +2028,21 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 
 				if (formatType == CF_UNICODETEXT)
 				{
-					// UTF-8 text -> convert to UTF-16 for Windows clipboard
 					CStringA utf8Data(dataStr.c_str());
-					// For UTF-16, store the UTF-8 text directly (Ditto handles conversion)
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, utf8Data.GetLength() + 1);
-					if (hGlobal)
+					int wideLen = MultiByteToWideChar(CP_UTF8, 0,
+						utf8Data.GetString(), utf8Data.GetLength(), nullptr, 0);
+					if (wideLen > 0)
 					{
-						char* pData = (char*)GlobalLock(hGlobal);
-						memcpy(pData, utf8Data.GetString(), utf8Data.GetLength() + 1);
-						GlobalUnlock(hGlobal);
+						hGlobal = GlobalAlloc(GMEM_MOVEABLE, (wideLen + 1) * sizeof(wchar_t));
+						if (hGlobal)
+						{
+							wchar_t* pData = (wchar_t*)GlobalLock(hGlobal);
+							MultiByteToWideChar(CP_UTF8, 0,
+								utf8Data.GetString(), utf8Data.GetLength(),
+								pData, wideLen);
+							pData[wideLen] = L'\0';
+							GlobalUnlock(hGlobal);
+						}
 					}
 				}
 				else if (formatType == CF_TEXT)
