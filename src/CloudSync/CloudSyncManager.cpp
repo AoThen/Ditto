@@ -459,6 +459,10 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 	{
 		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
 	}
+	else
+	{
+		delete ctx;
+	}
 }
 
 UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
@@ -3030,6 +3034,10 @@ void CCloudSyncManager::TriggerQuickSync()
 	if (pThread)
 	{
 		OutputDebugStringA("[CloudSync] TriggerQuickSync: spawned quick-push thread.\n");
+	}
+	else
+	{
+		delete ctx;
 	}
 }
 
