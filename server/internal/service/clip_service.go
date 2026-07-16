@@ -461,13 +461,27 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			CRC int64  `gorm:"column:crc"`
 			ID  string `gorm:"column:id"`
 		}
-		var crcRecords []crcRecord
-		if err := database.DB.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ?", userID, false).Find(&crcRecords).Error; err != nil {
-			return nil, err
+		// Collect non-zero CRCs from the push request to avoid a full table scan
+		crcSet := make(map[int64]struct{})
+		for _, pc := range req.PushClips {
+			if pc.CRC != 0 {
+				crcSet[pc.CRC] = struct{}{}
+			}
 		}
-		existingCRCs := make(map[string]string, len(crcRecords))
-		for _, r := range crcRecords {
-			existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+		existingCRCs := make(map[string]string)
+		if len(crcSet) > 0 {
+			crcValues := make([]int64, 0, len(crcSet))
+			for c := range crcSet {
+				crcValues = append(crcValues, c)
+			}
+			var crcRecords []crcRecord
+			if err := database.DB.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ? AND crc IN ?", userID, false, crcValues).Find(&crcRecords).Error; err != nil {
+				return nil, err
+			}
+			existingCRCs = make(map[string]string, len(crcRecords))
+			for _, r := range crcRecords {
+				existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+			}
 		}
 
 		// Pre-processing type: format data decoded outside transaction
