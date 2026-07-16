@@ -80,6 +80,7 @@ private:
 	CWinThread* m_pWsThread;   // WebSocket listener thread
 	BOOL      m_cryptoInitialized;
 	time_t    m_lastSyncTime;  // Track last successful sync time
+	time_t    m_lastPushTime;  // Track last successful push time (separate from pull sync time)
 	CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
 	LONG      m_nActiveQuickSyncThreads; // Track active quick-push threads
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
@@ -135,10 +136,13 @@ private:
 	// Filter out CF_HDROP formats that contain actual file data (sync paths only)
 	static BOOL FilterHDROPForSync(nlohmann::json& formats);
 
-	// Enumerate a single page of local clips modified since lastSyncTime
-	BOOL GetLocalClipsSince(time_t sinceTime, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore);
+	// Enumerate a single page of local clips modified since sinceTime, bounded by upperBound (0 = no bound)
+	BOOL GetLocalClipsSince(time_t sinceTime, time_t upperBound, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore);
 
 	static const int CLOUD_PUSH_BATCH_SIZE;
+
+	// Get the maximum lModifiedDate from the Main table (for first-push baseline snapshot)
+	time_t GetMaxLocalClipModifiedDate() const;
 
 	// Load formats for a specific clip
 	BOOL LoadClipFormats(int clipId, nlohmann::json& formatsArray);

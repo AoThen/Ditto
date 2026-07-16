@@ -306,6 +306,8 @@ public:
 	static void     SetCloudInitialPushDone(BOOL bValue);
 	static __int64  GetCloudInitialPushOffset();
 	static void     SetCloudInitialPushOffset(__int64 value);
+	static __int64  GetCloudLastPushTime();
+	static void     SetCloudLastPushTime(__int64 value);
 	static CString  GetCloudKeyFilePath();
 	static void     SetCloudKeyFilePath(LPCTSTR lpszValue);
 	static CString  GetCloudLastUsername();

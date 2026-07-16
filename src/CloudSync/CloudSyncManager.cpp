@@ -102,6 +102,11 @@ BOOL CCloudSyncManager::Initialize()
 		LogMessage(msg);
 	}
 
+	// Restore lastPushTime from registry (separate push cursor)
+	m_lastPushTime = (time_t)CGetSetOptions::GetCloudLastPushTime();
+	if (m_lastPushTime == 0)
+		m_lastPushTime = m_lastSyncTime;
+
 	// If no device ID is stored, generate one (will be overwritten on login)
 	if (m_deviceId.IsEmpty())
 	{
@@ -669,29 +674,53 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 		else
 			LogMessage(_T("PushNewClips: checking for new/modified clips since last sync..."));
 
-		// Enumerate local clips modified since last sync (thread-safe read)
+		time_t lastPush;
 		time_t lastSync;
 		EnterCriticalSection(&m_csSync);
+		lastPush = m_lastPushTime;
 		lastSync = m_lastSyncTime;
 		LeaveCriticalSection(&m_csSync);
 
 		BOOL bFirstPush = !CGetSetOptions::GetCloudInitialPushDone();
 		int offset = bFirstPush ? (int)CGetSetOptions::GetCloudInitialPushOffset() : 0;
-		time_t sinceTime = bForce ? 0 : (bFirstPush ? 0 : lastSync);
+
+		time_t pushStart = time(nullptr);
+
+		time_t baseline = 0;
+		if (bFirstPush && !bForce)
+		{
+			baseline = GetMaxLocalClipModifiedDate();
+		}
+
+		time_t sinceTime;
+		time_t upperBound;
+		if (bForce)
+		{
+			sinceTime = 0;
+			upperBound = 0;
+		}
+		else if (bFirstPush)
+		{
+			sinceTime = 0;
+			upperBound = (baseline > 0) ? baseline : 0;
+		}
+		else
+		{
+			sinceTime = lastPush;
+			upperBound = 0;
+		}
 
 		bool hasMore = true;
 		do
 		{
 			json page;
 			bool pageHasMore = false;
-			if (!GetLocalClipsSince(sinceTime, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
+			if (!GetLocalClipsSince(sinceTime, upperBound, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
 			{
 				LogMessage(_T("PushNewClips: failed to enumerate local clips."));
 				return FALSE;
 			}
 
-			// Set hasMore before the empty-page break so the first-push completion
-			// flag is set correctly when the final (empty) page is reached.
 			hasMore = pageHasMore;
 
 			if (page.empty())
@@ -699,17 +728,13 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				break;
 			}
 
-			// Build sync request JSON matching server's PushClipItem schema:
-		 // Server expects: { since, device_id, push_clips: [{ id, description, crc,
-			// group_id, short_cut, updated_at, formats: [{format_type, data}] }] }
 			json syncReq;
 			if (sinceTime > 0)
 			{
-				// Format as RFC3339: "2025-01-01T00:00:00Z"
 				SYSTEMTIME st;
 				FILETIME ft;
 				ULARGE_INTEGER uli;
-				uli.QuadPart = ((ULONGLONG)lastSync * 10000000ULL) + 116444736000000000ULL;
+				uli.QuadPart = ((ULONGLONG)sinceTime * 10000000ULL) + 116444736000000000ULL;
 				ft.dwLowDateTime = uli.LowPart;
 				ft.dwHighDateTime = uli.HighPart;
 				FileTimeToSystemTime(&ft, &st);
@@ -729,7 +754,6 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				syncReq["force"] = true;
 			syncReq["push_clips"] = page;
 
-			// Send to server
 			EnsureHttpClient();
 
 			std::string bodyStr = syncReq.dump();
@@ -740,68 +764,18 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				return FALSE;
 			}
 
-			// Handle authentication errors (401/403) - trigger re-auth flow
 			if (res->status == 401 || res->status == 403)
 			{
 				LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
-
-				// Clear stored credentials
 				CCloudAuth::Logout();
-
-				// Notify user via main window (post message to avoid blocking sync thread)
 				CWnd* pMainWnd = AfxGetMainWnd();
 				if (pMainWnd != nullptr)
-				{
-					// Post custom message with 401 status code
 					::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
-				}
-
 				LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
 				return FALSE;
 			}
 
-			if (res->status == 200)
-			{
-				try
-				{
-					json responseJson = json::parse(res->body);
-
-					// Server wraps response in { code: 0, data: { ... } }
-					if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
-					{
-						CString msg;
-						msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
-						LogMessage(msg);
-						return FALSE;
-					}
-
-					// Extract from data envelope
-					const json* dataNode = nullptr;
-					if (responseJson.contains("data") && responseJson["data"].is_object())
-					{
-						dataNode = &responseJson["data"];
-					}
-					else
-					{
-						dataNode = &responseJson; // Fallback: use top-level if no data wrapper
-					}
-
-					int syncedCount = dataNode->value("updated_count", 0);
-					int skippedCount = dataNode->value("skipped_count", 0);
-
-					CString msg;
-					msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
-					LogMessage(msg);
-				}
-				catch (const json::parse_error& e)
-				{
-					CString err;
-					err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
-					LogMessage(err);
-					return FALSE;
-				}
-			}
-			else
+			if (res->status != 200)
 			{
 				CString err;
 				err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
@@ -809,16 +783,59 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				return FALSE;
 			}
 
+			try
+			{
+				json responseJson = json::parse(res->body);
+				if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
+				{
+					CString msg;
+					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
+					LogMessage(msg);
+					return FALSE;
+				}
+				const json* dataNode = nullptr;
+				if (responseJson.contains("data") && responseJson["data"].is_object())
+					dataNode = &responseJson["data"];
+				else
+					dataNode = &responseJson;
+				int syncedCount = dataNode->value("updated_count", 0);
+				int skippedCount = dataNode->value("skipped_count", 0);
+				CString msg;
+				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
+				LogMessage(msg);
+			}
+			catch (const json::parse_error& e)
+			{
+				CString err;
+				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
+				LogMessage(err);
+				return FALSE;
+			}
+
 			offset += (int)page.size();
 			if (bFirstPush)
 				CGetSetOptions::SetCloudInitialPushOffset(offset);
+
 		} while (hasMore);
+
+		EnterCriticalSection(&m_csSync);
+		if (bFirstPush)
+		{
+			m_lastPushTime = (baseline > 0) ? baseline : pushStart;
+		}
+		else
+		{
+			m_lastPushTime = pushStart;
+		}
+		CGetSetOptions::SetCloudLastPushTime((__int64)m_lastPushTime);
+		LeaveCriticalSection(&m_csSync);
 
 		if (bFirstPush && !hasMore)
 		{
 			CGetSetOptions::SetCloudInitialPushDone(TRUE);
 			CGetSetOptions::SetCloudInitialPushOffset(0);
 		}
+
 		return TRUE;
 	}
 	catch (const std::exception& e)
@@ -1229,34 +1246,65 @@ void CCloudSyncManager::PullChanges()
 }
 
 // ---------------------------------------------------------------------------
+// GetMaxLocalClipModifiedDate: Get the maximum lModifiedDate from Main table
+// Used for first-push baseline snapshot to avoid OFFSET skip due to inserts.
+// ---------------------------------------------------------------------------
+time_t CCloudSyncManager::GetMaxLocalClipModifiedDate() const
+{
+	CSingleLock lockDb(&m_csDb, TRUE);
+	CString csSQL = _T("SELECT MAX(lModifiedDate) FROM Main WHERE bIsGroup = 0 AND lDontSync = 0");
+	CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+	if (q.eof() == false)
+	{
+		return (time_t)q.getInt64Field(0);
+	}
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
 // GetLocalClipsSince: Enumerate local clips modified since lastSyncTime
 // Produces JSON matching server's PushClipItem schema:
 //   { id, description, crc, group_id, short_cut, updated_at, formats: [{format_type, data}] }
 // ---------------------------------------------------------------------------
-BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore)
+BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, int offset, int limit, nlohmann::json& clipsArray, bool& hasMore)
 {
 	clipsArray = nlohmann::json::array();
 	hasMore = false;
 
 	try
 	{
-		CString csSQL;
+		CString where;
 		if (sinceTime > 0)
 		{
- csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
-			             _T("clipOrder, clipGroupOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lDontSync, m_Description, lastPasteDate, lModifiedDate ")
-			             _T("FROM Main WHERE lModifiedDate > %lld AND bIsGroup = 0 AND lDontSync = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"), sinceTime, limit, offset);
+			CString cond;
+			cond.Format(_T("lModifiedDate > %lld"), sinceTime);
+			where = cond;
+		}
+		if (upperBound > 0)
+		{
+			CString cond;
+			cond.Format(_T("lModifiedDate <= %lld"), upperBound);
+			if (!where.IsEmpty()) where += _T(" AND ");
+			where += cond;
+		}
+		if (!where.IsEmpty())
+		{
+			CString tmp;
+			tmp.Format(_T("WHERE %s AND "), (LPCTSTR)where);
+			where = tmp;
 		}
 		else
 		{
- csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
-			             _T("clipOrder, clipGroupOrder, stickyClipOrder, lShortCut, globalShortCut, ")
-			             _T("lDontAutoDelete, lDontSync, m_Description, lastPasteDate, lModifiedDate ")
-			             _T("FROM Main WHERE bIsGroup = 0 AND lDontSync = 0 ")
-			             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"), limit, offset);
+			where = _T("WHERE ");
 		}
+
+		CString csSQL;
+		csSQL.Format(_T("SELECT lID, lDate, mText, CRC, bIsGroup, lParentID, ")
+		             _T("clipOrder, clipGroupOrder, stickyClipOrder, lShortCut, globalShortCut, ")
+		             _T("lDontAutoDelete, lDontSync, m_Description, lastPasteDate, lModifiedDate ")
+		             _T("FROM Main %sbIsGroup = 0 AND lDontSync = 0 ")
+		             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"),
+		             (LPCTSTR)where, limit, offset);
 
 		CSingleLock lockDb(&m_csDb, TRUE);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
