@@ -121,6 +121,7 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_DOWNLOAD, &COptionCloud::OnBtnForceDownload)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_UPLOAD, &COptionCloud::OnBtnForceUpload)
 	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
+	ON_MESSAGE(WM_CLOUD_REINIT_SYNC, &COptionCloud::OnReinitSync)
 END_MESSAGE_MAP()
 
 BOOL COptionCloud::OnInitDialog()
@@ -346,22 +347,14 @@ void COptionCloud::OnBtnEnableEncryption()
 			m_bEncryptionEnabled = TRUE;
 			m_csEncryptionStatus.Format(theApp.m_Language.GetString("CloudEncryptionEnabledSalt", "Encryption enabled (Salt: %s...)"), result.salt.Left(16));
 
-			// Restart sync with new encryption key (safe even if sync was never started)
-			if (!theApp.m_CloudSyncManager.ReinitializeSync())
-			{
-				OutputDebugStringA("[OptionCloud] ReinitializeSync failed after encryption setup.\n");
+			// Defer ReinitializeSync via PostMessage to avoid UI thread blocking
+			// (Stop may wait up to 15s for sync thread). The handler runs after
+			// the success message is dismissed and shows a warning on failure.
+			PostMessage(WM_CLOUD_REINIT_SYNC, 0, 0);
 
-				MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabledNoSync",
-					"Encryption has been enabled, but cloud sync could not be started.\n\n"
-					"Please check your login status and try again."),
-					theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONWARNING);
-			}
-			else
-			{
-				MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabled",
-					"Encryption has been enabled. Your data will be encrypted before syncing."),
-					theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONINFORMATION);
-			}
+			MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabled",
+				"Encryption has been enabled. Your data will be encrypted before syncing."),
+				theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONINFORMATION);
 		}
 		else
 		{
@@ -707,5 +700,28 @@ msg = theApp.m_Language.GetString("CloudMsgEncryptionFailed",
 		}
 	}
 	
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// OnReinitSync: Async handler for deferred ReinitializeSync
+// Called via PostMessage from OnBtnEnableEncryption to avoid UI thread
+// blocking while Stop() waits for the sync thread to exit.
+// ---------------------------------------------------------------------------
+LRESULT COptionCloud::OnReinitSync(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(wParam);
+	UNREFERENCED_PARAMETER(lParam);
+
+	if (!theApp.m_CloudSyncManager.ReinitializeSync())
+	{
+		OutputDebugStringA("[OptionCloud] OnReinitSync: ReinitializeSync failed.\n");
+
+		MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabledNoSync",
+			"Encryption has been enabled, but cloud sync could not be started.\n\n"
+			"Please check your login status and try again."),
+			theApp.m_Language.GetString("CloudTitleEnableEncryption", "Enable Encryption"), MB_ICONWARNING);
+	}
+
 	return 0;
 }

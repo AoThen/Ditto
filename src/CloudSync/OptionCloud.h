@@ -85,4 +85,12 @@ protected:
 
 	// Handler for cloud authentication required message
 	afx_msg LRESULT OnCloudAuthRequired(WPARAM wParam, LPARAM lParam);
+
+	// Async reinitialize sync (avoids UI thread blocking during Stop)
+	afx_msg LRESULT OnReinitSync(WPARAM wParam, LPARAM lParam);
 };
+
+// Custom window message for async ReinitializeSync (deferred from button handler)
+#ifndef WM_CLOUD_REINIT_SYNC
+#define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
+#endif
