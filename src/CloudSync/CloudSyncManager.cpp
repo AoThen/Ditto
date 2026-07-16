@@ -68,6 +68,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_cryptoInitialized(FALSE)
 	, m_lastSyncTime(0)
 	, m_nActiveQuickSyncThreads(0)
+	, m_bFirstPushInProgress(0)
 	, m_pWsClient(nullptr)
 	, m_wsReconnectDelay(1000)
 	, m_forceOverrideLocal(0)
@@ -667,6 +668,19 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 
 BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 {
+	BOOL bFirstPush = !CGetSetOptions::GetCloudInitialPushDone();
+
+	// 原子守卫：防止并发首推（SyncThreadProc 和 QuickSyncThreadProc 同时进入）
+	if (bFirstPush)
+	{
+		if (InterlockedExchange(&m_bFirstPushInProgress, 1) == 1)
+		{
+			LogMessage(_T("PushNewClips: first push already in progress, skipping concurrent attempt"));
+			return TRUE;
+		}
+	}
+
+	BOOL bResult = FALSE;
 	try
 	{
 		if (bForce)
@@ -681,7 +695,6 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 		lastSync = m_lastSyncTime;
 		LeaveCriticalSection(&m_csSync);
 
-		BOOL bFirstPush = !CGetSetOptions::GetCloudInitialPushDone();
 		int offset = bFirstPush ? (int)CGetSetOptions::GetCloudInitialPushOffset() : 0;
 
 		time_t pushStart = time(nullptr);
@@ -718,7 +731,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			if (!GetLocalClipsSince(sinceTime, upperBound, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
 			{
 				LogMessage(_T("PushNewClips: failed to enumerate local clips."));
-				return FALSE;
+				bResult = FALSE; goto cleanup;
 			}
 
 			hasMore = pageHasMore;
@@ -761,7 +774,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			if (!res)
 			{
 				LogMessage(_T("PushNewClips: failed to connect to server"));
-				return FALSE;
+				bResult = FALSE; goto cleanup;
 			}
 
 			if (res->status == 401 || res->status == 403)
@@ -772,7 +785,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				if (pMainWnd != nullptr)
 					::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
 				LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
-				return FALSE;
+				bResult = FALSE; goto cleanup;
 			}
 
 			if (res->status != 200)
@@ -780,7 +793,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				CString err;
 				err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
 				LogMessage(err);
-				return FALSE;
+				bResult = FALSE; goto cleanup;
 			}
 
 			try
@@ -791,7 +804,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 					CString msg;
 					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
 					LogMessage(msg);
-					return FALSE;
+					bResult = FALSE; goto cleanup;
 				}
 				const json* dataNode = nullptr;
 				if (responseJson.contains("data") && responseJson["data"].is_object())
@@ -809,7 +822,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				CString err;
 				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
 				LogMessage(err);
-				return FALSE;
+				bResult = FALSE; goto cleanup;
 			}
 
 			offset += (int)page.size();
@@ -836,20 +849,25 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			CGetSetOptions::SetCloudInitialPushOffset(0);
 		}
 
-		return TRUE;
+		bResult = TRUE; goto cleanup;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("PushNewClips error: %hs"), e.what());
 		LogMessage(err);
-		return FALSE;
+		bResult = FALSE;
 	}
 	catch (...)
 	{
 		LogMessage(_T("PushNewClips: unknown error"));
-		return FALSE;
+		bResult = FALSE;
 	}
+
+cleanup:
+	if (bFirstPush)
+		InterlockedExchange(&m_bFirstPushInProgress, 0);
+	return bResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -955,7 +973,7 @@ BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 				msg.Format(_T("CF_HDROP filtered: %d file paths (contents NOT synced)"), (int)filePaths.size());
 				LogMessage(msg);
 
-				return TRUE;
+return TRUE;
 			}
 		}
 	}

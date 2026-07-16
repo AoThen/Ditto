@@ -83,6 +83,7 @@ private:
 	time_t    m_lastPushTime;  // Track last successful push time (separate from pull sync time)
 	CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
 	LONG      m_nActiveQuickSyncThreads; // Track active quick-push threads
+	LONG      m_bFirstPushInProgress;  // 0=idle, 1=first push in progress (InterlockedExchange)
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
 	int       m_wsReconnectDelay; // Exponential backoff for WS reconnection
 
