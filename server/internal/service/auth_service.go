@@ -64,52 +64,56 @@ type LoginResponse struct {
 }
 
 var (
-	ErrUsernameExists  = errors.New("用户名已存在")
-	ErrEmailExists     = errors.New("邮箱已被注册")
-	ErrInvalidCreds    = errors.New("用户名或密码错误")
-	ErrUserLocked      = errors.New("账号已锁定")
-	ErrTooManyAttempts = errors.New("尝试次数过多")
+	ErrUsernameExists      = errors.New("用户名已存在")
+	ErrEmailExists         = errors.New("邮箱已被注册")
+	ErrInvalidCreds        = errors.New("用户名或密码错误")
+	ErrUserLocked          = errors.New("账号已锁定")
+	ErrTooManyAttempts     = errors.New("尝试次数过多")
+	ErrRegistrationClosed  = errors.New("注册已关闭，请联系管理员")
 )
 
 func (s *AuthService) Register(req *RegisterRequest) (*RegisterResponse, error) {
-	// Check if username exists
-	var existing model.User
-	if err := database.DB.Where("username = ?", req.Username).First(&existing).Error; err == nil {
-		return nil, ErrUsernameExists
-	}
+	var resp *RegisterResponse
 
-	// Check if email exists
-	if err := database.DB.Where("email = ?", req.Email).First(&existing).Error; err == nil {
-		return nil, ErrEmailExists
-	}
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var existing model.User
 
-	// Hash password
-	hashedPassword, err := crypto.HashPassword(req.Password)
+		if err := tx.Where("username = ?", req.Username).First(&existing).Error; err == nil {
+			return ErrUsernameExists
+		}
+		if err := tx.Where("email = ?", req.Email).First(&existing).Error; err == nil {
+			return ErrEmailExists
+		}
+
+		hashedPassword, err := crypto.HashPassword(req.Password)
+		if err != nil {
+			return err
+		}
+
+		var count int64
+		tx.Model(&model.User{}).Count(&count)
+		if count > 0 {
+			return ErrRegistrationClosed
+		}
+
+		user := model.User{
+			Username:     req.Username,
+			Email:        req.Email,
+			PasswordHash: hashedPassword,
+			Role:         "admin",
+			IsActive:     true,
+		}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+
+		resp = &RegisterResponse{UserID: user.ID}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// First user automatically becomes admin
-	var count int64
-	database.DB.Model(&model.User{}).Count(&count)
-	role := "user"
-	if count == 0 {
-		role = "admin"
-	}
-
-	user := model.User{
-		Username:     req.Username,
-		Email:        req.Email,
-		PasswordHash: hashedPassword,
-		Role:         role,
-		IsActive:     true,
-	}
-
-	if err := database.DB.Create(&user).Error; err != nil {
-		return nil, err
-	}
-
-	return &RegisterResponse{UserID: user.ID}, nil
+	return resp, nil
 }
 
 func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginResponse, error) {

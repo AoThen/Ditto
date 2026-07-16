@@ -29,11 +29,7 @@ func (s *UserService) CreateUser(username, email, password string) (*model.User,
 		return nil, err
 	}
 
-	isFirst := IsFirstUser()
 	role := "user"
-	if isFirst {
-		role = "admin"
-	}
 
 	user := model.User{
 		Username:     username,

@@ -81,7 +81,7 @@ func InitSQLite(dbPath string, slowThreshold time.Duration) error {
 	}
 
 	// Open with WAL mode and foreign keys enabled
-	dsn := fmt.Sprintf("file:%s?_busy_timeout=5000&_fk=true&_journal_mode=WAL", dbPath)
+	dsn := fmt.Sprintf("file:%s?_busy_timeout=5000&_fk=true&_journal_mode=WAL&_txlock=immediate", dbPath)
 
 	var err error
 

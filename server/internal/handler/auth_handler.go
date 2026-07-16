@@ -44,6 +44,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, 40001, "用户名已存在")
 		case service.ErrEmailExists:
 			response.Error(c, http.StatusBadRequest, 40002, "邮箱已被注册")
+		case service.ErrRegistrationClosed:
+			response.Error(c, http.StatusForbidden, 40302, "注册已关闭，请联系管理员")
 		default:
 			log.Printf("[Register] error: %v", err)
 			response.Error(c, http.StatusInternalServerError, 50000, "注册失败")

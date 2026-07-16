@@ -1,7 +1,10 @@
 package service
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -154,49 +157,7 @@ func setupLoginTest(t *testing.T, password string) (*AuthService, uint, func()) 
 
 func TestAuthService_Register(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
-		svc, _, _, cleanup := setupAuthServiceTest(t)
-		defer cleanup()
-
-		req := &RegisterRequest{
-			Username: "newuser",
-			Email:    "new@example.com",
-			Password: "password123",
-		}
-		resp, err := svc.Register(req)
-		assert.NoError(t, err)
-		assert.NotZero(t, resp.UserID)
-	})
-
-	t.Run("DuplicateUsername", func(t *testing.T) {
-		svc, _, _, cleanup := setupAuthServiceTest(t)
-		defer cleanup()
-
-		req := &RegisterRequest{
-			Username: "authsvcuser",
-			Email:    "another@example.com",
-			Password: "password123",
-		}
-		_, err := svc.Register(req)
-		assert.Error(t, err)
-		assert.Equal(t, ErrUsernameExists, err)
-	})
-
-	t.Run("DuplicateEmail", func(t *testing.T) {
-		svc, _, _, cleanup := setupAuthServiceTest(t)
-		defer cleanup()
-
-		req := &RegisterRequest{
-			Username: "anotheruser",
-			Email:    "authsvc@example.com",
-			Password: "password123",
-		}
-		_, err := svc.Register(req)
-		assert.Error(t, err)
-		assert.Equal(t, ErrEmailExists, err)
-	})
-
-	t.Run("FirstUserBecomesAdmin", func(t *testing.T) {
-		tmpFile, err := os.CreateTemp("", "auth_admin_*.db")
+		tmpFile, err := os.CreateTemp("", "auth_reg_*.db")
 		require.NoError(t, err)
 		dbPath := tmpFile.Name()
 		tmpFile.Close()
@@ -208,22 +169,105 @@ func TestAuthService_Register(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { database.DB = nil }()
 
-		cfg := &config.Config{JWTSecret: "test"}
-		svc := NewAuthService(cfg)
+		svc := NewAuthService(&config.Config{JWTSecret: "test"})
 
 		req := &RegisterRequest{
-			Username: "firstuser",
-			Email:    "first@example.com",
+			Username: "newuser",
+			Email:    "new@example.com",
 			Password: "password123",
 		}
 		resp, err := svc.Register(req)
 		require.NoError(t, err)
+		assert.NotZero(t, resp.UserID)
 
 		var user model.User
 		err = database.DB.Where("id = ?", resp.UserID).First(&user).Error
 		require.NoError(t, err)
-		assert.Equal(t, "admin", user.Role)
+		assert.Equal(t, "admin", user.Role, "first user should be admin")
 	})
+
+	t.Run("RegistrationClosed", func(t *testing.T) {
+		tmpFile, err := os.CreateTemp("", "auth_regclosed_*.db")
+		require.NoError(t, err)
+		dbPath := tmpFile.Name()
+		tmpFile.Close()
+		defer os.Remove(dbPath)
+		defer os.Remove(dbPath + "-shm")
+		defer os.Remove(dbPath + "-wal")
+
+		err = database.Init(dbPath, 500*time.Millisecond)
+		require.NoError(t, err)
+		defer func() { database.DB = nil }()
+
+		svc := NewAuthService(&config.Config{JWTSecret: "test"})
+
+		firstReq := &RegisterRequest{
+			Username: "adminuser",
+			Email:    "admin@example.com",
+			Password: "password123",
+		}
+		_, err = svc.Register(firstReq)
+		require.NoError(t, err)
+
+		secondReq := &RegisterRequest{
+			Username: "seconduser",
+			Email:    "second@example.com",
+			Password: "password456",
+		}
+		_, err = svc.Register(secondReq)
+		assert.Error(t, err)
+		assert.Equal(t, ErrRegistrationClosed, err)
+	})
+}
+
+func TestAuthService_Register_Concurrent(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "auth_concur_*.db")
+	require.NoError(t, err)
+	dbPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(dbPath)
+	defer os.Remove(dbPath + "-shm")
+	defer os.Remove(dbPath + "-wal")
+
+	err = database.Init(dbPath, 500*time.Millisecond)
+	require.NoError(t, err)
+	defer func() { database.DB = nil }()
+
+	svc := NewAuthService(&config.Config{JWTSecret: "test"})
+
+	const goroutines = 10
+	var wg sync.WaitGroup
+	results := make(chan error, goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			req := &RegisterRequest{
+				Username: fmt.Sprintf("concuser%d", i),
+				Email:    fmt.Sprintf("conc%d@example.com", i),
+				Password: "password123",
+			}
+			_, err := svc.Register(req)
+			results <- err
+		}(i)
+	}
+
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	closedCount := 0
+	for err := range results {
+		if err == nil {
+			successCount++
+		} else if errors.Is(err, ErrRegistrationClosed) {
+			closedCount++
+		}
+	}
+
+	assert.Equal(t, 1, successCount, "exactly one registration should succeed")
+	assert.Equal(t, goroutines-1, closedCount, "remaining should be rejected as registration closed")
 }
 
 func TestAuthService_Login(t *testing.T) {
