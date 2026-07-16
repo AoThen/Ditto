@@ -271,7 +271,7 @@ void CCloudSyncManager::StartEncryptionRetry()
 		return;
 	}
 
-	m_pEncRetryThread->m_bAutoDelete = TRUE;
+	m_pEncRetryThread->m_bAutoDelete = FALSE;
 	LogMessage(_T("StartEncryptionRetry: retry thread started"));
 }
 
@@ -289,7 +289,7 @@ void CCloudSyncManager::StopEncryptionRetry()
 		{
 			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 5s"));
 		}
-		// m_bAutoDelete is TRUE, no manual delete needed
+		delete m_pEncRetryThread;
 		m_pEncRetryThread = nullptr;
 	}
 
