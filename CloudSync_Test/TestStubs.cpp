@@ -23,6 +23,8 @@ CClipFormat::CClipFormat(CLIPFORMAT cfType, HGLOBAL hgData, int parentId) {}
 CClipFormat::~CClipFormat() {}
 CClipFormat* CClipFormats::FindFormat(UINT cfType) { return nullptr; }
 bool CClipFormats::RemoveFormat(CLIPFORMAT cfType) { return false; }
+void CClipFormat::Free() {}
+Gdiplus::Bitmap* CClipFormat::CreateGdiplusBitmap() { return nullptr; }
 
 // -------------------------------------------------------------------
 // CGetSetOptions stubs (for methods referenced by compiled source files)
