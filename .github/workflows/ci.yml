@@ -56,15 +56,6 @@ jobs:
       run:
         working-directory: ./server
     steps:
-      - name: Clean up old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 1
-          delete_workflow_pattern: ${{ github.workflow }}
-
       - uses: actions/checkout@v4
 
       - name: Set up Go
@@ -83,15 +74,6 @@ jobs:
       run:
         working-directory: ./web
     steps:
-      - name: Clean up old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 1
-          delete_workflow_pattern: ${{ github.workflow }}
-
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -133,15 +115,6 @@ jobs:
   client-build-windows:
     runs-on: windows-2022
     steps:
-      - name: Clean up old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 1
-          delete_workflow_pattern: ${{ github.workflow }}
-
       - uses: actions/checkout@v4
 
       - name: Add MSBuild to PATH
@@ -177,15 +150,6 @@ jobs:
     needs: [ go-build, web-build ]
     timeout-minutes: 15
     steps:
-      - name: Clean up old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 1
-          delete_workflow_pattern: ${{ github.workflow }}
-
       - uses: actions/checkout@v4
 
       - name: Set up Go
@@ -234,15 +198,6 @@ jobs:
     needs: [ go-build, web-build ]
     timeout-minutes: 10
     steps:
-      - name: Clean up old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          retain_days: 1
-          keep_minimum_runs: 1
-          delete_workflow_pattern: ${{ github.workflow }}
-
       - uses: actions/checkout@v4
 
       - name: Set up Go
