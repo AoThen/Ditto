@@ -331,31 +331,6 @@ func TestAuthService_IsFirstUser(t *testing.T) {
 	})
 }
 
-func TestAuthService_RegisterAllowed(t *testing.T) {
-	t.Run("True", func(t *testing.T) {
-		tmpFile, err := os.CreateTemp("", "auth_regallowed_true_*.db")
-		require.NoError(t, err)
-		dbPath := tmpFile.Name()
-		tmpFile.Close()
-		defer os.Remove(dbPath)
-		defer os.Remove(dbPath + "-shm")
-		defer os.Remove(dbPath + "-wal")
-
-		err = database.Init(dbPath, 500*time.Millisecond)
-		require.NoError(t, err)
-		defer func() { database.DB = nil }()
-
-		assert.True(t, RegisterAllowed())
-	})
-
-	t.Run("False", func(t *testing.T) {
-		_, _, _, cleanup := setupAuthServiceTest(t)
-		defer cleanup()
-
-		assert.False(t, RegisterAllowed())
-	})
-}
-
 func TestAuthService_ResetPassword(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		svc, _, cleanup := setupLoginTest(t, "oldpassword")
@@ -385,4 +360,62 @@ func TestAuthService_GenerateDeviceID(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "dev-1-TXlEZXZpY2U", deviceID)
+}
+
+// TestConcurrentRegister verifies that only one registration succeeds under concurrency.
+func TestConcurrentRegister(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "auth_concurrent_reg_*.db")
+	require.NoError(t, err)
+	dbPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(dbPath)
+	defer os.Remove(dbPath + "-shm")
+	defer os.Remove(dbPath + "-wal")
+
+	err = database.Init(dbPath, 500*time.Millisecond)
+	require.NoError(t, err)
+	defer func() { database.DB = nil }()
+
+	svc := NewAuthService(&config.Config{
+		JWTSecret:          "test-secret",
+		TokenExpiryAccess:  30 * 24 * time.Hour,
+		TokenExpiryRefresh: 90 * 24 * time.Hour,
+	})
+
+	var wg sync.WaitGroup
+	results := make(chan error, 5)
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			req := &RegisterRequest{
+				Username: fmt.Sprintf("concurrent-user-%d", n),
+				Email:    fmt.Sprintf("user%d@test.com", n),
+				Password: "password123",
+			}
+			_, err := svc.Register(req)
+			results <- err
+		}(i)
+	}
+
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	errCount := 0
+	for r := range results {
+		if r == nil {
+			successCount++
+		} else {
+			errCount++
+		}
+	}
+
+	assert.Equal(t, 1, successCount, "exactly one registration should succeed")
+	assert.Equal(t, 4, errCount, "remaining four should fail")
+
+	var totalUsers int64
+	database.DB.Model(&model.User{}).Count(&totalUsers)
+	assert.Equal(t, int64(1), totalUsers, "only one user should exist")
 }

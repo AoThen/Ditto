@@ -72,6 +72,8 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_pWsClient(nullptr)
 	, m_lastPushTime(0)
 	, m_wsReconnectDelay(1000)
+	, m_pEncRetryThread(nullptr)
+	, m_hEncRetryStop(nullptr)
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
 	, m_lastSyncSuccessTime(0)
@@ -156,6 +158,9 @@ BOOL CCloudSyncManager::Initialize()
 			{
 				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 997, 0);
 			}
+
+			// Start background retry with exponential backoff (max 12 attempts, ~2h window)
+			StartEncryptionRetry();
 			return FALSE;
 		}
 		else
@@ -229,8 +234,127 @@ BOOL CCloudSyncManager::ReinitializeSync()
 	return Initialize();
 }
 
+// ---------------------------------------------------------------------------
+// Encryption retry: background thread with exponential backoff
+// Triggered when encryption is expected but DEK is lost at startup.
+// Retries up to 12 times (~2 hour window), then stops permanently.
+// ---------------------------------------------------------------------------
+void CCloudSyncManager::StartEncryptionRetry()
+{
+	if (m_pEncRetryThread != nullptr)
+	{
+		LogMessage(_T("StartEncryptionRetry: retry thread already running, skipping"));
+		return;
+	}
+
+	m_hEncRetryStop = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (m_hEncRetryStop == nullptr)
+	{
+		LogMessage(_T("StartEncryptionRetry: failed to create stop event"));
+		return;
+	}
+
+	m_pEncRetryThread = AfxBeginThread(EncryptionRetryThreadProc, this,
+		THREAD_PRIORITY_BELOW_NORMAL, 0, 0);
+	if (m_pEncRetryThread == nullptr)
+	{
+		LogMessage(_T("StartEncryptionRetry: failed to create thread"));
+		CloseHandle(m_hEncRetryStop);
+		m_hEncRetryStop = nullptr;
+		return;
+	}
+
+	m_pEncRetryThread->m_bAutoDelete = TRUE;
+	LogMessage(_T("StartEncryptionRetry: retry thread started"));
+}
+
+void CCloudSyncManager::StopEncryptionRetry()
+{
+	if (m_hEncRetryStop != nullptr)
+	{
+		SetEvent(m_hEncRetryStop);
+	}
+
+	if (m_pEncRetryThread != nullptr)
+	{
+		DWORD dwWait = WaitForSingleObject(m_pEncRetryThread->m_hThread, 5000);
+		if (dwWait == WAIT_TIMEOUT)
+		{
+			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 5s"));
+		}
+		// m_bAutoDelete is TRUE, no manual delete needed
+		m_pEncRetryThread = nullptr;
+	}
+
+	if (m_hEncRetryStop != nullptr)
+	{
+		CloseHandle(m_hEncRetryStop);
+		m_hEncRetryStop = nullptr;
+	}
+}
+
+UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
+{
+	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
+	if (pThis == nullptr)
+		return 1;
+
+	LogMessage(_T("EncryptionRetryThreadProc: started"));
+
+	// Exponential backoff: 30s, 60s, 120s, 240s, 480s, 600s (cap), ...
+	const DWORD baseDelay = 30 * 1000;
+	const DWORD maxDelay  = 10 * 60 * 1000;
+	const int   maxRetries = 12;
+
+	for (int attempt = 1; attempt <= maxRetries; attempt++)
+	{
+		// Calculate delay: 30s × 2^(attempt-1), capped at 10min
+		DWORD delay;
+		if (attempt == 1)
+			delay = baseDelay;
+		else
+			delay = min(baseDelay * (1 << (attempt - 1)), maxDelay);
+
+		// Wait for delay or stop signal
+		DWORD dwWait = WaitForSingleObject(pThis->m_hEncRetryStop, delay);
+		if (dwWait == WAIT_OBJECT_0)
+		{
+			LogMessage(_T("EncryptionRetryThreadProc: stop signaled, exiting"));
+			return 0;
+		}
+
+		LogMessage(CString(_T("EncryptionRetryThreadProc: attempt ")) +
+			CString::FromInt(attempt) + _T("/") + CString::FromInt(maxRetries));
+
+		if (pThis->InitializeEncryption())
+		{
+			LogMessage(_T("EncryptionRetryThreadProc: encryption recovery succeeded"));
+
+			// Clear persistent recovery flag
+			CGetSetOptions::SetCloudEncryptionNeedsRecovery(FALSE);
+
+			// Post reinit request to main thread to avoid deadlock
+			// (ReinitializeSync calls Stop which waits on this thread)
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_REINIT_SYNC, 0, 0);
+			}
+			return 0;
+		}
+
+		LogMessage(_T("EncryptionRetryThreadProc: attempt failed, will retry"));
+	}
+
+	LogMessage(_T("EncryptionRetryThreadProc: all ") +
+		CString::FromInt(maxRetries) + _T(" attempts exhausted, giving up"));
+	return 1;
+}
+
 void CCloudSyncManager::Stop()
 {
+	StopEncryptionRetry();
+
 	if (m_hStopEvent != nullptr)
 	{
 		SetEvent(m_hStopEvent);
@@ -1745,7 +1869,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				// (Content is same per CRC match, so no need to update formats)
 				CSingleLock lockDb(&m_csDb, TRUE);
 				CString csUpdateSQL;
-				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld, lDontSync = 0 WHERE lID = %d"),
+				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld WHERE lID = %d"),
 				                   (__int64)remoteUpdatedAt, existingId);
 				theApp.m_db.execDML(csUpdateSQL);
 

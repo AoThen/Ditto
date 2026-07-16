@@ -7,6 +7,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ditto-cloud-server/internal/database"
@@ -18,6 +19,47 @@ import (
 )
 
 var ErrInvalidSortBy = errors.New("无效的排序字段")
+
+var (
+	dedupMu    sync.RWMutex
+	dedupCache = make(map[string]time.Time)
+	dedupMax   = 10000
+	dedupTTL   = 5 * time.Minute
+)
+
+func dedupKey(userID uint, clipID string, crc int64) string {
+	return fmt.Sprintf("%d:%s:%d", userID, clipID, crc)
+}
+
+func isDeduped(key string) bool {
+	dedupMu.RLock()
+	entry, ok := dedupCache[key]
+	dedupMu.RUnlock()
+	if !ok {
+		return false
+	}
+	if time.Since(entry) > dedupTTL {
+		dedupMu.Lock()
+		delete(dedupCache, key)
+		dedupMu.Unlock()
+		return false
+	}
+	return true
+}
+
+func markDeduped(key string) {
+	dedupMu.Lock()
+	if len(dedupCache) >= dedupMax {
+		// Evict one random entry (Go map iteration order is randomized)
+		for k := range dedupCache {
+			delete(dedupCache, k)
+			break
+		}
+	}
+	dedupCache[key] = time.Now()
+	dedupMu.Unlock()
+}
+
 var ErrPushLimitExceeded = errors.New("push clips limit exceeded")
 
 // Broadcaster defines the interface for WebSocket broadcast.
@@ -544,6 +586,12 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				for _, p := range prepared {
 					pc := p.item
 
+					// Idempotency check: skip if recently processed
+					if isDeduped(dedupKey(userID, pc.ID, pc.CRC)) {
+						skippedCount++
+						continue
+					}
+
 					existing, exists := existingMap[pc.ID]
 
 					if !exists {
@@ -596,8 +644,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							Description: pc.Description,
 						})
 
+						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						pushedCount++
-					} else if !pc.UpdatedAt.After(existing.UpdatedAt) {
+					} else if !syncTime.After(existing.UpdatedAt) {
 						// LWW: push is older or equal -> loser, keep as conflict copy
 						conflictID := fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID)
 						conflictClip := model.Clip{
@@ -629,8 +678,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						}
 
 						skippedCount++
-						} else {
-							// LWW: push is strictly newer -> winner
+					} else {
+						// LWW: push is strictly newer -> winner
 						if pc.CRC != existing.CRC {
 							// Content changed: update with server time
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
@@ -672,6 +721,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							continue
 						}
 
+						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						pushedCount++
 					}
 				}

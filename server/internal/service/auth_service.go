@@ -1,11 +1,13 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"ditto-cloud-server/internal/config"
@@ -18,7 +20,8 @@ import (
 )
 
 type AuthService struct {
-	cfg *config.Config
+	cfg        *config.Config
+	registerMu sync.Mutex
 }
 
 func NewAuthService(cfg *config.Config) *AuthService {
@@ -73,6 +76,9 @@ var (
 )
 
 func (s *AuthService) Register(req *RegisterRequest) (*RegisterResponse, error) {
+	s.registerMu.Lock()
+	defer s.registerMu.Unlock()
+
 	var resp *RegisterResponse
 
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
@@ -109,7 +115,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*RegisterResponse, error) 
 
 		resp = &RegisterResponse{UserID: user.ID}
 		return nil
-	})
+	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
 		return nil, err
 	}
@@ -260,12 +266,6 @@ func IsFirstUser() bool {
 	var count int64
 	database.DB.Model(&model.User{}).Count(&count)
 	return count == 0
-}
-
-// RegisterAllowed returns true if new user registration is currently permitted.
-// Registration is only allowed when there are no users yet (first user becomes admin).
-func RegisterAllowed() bool {
-	return IsFirstUser()
 }
 
 // ResetPasswordByUsername resets a user's password by username (admin operation).

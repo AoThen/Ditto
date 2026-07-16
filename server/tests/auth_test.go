@@ -37,12 +37,12 @@ func TestRegister_DuplicateUsername(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// Second registration with same username should fail (registration closed)
+	// Second registration with same username should fail (username taken)
 	statusCode, respBody = testutil.RegisterUser(t, server, "dupuser", "second@example.com", "password456")
-	assert.Equal(t, http.StatusForbidden, statusCode)
+	assert.Equal(t, http.StatusBadRequest, statusCode)
 	code, message, _ := testutil.ParseResponse(t, respBody)
-	assert.Equal(t, 40302, code)
-	assert.Contains(t, message, "注册已关闭")
+	assert.Equal(t, 40001, code)
+	assert.Contains(t, message, "用户名已存在")
 }
 
 // TestRegister_DuplicateEmail — registration is only allowed for first user.
@@ -55,12 +55,12 @@ func TestRegister_DuplicateEmail(t *testing.T) {
 	code, _, _ := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, 0, code)
 
-	// Second registration with same email should fail (registration closed)
+	// Second registration with same email should fail (email taken)
 	statusCode, respBody = testutil.RegisterUser(t, server, "user2", "dupemail@example.com", "password456")
-	assert.Equal(t, http.StatusForbidden, statusCode)
+	assert.Equal(t, http.StatusBadRequest, statusCode)
 	code, message, _ := testutil.ParseResponse(t, respBody)
-	assert.Equal(t, 40302, code)
-	assert.Contains(t, message, "注册已关闭")
+	assert.Equal(t, 40002, code)
+	assert.Contains(t, message, "邮箱已被注册")
 }
 
 // TestRegister_InvalidInput — empty username/email/password, expect code=40000

@@ -93,6 +93,10 @@ private:
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
 	int       m_wsReconnectDelay; // Exponential backoff for WS reconnection
 
+	// Encryption retry state
+	CWinThread* m_pEncRetryThread;   // Encryption retry thread (when DEK lost at startup)
+	HANDLE      m_hEncRetryStop;     // Stop event for retry thread
+
 	// Atomic flags for one-shot force sync operations
 	LONG      m_forceOverrideLocal;  // Set before ForceDownload, read&reset in MergeRemoteClipToLocal
 	LONG      m_forceOverrideRemote; // Set before ForceUpload, read&reset in QuickSyncThreadProc
@@ -121,6 +125,15 @@ private:
 
 	// Force download thread proc (one-shot)
 	static UINT ForceSyncThreadProc(LPVOID pParam);
+
+	// Encryption retry thread proc (background retry when DEK lost)
+	static UINT EncryptionRetryThreadProc(LPVOID pParam);
+
+	// Start background retry of encryption initialization
+	void StartEncryptionRetry();
+
+	// Stop encryption retry thread
+	void StopEncryptionRetry();
 
 	// Push local clips to cloud
 	BOOL PushNewClips(BOOL bForce = FALSE);

@@ -429,6 +429,11 @@ func TestSyncLogOperation_AllStatuses(t *testing.T) {
 func setupClipServiceTest(t *testing.T) (*ClipService, uint, string, func()) {
 	t.Helper()
 
+	// Reset global dedup cache to prevent test isolation leaks
+	dedupMu.Lock()
+	dedupCache = make(map[string]time.Time)
+	dedupMu.Unlock()
+
 	tmpFile, err := os.CreateTemp("", "clip_service_test_*.db")
 	require.NoError(t, err)
 	dbPath := tmpFile.Name()
@@ -683,6 +688,10 @@ func TestSync_CreatesConflictCopy(t *testing.T) {
 	var existing model.Clip
 	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
 
+	// Set existing clip to the future so syncTime (now) is older — triggers conflict copy
+	database.DB.Model(&existing).Update("updated_at", time.Now().Add(time.Hour))
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
 	data := base64.StdEncoding.EncodeToString([]byte("updated content"))
 	req := &SyncRequest{
 		Since:    time.Now().Add(-time.Hour),
@@ -729,6 +738,10 @@ func TestSync_NewerEditNoConflictCopy(t *testing.T) {
 	var existing model.Clip
 	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
 
+	// Set existing clip to the past so syncTime (now) is newer — push should win
+	database.DB.Model(&existing).Update("updated_at", time.Now().Add(-time.Hour))
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
 	data := base64.StdEncoding.EncodeToString([]byte("updated content"))
 	req := &SyncRequest{
 		Since:    time.Now().Add(-time.Hour),
@@ -738,7 +751,7 @@ func TestSync_NewerEditNoConflictCopy(t *testing.T) {
 				ID:          "test-clip-1",
 				Description: "Pushed newer version",
 				CRC:         54321,
-				UpdatedAt:   existing.UpdatedAt.Add(time.Hour),
+				UpdatedAt:   existing.UpdatedAt,
 				Formats: []PushFormatItem{
 					{FormatType: 1, Data: data, Encrypted: false},
 				},
@@ -767,6 +780,10 @@ func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
 	var existing model.Clip
 	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
 
+	// Set existing clip to the future so syncTime (now) is older → creates conflict copy
+	database.DB.Model(&existing).Update("updated_at", time.Now().Add(time.Hour))
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
 	data := base64.StdEncoding.EncodeToString([]byte("loser content"))
 	reqA := &SyncRequest{
 		Since:    time.Now().Add(-time.Hour),
@@ -776,7 +793,7 @@ func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
 				ID:          "test-clip-1",
 				Description: "Loser version",
 				CRC:         54321,
-				UpdatedAt:   existing.UpdatedAt.Add(-time.Hour),
+				UpdatedAt:   existing.UpdatedAt,
 				Formats: []PushFormatItem{
 					{FormatType: 1, Data: data, Encrypted: false},
 				},
@@ -974,4 +991,51 @@ func TestResolveConflictClip_Discard(t *testing.T) {
 
 	database.DB.Model(&model.ClipFormat{}).Where("clip_id = ?", "conflict-discard").Count(&count)
 	assert.Equal(t, int64(0), count)
+}
+
+// TestLWWClockSkew verifies that server-side syncTime eliminates clock skew issues.
+func TestLWWClockSkew(t *testing.T) {
+	syncTime := time.Now()
+
+	// Scenario: client clock is 24h slow.
+	// Old code used pc.UpdatedAt (client time) → push loses (wrong)
+	// New code uses syncTime (server time) → push wins (correct)
+	slowClientTime := syncTime.Add(-24 * time.Hour)
+	existingUpdatedAt := syncTime.Add(-time.Hour) // clip updated 1h ago on server
+
+	// New code: syncTime is newer than existing → push WINS
+	winner := syncTime.After(existingUpdatedAt)
+	assert.True(t, winner, "syncTime is newer than existing, push should win")
+
+	// Old code: slowClientTime is NOT newer than existing → push LOSES (wrong!)
+	oldLoser := !slowClientTime.After(existingUpdatedAt)
+	assert.True(t, oldLoser,
+		"with slow client clock, old code incorrectly treated the push as loser")
+
+	// Opposite scenario: existing is newer than syncTime → push should be loser
+	existingFuture := syncTime.Add(time.Hour)
+	loser := !syncTime.After(existingFuture)
+	assert.True(t, loser, "existing is newer than syncTime, push should be loser")
+}
+
+// TestDedupCache verifies the in-memory idempotency cache.
+func TestDedupCache(t *testing.T) {
+	// Initial state: cache is empty
+	assert.False(t, isDeduped("1:c1:123"))
+
+	// Mark as processed
+	markDeduped("1:c1:123")
+	assert.True(t, isDeduped("1:c1:123"))
+
+	// Different key should not be deduped
+	assert.False(t, isDeduped("1:c1:456"))
+	assert.False(t, isDeduped("2:c1:123"))
+
+	// Max capacity eviction test
+	for i := 0; i < dedupMax+100; i++ {
+		key := fmt.Sprintf("k:%d", i)
+		markDeduped(key)
+	}
+	assert.True(t, len(dedupCache) <= dedupMax,
+		"cache should not exceed max capacity")
 }

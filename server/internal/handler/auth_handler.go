@@ -24,12 +24,6 @@ func NewAuthHandler(svc *service.AuthService, rl *middleware.RateLimiter) *AuthH
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
-	// Only allow registration when no users exist (first user becomes admin)
-	if !service.RegisterAllowed() {
-		response.Error(c, http.StatusForbidden, 40302, "注册已关闭，请联系管理员")
-		return
-	}
-
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Printf("[Register] bind json error: %v", err)
