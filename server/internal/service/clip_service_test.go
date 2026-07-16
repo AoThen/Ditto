@@ -566,6 +566,40 @@ func TestListClips_Pagination(t *testing.T) {
 	assert.Equal(t, 2, resp.PerPage)
 }
 
+func TestListClips_ExcludesConflictCopies(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	conflictClip := model.Clip{
+		ID:             "test-clip-conflict",
+		UserID:         userID,
+		DeviceID:       "test-device-1",
+		Description:    "Conflict copy",
+		CRC:            12346,
+		IsConflictCopy: true,
+	}
+	require.NoError(t, database.DB.Create(&conflictClip).Error)
+
+	normalClip := model.Clip{
+		ID:          "test-clip-normal-2",
+		UserID:      userID,
+		DeviceID:    "test-device-1",
+		Description: "Normal clip",
+		CRC:         12347,
+	}
+	require.NoError(t, database.DB.Create(&normalClip).Error)
+
+	resp, err := svc.ListClips(userID, 1, 20, "", "", "", "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), resp.Total)
+
+	items := resp.Items.([]ClipListItem)
+	for _, item := range items {
+		assert.NotEqual(t, "test-clip-conflict", item.ID)
+	}
+	assert.Equal(t, "test-clip-normal-2", items[0].ID)
+}
+
 func TestGetClip_Success(t *testing.T) {
 	svc, userID, _, cleanup := setupClipServiceTest(t)
 	defer cleanup()
@@ -640,6 +674,131 @@ func TestDeleteClip_NotFound(t *testing.T) {
 	err := svc.DeleteClip(userID, "non-existent-id")
 	assert.Error(t, err)
 	assert.Equal(t, "剪贴板不存在", err.Error())
+}
+
+func TestSync_CreatesConflictCopy(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	var existing model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
+	data := base64.StdEncoding.EncodeToString([]byte("updated content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Pushed conflicting version",
+				CRC:         54321,
+				UpdatedAt:   existing.UpdatedAt.Add(-time.Hour),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	var conflictClip model.Clip
+	err = database.DB.Where("user_id = ? AND is_conflict_copy = ?", userID, true).First(&conflictClip).Error
+	require.NoError(t, err)
+	assert.Equal(t, "test-clip-1", conflictClip.WinClipID)
+	assert.Equal(t, "Pushed conflicting version", conflictClip.Description)
+	assert.Equal(t, int64(54321), conflictClip.CRC)
+
+	var winner model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&winner).Error)
+	assert.Equal(t, "Test clip 1", winner.Description)
+	assert.Equal(t, int64(12345), winner.CRC)
+
+	var fmtCount int64
+	database.DB.Model(&model.ClipFormat{}).Where("clip_id = ?", conflictClip.ID).Count(&fmtCount)
+	assert.Equal(t, int64(1), fmtCount)
+}
+
+func TestSync_NewerEditNoConflictCopy(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	var existing model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
+	data := base64.StdEncoding.EncodeToString([]byte("updated content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Pushed newer version",
+				CRC:         54321,
+				UpdatedAt:   existing.UpdatedAt.Add(time.Hour),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	var conflictCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, true).Count(&conflictCount)
+	assert.Equal(t, int64(0), conflictCount)
+
+	var winner model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&winner).Error)
+	assert.Equal(t, "Pushed newer version", winner.Description)
+	assert.Equal(t, int64(54321), winner.CRC)
+}
+
+func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	var existing model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
+	data := base64.StdEncoding.EncodeToString([]byte("loser content"))
+	reqA := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Loser version",
+				CRC:         54321,
+				UpdatedAt:   existing.UpdatedAt.Add(-time.Hour),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+	_, err := svc.Sync(userID, reqA, deviceID)
+	require.NoError(t, err)
+
+	var conflictClip model.Clip
+	require.NoError(t, database.DB.Where("user_id = ? AND is_conflict_copy = ?", userID, true).First(&conflictClip).Error)
+
+	reqB := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: "device-B",
+		Limit:    100,
+	}
+	resp, err := svc.Sync(userID, reqB, "device-B")
+	require.NoError(t, err)
+
+	for _, c := range resp.NewClips {
+		assert.NotEqual(t, conflictClip.ID, c.ID)
+	}
 }
 
 func TestSync_PushNewClip(t *testing.T) {

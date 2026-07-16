@@ -425,3 +425,155 @@ func TestCleanupService_HardDeleteOldSoftDeleted_OnlyActiveClips(t *testing.T) {
 	database.DB.Unscoped().Model(&model.Clip{}).Where("id = ?", clip.ID).Select("count(*) > 0").Find(&exists)
 	assert.True(t, exists, "Active clip should still exist")
 }
+
+func TestCleanup_ConflictClipsDeletedAfterRetention(t *testing.T) {
+	cfg := &config.Config{
+		Port:                "0",
+		DatabasePath:        "",
+		JWTSecret:           "test-jwt-secret-key",
+		StartTime:           time.Now(),
+		CleanupInterval:     10 * time.Millisecond,
+		MaxClipAge:          24 * time.Hour,
+		MaxClipsPerUser:     100,
+		SoftDeleteRetention: -1 * time.Nanosecond,
+	}
+
+	tmpFile, err := os.CreateTemp("", "cleanup_conflict_test_*.db")
+	require.NoError(t, err)
+	dbPath := tmpFile.Name()
+	tmpFile.Close()
+
+	err = database.Init(dbPath, 500*time.Millisecond)
+	require.NoError(t, err)
+	defer func() {
+		database.DB = nil
+		os.Remove(dbPath)
+		os.Remove(dbPath + "-shm")
+		os.Remove(dbPath + "-wal")
+	}()
+
+	userID, deviceID := createTestUserAndDevice(t)
+
+	expiredConflict := model.Clip{
+		ID:             "conflict-expired",
+		UserID:         userID,
+		DeviceID:       deviceID,
+		Description:    "Expired conflict",
+		CRC:            12345,
+		IsConflictCopy: true,
+		WinClipID:      "winner-1",
+		UpdatedAt:      time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&expiredConflict).Error)
+
+	futureConflict := model.Clip{
+		ID:             "conflict-future",
+		UserID:         userID,
+		DeviceID:       deviceID,
+		Description:    "Future conflict",
+		CRC:            12346,
+		IsConflictCopy: true,
+		WinClipID:      "winner-2",
+		UpdatedAt:      time.Now().Add(1 * time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&futureConflict).Error)
+
+	svc := NewCleanupService(cfg)
+	stopCh := make(chan struct{})
+	go svc.Start(stopCh)
+
+	require.Eventually(t, func() bool {
+		var count int64
+		database.DB.Model(&model.Clip{}).Where("id = ?", expiredConflict.ID).Count(&count)
+		return count == 0
+	}, 2*time.Second, 10*time.Millisecond)
+
+	close(stopCh)
+	svc.Wait()
+
+	var futureCount int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", futureConflict.ID).Count(&futureCount)
+	assert.Equal(t, int64(1), futureCount)
+}
+
+func TestCleanup_UserLimitSkipsConflictCopies(t *testing.T) {
+	svc, cleanup := setupCleanupServiceTest(t)
+	defer cleanup()
+
+	userID, deviceID := createTestUserAndDevice(t)
+
+	conflict := model.Clip{
+		ID:             "conflict-oldest",
+		UserID:         userID,
+		DeviceID:       deviceID,
+		Description:    "Conflict copy",
+		CRC:            9999,
+		IsConflictCopy: true,
+		WinClipID:      "winner-z",
+		UpdatedAt:      time.Now().Add(-100 * time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&conflict).Error)
+
+	for i := 0; i < 12; i++ {
+		clip := model.Clip{
+			ID:          string(rune('a' + i)),
+			UserID:      userID,
+			DeviceID:    deviceID,
+			Description: "Test Clip",
+			CRC:         int64(i),
+			UpdatedAt:   time.Now().Add(time.Duration(i) * time.Minute),
+		}
+		require.NoError(t, database.DB.Create(&clip).Error)
+	}
+
+	deleted, err := svc.enforceUserLimits()
+	require.NoError(t, err)
+	assert.Equal(t, 2, deleted)
+
+	var conflictCount int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", conflict.ID).Count(&conflictCount)
+	assert.Equal(t, int64(1), conflictCount)
+
+	var normalCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, false).Count(&normalCount)
+	assert.Equal(t, int64(10), normalCount)
+}
+
+func TestCleanup_DeleteOldClipsSkipsConflictCopies(t *testing.T) {
+	svc, cleanup := setupCleanupServiceTest(t)
+	defer cleanup()
+
+	userID, deviceID := createTestUserAndDevice(t)
+
+	conflict := model.Clip{
+		ID:             "conflict-old",
+		UserID:         userID,
+		DeviceID:       deviceID,
+		Description:    "Old conflict",
+		CRC:            12345,
+		IsConflictCopy: true,
+		WinClipID:      "winner-x",
+		UpdatedAt:      time.Now().Add(-48 * time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&conflict).Error)
+
+	normalOld := model.Clip{
+		ID:          "normal-old",
+		UserID:      userID,
+		DeviceID:    deviceID,
+		Description: "Old normal",
+		CRC:         12346,
+		UpdatedAt:   time.Now().Add(-48 * time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&normalOld).Error)
+
+	deleted, err := svc.deleteOldClips()
+	require.NoError(t, err)
+	assert.Equal(t, 1, deleted)
+
+	var conflictCount, normalCount int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", conflict.ID).Count(&conflictCount)
+	database.DB.Model(&model.Clip{}).Where("id = ?", normalOld.ID).Count(&normalCount)
+	assert.Equal(t, int64(1), conflictCount)
+	assert.Equal(t, int64(0), normalCount)
+}

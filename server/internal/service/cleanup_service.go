@@ -80,9 +80,15 @@ func (s *CleanupService) runCleanup() {
 		log.Printf("[Cleanup] ERROR deleting old sync logs: %v", err)
 	}
 
+	// Step 5: Remove conflict copies older than soft-delete retention
+	deletedConflicts, err := s.deleteOldConflictClips()
+	if err != nil {
+		log.Printf("[Cleanup] ERROR deleting old conflict clips: %v", err)
+	}
+
 	elapsed := time.Since(startTime)
-	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) + %d (hard delete) + %d (sync logs) in %v",
-		deletedByAge, deletedByLimit, deletedHard, deletedLogs, elapsed.Round(time.Millisecond))
+	log.Printf("[Cleanup] Cleanup complete: deleted %d (by age) + %d (by limit) + %d (hard delete) + %d (sync logs) + %d (conflicts) in %v",
+		deletedByAge, deletedByLimit, deletedHard, deletedLogs, deletedConflicts, elapsed.Round(time.Millisecond))
 }
 
 // deleteOldClips removes clips older than MaxClipAge.
@@ -93,12 +99,29 @@ func (s *CleanupService) deleteOldClips() (int, error) {
 
 	cutoff := time.Now().Add(-s.cfg.MaxClipAge)
 
-	result := database.DB.Where("updated_at < ?", cutoff).Delete(&model.Clip{})
+	result := database.DB.Where("is_conflict_copy = ? AND updated_at < ?", false, cutoff).Delete(&model.Clip{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
 
 	return int(result.RowsAffected), nil
+}
+
+func (s *CleanupService) deleteOldConflictClips() (int, error) {
+	if database.DB == nil {
+		return 0, nil
+	}
+	cutoff := time.Now().Add(-s.cfg.SoftDeleteRetention)
+	var ids []string
+	if err := database.DB.Model(&model.Clip{}).
+		Where("is_conflict_copy = ? AND updated_at < ?", true, cutoff).
+		Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	return s.batchDeleteClips(ids)
 }
 
 // enforceUserLimits removes excess clips for users exceeding MaxClipsPerUser.
@@ -115,6 +138,7 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 	var overLimitUsers []UserClipCount
 	if err := database.DB.Model(&model.Clip{}).
 		Select("user_id, COUNT(*) as count").
+		Where("is_conflict_copy = ?", false).
 		Group("user_id").
 		Having("COUNT(*) > ?", s.cfg.MaxClipsPerUser).
 		Find(&overLimitUsers).Error; err != nil {
@@ -128,7 +152,7 @@ func (s *CleanupService) enforceUserLimits() (int, error) {
 		var clipIDs []string
 		if err := database.DB.Model(&model.Clip{}).
 			Select("id").
-			Where("user_id = ?", uc.UserID).
+			Where("user_id = ? AND is_conflict_copy = ?", uc.UserID, false).
 			Order("updated_at ASC").
 			Limit(int(excessCount)).
 			Pluck("id", &clipIDs).Error; err != nil {

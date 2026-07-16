@@ -104,7 +104,7 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 		return nil, err
 	}
 
-	query := database.DB.Model(&model.Clip{}).Where("user_id = ?", userID)
+	query := database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, false)
 	if groupID != "" {
 		query = query.Where("group_id = ?", groupID)
 	}
@@ -594,8 +594,42 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							ID:          clip.ID,
 							Description: pc.Description,
 						})
+
+						pushedCount++
+					} else if pc.UpdatedAt.Before(existing.UpdatedAt) {
+						// LWW: push is older -> loser, keep as conflict copy
+						conflictID := fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID)
+						conflictClip := model.Clip{
+							ID:             conflictID,
+							UserID:         userID,
+							DeviceID:       req.DeviceID,
+							Description:    pc.Description,
+							Pinyin:         utils.ConvertToPinyin(pc.Description),
+							CRC:            pc.CRC,
+							GroupID:        pc.GroupID,
+							ShortCut:       pc.ShortCut,
+							IsConflictCopy: true,
+							WinClipID:      existing.ID,
+							CreatedAt:      syncTime,
+							UpdatedAt:      syncTime,
+						}
+						if err := tx.Create(&conflictClip).Error; err != nil {
+							return err
+						}
+
+						for _, pf := range p.formats {
+							batchFormats = append(batchFormats, model.ClipFormat{
+								ClipID:     conflictID,
+								FormatType: pf.FormatType,
+								Data:       pf.Data,
+								Encrypted:  pf.Encrypted,
+								CreatedAt:  syncTime,
+							})
+						}
+
+						pushedCount++
 					} else {
-						// Content-based conflict resolution: update if CRC differs
+						// LWW: push is newer (or equal) -> winner
 						if pc.CRC != existing.CRC {
 							// Content changed: update with server time
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
@@ -636,9 +670,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							skippedCount++
 							continue
 						}
-					}
 
-					pushedCount++
+						pushedCount++
+					}
 				}
 
 				// Batch insert all accumulated formats
@@ -678,8 +712,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	var clips []model.Clip
-	query := database.DB.Where("user_id = ? AND updated_at > ? AND device_id != ?",
-		userID, req.Since, req.DeviceID).Order("updated_at DESC").Limit(pullLimit + 1)
+	query := database.DB.Where("user_id = ? AND is_conflict_copy = ? AND updated_at > ? AND device_id != ?",
+		userID, false, req.Since, req.DeviceID).Order("updated_at DESC").Limit(pullLimit + 1)
 
 	if err := query.Find(&clips).Error; err != nil {
 		return nil, err
