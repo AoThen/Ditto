@@ -83,6 +83,7 @@ CCloudSyncManager::CCloudSyncManager()
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
+	InitializeCriticalSection(&m_csWsClient);
 	InitializeCriticalSection(&m_csStatus);
 }
 
@@ -91,6 +92,7 @@ CCloudSyncManager::~CCloudSyncManager()
 	Stop();
 	DeleteCriticalSection(&m_csSync);
 	DeleteCriticalSection(&m_csHttpClient);
+	DeleteCriticalSection(&m_csWsClient);
 	DeleteCriticalSection(&m_csStatus);
 }
 
@@ -2820,16 +2822,7 @@ void CCloudSyncManager::StartWebSocket()
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::StopWebSocket()
 {
-	// First, force-close the WS connection to interrupt any blocking read()
-	if (m_pWsClient != nullptr)
-	{
-		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
-		if (wsClient->is_open())
-		{
-			wsClient->close(httplib::ws::CloseStatus::Normal, "Shutdown");
-		}
-	}
-
+	// 先设置停止事件通知 WS 线程退出
 	if (m_pWsThread != nullptr)
 	{
 		// m_hStopEvent is already set by Stop(), WS thread will see it
@@ -2847,15 +2840,17 @@ void CCloudSyncManager::StopWebSocket()
 		m_pWsThread = nullptr;
 	}
 
-	// Clean up WS client
+	// 线程已退出，安全清理 WS client
+	EnterCriticalSection(&m_csWsClient);
 	if (m_pWsClient != nullptr)
 	{
 		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
 		delete wsClient;
 		m_pWsClient = nullptr;
 	}
+	LeaveCriticalSection(&m_csWsClient);
 
-	m_wsReconnectDelay = 1000; // Reset backoff
+	m_wsReconnectDelay = 1000;
 }
 
 // ---------------------------------------------------------------------------
@@ -2888,13 +2883,17 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		};
 
 		auto* wsClient = new httplib::ws::WebSocketClient(wsUrl, headers);
+		EnterCriticalSection(&pThis->m_csWsClient);
 		pThis->m_pWsClient = wsClient;
+		LeaveCriticalSection(&pThis->m_csWsClient);
 
 		if (!wsClient->is_valid())
 		{
 			LogMessage(_T("WsThreadProc: invalid WS URL, retrying later."));
 			delete wsClient;
+			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
+			LeaveCriticalSection(&pThis->m_csWsClient);
 			Sleep(pThis->m_wsReconnectDelay);
 			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
 			continue;
@@ -2907,7 +2906,9 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
 			LogMessage(msg);
 			delete wsClient;
+			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
+			LeaveCriticalSection(&pThis->m_csWsClient);
 			Sleep(pThis->m_wsReconnectDelay);
 			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
 			continue;
@@ -2948,7 +2949,9 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			wsClient->close(httplib::ws::CloseStatus::Normal, "Client shutting down");
 		}
 		delete wsClient;
+		EnterCriticalSection(&pThis->m_csWsClient);
 		pThis->m_pWsClient = nullptr;
+		LeaveCriticalSection(&pThis->m_csWsClient);
 
 		// Check stop before reconnecting
 		if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)
