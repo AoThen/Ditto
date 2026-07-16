@@ -421,8 +421,8 @@ type PushClipItem struct {
 // PushFormatItem represents a format being pushed from client
 type PushFormatItem struct {
 	FormatType int    `json:"format_type"`
-	Data       string `json:"data"`       // base64-encoded
-	Encrypted  bool   `json:"encrypted"`  // true if data is E2E encrypted
+	Data       string `json:"data"`      // base64-encoded
+	Encrypted  bool   `json:"encrypted"` // true if data is E2E encrypted
 }
 
 // SyncResponse represents the sync API response
@@ -597,8 +597,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						})
 
 						pushedCount++
-					} else if pc.UpdatedAt.Before(existing.UpdatedAt) {
-						// LWW: push is older -> loser, keep as conflict copy
+					} else if !pc.UpdatedAt.After(existing.UpdatedAt) {
+						// LWW: push is older or equal -> loser, keep as conflict copy
 						conflictID := fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID)
 						conflictClip := model.Clip{
 							ID:             conflictID,
@@ -628,9 +628,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							})
 						}
 
-						pushedCount++
-					} else {
-						// LWW: push is newer (or equal) -> winner
+						skippedCount++
+						} else {
+							// LWW: push is strictly newer -> winner
 						if pc.CRC != existing.CRC {
 							// Content changed: update with server time
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
@@ -1028,5 +1028,3 @@ func buildSortClause(sortBy, sortOrder string) (string, error) {
 	}
 	return sortBy + " " + order, nil
 }
-
-

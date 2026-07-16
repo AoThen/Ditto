@@ -163,7 +163,7 @@ func buildSyncRequest(clipID, description, deviceID string, updatedAt time.Time,
 				"crc":         crcValue,
 				"group_id":    "",
 				"short_cut":   0,
-				"updated_at":  updatedAt.Format(time.RFC3339),
+				"updated_at":  updatedAt.Format(time.RFC3339Nano),
 				"formats": []map[string]interface{}{
 					{
 						"format_type": 13,

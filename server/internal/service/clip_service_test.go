@@ -702,7 +702,8 @@ func TestSync_CreatesConflictCopy(t *testing.T) {
 
 	resp, err := svc.Sync(userID, req, deviceID)
 	require.NoError(t, err)
-	assert.Equal(t, 1, resp.UpdatedCount)
+	assert.Equal(t, 0, resp.UpdatedCount, "older push should not update the winner")
+	assert.Equal(t, 1, resp.SkippedCount, "older push should be counted as skipped")
 
 	var conflictClip model.Clip
 	err = database.DB.Where("user_id = ? AND is_conflict_copy = ?", userID, true).First(&conflictClip).Error
