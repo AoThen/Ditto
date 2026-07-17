@@ -409,7 +409,11 @@ BOOL CCP_MainApp::InitInstance()
 
 	m_icuString.Load();
 	
+	Log(_T("InitInstance - calling CheckDBExists"));
+	OutputDebugString(_T("InitInstance - calling CheckDBExists\n"));
 	int nRet = CheckDBExists(CGetSetOptions::GetDBPath());
+	Log(StrF(_T("InitInstance - CheckDBExists returned %d"), nRet));
+	OutputDebugString(StrF(_T("InitInstance - CheckDBExists returned %d\n"), nRet));
 	if(nRet == FALSE)
 	{
 		m_pNoDbMainFrame = new CNoDbFrameWnd();
@@ -426,6 +430,8 @@ BOOL CCP_MainApp::InitInstance()
 	}
 
 	// Initialize Cloud Sync (best effort, non-blocking)
+	Log(_T("InitInstance - calling CloudSyncManager.Initialize"));
+	OutputDebugString(_T("InitInstance - calling CloudSyncManager.Initialize\n"));
 	m_CloudSyncManager.Initialize();
 
 	return TRUE;

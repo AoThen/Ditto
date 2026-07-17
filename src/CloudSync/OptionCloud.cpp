@@ -91,6 +91,7 @@ COptionCloud::COptionCloud()
 	, m_csEncryptionStatus(_T(""))
 	, m_bEncryptionEnabled(FALSE)
 	, m_nStatusTimer(0)
+	, m_bEnableDebugLogging(FALSE)
 {
 	m_csTitle = theApp.m_Language.GetString("CloudSyncTitle", "Cloud Sync");
 	m_psp.pszTitle = m_csTitle;
@@ -117,6 +118,7 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_CLOUD_ENCRYPTION_STATUS, m_csEncryptionStatus);
 	DDX_Check(pDX, IDC_CLOUD_BTN_ENABLE_ENCRYPTION, m_bEncryptionEnabled);
 	DDX_Text(pDX, IDC_CLOUD_KEY_FILE_PATH, m_csKeyFilePath);
+	DDX_Check(pDX, IDC_CLOUD_ENABLE_DEBUG_LOGGING, m_bEnableDebugLogging);
 }
 
 BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
@@ -205,6 +207,8 @@ BOOL COptionCloud::OnInitDialog()
 		}
 	}
 
+	m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
+
 	UpdateData(FALSE);
 
 	// Check if encryption needs recovery (DEK lost at startup)
@@ -256,6 +260,8 @@ BOOL COptionCloud::OnApply()
 	{
 		theApp.m_CloudSyncManager.Stop();
 	}
+
+	CGetSetOptions::SetEnableDebugLogging(m_bEnableDebugLogging);
 
 	return CPropertyPage::OnApply();
 }
@@ -322,7 +328,9 @@ void COptionCloud::RefreshSyncStatus()
 	if (csNew != m_csSyncStatus)
 	{
 		m_csSyncStatus = csNew;
-		UpdateData(FALSE);
+m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
+
+	UpdateData(FALSE);
 	}
 }
 

@@ -96,6 +96,8 @@ CString GetDefaultDBName()
 
 BOOL CheckDBExists(CString csDBPath)
 {
+	Log(StrF(_T("CheckDBExists - csDBPath = '%s'"), csDBPath));
+	OutputDebugString(StrF(_T("CheckDBExists - csDBPath = '%s'\n"), csDBPath));
 	CPath path(csDBPath);
 
 	//If this is the first time running this version then convert the old database to the new db
@@ -117,16 +119,22 @@ BOOL CheckDBExists(CString csDBPath)
 		if (rootType == ERootType::rtServerShare ||
 			((rootType == ERootType::rtDriveCur || rootType == rtDriveRoot) && driveLetter >= 'A' && driveLetter != 'C'))
 		{
+			Log(_T("CheckDBExists - network share or non-C: drive, returning FALSE"));
+			OutputDebugString(_T("CheckDBExists - network share or non-C: drive, returning FALSE\n"));
 			return FALSE;
 		}
 
 		//first try and create create a db at the same path that was selectd
 		bRet = CreateDB(csDBPath);
+		Log(StrF(_T("CheckDBExists - CreateDB returned, csDBPath='%s'"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - CreateDB returned, csDBPath='%s'\n"), csDBPath));
 
 		//if that didn't work then go back to the default location
 		if (FileExists(csDBPath) == FALSE)
 		{
 			csDBPath = GetDefaultDBName();
+			Log(StrF(_T("CheckDBExists - retry with default path '%s'"), csDBPath));
+			OutputDebugString(StrF(_T("CheckDBExists - retry with default path '%s'\n"), csDBPath));
 
 			nsPath::CPath FullPath(csDBPath);
 			CString csPath = FullPath.GetPath().GetStr();
@@ -138,12 +146,18 @@ BOOL CheckDBExists(CString csDBPath)
 			CGetSetOptions::SetDBPath(csDBPath);
 
 			bRet = CreateDB(csDBPath);
+			Log(StrF(_T("CheckDBExists - retry CreateDB returned, csDBPath='%s'"), csDBPath));
+			OutputDebugString(StrF(_T("CheckDBExists - retry CreateDB returned, csDBPath='%s'\n"), csDBPath));
 		}
 	}
 	else
 	{
+		Log(StrF(_T("CheckDBExists - file exists, calling ValidDB, csDBPath='%s'"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - file exists, calling ValidDB, csDBPath='%s'\n"), csDBPath));
 		if (ValidDB(csDBPath) == FALSE)
 		{
+			Log(_T("CheckDBExists - ValidDB returned FALSE"));
+			OutputDebugString(_T("CheckDBExists - ValidDB returned FALSE\n"));
 			//Db existed but was bad
 			CString csMarkAsBad;
 
@@ -176,15 +190,23 @@ BOOL CheckDBExists(CString csDBPath)
 		}
 		else
 		{
+			Log(_T("CheckDBExists - ValidDB OK, calling OpenDatabase"));
+			OutputDebugString(_T("CheckDBExists - ValidDB OK, calling OpenDatabase\n"));
 			bRet = TRUE;
 		}
 	}
 
 	if (bRet)
 	{
+		Log(StrF(_T("CheckDBExists - calling OpenDatabase('%s')"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - calling OpenDatabase('%s')\n"), csDBPath));
 		bRet = OpenDatabase(csDBPath);
+		Log(StrF(_T("CheckDBExists - OpenDatabase returned %d"), bRet));
+		OutputDebugString(StrF(_T("CheckDBExists - OpenDatabase returned %d\n"), bRet));
 	}
 
+	Log(StrF(_T("CheckDBExists - returning %d"), bRet));
+	OutputDebugString(StrF(_T("CheckDBExists - returning %d\n"), bRet));
 	return bRet;
 }
 
@@ -195,6 +217,8 @@ BOOL IsDatabaseOpen()
 
 BOOL OpenDatabase(CString dbPath)
 {
+	Log(StrF(_T("OpenDatabase - dbPath='%s'"), dbPath));
+	OutputDebugString(StrF(_T("OpenDatabase - dbPath='%s'\n"), dbPath));
 	try
 	{
 		CPath path(dbPath);
@@ -214,20 +238,39 @@ BOOL OpenDatabase(CString dbPath)
 		theApp.m_db.close();
 		theApp.m_db.open(dbPath);
 
+		Log(_T("OpenDatabase - db.open OK"));
+		OutputDebugString(_T("OpenDatabase - db.open OK\n"));
+
 		MigrateDatabaseSchema();
+
+		Log(_T("OpenDatabase - MigrateDatabaseSchema OK"));
+		OutputDebugString(_T("OpenDatabase - MigrateDatabaseSchema OK\n"));
 
 		if (!theApp.m_databaseOnNetworkShare)
 		{
+			Log(_T("OpenDatabase - setting WAL PRAGMA..."));
+			OutputDebugString(_T("OpenDatabase - setting WAL PRAGMA...\n"));
 			theApp.m_db.execDML(_T("PRAGMA journal_mode=WAL;"));
 			theApp.m_db.execDML(_T("PRAGMA synchronous=NORMAL;"));
 		}
 
+		Log(_T("OpenDatabase - WAL/sync PRAGMA OK"));
+		OutputDebugString(_T("OpenDatabase - WAL/sync PRAGMA OK\n"));
+
 		theApp.m_db.setBusyTimeout(CGetSetOptions::GetDbTimeout());
 		theApp.m_db.SetRegexCaseInsensitive(CGetSetOptions::GetRegexCaseInsensitive());
+
+		Log(_T("OpenDatabase - setBusyTimeout OK"));
+		OutputDebugString(_T("OpenDatabase - setBusyTimeout OK\n"));
+		Log(_T("OpenDatabase - returning TRUE"));
+		OutputDebugString(_T("OpenDatabase - returning TRUE\n"));
 
 		return TRUE;
 	}
 	CATCH_SQLITE_EXCEPTION
+
+		CString csErr; csErr.Format(_T("OpenDatabase - CATCH_SQLITE_EXCEPTION, error=%d msg=%s"), e.errorCode(), e.errorMessage()); Log(csErr);
+		OutputDebugString(csErr + _T("\n"));
 
 		return FALSE;
 }

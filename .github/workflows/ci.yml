@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
   workflow_dispatch:
@@ -143,6 +142,48 @@ jobs:
 
       - name: Run tests
         run: CloudSync_Test\x64\Release\CloudSync_Test.exe
+
+  # ── Windows Client Debug Portable ZIP ──────────────────────
+  client-build-debug-portable:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (Debug x64)
+        run: msbuild CP_Main.vcxproj /p:Configuration=Debug /p:Platform=x64
+
+      - name: Package portable zip
+        shell: cmd
+        run: |
+          mkdir DittoPortable
+          mkdir DittoPortable\Help
+          mkdir DittoPortable\Language
+          mkdir DittoPortable\Themes
+          mkdir DittoPortable\Addins
+          copy Debug64\Ditto.exe DittoPortable\
+          copy Debug64\ICU_Loader.dll DittoPortable\
+          copy Debug64\Addins\*.dll DittoPortable\Addins\
+          copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
+          copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
+          copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
+          copy DittoSetup\portable DittoPortable\portable
+          copy Debug\Language\*.xml DittoPortable\Language\
+          copy Debug\Themes\*.xml DittoPortable\Themes\
+          7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-portable-debug-x64
+          path: DittoPortable_Debug_x64.zip
+          retention-days: 30
 
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:

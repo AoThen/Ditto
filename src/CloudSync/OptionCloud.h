@@ -50,6 +50,7 @@
 
 // Rebuild pinyin index
 #define IDC_REBUILD_PINYIN  2236
+#define IDC_CLOUD_ENABLE_DEBUG_LOGGING  2237
 
 class COptionCloud : public CPropertyPage
 {
@@ -76,6 +77,7 @@ public:
 	BOOL    m_bEncryptionEnabled;
 	CString m_csKeyFilePath;
 	UINT_PTR m_nStatusTimer;
+	BOOL    m_bEnableDebugLogging;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
