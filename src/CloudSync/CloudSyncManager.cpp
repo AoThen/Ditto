@@ -1262,10 +1262,11 @@ void CCloudSyncManager::PullChanges()
 		CStringA sinceStr;
 		if (lastSync > 0)
 		{
-			CTime sinceTime((time_t)lastSync);
-			sinceStr.Format("%04hd-%02hd-%02hdT%02hd:%02hd:%02hdZ",
-				sinceTime.GetYear(), sinceTime.GetMonth(), sinceTime.GetDay(),
-				sinceTime.GetHour(), sinceTime.GetMinute(), sinceTime.GetSecond());
+			struct tm gmtm;
+			gmtime_s(&gmtm, &lastSync);
+			char timeBuf[32];
+			strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%dT%H:%M:%SZ", &gmtm);
+			sinceStr = CStringA(timeBuf);
 		}
 		else
 		{
@@ -1384,7 +1385,7 @@ void CCloudSyncManager::PullChanges()
 				// Read force-override-local flag once for all clips in this pull cycle
 				bForce = InterlockedExchange(&m_forceOverrideLocal, 0) == 1;
 
-				for (const auto& clip : *clipsNode)
+				for (auto clip : *clipsNode)
 				{
 					// Decrypt formats if encryption is enabled
 					json formats = clip.contains("formats") ? clip["formats"] : json::array();
@@ -1400,6 +1401,8 @@ void CCloudSyncManager::PullChanges()
 							LogMessage(msg);
 							continue;
 						}
+						// H1 FIX: Write decrypted formats back to clip (DecryptClipFormats received a copy)
+						clip["formats"] = formats;
 					}
 
 					// Merge clip into local database with LWW conflict resolution
@@ -1665,6 +1668,23 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 					serverFormats.push_back(serverFmt);
 				}
 				clipJson["formats"] = serverFormats;
+
+				// P0 FIX: Base64-encode all format data for wire transfer (server expects all data as base64)
+				// This ensures text, binary, and HDROP formats are uniformly encoded before encryption
+				for (auto& fmt : clipJson["formats"])
+				{
+					if (fmt.contains("data") && fmt["data"].is_string())
+					{
+						std::string raw = fmt["data"].get<std::string>();
+						if (!raw.empty())
+						{
+							const BYTE* bytes = reinterpret_cast<const BYTE*>(raw.data());
+							CStringA b64 = CCloudCrypto::Base64Encode(
+								std::vector<BYTE>(bytes, bytes + raw.size()));
+							fmt["data"] = std::string(b64.GetString());
+						}
+					}
+				}
 
 				EnterCriticalSection(&m_csSync);
 				BOOL bCryptoInit = m_cryptoInitialized;
@@ -2047,6 +2067,31 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 
 				if (dataStr.empty())
 					continue;
+
+				// P0 FIX: Base64-decode wire format data (server always returns base64)
+				// For text: single decode (plain text → base64 → push → base64 → pull)
+				// For binary: double decode (raw → base64 → base64 → push → base64 → pull)
+				{
+					CStringA b64Data(dataStr.c_str());
+					std::vector<BYTE> decoded = CCloudCrypto::Base64Decode(b64Data);
+					if (!decoded.empty())
+					{
+						dataStr = std::string(decoded.begin(), decoded.end());
+						dataSize = (int)decoded.size();
+
+						// Binary formats were base64-encoded twice (LoadClipFormats + GetLocalClipsSince)
+						if (formatType != CF_TEXT && formatType != CF_UNICODETEXT)
+						{
+							CStringA b64Again(dataStr.c_str());
+							std::vector<BYTE> decodedAgain = CCloudCrypto::Base64Decode(b64Again);
+							if (!decodedAgain.empty())
+							{
+								dataStr = std::string(decodedAgain.begin(), decodedAgain.end());
+								dataSize = (int)decodedAgain.size();
+							}
+						}
+					}
+				}
 
 				// Decode data based on whether it's base64 or plain text
 				HGLOBAL hGlobal = nullptr;
