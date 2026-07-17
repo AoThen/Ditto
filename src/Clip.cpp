@@ -493,6 +493,92 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		}
 	}
 
+	// Fallback: try to extract description from HTML Format
+	if(!bIsDescSet)
+	{
+		UINT htmlFormat = GetFormatID(_T("HTML Format"));
+		if(htmlFormat > 0 && oleData.IsDataAvailable(htmlFormat))
+		{
+			HGLOBAL hgHtml = oleData.GetGlobalData(htmlFormat);
+			if(hgHtml)
+			{
+				char* htmlData = (char*)GlobalLock(hgHtml);
+				if(htmlData)
+				{
+					INT_PTR htmlSize = GlobalSize(hgHtml);
+					CStringA html(htmlData, (int)htmlSize);
+
+					// Parse CF_HTML header to find content boundaries
+					int startHtml = 0, endHtml = 0;
+					int pos = html.Find("StartHTML:");
+					if(pos >= 0)
+					{
+						CStringA numStr = html.Mid(pos + 10, 10);
+						numStr.Trim();
+						startHtml = atoi(numStr);
+					}
+					pos = html.Find("EndHTML:");
+					if(pos >= 0)
+					{
+						CStringA numStr = html.Mid(pos + 8, 10);
+						numStr.Trim();
+						endHtml = atoi(numStr);
+					}
+
+					CStringA htmlContent;
+					if(startHtml > 0 && endHtml > startHtml && endHtml <= html.GetLength())
+					{
+						htmlContent = html.Mid(startHtml, endHtml - startHtml);
+					}
+					else
+					{
+						htmlContent = html;
+					}
+
+					// Strip HTML tags
+					CStringA plainText;
+					bool inTag = false;
+					INT_PTR len = htmlContent.GetLength();
+					for(int i = 0; i < len; i++)
+					{
+						char c = htmlContent[i];
+						if(c == '<')
+						{
+							inTag = true;
+						}
+						else if(c == '>')
+						{
+							inTag = false;
+						}
+						else if(!inTag)
+						{
+							plainText += c;
+						}
+					}
+
+					plainText.Replace("&nbsp;", " ");
+					plainText.Replace("&amp;", "&");
+					plainText.Replace("&lt;", "<");
+					plainText.Replace("&gt;", ">");
+					plainText.Replace("&quot;", "\"");
+					plainText.Trim();
+
+					if(!plainText.IsEmpty())
+					{
+						m_Desc = CString(plainText);
+						if(m_Desc.GetLength() > CGetSetOptions::m_bDescTextSize)
+						{
+							m_Desc = m_Desc.Left(CGetSetOptions::m_bDescTextSize);
+						}
+						bIsDescSet = true;
+						Log(StrF(_T("Set description from HTML Format, Desc: [%s]"), m_Desc.Left(30)));
+					}
+				}
+				GlobalUnlock(hgHtml);
+			}
+		}
+	}
+
 	INT_PTR nSize;
 	CClipFormat cf;
 	INT_PTR numTypes = pTypes->GetSize();
