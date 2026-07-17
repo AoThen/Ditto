@@ -17,7 +17,6 @@
 
 // Static member definitions
 std::vector<BYTE> CCloudCrypto::m_aesKey;
-BOOL CCloudCrypto::m_initialized = FALSE;
 
 // ---------------------------------------------------------------------------
 // Reset
@@ -25,7 +24,6 @@ BOOL CCloudCrypto::m_initialized = FALSE;
 void CCloudCrypto::Reset()
 {
 	m_aesKey.clear();
-	m_initialized = FALSE;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +39,6 @@ BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)
 	try
 	{
 		m_aesKey = aesKey;
-		m_initialized = TRUE;
 		return TRUE;
 	}
 	catch (...)
@@ -56,12 +53,6 @@ BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)
 // ---------------------------------------------------------------------------
 CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 {
-	if (!m_initialized)
-	{
-		CLOUD_CRYPTO_TRACE("[CloudCrypto] Encrypt: not initialized.\n");
-		return CStringA("");
-	}
-
 	try
 	{
 		// Build plaintext bytes
@@ -103,12 +94,6 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 // ---------------------------------------------------------------------------
 CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 {
-	if (!m_initialized)
-	{
-		CLOUD_CRYPTO_TRACE("[CloudCrypto] Decrypt: not initialized.\n");
-		return CStringA("");
-	}
-
 	try
 	{
 		std::vector<BYTE> data = Base64Decode(encryptedBase64);

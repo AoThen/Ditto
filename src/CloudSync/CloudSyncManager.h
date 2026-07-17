@@ -92,7 +92,7 @@ private:
 	BOOL      m_cryptoInitialized;
 	time_t    m_lastSyncTime;  // Track last successful sync time
 	time_t    m_lastPushTime;  // Track last successful push time (separate from pull sync time)
-	CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
+	mutable CRITICAL_SECTION m_csSync; // Protects m_lastSyncTime and m_cryptoInitialized
 	CRITICAL_SECTION m_csHttpClient; // Protects m_httpClient creation/reuse
 	LONG      m_nActiveQuickSyncThreads; // Track active quick-push threads
 	LONG      m_bFirstPushInProgress;  // 0=idle, 1=first push in progress (InterlockedExchange)

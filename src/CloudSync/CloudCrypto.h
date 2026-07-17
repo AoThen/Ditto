@@ -73,5 +73,4 @@ public:
 
 private:
 	static std::vector<BYTE> m_aesKey;
-	static BOOL m_initialized;
 };

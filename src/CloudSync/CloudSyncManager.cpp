@@ -235,7 +235,9 @@ BOOL CCloudSyncManager::ReinitializeSync()
 	Stop();
 
 	// Reset crypto flag so InitializeEncryption re-reads from registry
+	EnterCriticalSection(&m_csSync);
 	m_cryptoInitialized = FALSE;
+	LeaveCriticalSection(&m_csSync);
 
 	// Re-run full init — reads settings, creates events, thread, WS
 	return Initialize();
@@ -589,7 +591,10 @@ BOOL CCloudSyncManager::IsLoggedIn() const
 
 BOOL CCloudSyncManager::IsEncryptionEnabled() const
 {
-	return m_cryptoInitialized;
+	EnterCriticalSection(&m_csSync);
+	BOOL bRet = m_cryptoInitialized;
+	LeaveCriticalSection(&m_csSync);
+	return bRet;
 }
 
 CString CCloudSyncManager::GetSyncStatus() const
@@ -650,7 +655,9 @@ BOOL CCloudSyncManager::InitializeEncryption()
 
 		if (CCloudCrypto::Initialize(key))
 		{
+			EnterCriticalSection(&m_csSync);
 			m_cryptoInitialized = TRUE;
+			LeaveCriticalSection(&m_csSync);
 			OutputDebugString(_T("[CloudSync] Encryption initialized successfully.\n"));
 			return TRUE;
 		}
@@ -670,7 +677,10 @@ BOOL CCloudSyncManager::InitializeEncryption()
 // ---------------------------------------------------------------------------
 BOOL CCloudSyncManager::EncryptClipFormats(nlohmann::json& formats)
 {
-	if (!m_cryptoInitialized)
+	EnterCriticalSection(&m_csSync);
+	BOOL bInitialized = m_cryptoInitialized;
+	LeaveCriticalSection(&m_csSync);
+	if (!bInitialized)
 		return FALSE;
 
 	try
@@ -716,7 +726,10 @@ BOOL CCloudSyncManager::EncryptClipFormats(nlohmann::json& formats)
 // ---------------------------------------------------------------------------
 BOOL CCloudSyncManager::DecryptClipFormats(nlohmann::json& formats)
 {
-	if (!m_cryptoInitialized)
+	EnterCriticalSection(&m_csSync);
+	BOOL bInitialized = m_cryptoInitialized;
+	LeaveCriticalSection(&m_csSync);
+	if (!bInitialized)
 		return FALSE;
 
 	try
@@ -1373,7 +1386,10 @@ void CCloudSyncManager::PullChanges()
 				{
 					// Decrypt formats if encryption is enabled
 					json formats = clip.contains("formats") ? clip["formats"] : json::array();
-					if (m_cryptoInitialized && !formats.empty())
+					EnterCriticalSection(&m_csSync);
+					BOOL bCryptoInit = m_cryptoInitialized;
+					LeaveCriticalSection(&m_csSync);
+					if (bCryptoInit && !formats.empty())
 					{
 						if (!DecryptClipFormats(formats))
 						{
@@ -1648,7 +1664,10 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 				}
 				clipJson["formats"] = serverFormats;
 
-				if (m_cryptoInitialized && !serverFormats.empty())
+				EnterCriticalSection(&m_csSync);
+				BOOL bCryptoInit = m_cryptoInitialized;
+				LeaveCriticalSection(&m_csSync);
+				if (bCryptoInit && !serverFormats.empty())
 				{
 					if (!EncryptClipFormats(clipJson["formats"]))
 					{
