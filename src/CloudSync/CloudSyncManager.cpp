@@ -2906,7 +2906,7 @@ void CCloudSyncManager::StopWebSocket()
 	}
 	LeaveCriticalSection(&m_csWsClient);
 
-	m_wsReconnectDelay = 1000;
+	InterlockedExchange(&m_wsReconnectDelay, 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -2950,8 +2950,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
-			Sleep(pThis->m_wsReconnectDelay);
-			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+			LONG curDelay1 = pThis->m_wsReconnectDelay;
+			Sleep(curDelay1);
+			LONG newDelay1 = min(curDelay1 * 2, 30000L);
+			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay1, curDelay1);
 			continue;
 		}
 
@@ -2965,13 +2967,15 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
-			Sleep(pThis->m_wsReconnectDelay);
-			pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+			LONG curDelay2 = pThis->m_wsReconnectDelay;
+			Sleep(curDelay2);
+			LONG newDelay2 = min(curDelay2 * 2, 30000L);
+			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay2, curDelay2);
 			continue;
 		}
 
 		// Connected successfully — reset backoff
-		pThis->m_wsReconnectDelay = 1000;
+		InterlockedExchange(&pThis->m_wsReconnectDelay, 1000);
 		LogMessage(_T("WsThreadProc: connected to WebSocket server."));
 
 		// Read loop
@@ -3017,8 +3021,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		CString msg;
 		msg.Format(_T("WsThreadProc: reconnecting in %d ms"), pThis->m_wsReconnectDelay);
 		LogMessage(msg);
-		Sleep(pThis->m_wsReconnectDelay);
-		pThis->m_wsReconnectDelay = min(pThis->m_wsReconnectDelay * 2, 30000);
+LONG curDelay = pThis->m_wsReconnectDelay;
+			Sleep(curDelay);
+			LONG newDelay = min(curDelay * 2, 30000L);
+			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay, curDelay);
 	}
 
 	LogMessage(_T("WsThreadProc: WebSocket listener exiting."));
