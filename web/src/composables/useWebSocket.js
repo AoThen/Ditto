@@ -45,8 +45,16 @@ function handleMessage(msg) {
       ElMessage.info('收到新的剪贴板内容')
       break
     case 'clips_added':
-      { const clipStore = useClipStore(); msg.data.clips.forEach(c => clipStore.notifyClipAdded(c)) }
-      ElMessage.info(`收到 ${msg.data.clips.length} 条新的剪贴板内容`)
+      {
+        const clips = msg?.data?.clips
+        if (Array.isArray(clips)) {
+            const clipStore = useClipStore()
+            clips.forEach(c => clipStore.notifyClipAdded(c))
+            ElMessage.info(`收到 ${clips.length} 条新的剪贴板内容`)
+        } else {
+            console.warn('[WS] Malformed clips_added message:', msg)
+        }
+      }
       break
     case 'goaway':
       ElMessage.warning('服务器正在关闭连接')

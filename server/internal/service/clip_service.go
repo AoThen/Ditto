@@ -42,6 +42,12 @@ func isDeduped(key string) bool {
 	if time.Since(entry) > dedupTTL {
 		dedupMu.Lock()
 		delete(dedupCache, key)
+		for i, k := range dedupOrder {
+			if k == key {
+				dedupOrder = append(dedupOrder[:i], dedupOrder[i+1:]...)
+				break
+			}
+		}
 		dedupMu.Unlock()
 		return false
 	}

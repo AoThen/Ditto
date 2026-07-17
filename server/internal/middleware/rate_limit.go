@@ -188,6 +188,9 @@ func (rl *RateLimiter) SyncRateLimit() gin.HandlerFunc {
 		}
 		rl.mu.Unlock()
 		c.Next()
+		if c.Writer.Status() >= 400 {
+			rl.atomicIncrement(key)
+		}
 	}
 }
 

@@ -2171,8 +2171,22 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 	}
 	catch (CppSQLite3Exception& e)
 	{
-		theApp.m_db.execDML(_T("ROLLBACK;"));
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+		return false;
+	}
+	catch (std::bad_alloc&)
+	{
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		Log(_T("SaveFormats: std::bad_alloc"));
+		ASSERT(FALSE);
+		return false;
+	}
+	catch (...)
+	{
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		Log(_T("SaveFormats: unknown exception"));
 		ASSERT(FALSE);
 		return false;
 	}

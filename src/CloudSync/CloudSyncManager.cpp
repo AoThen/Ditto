@@ -303,11 +303,7 @@ void CCloudSyncManager::StopEncryptionRetry()
 
 	if (m_pEncRetryThread != nullptr)
 	{
-		DWORD dwWait = WaitForSingleObject(m_pEncRetryThread->m_hThread, 5000);
-		if (dwWait == WAIT_TIMEOUT)
-		{
-			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 5s"));
-		}
+		WaitForSingleObject(m_pEncRetryThread->m_hThread, INFINITE);
 		delete m_pEncRetryThread;
 		m_pEncRetryThread = nullptr;
 	}

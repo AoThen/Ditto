@@ -72,7 +72,7 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 
 		// Verify token_version against database to support refresh token rotation
 		var device model.Device
-		if err := database.DB.Where("id = ?", claims.DeviceID).First(&device).Error; err != nil {
+		if err := database.DB.Where("id = ? AND user_id = ?", claims.DeviceID, claims.UserID).First(&device).Error; err != nil {
 			response.Error(c, http.StatusUnauthorized, 40102, "设备不存在")
 			c.Abort()
 			return

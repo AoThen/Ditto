@@ -128,22 +128,25 @@ func (s *UserService) UpdateUser(id uint, updates map[string]interface{}) error 
 		}
 	}
 	// Prevent downgrading the last admin
-	if role, ok := filtered["role"]; ok && role == "user" {
-		var user model.User
-		if err := database.DB.First(&user, id).Error; err != nil {
-			return err
-		}
-		if user.Role == "admin" {
-			var adminCount int64
-			if err := database.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount).Error; err != nil {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if role, ok := filtered["role"]; ok && role == "user" {
+			var user model.User
+			if err := tx.First(&user, id).Error; err != nil {
 				return err
 			}
-			if adminCount <= 1 {
-				return errors.New("无法将最后一个管理员降级为普通用户")
+			if user.Role == "admin" {
+				var adminCount int64
+				if err := tx.Model(&model.User{}).Where("role = ?", "admin").
+					Count(&adminCount).Error; err != nil {
+					return err
+				}
+				if adminCount <= 1 {
+					return errors.New("无法将最后一个管理员降级为普通用户")
+				}
 			}
 		}
-	}
-	return database.DB.Model(&model.User{}).Where("id = ?", id).Updates(filtered).Error
+		return tx.Model(&model.User{}).Where("id = ?", id).Updates(filtered).Error
+	})
 }
 
 func (s *UserService) DeleteUser(id uint) error {

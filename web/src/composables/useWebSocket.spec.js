@@ -117,6 +117,18 @@ describe('useWebSocket', () => {
     expect(events[1].id).toBe('clip-2')
   })
 
+  it('handles malformed clips_added message gracefully', () => {
+    mod.useWebSocket().connect()
+    // Should not throw when data is null
+    expect(() => {
+      mockWs.onmessage({ data: JSON.stringify({ type: 'clips_added', data: null }) })
+    }).not.toThrow()
+    // Should not throw when clips is missing
+    expect(() => {
+      mockWs.onmessage({ data: JSON.stringify({ type: 'clips_added', data: {} }) })
+    }).not.toThrow()
+  })
+
   it('onmessage calls disconnect for goaway', () => {
     mod.useWebSocket().connect()
 

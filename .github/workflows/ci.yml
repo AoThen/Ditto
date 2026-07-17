@@ -174,8 +174,8 @@ jobs:
           copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
           copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
           copy DittoSetup\portable DittoPortable\portable
-          copy Debug\Language\*.xml DittoPortable\Language\
-          copy Debug\Themes\*.xml DittoPortable\Themes\
+          copy Debug64\Language\*.xml DittoPortable\Language\
+          copy Debug64\Themes\*.xml DittoPortable\Themes\
           7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
 
       - name: Upload portable zip
