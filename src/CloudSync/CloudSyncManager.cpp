@@ -1876,7 +1876,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				existingId = q.getIntField(_T("lID"));
 				localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
 				CString localText = q.getStringField(_T("mText"), _T(""));
-				CString remoteDesc(desc.c_str());
+				CString remoteDesc(CA2W(desc.c_str(), CP_UTF8));
 				// Compare full content to detect CRC-32 collisions
 				if (localText != remoteDesc)
 				{
