@@ -158,14 +158,19 @@ func TestWebSocket_BroadcastOnSync(t *testing.T) {
 	clipID := fmt.Sprintf("clip-ws-broadcast-%d", time.Now().UnixNano())
 	pushClipFromDevice(t, server.URL, tokenA, deviceA, clipID, "Broadcast clip from DeviceA")
 
-	// DeviceB should receive the clip_added broadcast
+	// DeviceB should receive the clips_added broadcast
 	connB.SetReadDeadline(time.Now().Add(5 * time.Second))
 	broadcastMsg := readJSONMessage(t, connB)
-	assert.Equal(t, "clip_added", broadcastMsg["type"], "DeviceB should receive clip_added broadcast")
+	assert.Equal(t, "clips_added", broadcastMsg["type"], "DeviceB should receive clips_added broadcast")
 
 	bData, ok := broadcastMsg["data"].(map[string]interface{})
-	require.True(t, ok, "clip_added message should have data field")
-	assert.Equal(t, clipID, bData["clip_id"], "broadcast should include the pushed clip's ID")
+	require.True(t, ok, "clips_added message should have data field")
+	clips, ok := bData["clips"].([]interface{})
+	require.True(t, ok, "clips_added message should have clips array")
+	require.Len(t, clips, 1, "clips array should have 1 clip")
+	clipMap, ok := clips[0].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, clipID, clipMap["clip_id"], "broadcast should include the pushed clip's ID")
 }
 
 // ============================================================================
@@ -308,15 +313,20 @@ func TestWebSocket_MultipleConnections(t *testing.T) {
 	clipID := fmt.Sprintf("clip-multi-%d", time.Now().UnixNano())
 	pushClipFromDevice(t, server.URL, token1, device1, clipID, "Multi-client broadcast clip")
 
-	// All 3 clients should receive the clip_added broadcast
+	// All 3 clients should receive the clips_added broadcast
 	for i, conn := range connections {
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		broadcastMsg := readJSONMessage(t, conn)
-		assert.Equal(t, "clip_added", broadcastMsg["type"], "Client %d should receive clip_added", i+1)
+		assert.Equal(t, "clips_added", broadcastMsg["type"], "Client %d should receive clips_added", i+1)
 
 		bData, ok := broadcastMsg["data"].(map[string]interface{})
-		require.True(t, ok, "Client %d: clip_added should have data field", i+1)
-		assert.Equal(t, clipID, bData["clip_id"], "Client %d: broadcast should include clip ID", i+1)
+		require.True(t, ok, "Client %d: clips_added should have data field", i+1)
+		clips, ok := bData["clips"].([]interface{})
+		require.True(t, ok, "Client %d: clips_added should have clips array", i+1)
+		require.Len(t, clips, 1, "Client %d: clips array should have 1 clip", i+1)
+		clipMap, ok := clips[0].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, clipID, clipMap["clip_id"], "Client %d: broadcast should include clip ID", i+1)
 	}
 }
 

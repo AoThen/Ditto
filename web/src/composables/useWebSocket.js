@@ -44,6 +44,10 @@ function handleMessage(msg) {
       { const clipStore = useClipStore(); clipStore.notifyClipAdded(msg.data) }
       ElMessage.info('收到新的剪贴板内容')
       break
+    case 'clips_added':
+      { const clipStore = useClipStore(); msg.data.clips.forEach(c => clipStore.notifyClipAdded(c)) }
+      ElMessage.info(`收到 ${msg.data.clips.length} 条新的剪贴板内容`)
+      break
     case 'goaway':
       ElMessage.warning('服务器正在关闭连接')
       disconnect()

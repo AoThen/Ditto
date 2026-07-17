@@ -23,7 +23,7 @@
 #### 1.1 核心功能
 - ✅ RESTful API（认证、设备管理、剪贴板 CRUD）
 - ✅ JWT 认证 + 设备 Token 机制
-- ✅ WebSocket 实时推送（clip_added 消息）
+- ✅ WebSocket 实时推送（clips_added 消息）
 - ✅ LWW 冲突解决策略（多设备同步）
 - ✅ 端到端加密支持（salt 管理）
 - ✅ 登录限流防护（IP + 用户维度）

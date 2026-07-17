@@ -104,6 +104,19 @@ describe('useWebSocket', () => {
     expect(events[0].id).toBe('clip-1')
   })
 
+  it('onmessage dispatches ws-clip-added for each clip in clips_added', () => {
+    mod.useWebSocket().connect()
+
+    const events = []
+    window.addEventListener('ws-clip-added', (e) => events.push(e.detail))
+
+    mockWs.onmessage({ data: JSON.stringify({ type: 'clips_added', data: { clips: [{ id: 'clip-1' }, { id: 'clip-2' }] } }) })
+
+    expect(events).toHaveLength(2)
+    expect(events[0].id).toBe('clip-1')
+    expect(events[1].id).toBe('clip-2')
+  })
+
   it('onmessage calls disconnect for goaway', () => {
     mod.useWebSocket().connect()
 

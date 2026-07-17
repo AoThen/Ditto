@@ -98,7 +98,7 @@ tests/
 | Test | Description |
 |------|-------------|
 | `TestWebSocket_Connect` | Connect with valid JWT, verify "connected" message |
-| `TestWebSocket_BroadcastOnSync` | Device A pushes clip → Device B receives "clip_added" via WS |
+| `TestWebSocket_BroadcastOnSync` | Device A pushes clip → Device B receives "clips_added" via WS |
 | `TestWebSocket_NoCrossUserBroadcast` | User B's WS does NOT receive User A's broadcasts |
 | `TestWebSocket_InvalidToken` | Connect with invalid JWT → HTTP 401 |
 | `TestWebSocket_MultipleConnections` | 3 WS clients for same user → all receive broadcast |

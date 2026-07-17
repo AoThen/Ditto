@@ -3042,9 +3042,9 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 		json j = json::parse(msg);
 		std::string type = j.value("type", "");
 
-		if (type == "clip_added")
+		if (type == "clip_added" || type == "clips_added")
 		{
-			LogMessage(_T("OnWsMessage: clip_added received, triggering sync."));
+			LogMessage(_T("OnWsMessage: clip/clips_added received, triggering sync."));
 			SetEvent(m_hWsTrigger);
 		}
 		else if (type == "connected")

@@ -243,9 +243,13 @@ func TestBroadcastToOthers(t *testing.T) {
 	}
 
 	// Simulate broadcast
-	mockBroadcaster.BroadcastToOthers(123, nil, "clip_added", map[string]interface{}{
-		"clip_id":   "clip-1",
-		"device_id": "device-abc",
+	mockBroadcaster.BroadcastToOthers(123, nil, "clips_added", map[string]interface{}{
+		"clips": []map[string]interface{}{
+			{
+				"clip_id":   "clip-1",
+				"device_id": "device-abc",
+			},
+		},
 	})
 
 	// Verify message was broadcast
@@ -257,8 +261,8 @@ func TestBroadcastToOthers(t *testing.T) {
 	if msg.UserID != 123 {
 		t.Errorf("userID = %d, want 123", msg.UserID)
 	}
-	if msg.MsgType != "clip_added" {
-		t.Errorf("msgType = %s, want clip_added", msg.MsgType)
+	if msg.MsgType != "clips_added" {
+		t.Errorf("msgType = %s, want clips_added", msg.MsgType)
 	}
 }
 
