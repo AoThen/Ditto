@@ -25,6 +25,7 @@ CClipFormat* CClipFormats::FindFormat(UINT cfType) { return nullptr; }
 bool CClipFormats::RemoveFormat(CLIPFORMAT cfType) { return false; }
 void CClipFormat::Free() {}
 Gdiplus::Bitmap* CClipFormat::CreateGdiplusBitmap() { return nullptr; }
+CClipFormat& CClipFormat::operator=(const CClipFormat&) { return *this; }
 
 // -------------------------------------------------------------------
 // CGetSetOptions stubs (for methods referenced by compiled source files)
