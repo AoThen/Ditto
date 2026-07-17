@@ -1844,7 +1844,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			// Use parameterized query to prevent SQL injection
 			CSingleLock lockDb(&m_csDb, TRUE);
 			CString csSQL;
-			csSQL.Format(_T("SELECT lID, lModifiedDate FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
+			csSQL.Format(_T("SELECT lID, lModifiedDate, mText FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
 			
 			CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 			stmt.bind(1, (int)crc);
@@ -1854,6 +1854,14 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			{
 				existingId = q.getIntField(_T("lID"));
 				localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
+				CString localText = q.getStringField(_T("mText"), _T(""));
+				CString remoteDesc(desc.c_str());
+				// Compare full content to detect CRC-32 collisions
+				if (localText != remoteDesc)
+				{
+					LogMessage(_T("MergeRemoteClipToLocal: CRC collision detected (mText differs), treating as new clip"));
+					existingId = -1;
+				}
 			}
 			lockDb.Unlock();
 		}
