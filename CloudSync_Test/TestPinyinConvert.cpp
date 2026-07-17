@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 #include "../src/Pinyin_Convert.h"
 
 TEST(PinyinConvert, ExtractAlphaPureLetters)
