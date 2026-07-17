@@ -404,7 +404,7 @@ BOOL CCP_MainApp::InitInstance()
 		cs.Format(_T("Error loading language file - %s - \n\n%s"), csFile, m_Language.m_csLastError);
 		Log(cs);
 
-		m_Language.LoadLanguageFile(_T("English.xml"));
+		m_Language.LoadLanguageFile(CGetSetOptions::GetPath(PATH_LANGUAGE) + _T("English.xml"));
 	}
 
 	m_icuString.Load();
