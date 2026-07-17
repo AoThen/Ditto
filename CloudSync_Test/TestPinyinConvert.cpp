@@ -60,3 +60,24 @@ TEST(PinyinConvert, IsAlphaQueryEmpty)
 	CPinyinConvert conv;
 	EXPECT_TRUE(conv.IsAlphaQuery(std::wstring(_T(""))) == false);
 }
+
+TEST(PinyinConvert, TextToPinyinChinese)
+{
+	auto py = CPinyinConvert::TextToPinyin(_T("你好"));
+	EXPECT_TRUE(py.first.GetLength() > 0);
+	EXPECT_TRUE(py.second.GetLength() > 0);
+}
+
+TEST(PinyinConvert, TextToPinyinMixed)
+{
+	auto py = CPinyinConvert::TextToPinyin(_T("hello世界"));
+	EXPECT_TRUE(py.first.GetLength() > 0);
+	EXPECT_TRUE(py.second.GetLength() > 0);
+}
+
+TEST(PinyinConvert, TextToPinyinEmpty)
+{
+	auto py = CPinyinConvert::TextToPinyin(_T(""));
+	EXPECT_TRUE(py.first.IsEmpty());
+	EXPECT_TRUE(py.second.IsEmpty());
+}

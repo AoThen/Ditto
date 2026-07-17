@@ -698,7 +698,6 @@ void COptionCloud::OnRebuildPinyinIndex()
 	if (AfxMessageBox(_T("Rebuild pinyin search index for all clips?"), MB_YESNO) != IDYES)
 		return;
 
-	CPinyinConvert conv;
 	CWaitCursor wait;
 
 	CppSQLite3Query q = theApp.m_db.execQuery(
@@ -710,11 +709,9 @@ void COptionCloud::OnRebuildPinyinIndex()
 	{
 		long id = q.getIntField(0);
 		CString mText = q.getStringField(1);
-		std::wstring wText(mText.GetString());
-		std::string pinyin = conv.ConvertToPinyin(wText);
-		std::string abbr = conv.ConvertToAbbreviation(wText);
-		CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
-		CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
+		auto py = CPinyinConvert::TextToPinyin(mText);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 		theApp.m_db.execDMLEx(
 			_T("UPDATE Main SET pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
 			pinyinW, abbrW, id);

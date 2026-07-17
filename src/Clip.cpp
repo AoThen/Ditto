@@ -1164,12 +1164,9 @@ bool CClip::AddToMainTable()
 {
 	try
 	{
-		std::wstring wDesc(m_Desc.GetString());
-		CPinyinConvert conv;
-		std::string pinyin = conv.ConvertToPinyin(wDesc);
-		std::string abbr = conv.ConvertToAbbreviation(wDesc);
-		CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
-		CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
@@ -1218,12 +1215,9 @@ bool CClip::ModifyMainTable()
 	bool bRet = false;
 	try
 	{
-		std::wstring wDesc(m_Desc.GetString());
-		CPinyinConvert conv;
-		std::string pinyin = conv.ConvertToPinyin(wDesc);
-		std::string abbr = conv.ConvertToAbbreviation(wDesc);
-		CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
-		CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
@@ -1277,12 +1271,9 @@ bool CClip::ModifyDescription()
 	bool bRet = false;
 	try
 	{
-		std::wstring wDesc(m_Desc.GetString());
-		CPinyinConvert conv;
-		std::string pinyin = conv.ConvertToPinyin(wDesc);
-		std::string abbr = conv.ConvertToAbbreviation(wDesc);
-		CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
-		CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 
 		m_Desc.Replace(_T("'"), _T("''"));
 
@@ -2365,12 +2356,9 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		if (bUpdateDesc)
 		{
-			std::wstring wDesc(m_Desc.GetString());
-			CPinyinConvert conv;
-			std::string pinyin = conv.ConvertToPinyin(wDesc);
-			std::string abbr = conv.ConvertToAbbreviation(wDesc);
-			CString pinyinW = CA2T(pinyin.c_str(), CP_UTF8);
-			CString abbrW = CA2T(abbr.c_str(), CP_UTF8);
+			auto py = CPinyinConvert::TextToPinyin(m_Desc);
+			CString pinyinW = py.first;
+			CString abbrW = py.second;
 
 			m_Desc.Replace(_T("'"), _T("''"));
 			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, pinyinW, abbrW, CTime::GetCurrentTime().GetTime(), m_id);

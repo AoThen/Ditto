@@ -28,8 +28,9 @@
 #include <algorithm>
 #include <exception>
 #include <string>
+	#include <vector>
 
-#include <signal.h>
+	#include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
 
@@ -1621,35 +1622,14 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 			}
 		}
 
-		strFilter = _T("(");
+		std::vector<CString> preds;
 
-		if (descriptionSql != _T(""))
-		{
-			strFilter += descriptionSql;
-		}
-
-		if (quickPasteSql != _T(""))
-		{
-			if (descriptionSql != _T(""))
-			{
-				strFilter += _T(" OR ");
-			}
-
-			strFilter += quickPasteSql;
-		}
-
-		if (fullTextSql != _T(""))
-		{
-			if (descriptionSql != _T("") ||
-				quickPasteSql != _T(""))
-			{
-				strFilter += _T(" OR ");
-			}
-
-			strFilter += fullTextSql;
-		}
-
-		strFilter += _T(")");
+		if (descriptionSql != _T("") && descriptionSql != _T("()"))
+			preds.push_back(descriptionSql);
+		if (quickPasteSql != _T("") && quickPasteSql != _T("()"))
+			preds.push_back(quickPasteSql);
+		if (fullTextSql != _T("") && fullTextSql != _T("()"))
+			preds.push_back(fullTextSql);
 
 		if (csSQLSearch != _T(""))
 		{
@@ -1667,10 +1647,28 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 				lowSearch.Replace(_T("_"), _T("\\_"));
 
 				CString pinyinLike;
-				pinyinLike.Format(_T(" OR Main.pinyin LIKE '%%%s%%' ESCAPE '\\' OR Main.pinyinAbbr LIKE '%%%s%%' ESCAPE '\\'"),
-					lowSearch, lowSearch);
-				strFilter += pinyinLike;
+				pinyinLike.Format(_T("Main.pinyin LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+				CString pinyinAbbrLike;
+				pinyinAbbrLike.Format(_T("Main.pinyinAbbr LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+				preds.push_back(pinyinLike);
+				preds.push_back(pinyinAbbrLike);
 			}
+		}
+
+		if (preds.empty() == false)
+		{
+			strFilter = _T("(");
+			for (size_t i = 0; i < preds.size(); i++)
+			{
+				if (i > 0)
+					strFilter += _T(" OR ");
+				strFilter += preds[i];
+			}
+			strFilter += _T(")");
+		}
+		else
+		{
+			strFilter = pinyinBaseFilter;
 		}
 
 		if (strParentFilter.IsEmpty() == FALSE)
