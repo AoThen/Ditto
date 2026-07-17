@@ -43,7 +43,6 @@ void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
-		m_httpClient->enable_server_certificate_verification(true);
 		m_httpClientUrl = serverUrl;
 	}
 }
