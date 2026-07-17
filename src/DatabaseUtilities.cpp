@@ -250,8 +250,8 @@ BOOL OpenDatabase(CString dbPath)
 		{
 			Log(_T("OpenDatabase - setting WAL PRAGMA..."));
 			OutputDebugString(_T("OpenDatabase - setting WAL PRAGMA...\n"));
-			theApp.m_db.execDML(_T("PRAGMA journal_mode=WAL;"));
-			theApp.m_db.execDML(_T("PRAGMA synchronous=NORMAL;"));
+			theApp.m_db.execQuery(_T("PRAGMA journal_mode=WAL;"));
+			theApp.m_db.execQuery(_T("PRAGMA synchronous=NORMAL;"));
 		}
 
 		Log(_T("OpenDatabase - WAL/sync PRAGMA OK"));
@@ -273,7 +273,6 @@ BOOL OpenDatabase(CString dbPath)
 		OutputDebugString(csErr + _T("\n"));
 
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
-		ASSERT(FALSE);
 		return FALSE;
 	}
 }
