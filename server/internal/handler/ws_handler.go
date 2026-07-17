@@ -5,27 +5,16 @@ import (
 	"net/http"
 
 	"ditto-cloud-server/internal/config"
-	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/hub"
-	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 )
 
 // WSHub interface abstracts the hub for dependency injection.
 type WSHub interface {
 	Register(userID int64, conn *websocket.Conn) *hub.Client
-}
-
-// WSJWTClaims mirrors the claims structure used in auth middleware.
-type WSJWTClaims struct {
-	UserID       uint   `json:"user_id"`
-	DeviceID     string `json:"device_id"`
-	TokenVersion int    `json:"token_version"`
-	jwt.RegisteredClaims
 }
 
 var upgrader = websocket.Upgrader{
@@ -69,75 +58,32 @@ func NewWSHandler(h WSHub, cfg *config.Config) *WSHandler {
 
 // HandleWebSocket upgrades HTTP to WebSocket and manages the connection.
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
-	// H1 + C3: Read JWT from HttpOnly cookie (primary) or Sec-WebSocket-Protocol (fallback)
-	tokenStr := ""
-
-	// Try HttpOnly cookie first (set by login, read by auth middleware)
-	if cookie, err := c.Cookie("device_token"); err == nil && cookie != "" {
-		tokenStr = cookie
-	}
-
-	// Fallback: Sec-WebSocket-Protocol header (for clients that don't support cookies)
-	if tokenStr == "" {
-		tokenStr = c.GetHeader("Sec-WebSocket-Protocol")
-	}
-
-	// Last fallback: raw request header
-	if tokenStr == "" {
-		tokenStr = c.Request.Header.Get("Sec-Websocket-Protocol")
-	}
-
-	if tokenStr == "" {
+	// Auth middleware has already validated the JWT and set user_id/device_id in context.
+	userIDAny, exists := c.Get("user_id")
+	if !exists {
 		response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
 		return
 	}
+	userID := userIDAny.(uint)
 
-	claims := &WSJWTClaims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
-		// MEDIUM FIX (M6): Enforce HMAC algorithm to prevent alg=None / algorithm confusion
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrSignatureInvalid
-		}
-		return []byte(h.cfg.JWTSecret), nil
-	})
-	if err != nil || !token.Valid {
-		response.Error(c, http.StatusUnauthorized, 40102, "无效的认证令牌")
+	deviceIDAny, exists := c.Get("device_id")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, 40100, "未提供设备令牌")
 		return
 	}
-
-	if claims.UserID == 0 {
-		response.Error(c, http.StatusUnauthorized, 40103, "令牌中缺少用户信息")
-		return
-	}
-
-	var device model.Device
-	if err := database.DB.Where("id = ?", claims.DeviceID).First(&device).Error; err != nil {
-		response.Error(c, http.StatusUnauthorized, 40102, "设备不存在")
-		return
-	}
-	if claims.TokenVersion != device.TokenVersion {
-		response.Error(c, http.StatusUnauthorized, 40102, "令牌已过期，请重新登录")
-		return
-	}
+	deviceID := deviceIDAny.(string)
 
 	// Upgrade HTTP to WebSocket
-	// Must respond with the same protocol to complete handshake
-	upgraderWithProtocol := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin:     upgrader.CheckOrigin, // Reuse same origin validation (H5)
-		Subprotocols:    []string{"ditto-ws"},
-	}
-	conn, err := upgraderWithProtocol.Upgrade(c.Writer, c.Request, nil)
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("[ws] failed to upgrade connection: %v", err)
 		return
 	}
 
 	// Register with hub
-	client := h.hub.Register(int64(claims.UserID), conn)
+	client := h.hub.Register(int64(userID), conn)
 
-	log.Printf("[ws] new connection established for user_id=%d, device_id=%s", claims.UserID, claims.DeviceID)
+	log.Printf("[ws] new connection established for user_id=%d, device_id=%s", userID, deviceID)
 
 	// Send initial "connected" message
 	client.Send(map[string]interface{}{

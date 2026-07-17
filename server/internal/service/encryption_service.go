@@ -61,23 +61,25 @@ var (
 func (s *EncryptionService) ensureSaltRecord(userID uint) (*model.EncryptionSettings, error) {
 	var settings model.EncryptionSettings
 
-	salt := make([]byte, 32)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
+	database.DB.Where(model.EncryptionSettings{UserID: userID}).
+		FirstOrInit(&settings)
+
+	if settings.ID == 0 {
+		// Only generate salt when creating a new record
+		salt := make([]byte, 32)
+		if _, err := rand.Read(salt); err != nil {
+			return nil, err
+		}
+		settings.UserID = userID
+		settings.Salt = salt
+		settings.WrappedDEK = make([]byte, 0)
+		settings.VerificationHash = make([]byte, 0)
+
+		if err := database.DB.Create(&settings).Error; err != nil {
+			return nil, err
+		}
 	}
 
-	result := database.DB.Where(model.EncryptionSettings{UserID: userID}).
-		Attrs(model.EncryptionSettings{
-			UserID:           userID,
-			Salt:             salt,
-			WrappedDEK:       make([]byte, 0),
-			VerificationHash: make([]byte, 0),
-		}).
-		FirstOrCreate(&settings)
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
 	return &settings, nil
 }
 

@@ -432,6 +432,7 @@ func setupClipServiceTest(t *testing.T) (*ClipService, uint, string, func()) {
 	// Reset global dedup cache to prevent test isolation leaks
 	dedupMu.Lock()
 	dedupCache = make(map[string]time.Time)
+	dedupOrder = nil
 	dedupMu.Unlock()
 
 	tmpFile, err := os.CreateTemp("", "clip_service_test_*.db")

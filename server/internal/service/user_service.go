@@ -114,8 +114,20 @@ func (s *UserService) CheckEmailTakenByOther(email string, excludeUserID uint) e
 	return nil
 }
 
+var allowedUpdateFields = map[string]bool{
+	"email":     true,
+	"is_active": true,
+	"role":      true,
+}
+
 func (s *UserService) UpdateUser(id uint, updates map[string]interface{}) error {
-	return database.DB.Model(&model.User{}).Where("id = ?", id).Updates(updates).Error
+	filtered := make(map[string]interface{})
+	for k, v := range updates {
+		if allowedUpdateFields[k] {
+			filtered[k] = v
+		}
+	}
+	return database.DB.Model(&model.User{}).Where("id = ?", id).Updates(filtered).Error
 }
 
 func (s *UserService) DeleteUser(id uint) error {

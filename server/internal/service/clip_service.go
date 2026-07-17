@@ -23,6 +23,7 @@ var ErrInvalidSortBy = errors.New("无效的排序字段")
 var (
 	dedupMu    sync.RWMutex
 	dedupCache = make(map[string]time.Time)
+	dedupOrder []string
 	dedupMax   = 10000
 	dedupTTL   = 5 * time.Minute
 )
@@ -50,13 +51,13 @@ func isDeduped(key string) bool {
 func markDeduped(key string) {
 	dedupMu.Lock()
 	if len(dedupCache) >= dedupMax {
-		// Evict one random entry (Go map iteration order is randomized)
-		for k := range dedupCache {
-			delete(dedupCache, k)
-			break
-		}
+		// FIFO eviction: remove the oldest entry
+		oldest := dedupOrder[0]
+		delete(dedupCache, oldest)
+		dedupOrder = dedupOrder[1:]
 	}
 	dedupCache[key] = time.Now()
+	dedupOrder = append(dedupOrder, key)
 	dedupMu.Unlock()
 }
 
@@ -498,21 +499,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			return nil, ErrPushLimitExceeded
 		}
 
-		// Collect CRCs from the push request; DB query moved inside transaction
-		type crcRecord struct {
-			CRC int64  `gorm:"column:crc"`
-			ID  string `gorm:"column:id"`
-		}
-		// Collect non-zero CRCs from the push request to avoid a full table scan
-		crcSet := make(map[int64]struct{})
-		for _, pc := range req.PushClips {
-			if pc.CRC != 0 {
-				crcSet[pc.CRC] = struct{}{}
-			}
-		}
-		existingCRCs := make(map[string]string)
-
-		// Pre-processing type: format data decoded outside transaction
+		// Pre-decode all format base64 data OUTSIDE any transaction
 		type preparedFormat struct {
 			FormatType int
 			Data       []byte
@@ -523,52 +510,62 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			formats []preparedFormat
 		}
 
-		// Single transaction for all chunks — atomicity guarantee
-		err := database.DB.Transaction(func(tx *gorm.DB) error {
-			// Load existing CRCs for deduplication inside the transaction
-			if len(crcSet) > 0 {
-				crcValues := make([]int64, 0, len(crcSet))
-				for c := range crcSet {
-					crcValues = append(crcValues, c)
+		allPrepared := make([]preparedItem, 0, len(req.PushClips))
+		for _, pc := range req.PushClips {
+			formats := make([]preparedFormat, 0, len(pc.Formats))
+			for _, pf := range pc.Formats {
+				data, err := base64.StdEncoding.DecodeString(pf.Data)
+				if err != nil {
+					return nil, fmt.Errorf("sync: base64 decode failed for clip %s: %w", pc.ID, err)
 				}
-				var crcRecords []crcRecord
-				if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ? AND crc IN ?", userID, false, crcValues).Find(&crcRecords).Error; err != nil {
-					return err
-				}
-				existingCRCs = make(map[string]string, len(crcRecords))
-				for _, r := range crcRecords {
-					existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
-				}
+				formats = append(formats, preparedFormat{
+					FormatType: pf.FormatType,
+					Data:       data,
+					Encrypted:  pf.Encrypted,
+				})
 			}
+			allPrepared = append(allPrepared, preparedItem{item: pc, formats: formats})
+		}
 
-			for start := 0; start < len(req.PushClips); start += PushBatchSize {
-				end := start + PushBatchSize
-				if end > len(req.PushClips) {
-					end = len(req.PushClips)
-				}
-				chunk := req.PushClips[start:end]
+		// Process in batches, each batch in its own transaction
+		// to minimize SQLite write-lock hold time
+		for start := 0; start < len(allPrepared); start += PushBatchSize {
+			end := start + PushBatchSize
+			if end > len(allPrepared) {
+				end = len(allPrepared)
+			}
+			chunk := allPrepared[start:end]
 
-				// Pre-decode all format base64 data
-				prepared := make([]preparedItem, 0, len(chunk))
-				for _, pc := range chunk {
-					formats := make([]preparedFormat, 0, len(pc.Formats))
-					for _, pf := range pc.Formats {
-						data, err := base64.StdEncoding.DecodeString(pf.Data)
-						if err != nil {
-							return fmt.Errorf("sync: base64 decode failed for clip %s: %w", pc.ID, err)
-						}
-						formats = append(formats, preparedFormat{
-							FormatType: pf.FormatType,
-							Data:       data,
-							Encrypted:  pf.Encrypted,
-						})
+			err := database.DB.Transaction(func(tx *gorm.DB) error {
+				// Collect CRCs for dedup within this batch
+				crcSet := make(map[int64]struct{})
+				for _, p := range chunk {
+					if p.item.CRC != 0 {
+						crcSet[p.item.CRC] = struct{}{}
 					}
-					prepared = append(prepared, preparedItem{item: pc, formats: formats})
+				}
+				existingCRCs := make(map[string]string)
+				if len(crcSet) > 0 {
+					crcValues := make([]int64, 0, len(crcSet))
+					for c := range crcSet {
+						crcValues = append(crcValues, c)
+					}
+					type crcRecord struct {
+						CRC int64  `gorm:"column:crc"`
+						ID  string `gorm:"column:id"`
+					}
+					var crcRecords []crcRecord
+					if err := tx.Model(&model.Clip{}).Select("id, crc").Where("user_id = ? AND is_conflict_copy = ? AND crc IN ?", userID, false, crcValues).Find(&crcRecords).Error; err != nil {
+						return err
+					}
+					for _, r := range crcRecords {
+						existingCRCs[fmt.Sprintf("%d", r.CRC)] = r.ID
+					}
 				}
 
 				// Load existing clips for this chunk's IDs
 				chunkIDs := make([]string, 0, len(chunk))
-				for _, p := range prepared {
+				for _, p := range chunk {
 					chunkIDs = append(chunkIDs, p.item.ID)
 				}
 				var existingClips []model.Clip
@@ -583,7 +580,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				// Accumulate formats for batch insert
 				var batchFormats []model.ClipFormat
 
-				for _, p := range prepared {
+				for _, p := range chunk {
 					pc := p.item
 
 					// Idempotency check: skip if recently processed
@@ -732,24 +729,29 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						return err
 					}
 				}
-			}
 
-			return nil
-		})
-		if err != nil {
-			return nil, err
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// Step 1.5: Broadcast to other devices of the same user (real-time push)
+	// Batch all pushed clips into a single message to avoid N broadcast calls
 	if s.broadcaster != nil && len(pushedClips) > 0 {
-		for _, pc := range pushedClips {
-			s.broadcaster.BroadcastToOthers(int64(userID), nil, "clip_added", map[string]interface{}{
+		clipsData := make([]map[string]interface{}, len(pushedClips))
+		for i, pc := range pushedClips {
+			clipsData[i] = map[string]interface{}{
 				"clip_id":     pc.ID,
 				"device_id":   req.DeviceID,
 				"description": pc.Description,
-			})
+			}
 		}
+		s.broadcaster.BroadcastToOthers(int64(userID), nil, "clips_added", map[string]interface{}{
+			"clips": clipsData,
+		})
 	}
 
 	// Step 2: Query clips updated since "since" from other devices

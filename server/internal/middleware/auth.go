@@ -39,6 +39,11 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 
+		// Last fallback: Sec-WebSocket-Protocol header (for WebSocket clients that don't support cookies)
+		if tokenStr == "" {
+			tokenStr = c.GetHeader("Sec-WebSocket-Protocol")
+		}
+
 		if tokenStr == "" {
 			response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
 			c.Abort()

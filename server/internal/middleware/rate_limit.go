@@ -68,7 +68,7 @@ func (rl *RateLimiter) LoginRateLimit() gin.HandlerFunc {
 		if record != nil && record.FailCount >= ipMaxFailures {
 			rl.mu.Unlock()
 			banUntil := time.Now().Add(ipBanDuration)
-			rl.saveRecord(ipKey, ipMaxFailures, &banUntil)
+			rl.setBanOnly(ipKey, &banUntil)
 			response.Error(c, http.StatusTooManyRequests, 42901, "尝试次数过多，请 15 分钟后重试")
 			c.Abort()
 			return
@@ -84,36 +84,24 @@ func (rl *RateLimiter) RecordLoginFailure(ip, username string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// IP-based tracking
+	// IP-based tracking — atomic increment at DB level avoids TOCTOU
 	ipKey := "login:ip:" + ip
-	ipRecord := rl.getRecord(ipKey)
-	if ipRecord == nil {
-		ipRecord = &model.RateLimitRecord{Key: ipKey}
-	}
-	ipRecord.FailCount++
+	ipRecord := rl.atomicIncrement(ipKey)
 
-	// Ban IP if threshold reached
-	if ipRecord.FailCount >= ipMaxFailures {
+	if ipRecord.FailCount >= ipMaxFailures && ipRecord.BanUntil == nil {
 		banUntil := time.Now().Add(ipBanDuration)
-		rl.saveRecord(ipKey, ipRecord.FailCount, &banUntil)
-	} else {
-		rl.saveRecord(ipKey, ipRecord.FailCount, nil)
+		rl.setBanOnly(ipKey, &banUntil)
+		ipRecord.BanUntil = &banUntil
 	}
 
-	// User-based tracking
+	// User-based tracking — atomic increment at DB level avoids TOCTOU
 	userKey := "login:user:" + username
-	userRecord := rl.getRecord(userKey)
-	if userRecord == nil {
-		userRecord = &model.RateLimitRecord{Key: userKey}
-	}
-	userRecord.FailCount++
+	userRecord := rl.atomicIncrement(userKey)
 
-	// Lock user account if threshold reached
-	if userRecord.FailCount >= userMaxFailures {
+	if userRecord.FailCount >= userMaxFailures && userRecord.BanUntil == nil {
 		lockUntil := time.Now().Add(userLockDuration)
-		rl.saveRecord(userKey, userRecord.FailCount, &lockUntil)
-	} else {
-		rl.saveRecord(userKey, userRecord.FailCount, nil)
+		rl.setBanOnly(userKey, &lockUntil)
+		userRecord.BanUntil = &lockUntil
 	}
 }
 
@@ -138,6 +126,34 @@ func (rl *RateLimiter) IsUserLocked(username string) bool {
 	return false
 }
 
+func (rl *RateLimiter) atomicIncrement(key string) *model.RateLimitRecord {
+	database.DB.Exec(`
+		INSERT INTO rate_limit_records (key, fail_count, updated_at)
+		VALUES (?, 1, ?)
+		ON CONFLICT(key) DO UPDATE SET
+			fail_count = rate_limit_records.fail_count + 1,
+			updated_at = ?
+	`, key, time.Now(), time.Now())
+
+	var record model.RateLimitRecord
+	database.DB.Where("key = ?", key).First(&record)
+
+	rl.cache.Store(key, &rateLimitCacheEntry{
+		record:    &record,
+		expiresAt: time.Now().Add(1 * time.Minute),
+	})
+	return &record
+}
+
+func (rl *RateLimiter) setBanOnly(key string, banUntil *time.Time) {
+	database.DB.Model(&model.RateLimitRecord{}).
+		Where("key = ?", key).
+		Updates(map[string]interface{}{
+			"ban_until":  banUntil,
+			"updated_at": time.Now(),
+		})
+}
+
 func (rl *RateLimiter) getRecord(key string) *model.RateLimitRecord {
 	if val, ok := rl.cache.Load(key); ok {
 		entry := val.(*rateLimitCacheEntry)
@@ -155,20 +171,6 @@ func (rl *RateLimiter) getRecord(key string) *model.RateLimitRecord {
 		expiresAt: time.Now().Add(1 * time.Minute),
 	})
 	return &record
-}
-
-func (rl *RateLimiter) saveRecord(key string, failCount int, banUntil *time.Time) {
-	record := model.RateLimitRecord{
-		Key:       key,
-		FailCount: failCount,
-		BanUntil:  banUntil,
-		UpdatedAt: time.Now(),
-	}
-	database.DB.Save(&record)
-	rl.cache.Store(key, &rateLimitCacheEntry{
-		record:    &record,
-		expiresAt: time.Now().Add(1 * time.Minute),
-	})
 }
 
 func (rl *RateLimiter) deleteRecord(key string) {

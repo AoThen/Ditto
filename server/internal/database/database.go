@@ -158,6 +158,7 @@ func recordMigrationVersion(db *gorm.DB) error {
 }
 
 // BackfillPinyin populates the pinyin column for existing clips that have empty pinyin.
+// Uses batch CASE WHEN UPDATE to avoid N+1 SQL writes.
 func BackfillPinyin() {
 	var count int64
 	DB.Model(&model.Clip{}).Where("pinyin IS NULL OR pinyin = ''").Count(&count)
@@ -169,11 +170,24 @@ func BackfillPinyin() {
 	const batchSize = 100
 	var clips []model.Clip
 	DB.Model(&model.Clip{}).Where("pinyin IS NULL OR pinyin = ''").FindInBatches(&clips, batchSize, func(tx *gorm.DB, batch int) error {
+		var queryBuilder strings.Builder
+		queryBuilder.WriteString("UPDATE clips SET pinyin = CASE id ")
+		var args []interface{}
 		for _, clip := range clips {
 			pinyin := utils.ConvertToPinyin(clip.Description)
-			tx.Model(&clip).Update("pinyin", pinyin)
+			queryBuilder.WriteString("WHEN ? THEN ? ")
+			args = append(args, clip.ID, pinyin)
 		}
-		return nil
+		queryBuilder.WriteString("ELSE pinyin END WHERE id IN (")
+		for i, clip := range clips {
+			if i > 0 {
+				queryBuilder.WriteString(",")
+			}
+			queryBuilder.WriteString("?")
+			args = append(args, clip.ID)
+		}
+		queryBuilder.WriteString(")")
+		return tx.Exec(queryBuilder.String(), args...).Error
 	})
 	log.Printf("[Backfill] Pinyin backfill completed")
 }
