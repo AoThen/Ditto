@@ -797,7 +797,9 @@ BOOL CreateDB(CString csFile)
 			_T("stickyClipGroupOrder REAL, ")
 			_T("MoveToGroupShortCut INTEGER, ")
 			_T("GlobalMoveToGroupShortCut INTEGER, ")
-			_T("lModifiedDate INTEGER);"));
+			_T("lModifiedDate INTEGER, ")
+			_T("pinyin TEXT, ")
+			_T("pinyinAbbr TEXT);"));
 
 		db.execDML(_T("CREATE TABLE Data(")
 			_T("lID INTEGER PRIMARY KEY AUTOINCREMENT, ")
@@ -1210,6 +1212,7 @@ BOOL MigrateDatabaseSchema()
 		CppSQLite3Query q = theApp.m_db.execQuery(_T("PRAGMA table_info(Main)"));
 		bool hasDontSync = false;
 		bool hasDescription = false;
+		bool hasPinyin = false;
 		while (q.eof() == false)
 		{
 			CString colName = q.getStringField(_T("name"));
@@ -1217,6 +1220,8 @@ BOOL MigrateDatabaseSchema()
 				hasDontSync = true;
 			if (colName == _T("m_Description"))
 				hasDescription = true;
+			if (colName == _T("pinyin"))
+				hasPinyin = true;
 			q.nextRow();
 		}
 
@@ -1225,6 +1230,12 @@ BOOL MigrateDatabaseSchema()
 
 		if (!hasDescription)
 			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN m_Description TEXT DEFAULT ''"));
+
+		if (!hasPinyin)
+		{
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyin TEXT DEFAULT ''"));
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyinAbbr TEXT DEFAULT ''"));
+		}
 
 		return TRUE;
 	}
