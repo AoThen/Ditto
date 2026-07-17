@@ -83,7 +83,7 @@ COptionCloud::COptionCloud()
 	, m_bPeriodicSync(TRUE)
 	, m_csSyncInterval(_T("30"))
 	, m_csSyncStatus(_T(""))
-	, m_csServerUrl(_T("https://localhost:8080"))
+	, m_csServerUrl(CLOUD_DEFAULT_SERVER_URL)
 	, m_csUsername(_T(""))
 	, m_csPassword(_T(""))
 	, m_csStatus(_T(""))
@@ -149,7 +149,7 @@ BOOL COptionCloud::OnInitDialog()
 	m_csServerUrl = CGetSetOptions::GetCloudServerUrl();
 	if (m_csServerUrl.IsEmpty())
 	{
-		m_csServerUrl = _T("https://localhost:8080");
+		m_csServerUrl = CLOUD_DEFAULT_SERVER_URL;
 	}
 
 	// Load username from encryption salt (if available) or show last used

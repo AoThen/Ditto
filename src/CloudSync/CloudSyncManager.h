@@ -17,6 +17,9 @@
 #define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
 #endif
 
+// Default cloud server URL (when none configured)
+#define CLOUD_DEFAULT_SERVER_URL _T("https://localhost:8080")
+
 // Context for fire-and-forget quick sync threads
 struct QuickSyncContext {
 	void* pManager;            // CCloudSyncManager*

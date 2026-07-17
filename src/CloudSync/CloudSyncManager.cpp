@@ -101,7 +101,7 @@ BOOL CCloudSyncManager::Initialize()
 	m_serverUrl = CGetSetOptions::GetCloudServerUrl();
 	if (m_serverUrl.IsEmpty())
 	{
-		m_serverUrl = _T("https://localhost:8080");
+		m_serverUrl = CLOUD_DEFAULT_SERVER_URL;
 	}
 	m_deviceToken = CGetSetOptions::GetCloudDeviceToken();
 	m_deviceId = CGetSetOptions::GetCloudDeviceId();
