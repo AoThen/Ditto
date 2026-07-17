@@ -176,7 +176,20 @@ jobs:
           copy DittoSetup\portable DittoPortable\portable
           copy Debug64\Language\*.xml DittoPortable\Language\
           copy Debug64\Themes\*.xml DittoPortable\Themes\
-          7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
+
+      - name: Verify portable package integrity
+        shell: cmd
+        run: |
+          if not exist DittoPortable\Ditto.exe exit /b 1
+          if not exist DittoPortable\ICU_Loader.dll exit /b 1
+          if not exist DittoPortable\portable exit /b 1
+          dir DittoPortable\Language\*.xml >nul 2>&1 || exit /b 1
+          dir DittoPortable\Themes\*.xml >nul 2>&1 || exit /b 1
+          echo All required files present
+
+      - name: Create portable zip
+        shell: cmd
+        run: 7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
 
       - name: Upload portable zip
         uses: actions/upload-artifact@v4

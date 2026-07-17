@@ -154,14 +154,6 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
-		// When disabling a user, revoke all their device tokens
-		if !*req.IsActive {
-			if err := database.DB.Model(&model.Device{}).Where("user_id = ?", id).
-				Update("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
-				response.Error(c, http.StatusInternalServerError, 50000, "吊销设备令牌失败")
-				return
-			}
-		}
 	}
 
 	if req.Role != nil {

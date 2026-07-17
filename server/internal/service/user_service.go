@@ -127,7 +127,7 @@ func (s *UserService) UpdateUser(id uint, updates map[string]interface{}) error 
 			filtered[k] = v
 		}
 	}
-	// Prevent downgrading the last admin
+	// Prevent downgrading the last admin, and atomically revoke tokens when disabling
 	return database.DB.Transaction(func(tx *gorm.DB) error {
 		if role, ok := filtered["role"]; ok && role == "user" {
 			var user model.User
@@ -145,6 +145,13 @@ func (s *UserService) UpdateUser(id uint, updates map[string]interface{}) error 
 				}
 			}
 		}
+		// Atomically revoke all device tokens when disabling a user
+		if isActive, ok := filtered["is_active"]; ok && !isActive.(bool) {
+			if err := tx.Model(&model.Device{}).Where("user_id = ?", id).
+				Update("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
+				return err
+			}
+		}
 		return tx.Model(&model.User{}).Where("id = ?", id).Updates(filtered).Error
 	})
 }
@@ -155,73 +162,48 @@ func (s *UserService) DeleteUser(id uint) error {
 		return err
 	}
 
-	tx := database.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		}
-	}()
-
-	// Re-query user inside transaction to avoid TOCTOU
-	var txUser model.User
-	if err := tx.First(&txUser, id).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	var adminCount int64
-	if err := tx.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if txUser.Role == "admin" && adminCount <= 1 {
-		tx.Rollback()
-		return errors.New("无法删除最后一个管理员账号")
-	}
-
-	var clipIDs []string
-	if err := tx.Model(&model.Clip{}).Where("user_id = ?", txUser.ID).Pluck("id", &clipIDs).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	if len(clipIDs) > 0 {
-		if err := tx.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
-			tx.Rollback()
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		// Re-query user inside transaction to avoid TOCTOU
+		var txUser model.User
+		if err := tx.First(&txUser, id).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(&model.Clip{}, clipIDs).Error; err != nil {
-			tx.Rollback()
+		var adminCount int64
+		if err := tx.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount).Error; err != nil {
 			return err
 		}
-	}
+		if txUser.Role == "admin" && adminCount <= 1 {
+			return errors.New("无法删除最后一个管理员账号")
+		}
 
-	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Device{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Group{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.SyncLog{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.EncryptionSettings{}).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	if err := tx.Delete(&txUser).Error; err != nil {
-		tx.Rollback()
-		return err
-	}
+		var clipIDs []string
+		if err := tx.Model(&model.Clip{}).Where("user_id = ?", txUser.ID).Pluck("id", &clipIDs).Error; err != nil {
+			return err
+		}
 
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
-		return err
-	}
-	return nil
+		if len(clipIDs) > 0 {
+			if err := tx.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Delete(&model.Clip{}, clipIDs).Error; err != nil {
+				return err
+			}
+		}
+
+		if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Device{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.Group{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.SyncLog{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", txUser.ID).Delete(&model.EncryptionSettings{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&txUser).Error
+	})
 }
 
 func (s *UserService) ResetPassword(userID uint, newPassword string) error {

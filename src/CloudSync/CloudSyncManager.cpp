@@ -97,6 +97,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
 	, m_lastSyncSuccessTime(0)
+	, m_bSyncStopped(FALSE)
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
@@ -107,6 +108,7 @@ CCloudSyncManager::CCloudSyncManager()
 CCloudSyncManager::~CCloudSyncManager()
 {
 	Stop();
+	m_bSyncStopped = TRUE;
 	DeleteCriticalSection(&m_csSync);
 	DeleteCriticalSection(&m_csHttpClient);
 	DeleteCriticalSection(&m_csWsClient);
@@ -386,22 +388,24 @@ void CCloudSyncManager::Stop()
 
 	if (m_pSyncThread != nullptr)
 	{
-		// Wait up to 15 seconds for thread to exit gracefully
+		// Wait up to 30 seconds for thread to exit gracefully
+		// 30s matches the HTTP read timeout, so a single long operation should complete
 		// DO NOT use TerminateThread -- it can corrupt SQLite database and leak resources
-		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 15000);
+		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 30000);
 		if (dwWait == WAIT_TIMEOUT)
 		{
-			// Thread didn't exit in time -- log warning and continue cleanup
-			// The thread will eventually exit when it checks m_hStopEvent
-			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within timeout, continuing cleanup.\n"));
+			// Thread didn't exit in time -- detach and let it self-destruct
+			// delete would destroy CWinThread but not the OS thread, leading to use-after-free
+			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within timeout, detaching.\n"));
+			m_pSyncThread->m_bAutoDelete = TRUE;
+			m_pSyncThread = nullptr;
 		}
 		else
 		{
 			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
+			delete m_pSyncThread;
+			m_pSyncThread = nullptr;
 		}
-
-		delete m_pSyncThread;
-		m_pSyncThread = nullptr;
 	}
 
 	// Wait for all active quick-push threads to complete (up to 5 seconds)
@@ -870,21 +874,34 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		{
 			pThis->CheckAndNotifyEncryptionChange();
 
+			// Check stop event between each operation so the thread responds
+			// promptly to Stop() instead of being blocked in a long HTTP call
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
+
 			// Push groups first (so group_id mappings exist before clip push)
 			pThis->PushGroups();
 
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
 			pThis->PushNewClips();
+
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
 
 			// Pull groups first so group_id mappings exist before clip import
 			pThis->PullGroups();
+
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
 			// Then pull changes (clips can now resolve group_id to local parentId)
 			pThis->PullChanges();
 
-			EnterCriticalSection(&pThis->m_csStatus);
-			pThis->m_csSyncStatus = _T("");
-			pThis->m_csLastError = _T("");
-			pThis->m_lastSyncSuccessTime = time(nullptr);
-			LeaveCriticalSection(&pThis->m_csStatus);
+			// Only update status if we haven't been asked to stop
+			if (WaitForSingleObject(pThis->m_hStopEvent, 0) != WAIT_OBJECT_0)
+			{
+				EnterCriticalSection(&pThis->m_csStatus);
+				pThis->m_csSyncStatus = _T("");
+				pThis->m_csLastError = _T("");
+				pThis->m_lastSyncSuccessTime = time(nullptr);
+				LeaveCriticalSection(&pThis->m_csStatus);
+			}
 		}
 		catch (const std::exception& e)
 		{

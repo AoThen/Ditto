@@ -40,15 +40,8 @@ func isDeduped(key string) bool {
 		return false
 	}
 	if time.Since(entry) > dedupTTL {
-		dedupMu.Lock()
-		delete(dedupCache, key)
-		for i, k := range dedupOrder {
-			if k == key {
-				dedupOrder = append(dedupOrder[:i], dedupOrder[i+1:]...)
-				break
-			}
-		}
-		dedupMu.Unlock()
+		// Entry expired — treat as not deduped.
+		// Don't delete here (avoids RLock→Lock race); markDeduped's FIFO eviction handles cleanup.
 		return false
 	}
 	return true
@@ -554,19 +547,6 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			}
 		}
 
-		// Check storage quota
-		var totalBytes int64
-		database.DB.Raw("SELECT COALESCE(SUM(LENGTH(data)),0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ?)", userID).Scan(&totalBytes)
-		var newBytes int64
-		for _, p := range allPrepared {
-			for _, f := range p.formats {
-				newBytes += int64(len(f.Data))
-			}
-		}
-		if totalBytes+newBytes > 100*1024*1024 { // 100MB default limit
-			return nil, fmt.Errorf("sync: storage quota exceeded (max 100MB)")
-		}
-
 		// Process in batches, each batch in its own transaction
 		// to minimize SQLite write-lock hold time
 		for start := 0; start < len(allPrepared); start += PushBatchSize {
@@ -576,7 +556,24 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			}
 			chunk := allPrepared[start:end]
 
+			// Calculate this batch's new bytes for quota check inside transaction
+			var batchNewBytes int64
+			for _, p := range chunk {
+				for _, f := range p.formats {
+					batchNewBytes += int64(len(f.Data))
+				}
+			}
+
 			err := database.DB.Transaction(func(tx *gorm.DB) error {
+				// Check storage quota inside transaction to prevent TOCTOU
+				var currentBytes int64
+				if err := tx.Raw("SELECT COALESCE(SUM(LENGTH(data)),0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ?)", userID).Scan(&currentBytes).Error; err != nil {
+					return err
+				}
+				if currentBytes+batchNewBytes > 100*1024*1024 { // 100MB default limit
+					return fmt.Errorf("sync: storage quota exceeded (max 100MB)")
+				}
+
 				// Collect CRCs for dedup within this batch
 				crcSet := make(map[int64]struct{})
 				for _, p := range chunk {

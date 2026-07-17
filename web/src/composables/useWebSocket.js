@@ -41,8 +41,7 @@ function handleMessage(msg) {
     case 'ping':
       break
     case 'clip_added':
-      { const clipStore = useClipStore(); clipStore.notifyClipAdded(msg.data) }
-      ElMessage.info('收到新的剪贴板内容')
+      { const clipStore = useClipStore(); if (msg?.data) clipStore.notifyClipAdded(msg.data) }
       break
     case 'clips_added':
       {
