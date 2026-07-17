@@ -43,7 +43,7 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
-		m_httpClient->set_server_certificate_verification(true);
+		m_httpClient->enable_server_certificate_verification(true);
 		{
 			httplib::Headers headers;
 			headers.emplace("Authorization", "Bearer " + CStringToStdString(deviceToken));

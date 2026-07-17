@@ -2750,7 +2750,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 					err.Format(_T("PushGroups: failed to update group %hs (HTTP %d)"), remoteId.c_str(), res ? res->status : 0);
 					LogMessage(err);
 				}
-
+			}
 			q.nextRow();
 		}
 	}
