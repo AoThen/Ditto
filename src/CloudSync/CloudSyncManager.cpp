@@ -2765,7 +2765,7 @@ void CCloudSyncManager::PullGroups()
 			CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT remote_id, local_id FROM CloudGroupMap"));
 			while (!q.eof())
 			{
-				std::string remoteId = q.getStringField(_T("remote_id"), "");
+				std::string remoteId = std::string(CStringA(q.getStringField(_T("remote_id"), _T(""))));
 				int localId = q.getIntField(_T("local_id"));
 				if (!remoteId.empty() && seenRemoteIds.find(remoteId) == seenRemoteIds.end())
 				{

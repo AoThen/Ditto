@@ -267,12 +267,15 @@ BOOL OpenDatabase(CString dbPath)
 
 		return TRUE;
 	}
-	CATCH_SQLITE_EXCEPTION
-
+	catch (CppSQLite3Exception& e)
+	{
 		CString csErr; csErr.Format(_T("OpenDatabase - CATCH_SQLITE_EXCEPTION, error=%d msg=%s"), e.errorCode(), e.errorMessage()); Log(csErr);
 		OutputDebugString(csErr + _T("\n"));
 
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
 		return FALSE;
+	}
 }
 
 void ReOrderStickyClips(int parentID, CppSQLite3DB& db)
