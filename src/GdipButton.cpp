@@ -254,8 +254,9 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			pOldBitmap = m_dcBk.SelectObject(&bmp);
 			m_dcBk.BitBlt(0, 0, rect.Width(), rect.Height(), &clDC, rect1.left, rect1.top, SRCCOPY);
 			m_dcBk.SelectObject(pOldBitmap);
-		{
-			PaintBk(pDC);
+		}
+
+		PaintBk(pDC);
 
 			/*graphics.DrawImage(*m_pStdImage, 0, 0);
 		
@@ -360,7 +361,6 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				m_dcGS.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 				m_dcGS.SelectObject(pOldBitmap);
 			}
-		}
 
 		// alternate image
 		if( (m_dcAlt.m_hDC == NULL) && m_bHaveAltImage )

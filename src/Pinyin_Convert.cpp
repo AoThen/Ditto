@@ -99,5 +99,5 @@ std::pair<CString, CString> CPinyinConvert::TextToPinyin(const CString& text)
 	CPinyinConvert conv;
 	std::string pinyin = conv.ConvertToPinyin(wText);
 	std::string abbr = conv.ConvertToAbbreviation(wText);
-	return std::make_pair(CA2T(pinyin.c_str(), CP_UTF8), CA2T(abbr.c_str(), CP_UTF8));
+	return std::make_pair(CString(CA2T(pinyin.c_str(), CP_UTF8)), CString(CA2T(abbr.c_str(), CP_UTF8)));
 }
