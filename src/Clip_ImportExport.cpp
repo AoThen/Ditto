@@ -13,6 +13,7 @@
 #include <afxstr.h>
 #include <zconf.h>
 #include "Clip.h"
+#include <new>
 
 #define CURRENT_EXPORT_VERSION 1
 
@@ -54,7 +55,7 @@ bool CClip_ImportExport::ExportToSqliteDB(CppSQLite3DB& db)
 			{
 				//First compress the data
 				INT_PTR zippedSize = compressBound((ULONG)originalSize);
-				Bytef* pZipped = new Bytef[zippedSize];
+				Bytef* pZipped = new (std::nothrow) Bytef[zippedSize];
 				if (pZipped)
 				{
 					INT_PTR zipReturn = compress(pZipped, (uLongf*)&zippedSize, (const Bytef*)Data, (ULONG)originalSize);
@@ -247,7 +248,7 @@ bool CClip_ImportExport::ImportFromSqliteV1(CppSQLite3DB& db, CppSQLite3Query& q
 			const unsigned char* cData = qData.getBlobField(_T("ooData"), nDataLen);
 			if (cData != NULL)
 			{
-				Bytef* pUnZippedData = new Bytef[lOriginalSize];
+				Bytef* pUnZippedData = new (std::nothrow) Bytef[lOriginalSize];
 				if (pUnZippedData)
 				{
 					//the data in the exported file is compressed so uncompress it now

@@ -210,6 +210,7 @@ public:
 
 public:
 	virtual BOOL InitInstance();
+	virtual int Run();
 	virtual int ExitInstance();
 
 	afx_msg void OnAppAbout();

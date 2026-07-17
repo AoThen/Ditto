@@ -253,11 +253,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			bmp.CreateCompatibleBitmap(&clDC, rect.Width(), rect.Height());
 			pOldBitmap = m_dcBk.SelectObject(&bmp);
 			m_dcBk.BitBlt(0, 0, rect.Width(), rect.Height(), &clDC, rect1.left, rect1.top, SRCCOPY);
-			bmp.DeleteObject();
-		}
-
-		// standard image
-		if (m_dcStd.m_hDC == NULL)
+			m_dcBk.SelectObject(pOldBitmap);
 		{
 			PaintBk(pDC);
 
@@ -280,7 +276,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 			pOldBitmap = m_dcStd.SelectObject(&bmp);
 			m_dcStd.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-			bmp.DeleteObject();
+			m_dcStd.SelectObject(pOldBitmap);
 
 			// standard image pressed
 			if (m_dcStdP.m_hDC == NULL)
@@ -306,7 +302,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				pOldBitmap = m_dcStdP.SelectObject(&bmp);
 				m_dcStdP.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-				bmp.DeleteObject();
+				m_dcStdP.SelectObject(pOldBitmap);
 			}
 
 			// standard image hot
@@ -334,7 +330,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				pOldBitmap = m_dcStdH.SelectObject(&bmp);
 				m_dcStdH.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-				bmp.DeleteObject();
+				m_dcStdH.SelectObject(pOldBitmap);
 			}
 
 			// grayscale image
@@ -362,7 +358,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				pOldBitmap = m_dcGS.SelectObject(&bmp);
 				m_dcGS.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-				bmp.DeleteObject();
+				m_dcGS.SelectObject(pOldBitmap);
 			}
 		}
 
@@ -377,7 +373,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 			pOldBitmap = m_dcAlt.SelectObject(&bmp);
 			m_dcAlt.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-			bmp.DeleteObject();
+			m_dcAlt.SelectObject(pOldBitmap);
 
 			// alternate image pressed
 			if( (m_dcAltP.m_hDC == NULL) && m_bHaveAltImage )
@@ -390,7 +386,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				pOldBitmap = m_dcAltP.SelectObject(&bmp);
 				m_dcAltP.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-				bmp.DeleteObject();
+				m_dcAltP.SelectObject(pOldBitmap);
 			}
 
 			// alternate image hot
@@ -418,7 +414,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				pOldBitmap = m_dcAltH.SelectObject(&bmp);
 				m_dcAltH.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-				bmp.DeleteObject();
+				m_dcAltH.SelectObject(pOldBitmap);
 			}
 		}
 
@@ -643,7 +639,7 @@ void CGdipButton::SetBkGnd(CDC* pDC)
 	bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 	pOldBitmap = m_dcBk.SelectObject(&bmp);
 	m_dcBk.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, rectS.left, rectS.top, SRCCOPY);
-	bmp.DeleteObject();
+	m_dcBk.SelectObject(pOldBitmap);
 }
 
 

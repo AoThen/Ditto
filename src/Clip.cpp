@@ -73,11 +73,23 @@ HGLOBAL COleDataObjectEx::GetGlobalData(CLIPFORMAT cfFormat, LPFORMATETC lpForma
 			
 			li.HighPart = li.LowPart = 0;
 			
-			if ( SUCCEEDED( stg.pstm->Seek ( li, STREAM_SEEK_END, &uli )))
+if ( SUCCEEDED( stg.pstm->Seek ( li, STREAM_SEEK_END, &uli )))
 			{
 				hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, uli.LowPart );
-				
+				if (hGlobal == NULL)
+				{
+					Log(StrF(_T("COleDataObjectEx::GetGlobalData: GlobalAlloc failed, size=%lu"), uli.LowPart));
+					break;
+				}
+
 				void* pv = GlobalLock(hGlobal);
+				if (pv == NULL)
+				{
+					Log(_T("COleDataObjectEx::GetGlobalData: GlobalLock failed"));
+					GlobalFree(hGlobal);
+					hGlobal = NULL;
+					break;
+				}
 				stg.pstm->Seek(li, STREAM_SEEK_SET, NULL);
 				HRESULT result = stg.pstm->Read(pv, uli.LowPart, (PULONG)&uDataSize);
 				GlobalUnlock(hGlobal);
@@ -141,6 +153,84 @@ CClipFormat::CClipFormat(CLIPFORMAT cfType, HGLOBAL hgData, int parentId)
 CClipFormat::~CClipFormat() 
 { 
 	Free(); 
+}
+
+CClipFormat::CClipFormat(const CClipFormat& other)
+	: m_cfType(other.m_cfType)
+	, m_hgData(NULL)
+	, m_autoDeleteData(true)
+	, m_dataId(other.m_dataId)
+	, m_parentId(other.m_parentId)
+{
+	if (other.m_hgData)
+	{
+		SIZE_T size = ::GlobalSize(other.m_hgData);
+		if (size > 0)
+		{
+			LPVOID pSrc = ::GlobalLock(other.m_hgData);
+			if (pSrc)
+			{
+				m_hgData = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, size);
+				if (m_hgData)
+				{
+					LPVOID pDst = ::GlobalLock(m_hgData);
+					if (pDst)
+					{
+						memcpy(pDst, pSrc, size);
+						::GlobalUnlock(m_hgData);
+					}
+					else
+					{
+						::GlobalFree(m_hgData);
+						m_hgData = NULL;
+					}
+				}
+				::GlobalUnlock(other.m_hgData);
+			}
+		}
+	}
+}
+
+CClipFormat& CClipFormat::operator=(const CClipFormat& other)
+{
+	if (this != &other)
+	{
+		Free();
+		m_cfType = other.m_cfType;
+		m_dataId = other.m_dataId;
+		m_parentId = other.m_parentId;
+		m_autoDeleteData = true;
+		m_hgData = NULL;
+
+		if (other.m_hgData)
+		{
+			SIZE_T size = ::GlobalSize(other.m_hgData);
+			if (size > 0)
+			{
+				LPVOID pSrc = ::GlobalLock(other.m_hgData);
+				if (pSrc)
+				{
+					m_hgData = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, size);
+					if (m_hgData)
+					{
+						LPVOID pDst = ::GlobalLock(m_hgData);
+						if (pDst)
+						{
+							memcpy(pDst, pSrc, size);
+							::GlobalUnlock(m_hgData);
+						}
+						else
+						{
+							::GlobalFree(m_hgData);
+							m_hgData = NULL;
+						}
+					}
+					::GlobalUnlock(other.m_hgData);
+				}
+			}
+		}
+	}
+	return *this;
 }
 
 void CClipFormat::Clear()
@@ -784,14 +874,25 @@ bool CClip::SetDescFromText(HGLOBAL hgData, bool unicode)
 	if(unicode)
 	{
 		TCHAR* text = (TCHAR *) GlobalLock(hgData);
+		if (text == NULL)
+		{
+			Log(_T("CClip::SetDescFromText: GlobalLock failed (unicode)"));
+			return false;
+		}
 		bufLen = GlobalSize(hgData);
+		size_t realLen = wcsnlen_s(text, bufLen / sizeof(wchar_t));
 
-		m_Desc = CString(text, (int)(bufLen/(sizeof(wchar_t))));
+		m_Desc = CString(text, (int)realLen);
 		bRet = true;
 	}
 	else
 	{
 		char* text = (char *) GlobalLock(hgData);
+		if (text == NULL)
+		{
+			Log(_T("CClip::SetDescFromText: GlobalLock failed (ansi)"));
+			return false;
+		}
 		bufLen = GlobalSize(hgData);
 	
 		m_Desc = CString(text, (int)bufLen);
@@ -830,7 +931,15 @@ bool CClip::SetDescFromType()
 	{
 		using namespace nsPath;
 
+		if (m_Formats[nCF_HDROPIndex].m_hgData == NULL)
+			return false;
+
 		HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
+		if (drop == NULL)
+		{
+			Log(_T("CClip::SetDescFromType: GlobalLock failed for HDROP"));
+			return false;
+		}
 		int nNumFiles = min(5, DragQueryFile(drop, -1, NULL, 0));
 
 		if(nNumFiles > 1)
@@ -2087,12 +2196,14 @@ BOOL CClip::WriteImageToFile(CString path)
 	if (!bitmap && !png) return false;
 	
 	std::shared_ptr<CImage> i;
-	// png is more closer to original
-	if (png)
+	if (png && png->m_hgData)
 		i = PNGImageHelper::CImageFromHGLOBAL(png->m_hgData);
-	else
+	else if (bitmap && bitmap->m_hgData)
 		i = DIBImageHelper::CImageFromHGLOBAL(bitmap->m_hgData);
+	else
+		return FALSE;
 
+	if (!i) return FALSE;
 	return i->Save(path) == S_OK;
 }
 

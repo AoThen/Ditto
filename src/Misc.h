@@ -8,6 +8,7 @@
 
 #include "..\Shared/ArrayEx.h"
 #include <vector>
+#include <new>
 
 #define VK_MOUSE_CLICK 0x01
 #define VK_MOUSE_DOUBLE_CLICK 0x02
@@ -49,6 +50,16 @@ public:
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));	\
 		ASSERT(FALSE);				\
     }								\
+	catch (std::bad_alloc&)			\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: std::bad_alloc"));	\
+		ASSERT(FALSE);				\
+	}								\
+	catch (...)						\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: unknown exception"));	\
+		ASSERT(FALSE);				\
+	}
 
 #define CATCH_SQLITE_EXCEPTION_AND_RETURN(bRet)		\
 	catch (CppSQLite3Exception& e)	\
@@ -57,6 +68,18 @@ public:
 		ASSERT(FALSE);				\
 		return bRet;				\
     }								\
+	catch (std::bad_alloc&)			\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: std::bad_alloc"));	\
+		ASSERT(FALSE);				\
+		return bRet;				\
+	}								\
+	catch (...)						\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: unknown exception"));	\
+		ASSERT(FALSE);				\
+		return bRet;				\
+	}
 	
 #define	FIX_PATH(strPath) \
 { \

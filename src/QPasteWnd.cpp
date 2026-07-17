@@ -1339,6 +1339,11 @@ LRESULT CQPasteWnd::OnRefreshView(WPARAM wParam, LPARAM lParam)
 	// remove all additional refresh view messages from the queue
 	while (::PeekMessage(&msg, m_hWnd, WM_REFRESH_VIEW, WM_REFRESH_VIEW, PM_REMOVE)) {}
 
+	if (!theApp.m_bShowingQuickPaste)
+	{
+		return FALSE;
+	}
+
 	if (theApp.m_bShowingQuickPaste)
 	{
 		CopyReasonEnum::CopyReason copyReason = (CopyReasonEnum::CopyReason)wParam;

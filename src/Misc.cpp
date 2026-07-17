@@ -53,9 +53,9 @@ CString GetComputerName()
 void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 {
 #ifdef _UNICODE
-	FILE *file = _wfopen(fn, _T("a"));
+	FILE *file = _wfopen(fn, L"ab");
 #else
-	FILE *file = fopen(fn, _T("a"));
+	FILE *file = fopen(fn, _T("ab"));
 #endif
 
 	ASSERT( file );
@@ -63,9 +63,10 @@ void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 	if(file != NULL)
 	{
 		#ifdef _UNICODE
-			fwprintf(file, _T("%s"), msg);
+			CStringA utf8Msg = CW2A(msg, CP_UTF8);
+			fwrite((LPCSTR)utf8Msg, 1, utf8Msg.GetLength(), file);
 		#else
-			fprintf(file, _T("%s"),msg);
+			fprintf(file, _T("%s"), msg);
 		#endif
 
 		fclose(file);	

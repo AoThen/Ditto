@@ -35,6 +35,7 @@ protected:
 	bool m_desktopHasFocus;
 	HMODULE m_hOleacc;
 	AccessibleObjectFromWindow m_AccessibleObjectFromWindow;
+	DWORD m_lastTrackTime;
 	
 protected:
 	bool WaitForActiveWnd(HWND hwndToHaveFocus, int timeout);

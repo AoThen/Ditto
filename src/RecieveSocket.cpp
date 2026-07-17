@@ -251,9 +251,15 @@ BOOL CRecieveSocket::RecieveCSendInfo(CSendInfo *pInfo)
 	LPVOID lpData = ReceiveEncryptedData(lRecieveSize, lOutSize);
 	if(lpData)
 	{
-		memcpy(pInfo, lpData, sizeof(CSendInfo));
-
-		bRet = (pInfo->m_nSize == sizeof(CSendInfo));
+		if (lOutSize >= (long)sizeof(CSendInfo))
+		{
+			memcpy(pInfo, lpData, sizeof(CSendInfo));
+			bRet = (pInfo->m_nSize == sizeof(CSendInfo));
+		}
+		else
+		{
+			Log(StrF(_T("CRecieveSocket::RecieveCSendInfo: decrypted size %ld < expected %zu"), lOutSize, sizeof(CSendInfo)));
+		}
 
 		FreeDecryptedData();
 	}

@@ -44,6 +44,8 @@ public:
 	int m_parentId;
 
 	CClipFormat(CLIPFORMAT cfType = 0, HGLOBAL hgData = 0, int parentId = -1);
+	CClipFormat(const CClipFormat& other);
+	CClipFormat& operator=(const CClipFormat& other);
 	~CClipFormat();
 
 	void Clear();

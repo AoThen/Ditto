@@ -404,7 +404,7 @@ BOOL CCP_MainApp::InitInstance()
 		cs.Format(_T("Error loading language file - %s - \n\n%s"), csFile, m_Language.m_csLastError);
 		Log(cs);
 
-		m_Language.LoadLanguageFile(CGetSetOptions::GetPath(PATH_LANGUAGE) + _T("English.xml"));
+		m_Language.LoadLanguageFile(_T("English"));
 	}
 
 	m_icuString.Load();
@@ -435,6 +435,30 @@ BOOL CCP_MainApp::InitInstance()
 	m_CloudSyncManager.Initialize();
 
 	return TRUE;
+}
+
+int CCP_MainApp::Run()
+{
+	try
+	{
+		return CWinApp::Run();
+	}
+	catch (CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("Unhandled SQLite exception in message loop: %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+	}
+	catch (std::exception& e)
+	{
+		Log(StrF(_T("Unhandled C++ exception in message loop: %hs"), e.what()));
+		ASSERT(FALSE);
+	}
+	catch (...)
+	{
+		Log(_T("Unhandled unknown exception in message loop"));
+		ASSERT(FALSE);
+	}
+	return EXIT_FAILURE;
 }
 
 void CCP_MainApp::CreateMainWnd()
@@ -910,7 +934,7 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 	// give some visual indication
 	if(m_bShowingQuickPaste)
 	{
-		ASSERT(QPasteWnd());
+		if (!QPasteWnd()) return;
 		QPasteWnd()->SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
 		QPasteWnd()->RefreshNc();
 	}

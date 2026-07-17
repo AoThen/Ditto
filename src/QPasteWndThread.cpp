@@ -195,7 +195,8 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					pos++;
 				}
 
-				DWORD loadCount = GetTickCount() - startTick;
+				DWORD elapsedLoad = GetTickCount() - startTick;
+				int totalLoaded = loadCount;
 				DWORD countCountStart = GetTickCount();
 				DWORD countCount = 0;
 				DWORD acceleratorCount = 0;
@@ -226,7 +227,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					pasteWnd->m_loadItems.erase(pasteWnd->m_loadItems.begin());
 				}
 
-				Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), loadCount, GetTickCount() - startTick, loadCount, countCount, acceleratorCount));
+				Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), totalLoaded, GetTickCount() - startTick, elapsedLoad, countCount, acceleratorCount));
 			}
 			catch (CppSQLite3Exception& e)	\
 			{								\
