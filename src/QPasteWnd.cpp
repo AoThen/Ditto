@@ -1649,15 +1649,20 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 		if (csSQLSearch != _T(""))
 		{
 			CPinyinConvert pinyinConv;
-			if (pinyinConv.IsAlphaQuery(std::wstring(csSQLSearch)))
+			CString alphaOnly = pinyinConv.ExtractAlpha(csSQLSearch);
+			if (alphaOnly.IsEmpty() == FALSE)
 			{
 				m_lstHeader.SetPinyinSearch(true);
 
-				CString lowSearch = csSQLSearch;
+				CString lowSearch = alphaOnly;
 				lowSearch.MakeLower();
+				lowSearch.Replace(_T("\\"), _T("\\\\"));
+				lowSearch.Replace(_T("'"), _T("''"));
+				lowSearch.Replace(_T("%"), _T("\\%"));
+				lowSearch.Replace(_T("_"), _T("\\_"));
 
 				CString pinyinLike;
-				pinyinLike.Format(_T(" OR Main.pinyin LIKE '%%%s%%' OR Main.pinyinAbbr LIKE '%%%s%%'"),
+				pinyinLike.Format(_T(" OR Main.pinyin LIKE '%%%s%%' ESCAPE '\\' OR Main.pinyinAbbr LIKE '%%%s%%' ESCAPE '\\'"),
 					lowSearch, lowSearch);
 				strFilter += pinyinLike;
 			}

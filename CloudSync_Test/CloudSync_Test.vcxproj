@@ -94,6 +94,7 @@
     <ClCompile Include="TestWildCardMatch.cpp" />
     <ClCompile Include="TestSHA2.cpp" />
     <ClCompile Include="TestSlugify.cpp" />
+    <ClCompile Include="TestPinyinConvert.cpp" />
     <ClCompile Include="TestConvertRTFToText.cpp" />
     <ClCompile Include="CloudCryptoTest.cpp" />
     <ClCompile Include="CloudEncryptionTest.cpp" />
@@ -158,6 +159,9 @@
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\MemUtil.cpp">
+      <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="..\src\Pinyin_Convert.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>

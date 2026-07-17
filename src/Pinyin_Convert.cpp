@@ -22,6 +22,18 @@ bool CPinyinConvert::IsAlphaQuery(const std::wstring& s) const
     return true;
 }
 
+CString CPinyinConvert::ExtractAlpha(const CString& input) const
+{
+    CString result;
+    for (int i = 0; i < input.GetLength(); i++)
+    {
+        TCHAR c = input[i];
+        if ((c >= _T('a') && c <= _T('z')) || (c >= _T('A') && c <= _T('Z')))
+            result += c;
+    }
+    return result;
+}
+
 const char* CPinyinConvert::LookupPinyin(wchar_t ch)
 {
     if (ch < kPinyinTableFirst || ch > kPinyinTableLast)

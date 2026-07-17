@@ -2185,11 +2185,18 @@ void CQListCtrl::StopHideScrollBarTimer()
 void CQListCtrl::SetSearchText(CString text)
 {
 	m_searchText = text;
+	ClearPinyinCache();
 }
 
 void CQListCtrl::SetPinyinSearch(bool bPinyin)
 {
 	m_bPinyinSearch = bPinyin;
+	ClearPinyinCache();
+}
+
+void CQListCtrl::ClearPinyinCache()
+{
+	m_pinyinCache.clear();
 }
 
 void CQListCtrl::HidePopup(bool checkShowPersistant)
@@ -2345,13 +2352,27 @@ void CQListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 
 int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, COLORREF color)
 {
+	CString cacheKey = csText;
+
 	std::wstring wText(csText.GetString());
 	size_t nChars = wText.length();
 	if (nChars == 0) return 0;
 
-	CPinyinConvert conv;
-	std::string pinyin = conv.ConvertToPinyin(wText);
-	std::string abbr = conv.ConvertToAbbreviation(wText);
+	std::string pinyin;
+	std::string abbr;
+	auto cacheIt = m_pinyinCache.find(cacheKey);
+	if (cacheIt != m_pinyinCache.end())
+	{
+		pinyin = cacheIt->second.first;
+		abbr = cacheIt->second.second;
+	}
+	else
+	{
+		CPinyinConvert conv;
+		pinyin = conv.ConvertToPinyin(wText);
+		abbr = conv.ConvertToAbbreviation(wText);
+		m_pinyinCache[cacheKey] = std::make_pair(pinyin, abbr);
+	}
 
 	CT2A searchA(searchText, CP_UTF8);
 	std::string searchStr(searchA);
