@@ -17,12 +17,14 @@
 
 // Static member definitions
 std::vector<BYTE> CCloudCrypto::m_aesKey;
+std::mutex CCloudCrypto::s_aesMutex;
 
 // ---------------------------------------------------------------------------
 // Reset
 // ---------------------------------------------------------------------------
 void CCloudCrypto::Reset()
 {
+	std::lock_guard<std::mutex> lock(s_aesMutex);
 	m_aesKey.clear();
 }
 
@@ -38,6 +40,7 @@ BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)
 	}
 	try
 	{
+		std::lock_guard<std::mutex> lock(s_aesMutex);
 		m_aesKey = aesKey;
 		return TRUE;
 	}
@@ -55,6 +58,15 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 {
 	try
 	{
+		// Copy key under lock for thread safety
+		std::vector<BYTE> aesKey;
+		{
+			std::lock_guard<std::mutex> lock(s_aesMutex);
+			aesKey = m_aesKey;
+		}
+		if (aesKey.size() != 32)
+			return CStringA("");
+
 		// Build plaintext bytes
 		std::vector<BYTE> pt(plaintext.GetString(), plaintext.GetString() + plaintext.GetLength());
 
@@ -63,7 +75,7 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 
 		// Encrypt
 		std::vector<BYTE> tag;
-		std::vector<BYTE> ct = AesGcmEncrypt(m_aesKey, iv, pt, tag);
+		std::vector<BYTE> ct = AesGcmEncrypt(aesKey, iv, pt, tag);
 		if (tag.empty())
 		{
 			CLOUD_CRYPTO_TRACE("[CloudCrypto] Encrypt: AesGcmEncrypt failed. pt.size()=%zu\n", pt.size());
@@ -96,6 +108,15 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 {
 	try
 	{
+		// Copy key under lock for thread safety
+		std::vector<BYTE> aesKey;
+		{
+			std::lock_guard<std::mutex> lock(s_aesMutex);
+			aesKey = m_aesKey;
+		}
+		if (aesKey.size() != 32)
+			return CStringA("");
+
 		std::vector<BYTE> data = Base64Decode(encryptedBase64);
 		if (data.size() < 12 + 16) // minimum: IV + tag, no ciphertext
 		{
@@ -115,7 +136,7 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 		CLOUD_CRYPTO_TRACE("[CloudCrypto] Decrypt: data.size()=%zu, ct.size()=%zu\n", data.size(), ct.size());
 
 		// Decrypt
-		std::vector<BYTE> pt = AesGcmDecrypt(m_aesKey, iv, ct, tag);
+		std::vector<BYTE> pt = AesGcmDecrypt(aesKey, iv, ct, tag);
 		CLOUD_CRYPTO_TRACE("[CloudCrypto] Decrypt: pt.size()=%zu\n", pt.size());
 		
 		if (pt.empty() && !ct.empty())

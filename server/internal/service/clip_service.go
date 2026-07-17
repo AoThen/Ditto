@@ -527,6 +527,40 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			allPrepared = append(allPrepared, preparedItem{item: pc, formats: formats})
 		}
 
+		// Validate group ownership for all pushed clips
+		groupIDs := make(map[string]bool)
+		for _, p := range allPrepared {
+			if p.item.GroupID != "" {
+				groupIDs[p.item.GroupID] = true
+			}
+		}
+		if len(groupIDs) > 0 {
+			gids := make([]string, 0, len(groupIDs))
+			for gid := range groupIDs {
+				gids = append(gids, gid)
+			}
+			var ownedGroups []model.Group
+			if err := database.DB.Where("id IN ? AND user_id = ?", gids, userID).Find(&ownedGroups).Error; err != nil {
+				return nil, fmt.Errorf("sync: group validation failed: %w", err)
+			}
+			if len(ownedGroups) != len(gids) {
+				return nil, fmt.Errorf("sync: one or more group_ids do not belong to this user")
+			}
+		}
+
+		// Check storage quota
+		var totalBytes int64
+		database.DB.Raw("SELECT COALESCE(SUM(LENGTH(data)),0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ?)", userID).Scan(&totalBytes)
+		var newBytes int64
+		for _, p := range allPrepared {
+			for _, f := range p.formats {
+				newBytes += int64(len(f.Data))
+			}
+		}
+		if totalBytes+newBytes > 100*1024*1024 { // 100MB default limit
+			return nil, fmt.Errorf("sync: storage quota exceeded (max 100MB)")
+		}
+
 		// Process in batches, each batch in its own transaction
 		// to minimize SQLite write-lock hold time
 		for start := 0; start < len(allPrepared); start += PushBatchSize {

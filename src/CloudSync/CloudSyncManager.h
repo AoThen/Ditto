@@ -114,6 +114,7 @@ private:
 	// Reusable HTTP client (httplib::Client) for all REST API calls
 	std::unique_ptr<httplib::Client> m_httpClient;
 	CString   m_httpClientUrl; // Cached URL to detect server URL changes
+	CStringA  m_lastHttpToken; // Last token used for HTTP client auth headers
 
 	// Critical section for thread-safe access to theApp.m_db from sync thread
 	mutable CCriticalSection m_csDb;

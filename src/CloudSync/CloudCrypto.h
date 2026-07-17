@@ -2,6 +2,7 @@
 #include <afx.h>
 #include <string>
 #include <vector>
+#include <mutex>
 
 class CCloudCrypto
 {
@@ -73,4 +74,5 @@ public:
 
 private:
 	static std::vector<BYTE> m_aesKey;
+	static std::mutex s_aesMutex;
 };

@@ -127,6 +127,22 @@ func (s *UserService) UpdateUser(id uint, updates map[string]interface{}) error 
 			filtered[k] = v
 		}
 	}
+	// Prevent downgrading the last admin
+	if role, ok := filtered["role"]; ok && role == "user" {
+		var user model.User
+		if err := database.DB.First(&user, id).Error; err != nil {
+			return err
+		}
+		if user.Role == "admin" {
+			var adminCount int64
+			if err := database.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount).Error; err != nil {
+				return err
+			}
+			if adminCount <= 1 {
+				return errors.New("无法将最后一个管理员降级为普通用户")
+			}
+		}
+	}
 	return database.DB.Model(&model.User{}).Where("id = ?", id).Updates(filtered).Error
 }
 
@@ -210,5 +226,15 @@ func (s *UserService) ResetPassword(userID uint, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	return database.DB.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", hashedPassword).Error
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.User{}).Where("id = ?", userID).Update("password_hash", hashedPassword).Error; err != nil {
+			return err
+		}
+		// Revoke all device tokens by incrementing token_version
+		if err := tx.Model(&model.Device{}).Where("user_id = ?", userID).
+			Update("token_version", gorm.Expr("token_version + 1")).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }

@@ -173,6 +173,24 @@ func (rl *RateLimiter) getRecord(key string) *model.RateLimitRecord {
 	return &record
 }
 
+func (rl *RateLimiter) SyncRateLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+		key := "sync:user:" + fmt.Sprintf("%d", userID)
+
+		rl.mu.Lock()
+		record := rl.getRecord(key)
+		if record != nil && record.FailCount >= 60 {
+			rl.mu.Unlock()
+			response.Error(c, http.StatusTooManyRequests, 42902, "同步请求过于频繁，请稍后再试")
+			c.Abort()
+			return
+		}
+		rl.mu.Unlock()
+		c.Next()
+	}
+}
+
 func (rl *RateLimiter) deleteRecord(key string) {
 	database.DB.Delete(&model.RateLimitRecord{}, "key = ?", key)
 	rl.cache.Delete(key)

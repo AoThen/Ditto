@@ -42,14 +42,31 @@ static void LogMessage(const CString& msg)
 void CCloudSyncManager::EnsureHttpClient()
 {
 	EnterCriticalSection(&m_csHttpClient);
+	// Normalize URL: ensure https:// prefix
 	CStringA serverUrlA(m_serverUrl);
 	std::string url = serverUrlA.GetString();
+	if (url.find("https://") != 0 && url.find("http://") != 0)
+	{
+		url = "https://" + url;
+	}
+	// Detect token change: if token differs from last used, force client rebuild
+	if (m_httpClient && m_httpClientUrl == m_serverUrl)
+	{
+		CStringA currentToken = CGetSetOptions::GetCloudDeviceToken();
+		if (m_lastHttpToken != currentToken)
+		{
+			m_httpClient.reset();
+			m_httpClientUrl.Empty();
+		}
+	}
 	if (!m_httpClient || m_httpClientUrl != m_serverUrl)
 	{
 		m_httpClient = std::make_unique<httplib::Client>(url);
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
+		m_deviceToken = CGetSetOptions::GetCloudDeviceToken();
+		m_lastHttpToken = m_deviceToken;
 		m_httpClient->set_default_headers({
 			{"Authorization", "Bearer " + std::string(CStringA(m_deviceToken))}
 		});
@@ -780,7 +797,9 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	{
 		EnsureHttpClient();
 
+		EnterCriticalSection(&m_csHttpClient);
 		auto res = m_httpClient->Get("/api/v1/encryption/salt");
+		LeaveCriticalSection(&m_csHttpClient);
 		if (!res || res->status != 200)
 			return FALSE;
 
@@ -1002,7 +1021,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			EnsureHttpClient();
 
 			std::string bodyStr = syncReq.dump();
+			EnterCriticalSection(&m_csHttpClient);
 			auto res = m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json");
+			LeaveCriticalSection(&m_csHttpClient);
 			if (!res)
 			{
 				LogMessage(_T("PushNewClips: failed to connect to server"));
@@ -1276,10 +1297,15 @@ void CCloudSyncManager::PullChanges()
 		// Use GET /clips/changes for pull-only (server has a dedicated pull endpoint)
 		EnsureHttpClient();
 
-		// GET /api/v1/clips/changes?since=...
-		CStringA path;
+		bool hasMore = false;
+		do
+		{
+			// GET /api/v1/clips/changes?since=...
+			CStringA path;
 		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
+		EnterCriticalSection(&m_csHttpClient);
 		auto res = m_httpClient->Get(path.GetString());
+		LeaveCriticalSection(&m_csHttpClient);
 		if (!res)
 		{
 			LogMessage(_T("PullChanges: failed to connect to server"));
@@ -1374,7 +1400,7 @@ void CCloudSyncManager::PullChanges()
 			if (!hasClips && !hasDeletions)
 			{
 				LogMessage(_T("PullChanges: no new clips or deletions from other devices"));
-				return;
+				hasMore = false;
 			}
 
 			// Process each new clip
@@ -1500,10 +1526,14 @@ void CCloudSyncManager::PullChanges()
 				}
 			}
 
-			EnterCriticalSection(&m_csSync);
-			m_lastSyncTime = newSyncTime;
-			LeaveCriticalSection(&m_csSync);
-			CGetSetOptions::SetCloudLastSyncTime((__int64)newSyncTime);
+			// Only advance cursor if we actually processed clips successfully
+			if (mergedCount > 0 || deletedCount > 0)
+			{
+				EnterCriticalSection(&m_csSync);
+				m_lastSyncTime = newSyncTime;
+				LeaveCriticalSection(&m_csSync);
+				CGetSetOptions::SetCloudLastSyncTime((__int64)newSyncTime);
+			}
 
 			CString msg;
 			if (deletedCount > 0)
@@ -1517,6 +1547,24 @@ void CCloudSyncManager::PullChanges()
 					hasClips ? clipsNode->size() : 0, mergedCount);
 			}
 			LogMessage(msg);
+
+			// Check has_more for pagination
+			hasMore = dataNode->value("has_more", false);
+			if (hasMore)
+			{
+				if (dataNode->contains("server_time"))
+				{
+					sinceStr = CStringA((*dataNode)["server_time"].get<std::string>().c_str());
+				}
+				else if (dataNode->contains("sync_time"))
+				{
+					sinceStr = CStringA((*dataNode)["sync_time"].get<std::string>().c_str());
+				}
+				else
+				{
+					hasMore = false;
+				}
+			}
 		}
 		catch (const json::parse_error& e)
 		{
@@ -1526,7 +1574,9 @@ void CCloudSyncManager::PullChanges()
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = err;
 			LeaveCriticalSection(&m_csStatus);
+			hasMore = false;
 		}
+		} while (hasMore);
 	}
 	catch (const std::exception& e)
 	{
@@ -1876,9 +1926,53 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			}
 		}
 
-		// Check if clip already exists locally (by CRC match - same content)
+		// FIRST: Check if we already have a mapping for this remote clip
 		int existingId = -1;
 		time_t localModDate = 0;
+		if (!serverIdStr.empty())
+		{
+			existingId = GetLocalIdByRemoteId(serverIdStr);
+			if (existingId > 0)
+			{
+				// Found existing mapping - load its modification time
+				CSingleLock lockDb(&m_csDb, TRUE);
+				CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+					_T("SELECT lModifiedDate FROM Main WHERE lID = ? AND bIsGroup = 0 LIMIT 1"));
+				stmt.bind(1, existingId);
+				CppSQLite3Query q = stmt.execQuery();
+				if (q.eof() == false)
+				{
+					localModDate = (time_t)q.getInt64Field(_T("lModifiedDate"));
+				}
+				lockDb.Unlock();
+
+				if (bForce)
+				{
+					// Force: delete and recreate
+					DeleteLocalClip(existingId);
+					existingId = -1;
+				}
+				else if (remoteUpdatedAt > localModDate)
+				{
+					// Remote is newer: update this clip's content
+					DeleteLocalClip(existingId);
+					existingId = -1;  // Will recreate below
+				}
+				else
+				{
+					// Local is newer: skip, keep mapping
+					CString msg;
+					msg.Format(_T("MergeRemoteClipToLocal: clip %hs exists locally (LWW: local wins)"), serverIdStr.c_str());
+					LogMessage(msg);
+					return existingId;
+				}
+			}
+		}
+
+		// If no mapping found, fall through to existing CRC/description match logic
+		if (existingId <= 0)
+		{
+			// Check if clip already exists locally (by CRC match - same content)
 		try
 		{
 			// Primary check: CRC match (same content already exists)
@@ -1909,6 +2003,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 		catch (...)
 		{
 			LogMessage(_T("MergeRemoteClipToLocal: CRC query failed, will create new clip"));
+		}
 		}
 
 		if (existingId > 0)
@@ -2319,10 +2414,11 @@ void CCloudSyncManager::SaveRemoteIdMapping(int localId, const std::string& remo
 	try
 	{
 		CSingleLock lockDb(&m_csDb, TRUE);
-		CString csSQL;
-		csSQL.Format(_T("INSERT OR REPLACE INTO CloudClipMap (local_id, remote_id) ")
-		             _T("VALUES (%d, '%hs')"), localId, remoteId.c_str());
-		theApp.m_db.execDML(csSQL);
+		CString csSQL = _T("INSERT OR REPLACE INTO CloudClipMap (local_id, remote_id) VALUES (?, ?)");
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+		stmt.bind(1, localId);
+		stmt.bind(2, CString(remoteId.c_str()));
+		stmt.execDML();
 	}
 	catch (const CppSQLite3Exception& e)
 	{
@@ -2348,10 +2444,10 @@ int CCloudSyncManager::GetLocalIdByRemoteId(const std::string& remoteId)
 	try
 	{
 		CSingleLock lockDb(&m_csDb, TRUE);
-		CString csSQL;
-		csSQL.Format(_T("SELECT local_id FROM CloudClipMap WHERE remote_id = '%hs' LIMIT 1"),
-		             remoteId.c_str());
-		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+		CString csSQL = _T("SELECT local_id FROM CloudClipMap WHERE remote_id = ? LIMIT 1");
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+		stmt.bind(1, CString(remoteId.c_str()));
+		CppSQLite3Query q = stmt.execQuery();
 		if (q.eof() == false)
 		{
 			return q.getIntField(_T("local_id"));
@@ -2443,10 +2539,11 @@ void CCloudSyncManager::SaveRemoteGroupIdMapping(int localId, const std::string&
 	try
 	{
 		CSingleLock lockDb(&m_csDb, TRUE);
-		CString csSQL;
-		csSQL.Format(_T("INSERT OR REPLACE INTO CloudGroupMap (local_id, remote_id) ")
-		             _T("VALUES (%d, '%hs')"), localId, remoteId.c_str());
-		theApp.m_db.execDML(csSQL);
+		CString csSQL = _T("INSERT OR REPLACE INTO CloudGroupMap (local_id, remote_id) VALUES (?, ?)");
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+		stmt.bind(1, localId);
+		stmt.bind(2, CString(remoteId.c_str()));
+		stmt.execDML();
 	}
 	catch (const CppSQLite3Exception& e)
 	{
@@ -2472,10 +2569,10 @@ int CCloudSyncManager::GetLocalGroupIdByRemoteId(const std::string& remoteId)
 	try
 	{
 		CSingleLock lockDb(&m_csDb, TRUE);
-		CString csSQL;
-		csSQL.Format(_T("SELECT local_id FROM CloudGroupMap WHERE remote_id = '%hs' LIMIT 1"),
-		             remoteId.c_str());
-		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+		CString csSQL = _T("SELECT local_id FROM CloudGroupMap WHERE remote_id = ? LIMIT 1");
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+		stmt.bind(1, CString(remoteId.c_str()));
+		CppSQLite3Query q = stmt.execQuery();
 		if (q.eof() == false)
 		{
 			return q.getIntField(_T("local_id"));
@@ -2566,9 +2663,10 @@ void CCloudSyncManager::DeleteRemoteGroupIdMappingByRemote(const std::string& re
 	try
 	{
 		CSingleLock lockDb(&m_csDb, TRUE);
-		CString csSQL;
-		csSQL.Format(_T("DELETE FROM CloudGroupMap WHERE remote_id = '%hs'"), remoteId.c_str());
-		theApp.m_db.execDML(csSQL);
+		CString csSQL = _T("DELETE FROM CloudGroupMap WHERE remote_id = ?");
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+		stmt.bind(1, CString(remoteId.c_str()));
+		stmt.execDML();
 	}
 	catch (const CppSQLite3Exception& e)
 	{
@@ -2620,7 +2718,9 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			if (remoteId.empty())
 			{
 				// Create new group
+				EnterCriticalSection(&m_csHttpClient);
 				auto res = m_httpClient->Post("/api/v1/groups", body.dump(), "application/json");
+				LeaveCriticalSection(&m_csHttpClient);
 				if (res && res->status == 200)
 				{
 					try
@@ -2641,14 +2741,24 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			else
 			{
 				// Update existing group
+				EnterCriticalSection(&m_csHttpClient);
 				auto res = m_httpClient->Put(("/api/v1/groups/" + remoteId).c_str(), body.dump(), "application/json");
-			}
+				LeaveCriticalSection(&m_csHttpClient);
+				if (!res || res->status != 200)
+				{
+					CString err;
+					err.Format(_T("PushGroups: failed to update group %hs (HTTP %d)"), remoteId.c_str(), res ? res->status : 0);
+					LogMessage(err);
+				}
 
 			q.nextRow();
 		}
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
+		CString err;
+		err.Format(_T("PushGroups error: %hs"), e.what());
+		LogMessage(err);
 	}
 	return newGroupIds;
 }
@@ -2669,7 +2779,9 @@ void CCloudSyncManager::PullGroups()
 		while (hasMore)
 		{
 			std::string url = "/api/v1/groups?page=" + std::to_string(page) + "&per_page=200";
+			EnterCriticalSection(&m_csHttpClient);
 			auto res = m_httpClient->Get(url.c_str());
+			LeaveCriticalSection(&m_csHttpClient);
 			if (!res || res->status != 200)
 				break;
 
@@ -2772,8 +2884,11 @@ void CCloudSyncManager::PullGroups()
 					CString csSQL;
 					csSQL.Format(_T("DELETE FROM Main WHERE lID = %d AND bIsGroup = 1"), localId);
 					theApp.m_db.execDML(csSQL);
-					csSQL.Format(_T("DELETE FROM CloudGroupMap WHERE remote_id = '%hs'"), remoteId.c_str());
-					theApp.m_db.execDML(csSQL);
+					// Parameterized: remote_id from server
+					CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+						_T("DELETE FROM CloudGroupMap WHERE remote_id = ?"));
+					stmt.bind(1, CString(remoteId.c_str()));
+					stmt.execDML();
 				}
 				q.nextRow();
 			}
@@ -2791,7 +2906,9 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 {
 	if (remoteGroupId.empty()) return;
 	EnsureHttpClient();
+	EnterCriticalSection(&m_csHttpClient);
 	auto res = m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str());
+	LeaveCriticalSection(&m_csHttpClient);
 	if (res && (res->status == 200 || res->status == 404))
 	{
 		DeleteRemoteGroupIdMappingByRemote(remoteGroupId);
@@ -2819,7 +2936,9 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 	nlohmann::json body;
 	body["ids"] = remoteIds;
 
+	EnterCriticalSection(&m_csHttpClient);
 	auto res = m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json");
+	LeaveCriticalSection(&m_csHttpClient);
 }
 
 // ---------------------------------------------------------------------------
@@ -2843,7 +2962,9 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 	nlohmann::json body;
 	body["ids"] = remoteIds;
 
+	EnterCriticalSection(&m_csHttpClient);
 	auto res = m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json");
+	LeaveCriticalSection(&m_csHttpClient);
 	if (res && (res->status == 200 || res->status == 404))
 	{
 		for (int localId : localClipIds)
@@ -3157,7 +3278,13 @@ void CCloudSyncManager::TriggerQuickSync()
 
 void CCloudSyncManager::OnGroupDeleted(int localGroupId)
 {
-	LogMessage(_T("OnGroupDeleted: removing group mapping and triggering quick sync."));
+	LogMessage(_T("OnGroupDeleted: notifying server and removing group mapping."));
+	// Notify server about the deletion
+	std::string remoteGroupId = GetRemoteGroupIdByLocalId(localGroupId);
+	if (!remoteGroupId.empty())
+	{
+		DeleteRemoteGroup(remoteGroupId);
+	}
 	DeleteRemoteGroupIdMapping(localGroupId);
 	TriggerQuickSync();
 }

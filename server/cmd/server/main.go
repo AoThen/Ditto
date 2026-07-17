@@ -203,7 +203,7 @@ func main() {
 			clips.GET("/:id", clipHandler.GetClip)
 			clips.GET("/:id/download", clipHandler.DownloadClip)
 			clips.DELETE("/:id", clipHandler.DeleteClip)
-			clips.POST("/sync", clipHandler.Sync)
+			clips.POST("/sync", rateLimiter.SyncRateLimit(), clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
 			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)

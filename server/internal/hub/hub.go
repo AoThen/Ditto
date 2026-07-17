@@ -182,7 +182,11 @@ func (h *Hub) Register(userID int64, conn *websocket.Conn) *Client {
 
 // Unregister removes a WebSocket connection.
 func (h *Hub) Unregister(client *Client) {
-	h.unregister <- client
+	select {
+	case h.unregister <- client:
+	default:
+		// If runLoop is not consuming (shutting down), skip to avoid blocking
+	}
 }
 
 // Broadcast sends a message to ALL connections of a user.
@@ -306,6 +310,8 @@ func (h *Hub) closeAll() {
 func (h *Hub) Shutdown() {
 	h.cancel()
 	close(h.done)
+	// Also close all connections directly (handles case where runLoop may not process them)
+	h.closeAll()
 	h.backend.Close()
 	h.wg.Wait()
 	log.Println("[ws] hub shut down")

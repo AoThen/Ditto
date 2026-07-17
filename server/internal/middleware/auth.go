@@ -83,6 +83,19 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
+		// Verify user is active
+		var user model.User
+		if err := database.DB.First(&user, claims.UserID).Error; err != nil {
+			response.Error(c, http.StatusUnauthorized, 40102, "用户不存在")
+			c.Abort()
+			return
+		}
+		if !user.IsActive {
+			response.Error(c, http.StatusForbidden, 40301, "账号已被禁用")
+			c.Abort()
+			return
+		}
+
 		c.Set("user_id", claims.UserID)
 		c.Set("device_id", claims.DeviceID)
 		// C3 FIX: Store raw token in context for refresh (avoids ParseUnverified)

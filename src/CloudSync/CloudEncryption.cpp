@@ -24,12 +24,26 @@ static std::string CStringToStdString(const CString& str)
 void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString& deviceToken)
 {
 	std::string url = CStringToStdString(serverUrl);
+	// Enforce HTTPS: reject plain http for security
+	if (url.find("https://") != 0)
+	{
+		if (url.find("http://") == 0)
+		{
+			OutputDebugStringA("[CloudEncryption] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			m_httpClient.reset();
+			m_httpClientUrl.Empty();
+			return;
+		}
+		// No scheme - default to https
+		url = "https://" + url;
+	}
 	if (!m_httpClient || m_httpClientUrl != serverUrl)
 	{
 		m_httpClient = std::make_unique<httplib::Client>(url);
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
+		m_httpClient->set_server_certificate_verification(true);
 		{
 			httplib::Headers headers;
 			headers.emplace("Authorization", "Bearer " + CStringToStdString(deviceToken));

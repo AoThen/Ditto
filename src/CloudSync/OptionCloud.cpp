@@ -750,6 +750,9 @@ msg = theApp.m_Language.GetString("CloudMsgAuthExpired",
 		
 		// Automatically open login dialog flow
 		OnBtnLogin();
+		
+		// After login, reinitialize sync to pick up the new token
+		PostMessage(WM_CLOUD_REINIT_SYNC, 0, 0);
 	}
 	else if (statusCode == 403)
 	{
