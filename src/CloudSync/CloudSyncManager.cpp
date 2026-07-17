@@ -804,6 +804,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	}
 	catch (...)
 	{
+		LogMessage(_T("CheckAndNotifyEncryptionChange: unexpected error"));
 	}
 	return FALSE;
 }
@@ -1190,6 +1191,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 	}
 	catch (...)
 	{
+		LogMessage(_T("ExtractFilePathsFromHDROP: unexpected error"));
 	}
 	return paths;
 }
@@ -1886,7 +1888,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 		}
 		catch (...)
 		{
-			// Clip doesn't exist, will create new one
+			LogMessage(_T("MergeRemoteClipToLocal: CRC query failed, will create new clip"));
 		}
 
 		if (existingId > 0)
@@ -1989,7 +1991,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			}
 			catch (...)
 			{
-				// No description match or error - will create new clip
+				LogMessage(_T("MergeRemoteClipToLocal: description match query failed, will create new clip"));
 			}
 		}
 
@@ -2585,7 +2587,10 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 							newGroupIds.push_back(resp["data"]["id"].get<std::string>());
 						}
 					}
-					catch (...) {}
+					catch (...)
+					{
+						LogMessage(_T("PushGroups: failed to process group response"));
+					}
 				}
 			}
 			else
@@ -2702,7 +2707,11 @@ void CCloudSyncManager::PullGroups()
 				hasMore = resp["data"].value("has_more", false);
 				page++;
 			}
-			catch (...) { break; }
+			catch (...)
+			{
+				LogMessage(_T("PullGroups: failed to parse page, breaking pagination"));
+				break;
+			}
 		}
 
 		// 清理已不在服务端存在的群组映射
@@ -2801,7 +2810,10 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 				csSQL.Format(_T("DELETE FROM CloudClipMap WHERE local_id = %d"), localId);
 				theApp.m_db.execDML(csSQL);
 			}
-			catch (...) { }
+			catch (...)
+			{
+				LogMessage(_T("MarkClipsDontSync: failed to delete mapping"));
+			}
 		}
 	}
 }
