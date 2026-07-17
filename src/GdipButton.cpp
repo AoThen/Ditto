@@ -254,6 +254,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			pOldBitmap = m_dcBk.SelectObject(&bmp);
 			m_dcBk.BitBlt(0, 0, rect.Width(), rect.Height(), &clDC, rect1.left, rect1.top, SRCCOPY);
 			m_dcBk.SelectObject(pOldBitmap);
+			bmp.DeleteObject();
 		}
 
 		PaintBk(pDC);
@@ -278,6 +279,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			pOldBitmap = m_dcStd.SelectObject(&bmp);
 			m_dcStd.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 			m_dcStd.SelectObject(pOldBitmap);
+			bmp.DeleteObject();
 
 			// standard image pressed
 			if (m_dcStdP.m_hDC == NULL)
@@ -304,6 +306,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				pOldBitmap = m_dcStdP.SelectObject(&bmp);
 				m_dcStdP.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 				m_dcStdP.SelectObject(pOldBitmap);
+				bmp.DeleteObject();
 			}
 
 			// standard image hot
@@ -332,6 +335,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				pOldBitmap = m_dcStdH.SelectObject(&bmp);
 				m_dcStdH.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 				m_dcStdH.SelectObject(pOldBitmap);
+				bmp.DeleteObject();
 			}
 
 			// grayscale image
@@ -360,6 +364,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				pOldBitmap = m_dcGS.SelectObject(&bmp);
 				m_dcGS.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 				m_dcGS.SelectObject(pOldBitmap);
+				bmp.DeleteObject();
 			}
 
 		// alternate image
@@ -374,6 +379,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			pOldBitmap = m_dcAlt.SelectObject(&bmp);
 			m_dcAlt.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 			m_dcAlt.SelectObject(pOldBitmap);
+			bmp.DeleteObject();
 
 			// alternate image pressed
 			if( (m_dcAltP.m_hDC == NULL) && m_bHaveAltImage )
@@ -387,6 +393,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				pOldBitmap = m_dcAltP.SelectObject(&bmp);
 				m_dcAltP.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 				m_dcAltP.SelectObject(pOldBitmap);
+				bmp.DeleteObject();
 			}
 
 			// alternate image hot
