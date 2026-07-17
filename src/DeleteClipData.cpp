@@ -981,7 +981,7 @@ void CDeleteClipData::SetDescriptionWindowText(INT_PTR row)
 
 	if (theApp.m_GroupID > 0)
 	{
-		int sticky = selectedClip.m_stickyClipGroupOrder;
+		int sticky = static_cast<int>(selectedClip.m_stickyClipGroupOrder);
 		if (sticky != INVALID_STICKY)
 		{
 			clipData += _T(" | ");
@@ -990,7 +990,7 @@ void CDeleteClipData::SetDescriptionWindowText(INT_PTR row)
 	}
 	else
 	{
-		int sticky = selectedClip.m_stickyClipOrder;
+		int sticky = static_cast<int>(selectedClip.m_stickyClipOrder);
 		if (sticky != INVALID_STICKY)
 		{
 			clipData += _T(" | ");

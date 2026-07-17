@@ -631,7 +631,7 @@ CString CGetSetOptions::GetProfileString(CString csName, CString csDefault, CStr
 		bool setMaxSize = false;
 		while (true)
 		{
-			if (maxSize > -1 && maxSize < dwBufLen)
+			if (maxSize >= 0 && static_cast<DWORD>(maxSize) < dwBufLen)
 			{
 				dwBufLen = maxSize;
 				setMaxSize = true;
@@ -677,7 +677,7 @@ CString CGetSetOptions::GetProfileString(CString csName, CString csDefault, CStr
 		if (lResult == ERROR_SUCCESS &&
 			dwBufLen > 0)
 		{
-			if (maxSize > -1 && maxSize < dwBufLen)
+			if (maxSize >= 0 && static_cast<DWORD>(maxSize) < dwBufLen)
 			{
 				dwBufLen = maxSize;
 			}
@@ -1587,11 +1587,12 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 
 		TCHAR seps[]   = _T(",");
 		TCHAR *token;
+		TCHAR* context = nullptr;
 
 		TCHAR *pString = cs.GetBuffer(cs.GetLength());
 
 		/* Establish string and get the first token: */
-		token = STRTOK(pString, seps);
+		token = _tcstok_s(pString, seps, &context);
 		while(token != NULL)
 		{
 			CString cs(token);
@@ -1601,7 +1602,7 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 			m_csNetworkPasswordArray.Add(cs);
 
 			// Get next token
-			token = STRTOK(NULL, seps);
+			token = _tcstok_s(nullptr, seps, &context);
 		}
 
 		cs.ReleaseBuffer();

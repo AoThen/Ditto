@@ -111,7 +111,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 		        loadItemsIndex = max(pasteWnd->m_loadItems.begin()->x, 0);
 		        loadItemsCount = pasteWnd->m_loadItems.begin()->y - pasteWnd->m_loadItems.begin()->x;
 		        pasteWnd->m_bStopQuery = false;
-				listSize = pasteWnd->m_listItems.size();
+				listSize = static_cast<int>(pasteWnd->m_listItems.size());
 		        clearFirstLoadItem = true;
 		    }
 		}

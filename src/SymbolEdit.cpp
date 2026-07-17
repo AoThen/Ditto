@@ -894,7 +894,7 @@ void CSymbolEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 		m_centerTextDiff = (rectWnd.Height() - uiVClientHeight) / 2;
 
-		if (m_centerTextDiff < 0 || m_centerTextDiff > uiVClientHeight)
+		if (m_centerTextDiff < 0 || static_cast<UINT>(m_centerTextDiff) > uiVClientHeight)
 		{
 			m_centerTextDiff = 0;
 		}

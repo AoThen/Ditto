@@ -20,12 +20,6 @@
 #endif
 
 #ifdef _UNICODE				
-	#define STRTOK(a, b)	wcstok(a, b)
-#else
-	#define STRTOK(a, b)	strtok(a, b)
-#endif
-
-#ifdef _UNICODE				
 	#define STRCPY_S(a, sz, b)	wcscpy_s(a, sz, b)
 #else
 	#define STRCPY_S(a, sz, b)	strcpy_s(a, sz, b)

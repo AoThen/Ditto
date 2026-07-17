@@ -2113,12 +2113,12 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 
 	if (cf_dibBytes != nullptr && cf_dibBytes->size() > 0)
 	{
-		AddFormat(CF_DIB, cf_dibBytes->data(), cf_dibBytes->size(), false);
+		AddFormat(CF_DIB, cf_dibBytes->data(), static_cast<UINT>(cf_dibBytes->size()), false);
 	}
 
 	if (pngBytes != nullptr && pngBytes->size() > 0)
 	{
-		AddFormat(theApp.m_PNG_Format, pngBytes->data(), pngBytes->size(), false);
+		AddFormat(theApp.m_PNG_Format, pngBytes->data(), static_cast<UINT>(pngBytes->size()), false);
 	}
 
 	if (rtf != nullptr)

@@ -2458,7 +2458,7 @@ void CQPasteWnd::OnToggleDontSync()
 		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
 		{
 			CString idStr;
-			idStr.Format(_T("%d"), IDs[i]);
+			idStr.Format(_T("%d"), static_cast<int>(IDs[i]));
 			if (i > 0) idsStr += _T(",");
 			idsStr += idStr;
 		}
@@ -2470,7 +2470,7 @@ void CQPasteWnd::OnToggleDontSync()
 	{
 		std::vector<int> localIds;
 		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
-			localIds.push_back(IDs[i]);
+			localIds.push_back(static_cast<int>(IDs[i]));
 		theApp.m_CloudSyncManager.MarkClipsDontSync(localIds);
 	}
 

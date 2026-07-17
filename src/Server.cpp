@@ -388,8 +388,6 @@ void CServer::AddRemoteCF_HDROPFormat()
 
 	Drop.respondPort = m_respondPort;
 
-	CTextConvert Convert;
-
 	CStringA dest = CTextConvert::UnicodeToUTF8(m_csIP);
 	strncpy(Drop.m_cIP, dest, sizeof(Drop.m_cIP)-1);
 	

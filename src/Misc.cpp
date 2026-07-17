@@ -617,99 +617,69 @@ BOOL CALLBACK MyMonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMo
 
 int GetScreenWidth(void)
 {
-	OSVERSIONINFO OS_Version_Info;
-	DWORD dwPlatform = 0;
+	int width, height;
 	
-	if(GetVersionEx(&OS_Version_Info) != 0)
+	width = GetSystemMetrics(SM_CXSCREEN);
+	height = GetSystemMetrics(SM_CYSCREEN);
+	switch(width)
 	{
-		dwPlatform = OS_Version_Info.dwPlatformId;
-	}
-	
-	if(dwPlatform == VER_PLATFORM_WIN32_NT)
-	{
-		int width, height;
-		
-		width = GetSystemMetrics(SM_CXSCREEN);
-		height = GetSystemMetrics(SM_CYSCREEN);
-		switch(width)
+	default:
+	case 640:
+	case 800:
+	case 1024:
+		return(width);
+	case 1280:
+		if(height == 480)
 		{
-		default:
-		case 640:
-		case 800:
-		case 1024:
-			return(width);
-		case 1280:
-			if(height == 480)
-			{
-				return(width / 2);
-			}
-			return(width);
-		case 1600:
-			if(height == 600)
-			{
-				return(width / 2);
-			}
-			return(width);
-		case 2048:
-			if(height == 768)
-			{
-				return(width / 2);
-			}
-			return(width);
+			return(width / 2);
 		}
-	}
-	else
-	{
-		return(GetSystemMetrics(SM_CXVIRTUALSCREEN));
+		return(width);
+	case 1600:
+		if(height == 600)
+		{
+			return(width / 2);
+		}
+		return(width);
+	case 2048:
+		if(height == 768)
+		{
+			return(width / 2);
+		}
+		return(width);
 	}
 }
 
 int GetScreenHeight(void)
 {
-	OSVERSIONINFO OS_Version_Info;
-	DWORD dwPlatform = 0;
+	int width, height;
 	
-	if(GetVersionEx(&OS_Version_Info) != 0)
+	width = GetSystemMetrics(SM_CXSCREEN);
+	height = GetSystemMetrics(SM_CYSCREEN);
+	switch(height)
 	{
-		dwPlatform = OS_Version_Info.dwPlatformId;
-	}
-	
-	if(dwPlatform == VER_PLATFORM_WIN32_NT)
-	{
-		int width, height;
-		
-		width = GetSystemMetrics(SM_CXSCREEN);
-		height = GetSystemMetrics(SM_CYSCREEN);
-		switch(height)
+	default:
+	case 480:
+	case 600:
+	case 768:
+		return(height);
+	case 960:
+		if(width == 640)
 		{
-		default:
-		case 480:
-		case 600:
-		case 768:
-			return(height);
-		case 960:
-			if(width == 640)
-			{
-				return(height / 2);
-			}
-			return(height);
-		case 1200:
-			if(width == 800)
-			{
-				return(height / 2);
-			}
-			return(height);
-		case 1536:
-			if(width == 1024)
-			{
-				return(height / 2);
-			}
-			return(height);
+			return(height / 2);
 		}
-	}
-	else
-	{
-		return(GetSystemMetrics(SM_CYVIRTUALSCREEN));
+		return(height);
+	case 1200:
+		if(width == 800)
+		{
+			return(height / 2);
+		}
+		return(height);
+	case 1536:
+		if(width == 1024)
+		{
+			return(height / 2);
+		}
+		return(height);
 	}
 }
 
@@ -1075,18 +1045,7 @@ CString GetProcessName(HWND hWnd, DWORD processId)
 
 BOOL IsVista()
 {
-	OSVERSIONINFO osver;
-
-	osver.dwOSVersionInfoSize = sizeof( OSVERSIONINFO );
-
-	if (::GetVersionEx( &osver ) && 
-		osver.dwPlatformId == VER_PLATFORM_WIN32_NT && 
-		(osver.dwMajorVersion >= 6 ) )
-	{
-		return TRUE;
-	}
-
-	return FALSE;
+	return TRUE;
 }
 
 bool IsRunningLimited()
@@ -1548,7 +1507,7 @@ CString FolderPath(int folderId)
 			}
 
 			folder = _T("Group Path: \\");
-			for (int folderPos = arr.GetCount() - 1; folderPos >= 0; folderPos--)
+			for (INT_PTR folderPos = arr.GetCount() - 1; folderPos >= 0; folderPos--)
 			{
 				folder += _T("\\");
 				folder += arr[folderPos];
@@ -1709,10 +1668,9 @@ BOOL BackupDbPrompt(HWND hwnd)
 
 int WordCount(const CString &text)
 {
-	#define OUT 0
-	#define IN 1
+	enum { STATE_OUT = 0, STATE_IN = 1 };
 
-	int state = OUT;
+	int state = STATE_OUT;
 	unsigned wc = 0; // word count
 
 	// Scan all characters one by one
@@ -1722,11 +1680,11 @@ int WordCount(const CString &text)
 		
 		if (str == ' ' || str == '\r' || str == '\n' || str == '\t')
 		{
-			state = OUT;
+			state = STATE_OUT;
 		}
-		else if (state == OUT)
+		else if (state == STATE_OUT)
 		{
-			state = IN;
+			state = STATE_IN;
 			wc++;
 		}
 	}

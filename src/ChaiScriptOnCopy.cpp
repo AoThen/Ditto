@@ -19,7 +19,7 @@ ChaiScriptOnCopy::~ChaiScriptOnCopy()
 std::string FormatCurrentTime(const std::string &format) {
 	CTime t = CTime::GetCurrentTime();
 	CStringA x = t.Format(format.c_str());
-	return x;
+	return std::string(x);
 }
 
 bool ChaiScriptOnCopy::ProcessScript(CDittoChaiScript &clipData, std::string script)

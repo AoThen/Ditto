@@ -195,8 +195,8 @@ BOOL CImageViewer::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 		if (oldScale > 0 && m_scale > 0)
 		{
-			delta.x = round((pt.x * (1 / oldScale)) - (pt.x * (1 / m_scale)));
-			delta.y = round((pt.y * (1 / oldScale)) - (pt.y * (1 / m_scale)));
+			delta.x = static_cast<LONG>(round((pt.x * (1 / oldScale)) - (pt.x * (1 / m_scale))));
+			delta.y = static_cast<LONG>(round((pt.y * (1 / oldScale)) - (pt.y * (1 / m_scale))));
 
 			m_scrollHelper.Update(delta);
 		}

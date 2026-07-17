@@ -70,11 +70,11 @@ BOOL CHyperLink::PreTranslateMessage(MSG* pMsg)
 
 void CHyperLink::OnClicked()
 {
-    int result = (int)GotoURL(m_strURL, SW_SHOW);
+    INT_PTR result = reinterpret_cast<INT_PTR>(GotoURL(m_strURL, SW_SHOW));
     m_bVisited = (result > HINSTANCE_ERROR);
     if (!m_bVisited) {
         MessageBeep(MB_ICONEXCLAMATION);     // Unable to follow link
-        ReportError(result);
+        ReportError(static_cast<int>(result));
     } else 
         SetVisited();                        // Repaint to show visited colour
 }
@@ -380,8 +380,8 @@ void CHyperLink::ReportError(int nError)
 HINSTANCE CHyperLink::GotoURL(LPCTSTR url, int showcmd)
 {
     HINSTANCE result = ShellExecute(NULL, _T("open"), url, NULL, NULL, showcmd);
-    if ((UINT)result <= HINSTANCE_ERROR) {
-        ReportError((int)result);
+    if (reinterpret_cast<INT_PTR>(result) <= HINSTANCE_ERROR) {
+        ReportError(static_cast<int>(reinterpret_cast<INT_PTR>(result)));
     }
     return result;
 }
