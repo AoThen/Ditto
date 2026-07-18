@@ -4,13 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"ditto-cloud-server/internal/database"
-	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
 	"ditto-cloud-server/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type AdminHandler struct {

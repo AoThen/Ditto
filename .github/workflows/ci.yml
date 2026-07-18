@@ -158,13 +158,17 @@ jobs:
       - name: Build (Debug x64)
         run: msbuild CP_Main.vcxproj /p:Configuration=Debug /p:Platform=x64
 
+      - name: Build ICU_Loader
+        run: msbuild ICU_Loader\ICU_Loader.vcxproj /p:Configuration=Debug /p:Platform=x64
+
+      - name: Build Addins
+        run: msbuild Addins\DittoUtil\DittoUtil.vcxproj /p:Configuration=Debug /p:Platform=x64
+
       - name: Package portable zip
         shell: cmd
         run: |
           mkdir DittoPortable
           mkdir DittoPortable\Help
-          mkdir DittoPortable\Language
-          mkdir DittoPortable\Themes
           mkdir DittoPortable\Addins
           copy Debug64\Ditto.exe DittoPortable\
           copy Debug64\ICU_Loader.dll DittoPortable\
@@ -174,17 +178,18 @@ jobs:
           copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
           copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
           copy DittoSetup\portable DittoPortable\portable
-          copy Debug64\Language\*.xml DittoPortable\Language\
-          copy Debug64\Themes\*.xml DittoPortable\Themes\
 
       - name: Verify portable package integrity
         shell: cmd
         run: |
           if not exist DittoPortable\Ditto.exe exit /b 1
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
           if not exist DittoPortable\portable exit /b 1
-          dir DittoPortable\Language\*.xml >nul 2>&1 || exit /b 1
-          dir DittoPortable\Themes\*.xml >nul 2>&1 || exit /b 1
+          if not exist DittoPortable\vcruntime140.dll exit /b 1
+          if not exist DittoPortable\vcruntime140_1.dll exit /b 1
+          if not exist DittoPortable\msvcp140.dll exit /b 1
+          if not exist DittoPortable\mfc140u.dll exit /b 1
           echo All required files present
 
       - name: Create portable zip
