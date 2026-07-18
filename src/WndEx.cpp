@@ -80,7 +80,7 @@ BOOL CWndEx::Create(const CRect& crStart, CWnd* pParentWnd)
 	wc.hInstance = AfxGetInstanceHandle();
 	wc.hIcon = NULL;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+	wc.hbrBackground = (HBRUSH) GetStockObject(NULL_BRUSH);
 	wc.lpszMenuName =  NULL;
 	wc.lpszClassName = _T("QPasteClass");
 	
