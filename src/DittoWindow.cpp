@@ -250,6 +250,10 @@ void CDittoWindow::DoNcPaint(CWnd *pWnd)
 	// Draw the window border
 	CRect rcBorder(0, 0, lWidth, rcFrame.Height());
 
+	// Fill entire window background to prevent WHITE_BRUSH from showing through during drag/resize
+	CBrush bgBrush(CGetSetOptions::m_Theme.MainWindowBG());
+	dc.FillRect(rcBorder, &bgBrush);
+
 	int border = m_dpi.Scale(2);
 	int widthHeight = m_dpi.Scale(16);
 
