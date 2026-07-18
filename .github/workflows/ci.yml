@@ -155,14 +155,8 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
 
-      - name: Build (Debug x64)
-        run: msbuild CP_Main.vcxproj /p:Configuration=Debug /p:Platform=x64
-
-      - name: Build ICU_Loader
-        run: msbuild ICU_Loader\ICU_Loader.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=%CD%\
-
-      - name: Build Addins
-        run: msbuild Addins\DittoUtil\DittoUtil.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=%CD%\
+      - name: Build (Debug x64) and dependencies
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
 
       - name: Package portable zip
         shell: cmd
