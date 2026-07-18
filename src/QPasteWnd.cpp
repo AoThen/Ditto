@@ -847,9 +847,10 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 			if (theApp.m_bShowingQuickPaste == false)
 			{
 				BOOL fillList = FALSE;
-				if (m_listItems.size() == 0)
+				if (m_listItems.size() == 0 || m_pendingRefresh)
 				{
 					fillList = TRUE;
+					m_pendingRefresh = FALSE;
 				}
 				else if (theApp.m_databaseOnNetworkShare)
 				{
@@ -1342,6 +1343,7 @@ LRESULT CQPasteWnd::OnRefreshView(WPARAM wParam, LPARAM lParam)
 
 	if (!theApp.m_bShowingQuickPaste)
 	{
+		m_pendingRefresh = true;
 		return FALSE;
 	}
 
