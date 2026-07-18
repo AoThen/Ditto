@@ -204,7 +204,7 @@ BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 	////only send a response port if it's different than the default
 	if (CGetSetOptions::m_lPort != 23443 || m_connectionPort != 23443)
 	{
-		Info.m_respondPort = static_cast<short>(CGetSetOptions::m_lPort);
+		Info.m_respondPort = static_cast<unsigned short>(CGetSetOptions::m_lPort);
 	}
 
 	//Send all text over as UTF-8

@@ -1,5 +1,8 @@
 #pragma once
+
+#ifndef RC_INVOKED
 #include <afxdlgs.h>  // CPropertyPage
+#endif
 
 // Cloud sync options dialog resource ID
 #define IDD_OPTIONS_CLOUD  2200
@@ -51,6 +54,8 @@
 // Rebuild pinyin index
 #define IDC_REBUILD_PINYIN  2236
 #define IDC_CLOUD_ENABLE_DEBUG_LOGGING  2237
+
+#ifndef RC_INVOKED
 
 class COptionCloud : public CPropertyPage
 {
@@ -109,5 +114,7 @@ protected:
 	// Async reinitialize sync (avoids UI thread blocking during Stop)
 	afx_msg LRESULT OnReinitSync(WPARAM wParam, LPARAM lParam);
 };
+
+#endif
 
 

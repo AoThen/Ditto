@@ -434,11 +434,11 @@ void CCloudSyncManager::Stop()
 		m_hWsTrigger = nullptr;
 	}
 
-	if (m_hStopEvent != nullptr)
-	{
-		CloseHandle(m_hStopEvent);
-		m_hStopEvent = nullptr;
-	}
+	// NOTE: m_hStopEvent is intentionally NOT closed here.
+	// Threads (SyncThread, WsThread) may still be running after timeout-based detach
+	// and they read m_hStopEvent in their loops. Closing it would cause WAIT_FAILED
+	// on already-stopped threads, making them unable to detect the stop signal.
+	// The event handle is a kernel object; the OS will clean it up on process exit.
 }
 
 void CCloudSyncManager::OnClipAdded(void* pClip)
@@ -501,43 +501,50 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 
 	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(ctx->pManager);
 
-	// SAFETY: Check again under the lock that the manager is still alive
-	EnterCriticalSection(ctx->pCS);
-	BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
-	if (bAlive)
+	try
 	{
-		// Release the lock before doing actual work (long-running)
-		LeaveCriticalSection(ctx->pCS);
-
-		// Check force upload flag (one-shot, auto-reset)
-		BOOL bForce = InterlockedExchange(&pThis->m_forceOverrideRemote, 0) == 1;
-
-		auto newGroupIds = pThis->PushGroups();
-		if (!pThis->PushNewClips(bForce))
+		// SAFETY: Check again under the lock that the manager is still alive
+		EnterCriticalSection(ctx->pCS);
+		BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
+		if (bAlive)
 		{
-			// PushNewClips failed - rollback newly created groups
-			for (const auto& gid : newGroupIds)
+			// Release the lock before doing actual work (long-running)
+			LeaveCriticalSection(ctx->pCS);
+
+			// Check force upload flag (one-shot, auto-reset)
+			BOOL bForce = InterlockedExchange(&pThis->m_forceOverrideRemote, 0) == 1;
+
+			auto newGroupIds = pThis->PushGroups();
+			if (!pThis->PushNewClips(bForce))
 			{
-				pThis->DeleteRemoteGroup(gid);
+				// PushNewClips failed - rollback newly created groups
+				for (const auto& gid : newGroupIds)
+				{
+					pThis->DeleteRemoteGroup(gid);
+				}
+				EnterCriticalSection(&pThis->m_csStatus);
+				pThis->m_csSyncStatus = _T("Error");
+				pThis->m_csLastError = _T("Quick push failed");
+				LeaveCriticalSection(&pThis->m_csStatus);
 			}
-			EnterCriticalSection(&pThis->m_csStatus);
-			pThis->m_csSyncStatus = _T("Error");
-			pThis->m_csLastError = _T("Quick push failed");
-			LeaveCriticalSection(&pThis->m_csStatus);
+			else
+			{
+				EnterCriticalSection(&pThis->m_csStatus);
+				pThis->m_csSyncStatus = _T("");
+				pThis->m_csLastError = _T("");
+				pThis->m_lastSyncSuccessTime = time(nullptr);
+				LeaveCriticalSection(&pThis->m_csStatus);
+			}
 		}
 		else
 		{
-			EnterCriticalSection(&pThis->m_csStatus);
-			pThis->m_csSyncStatus = _T("");
-			pThis->m_csLastError = _T("");
-			pThis->m_lastSyncSuccessTime = time(nullptr);
-			LeaveCriticalSection(&pThis->m_csStatus);
+			LeaveCriticalSection(ctx->pCS);
+			OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
 		}
 	}
-	else
+	catch (...)
 	{
-		LeaveCriticalSection(ctx->pCS);
-		OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
+		LogMessage(_T("QuickSyncThreadProc: exception caught, ensuring counter decrement."));
 	}
 
 	// Decrement the active thread counter
@@ -582,16 +589,23 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 	if (!pThis)
 		return 1;
 
-	LogMessage(_T("ForceSyncThreadProc: running pull changes with override..."));
-	pThis->PullGroups();
-	pThis->PullChanges();
-	LogMessage(_T("ForceSyncThreadProc: force download complete."));
+	try
+	{
+		LogMessage(_T("ForceSyncThreadProc: running pull changes with override..."));
+		pThis->PullGroups();
+		pThis->PullChanges();
+		LogMessage(_T("ForceSyncThreadProc: force download complete."));
 
-	EnterCriticalSection(&pThis->m_csStatus);
-	pThis->m_csSyncStatus = _T("");
-	pThis->m_csLastError = _T("");
-	pThis->m_lastSyncSuccessTime = time(nullptr);
-	LeaveCriticalSection(&pThis->m_csStatus);
+		EnterCriticalSection(&pThis->m_csStatus);
+		pThis->m_csSyncStatus = _T("");
+		pThis->m_csLastError = _T("");
+		pThis->m_lastSyncSuccessTime = time(nullptr);
+		LeaveCriticalSection(&pThis->m_csStatus);
+	}
+	catch (...)
+	{
+		LogMessage(_T("ForceSyncThreadProc: exception caught, ensuring counter decrement."));
+	}
 
 	// Decrement active thread counter so Stop() can complete
 	EnterCriticalSection(&pThis->m_csSync);
@@ -3125,10 +3139,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		if (!wsClient->is_valid())
 		{
 			LogMessage(_T("WsThreadProc: invalid WS URL, retrying later."));
-			delete wsClient;
 			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
+			delete wsClient;
 			LONG curDelay1 = pThis->m_wsReconnectDelay;
 			Sleep(curDelay1);
 			LONG newDelay1 = min(curDelay1 * 2, 30000L);
@@ -3142,10 +3156,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			CString msg;
 			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
 			LogMessage(msg);
-			delete wsClient;
 			EnterCriticalSection(&pThis->m_csWsClient);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
+			delete wsClient;
 			LONG curDelay2 = pThis->m_wsReconnectDelay;
 			Sleep(curDelay2);
 			LONG newDelay2 = min(curDelay2 * 2, 30000L);
@@ -3187,10 +3201,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		{
 			wsClient->close(httplib::ws::CloseStatus::Normal, "Client shutting down");
 		}
-		delete wsClient;
 		EnterCriticalSection(&pThis->m_csWsClient);
 		pThis->m_pWsClient = nullptr;
 		LeaveCriticalSection(&pThis->m_csWsClient);
+		delete wsClient;
 
 		// Check stop before reconnecting
 		if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)

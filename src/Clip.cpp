@@ -1164,12 +1164,13 @@ bool CClip::AddToMainTable()
 {
 	try
 	{
+		m_Desc.Replace(_T("'"), _T("''"));
+		m_csQuickPaste.Replace(_T("'"), _T("''"));
+		m_description.Replace(_T("'"), _T("''"));
+
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
-
-		m_Desc.Replace(_T("'"), _T("''"));
-		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
 		CString cs;
 		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate, pinyin, pinyinAbbr) ")
@@ -1215,12 +1216,13 @@ bool CClip::ModifyMainTable()
 	bool bRet = false;
 	try
 	{
+		m_Desc.Replace(_T("'"), _T("''"));
+		m_csQuickPaste.Replace(_T("'"), _T("''"));
+		m_description.Replace(_T("'"), _T("''"));
+
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
-
-		m_Desc.Replace(_T("'"), _T("''"));
-		m_csQuickPaste.Replace(_T("'"), _T("''"));
 
 		theApp.m_db.execDMLEx(_T("UPDATE Main SET lShortCut = %d, ")
 			_T("mText = '%s', ")
@@ -1271,11 +1273,11 @@ bool CClip::ModifyDescription()
 	bool bRet = false;
 	try
 	{
+		m_Desc.Replace(_T("'"), _T("''"));
+
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
-
-		m_Desc.Replace(_T("'"), _T("''"));
 
 		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
@@ -2370,11 +2372,12 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		if (bUpdateDesc)
 		{
+			m_Desc.Replace(_T("'"), _T("''"));
+
 			auto py = CPinyinConvert::TextToPinyin(m_Desc);
 			CString pinyinW = py.first;
 			CString abbrW = py.second;
 
-			m_Desc.Replace(_T("'"), _T("''"));
 			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, pinyinW, abbrW, CTime::GetCurrentTime().GetTime(), m_id);
 		}
 

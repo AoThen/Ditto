@@ -195,7 +195,8 @@ bool CGroupTree::DoActionToggleDontSync()
 	if (!isDontSync)
 	{
 		CString msg;
-		msg.Format(_T("将同时标记该组下所有子分组和内容为不同步，确定？"));
+		msg.Format(theApp.m_Language.GetString("GroupDontSyncConfirm",
+			_T("将同时标记该组下所有子分组和内容为不同步，确定？")));
 		if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
 			return false;
 
@@ -209,6 +210,29 @@ bool CGroupTree::DoActionToggleDontSync()
 				groupId, groupId);
 		}
 		CATCH_SQLITE_EXCEPTION
+
+		// Collect all descendant IDs for cloud sync notification
+		std::vector<int> affectedIds;
+		affectedIds.push_back(groupId);
+		try
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(
+				_T("WITH RECURSIVE descendants AS (")
+				_T("SELECT lID FROM Main WHERE lParentID = %d ")
+				_T("UNION ALL ")
+				_T("SELECT m.lID FROM Main m JOIN descendants d ON m.lParentID = d.lID) ")
+				_T("SELECT lID FROM descendants"),
+				groupId);
+			while (!q.eof())
+			{
+				affectedIds.push_back(q.getIntField(_T("lID")));
+				q.nextRow();
+			}
+		}
+		CATCH_SQLITE_EXCEPTION
+
+		theApp.m_CloudSyncManager.MarkClipsDontSync(affectedIds);
+		theApp.m_CloudSyncManager.TriggerQuickSync();
 	}
 	else
 	{

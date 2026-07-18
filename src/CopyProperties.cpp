@@ -357,7 +357,10 @@ void CCopyProperties::OnOK()
 						ids.push_back(m_lCopyID);
 						theApp.m_CloudSyncManager.MarkClipsDontSync(ids);
 					}
-					theApp.m_CloudSyncManager.TriggerQuickSync();
+					else
+					{
+						theApp.m_CloudSyncManager.TriggerQuickSync();
+					}
 				}
 			}
 		}

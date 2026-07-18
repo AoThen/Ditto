@@ -27,8 +27,6 @@ public:
 
 	static std::vector<BYTE> Base64Decode(const CStringA& base64);
 
-	static std::vector<BYTE> Base64Decode(const CString& base64);
-
 	static std::vector<BYTE> Sha256(const std::vector<BYTE>& data);
 
 	static std::vector<BYTE> AesGcmEncrypt(

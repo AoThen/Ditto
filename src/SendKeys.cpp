@@ -275,7 +275,6 @@ void CSendKeys::SendKeyDown(BYTE VKey, WORD NumTimes, bool GenUpMsg, bool bDelay
  {
   WORD Cnt = 0;
   BYTE ScanCode = 0;
-  bool NumState = false;
 
   if (VKey == VK_NUMLOCK)
   {
