@@ -30,6 +30,11 @@
 	<GroupTreeBG>RGB(0,0,0)</GroupTreeBG>
 	<GroupTreeText>RGB(153,153,153)</GroupTreeText>
 
+	<MainWindowBG>RGB(12,12,12)</MainWindowBG>
+
+	<SearchTextBoxFocusBG>RGB(51,51,51)</SearchTextBoxFocusBG>
+	<SearchTextBoxFocusText>RGB(200,200,200)</SearchTextBoxFocusText>
+
 	<!-- 缺失节点补充 -->
 	<ClipPastedColor>#006600</ClipPastedColor>
 	<SearchTextBoxFocusBorder>#0078D7</SearchTextBoxFocusBorder>

@@ -470,7 +470,7 @@ void CSymbolEdit::OnPaint()
 	textRect.right -= HIWORD(margins);
 
 	// Clearing the background
-	dc.FillSolidRect(rect, GetSysColor(COLOR_WINDOW));	
+	dc.FillSolidRect(rect, CGetSetOptions::m_Theme.MainWindowBG());	
 
 	if (m_hSymbolIcon)
 	{
