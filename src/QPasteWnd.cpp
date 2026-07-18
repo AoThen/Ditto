@@ -4318,6 +4318,7 @@ bool CQPasteWnd::DoActionPasteSelectedPlainText()
 {
 	CSpecialPasteOptions pasteOptions;
 	pasteOptions.m_pasteAsPlainText = true;
+	pasteOptions.m_trimWhiteSpace = true;
 	OpenSelection(pasteOptions);
 	return true;
 }
