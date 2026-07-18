@@ -159,10 +159,10 @@ jobs:
         run: msbuild CP_Main.vcxproj /p:Configuration=Debug /p:Platform=x64
 
       - name: Build ICU_Loader
-        run: msbuild ICU_Loader\ICU_Loader.vcxproj /p:Configuration=Debug /p:Platform=x64
+        run: msbuild ICU_Loader\ICU_Loader.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=%CD%\
 
       - name: Build Addins
-        run: msbuild Addins\DittoUtil\DittoUtil.vcxproj /p:Configuration=Debug /p:Platform=x64
+        run: msbuild Addins\DittoUtil\DittoUtil.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=%CD%\
 
       - name: Package portable zip
         shell: cmd
