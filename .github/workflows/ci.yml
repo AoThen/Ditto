@@ -143,8 +143,8 @@ jobs:
       - name: Run tests
         run: CloudSync_Test\x64\Release\CloudSync_Test.exe
 
-  # ── Windows Client Debug Portable ZIP ──────────────────────
-  client-build-debug-portable:
+  # ── Windows Client Portable ZIP ──────────────────────────
+  client-build-portable:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -155,23 +155,27 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
 
-      - name: Build (Debug x64) and dependencies
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
+      - name: Build (Release x64) and dependencies
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
 
       - name: Package portable zip
         shell: cmd
         run: |
           mkdir DittoPortable
           mkdir DittoPortable\Help
+          mkdir DittoPortable\Language
+          mkdir DittoPortable\Themes
           mkdir DittoPortable\Addins
-          copy Debug64\Ditto.exe DittoPortable\
-          copy Debug64\ICU_Loader.dll DittoPortable\
-          copy Debug64\Addins\*.dll DittoPortable\Addins\
+          copy Release64\Ditto.exe DittoPortable\
+          copy Release64\ICU_Loader.dll DittoPortable\
+          copy Release64\Addins\*.dll DittoPortable\Addins\
           copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
           copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
           copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
           copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
           copy DittoSetup\portable DittoPortable\portable
+          copy Debug\Language\*.xml DittoPortable\Language\
+          copy Debug\Themes\*.xml DittoPortable\Themes\
 
       - name: Verify portable package integrity
         shell: cmd
@@ -184,17 +188,19 @@ jobs:
           if not exist DittoPortable\vcruntime140_1.dll exit /b 1
           if not exist DittoPortable\msvcp140.dll exit /b 1
           if not exist DittoPortable\mfc140u.dll exit /b 1
+          if not exist DittoPortable\Language\English.xml exit /b 1
+          if not exist DittoPortable\Themes\Classic.xml exit /b 1
           echo All required files present
 
       - name: Create portable zip
         shell: cmd
-        run: 7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
+        run: 7z a -tzip DittoPortable_Release_x64.zip DittoPortable\*
 
       - name: Upload portable zip
         uses: actions/upload-artifact@v4
         with:
-          name: ditto-portable-debug-x64
-          path: DittoPortable_Debug_x64.zip
+          name: ditto-portable-release-x64
+          path: DittoPortable_Release_x64.zip
           retention-days: 30
 
   # ── Playwright E2E ─────────────────────────────────────────
