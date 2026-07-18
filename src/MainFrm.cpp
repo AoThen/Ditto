@@ -197,7 +197,13 @@ LRESULT CMainFrame::OnTrayNotification(WPARAM wParam, LPARAM lParam)
 {
 	if (WM_MOUSEFIRST <= LOWORD(lParam) && LOWORD(lParam) <= WM_MOUSELAST)
 	{
-		theApp.m_activeWnd.TrackActiveWnd(true);
+		static DWORD s_lastTrayTrack = 0;
+		DWORD now = GetTickCount();
+		if (now - s_lastTrayTrack >= 200)
+		{
+			theApp.m_activeWnd.TrackActiveWnd(true);
+			s_lastTrayTrack = now;
+		}
 	}
 
 	//click on balloon
