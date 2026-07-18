@@ -233,6 +233,7 @@ jobs:
           copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
           copy "%WINDIR%\System32\msvcp140d.dll" DittoPortable\
           copy "%WINDIR%\System32\mfc140ud.dll" DittoPortable\
+          copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
           copy DittoSetup\portable DittoPortable\portable
           copy Debug\Language\*.xml DittoPortable\Language\
           copy Debug\Themes\*.xml DittoPortable\Themes\
@@ -248,6 +249,7 @@ jobs:
           if not exist DittoPortable\vcruntime140_1d.dll exit /b 1
           if not exist DittoPortable\msvcp140d.dll exit /b 1
           if not exist DittoPortable\mfc140ud.dll exit /b 1
+          if not exist DittoPortable\ucrtbased.dll exit /b 1
           if not exist DittoPortable\Language\English.xml exit /b 1
           if not exist DittoPortable\Themes\Classic.xml exit /b 1
           echo All required files present
