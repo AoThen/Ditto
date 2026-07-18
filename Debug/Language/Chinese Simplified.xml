@@ -697,7 +697,35 @@
 		<Item English_Text = "Data Size" ID = "DataSize">数据大小</Item>
 		<Item English_Text = "Quick Paste Text" ID = "QuickPasteText">快速粘贴文本</Item>
 	</Ditto_DeleteClipData>
-	
+
+	<Ditto_Options_Quick_Paste>
+		<Item English_Text="Show text for first ten copy hot keys" ID="1034">显示前十个复制热键的文本</Item>
+		<Item English_Text="Show leading whitespace" ID="2021">显示前导空白</Item>
+		<Item English_Text="Enable Quick Paste Transparency" ID="2006">启用快速粘贴透明度</Item>
+		<Item English_Text="Show thumbnails (for CF_DIB types) (Could Increase Memory Usage and Display Speed)" ID="2022">显示缩略图（适用于 CF_DIB 类型，可能增加内存占用和显示耗时）</Item>
+		<Item English_Text="Draw RTF Text in List (for RTF types) (Could Increase Memory Usage and Display Speed)" ID="2023">在列表中绘制 RTF 文本（适用于 RTF 类型，可能增加内存占用和显示耗时）</Item>
+		<Item English_Text="Find As You Type" ID="2036">输入时查找</Item>
+		<Item English_Text="Ensure Entire Window is Visible" ID="2037">确保整个窗口可见</Item>
+		<Item English_Text="Show Clips That are in Groups in Main List" ID="2038">在主列表中显示组内剪贴项</Item>
+		<Item English_Text="Prompt when deleting clips" ID="2039">删除剪贴项时提示</Item>
+		<Item English_Text="Always Show Scroll Bar" ID="2040">始终显示滚动条</Item>
+		<Item English_Text="Elevated privileges to paste into elevated apps" ID="2041">粘贴到高权限应用程序时提升权限</Item>
+		<Item English_Text="Show In Taskbar" ID="2042">在任务栏显示</Item>
+		<Item English_Text="Show indicator a clip has been pasted" ID="2043">显示已粘贴剪贴项标志</Item>
+		<Item English_Text="At Caret" ID="2015">插入符号处</Item>
+		<Item English_Text="At Cursor" ID="2016">光标处</Item>
+		<Item English_Text="At Previous Position" ID="2017">上次打开的位置</Item>
+		<Item English_Text="About Theme" ID="2094">关于主题</Item>
+		<Item English_Text="Font" ID="1040">字体</Item>
+		<Item English_Text="Default Font" ID="2031">默认字体</Item>
+		<Item English_Text="..." ID="2124">浏览</Item>
+		<Item English_Text="Text Lines per Clip" ID="2062">每剪贴项行数</Item>
+		<Item English_Text="Popup Positioning" ID="2063">窗口弹出位置</Item>
+		<Item English_Text="Theme" ID="2092">主题</Item>
+		<Item English_Text="Diff Application Path" ID="2122">差异比较工具路径</Item>
+		<Item English_Text="Quick Paste" ID="-1">快速粘贴</Item>
+	</Ditto_Options_Quick_Paste>
+
 	<Ditto_Options_Quick_Paste_Keyboard>
 		<Item English_Text = "Quick Paste Keyboard" ID = "-1" PropertyPage = "true">快速粘贴按键</Item>
 		

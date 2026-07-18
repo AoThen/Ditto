@@ -89,6 +89,7 @@ Debug/portable
 /Win32/Debug
 /Debug
 !/Debug/Language/
+!/Debug/Themes/
 /Addins/DittoUtil/x64
 # /EncryptDecrypt - Now using trusted Shared/Encryption.h implementation
 /focusdll/x64

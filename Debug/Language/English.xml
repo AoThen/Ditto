@@ -696,7 +696,35 @@
 		<Item English_Text = "Data Size" ID = "DataSize"></Item>
 		<Item English_Text = "Quick Paste Text" ID = "QuickPasteText"></Item>
 	</Ditto_DeleteClipData>
-	
+
+	<Ditto_Options_Quick_Paste>
+		<Item English_Text="Show text for first ten copy hot keys" ID="1034"></Item>
+		<Item English_Text="Show leading whitespace" ID="2021"></Item>
+		<Item English_Text="Enable Quick Paste Transparency" ID="2006"></Item>
+		<Item English_Text="Show thumbnails (for CF_DIB types) (Could Increase Memory Usage and Display Speed)" ID="2022"></Item>
+		<Item English_Text="Draw RTF Text in List (for RTF types) (Could Increase Memory Usage and Display Speed)" ID="2023"></Item>
+		<Item English_Text="Find As You Type" ID="2036"></Item>
+		<Item English_Text="Ensure Entire Window is Visible" ID="2037"></Item>
+		<Item English_Text="Show Clips That are in Groups in Main List" ID="2038"></Item>
+		<Item English_Text="Prompt when deleting clips" ID="2039"></Item>
+		<Item English_Text="Always Show Scroll Bar" ID="2040"></Item>
+		<Item English_Text="Elevated privileges to paste into elevated apps" ID="2041"></Item>
+		<Item English_Text="Show In Taskbar" ID="2042"></Item>
+		<Item English_Text="Show indicator a clip has been pasted" ID="2043"></Item>
+		<Item English_Text="At Caret" ID="2015"></Item>
+		<Item English_Text="At Cursor" ID="2016"></Item>
+		<Item English_Text="At Previous Position" ID="2017"></Item>
+		<Item English_Text="About Theme" ID="2094"></Item>
+		<Item English_Text="Font" ID="1040"></Item>
+		<Item English_Text="Default Font" ID="2031"></Item>
+		<Item English_Text="..." ID="2124"></Item>
+		<Item English_Text="Text Lines per Clip" ID="2062"></Item>
+		<Item English_Text="Popup Positioning" ID="2063"></Item>
+		<Item English_Text="Theme" ID="2092"></Item>
+		<Item English_Text="Diff Application Path" ID="2122"></Item>
+		<Item English_Text="Quick Paste" ID="-1"></Item>
+	</Ditto_Options_Quick_Paste>
+
 	<Ditto_Options_Quick_Paste_Keyboard>
 		<Item English_Text = "Quick Paste Keyboard" ID = "-1" PropertyPage = "true"></Item>
 		

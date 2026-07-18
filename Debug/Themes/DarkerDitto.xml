@@ -30,15 +30,16 @@
 	<GroupTreeBG>RGB(0,0,0)</GroupTreeBG>
 	<GroupTreeText>RGB(153,153,153)</GroupTreeText>
 
-	<CaptionSize></CaptionSize>
-	<CaptionFontSize></CaptionFontSize>
+	<!-- 缺失节点补充 -->
+	<ClipPastedColor>#006600</ClipPastedColor>
+	<SearchTextBoxFocusBorder>#0078D7</SearchTextBoxFocusBorder>
+	<SearchTextHighlight>#0078D7</SearchTextHighlight>
+	<ScrollBarThumb>#555555</ScrollBarThumb>
+	<ScrollBarThumbHover>#777777</ScrollBarThumbHover>
+	<ScrollBarTrack>#333333</ScrollBarTrack>
 
-	<DescriptionWindowBG>RGB(100,100,100)</DescriptionWindowBG>
-	<DescriptionWindowText>RGB(200,200,200)</DescriptionWindowText>
-
-	<MainWindowBG>RGB(0,0,0)</MainWindowBG>
-
-	<SearchTextBoxFocusBG>RGB(24,24,24)</SearchTextBoxFocusBG>
-	<SearchTextBoxFocusText>RGB(127,127,127)</SearchTextBoxFocusText>
+	<!-- CaptionSize/CaptionFontSize 补填数值 -->
+	<CaptionSize>25</CaptionSize>
+	<CaptionFontSize>19</CaptionFontSize>
 
 </Ditto_Theme_File>
