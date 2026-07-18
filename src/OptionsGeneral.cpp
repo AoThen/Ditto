@@ -188,6 +188,11 @@ void COptionsGeneral::FillLanguages()
 
 	CString csLanguage = CGetSetOptions::GetLanguageFile();
 
+	if(csLanguage.IsEmpty())
+	{
+		csLanguage = CMultiLanguage::DetectSystemLanguage();
+	}
+
 	CFileFind find;
 	BOOL bCont = find.FindFile(csFile);
 	int nEnglishIndex = NO_MATCH;

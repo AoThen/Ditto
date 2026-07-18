@@ -398,6 +398,12 @@ BOOL CCP_MainApp::InitInstance()
 	Log(StrF(_T("Starting up ditto with mutex: %s"), csMutex));
 
 	CString csFile = CGetSetOptions::GetLanguageFile();
+
+	if(csFile.IsEmpty())
+	{
+		csFile = CMultiLanguage::DetectSystemLanguage();
+	}
+
 	if(m_Language.LoadLanguageFile(csFile) == false)
 	{
 		CString cs;

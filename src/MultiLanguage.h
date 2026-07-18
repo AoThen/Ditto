@@ -73,6 +73,7 @@ public:
 	CString GetLangCode() { return m_csLangCode;	}
 
 	void	SetOnlyGetHeader(bool bVal)	{ m_bOnlyGetHeader = true;	}
+	static CString DetectSystemLanguage();
 	static CMenu* GetMenuPos(CMenu *pMenu, const CString &csLookingForMenuText, int &nMenuPos, bool returnChildIfOne = FALSE);
 
 	CString m_csLastError;
