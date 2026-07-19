@@ -15,11 +15,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ClipHandler struct {
-	service *service.ClipService
+// ClipServiceInterface defines the methods ClipHandler needs from ClipService.
+type ClipServiceInterface interface {
+	ListClips(userID uint, page, perPage int, search, groupID, sortBy, sortOrder string) (*response.PaginatedResponse, error)
+	GetClip(userID uint, clipID string) (*service.ClipDetail, error)
+	DeleteClip(userID uint, clipID string) error
+	Sync(userID uint, req *service.SyncRequest, deviceID string) (*service.SyncResponse, error)
+	DownloadClipFormat(userID uint, clipID string, formatType int) (*service.DownloadResult, error)
+	ListConflictClips(userID uint, page, perPage int) (*response.PaginatedResponse, error)
+	ResolveConflictClip(userID uint, conflictClipID string, action string) error
+	BatchDeleteClips(userID uint, clipIDs []string) (int64, error)
+	BatchMarkDontSync(userID uint, clipIDs []string) (int64, error)
 }
 
-func NewClipHandler(svc *service.ClipService) *ClipHandler {
+type ClipHandler struct {
+	service ClipServiceInterface
+}
+
+func NewClipHandler(svc ClipServiceInterface) *ClipHandler {
 	return &ClipHandler{service: svc}
 }
 

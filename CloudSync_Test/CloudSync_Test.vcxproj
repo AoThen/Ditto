@@ -172,6 +172,7 @@
     <ClInclude Include="..\src\CloudSync\CloudKeyExport.h" />
     <ClInclude Include="..\src\CloudSync\CloudSyncManager.h" />
     <ClInclude Include="GetSetOptionsMock.h" />
+    <ClInclude Include="IClipMock.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>

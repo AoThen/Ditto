@@ -8,6 +8,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ClientInterface abstracts a client for dependency injection in handler tests.
+type ClientInterface interface {
+	Send(msg map[string]interface{})
+	WritePump()
+	ReadPump()
+}
+
 // Client represents a single WebSocket connection.
 type Client struct {
 	hub    *Hub

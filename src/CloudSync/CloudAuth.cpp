@@ -9,6 +9,7 @@ using json = nlohmann::json;
 // Static member definitions
 std::unique_ptr<httplib::Client> CCloudAuth::m_httpClient;
 CString CCloudAuth::m_httpClientUrl;
+std::shared_ptr<IHttpClient> CCloudAuth::m_testClient;
 
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
@@ -23,6 +24,8 @@ static std::string CStringToStdString(const CString& str)
 
 void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 {
+	if (m_testClient) return;
+
 	std::string url = CStringToStdString(serverUrl);
 	// Enforce HTTPS: reject plain http for security
 	if (url.find("https://") != 0)
@@ -47,6 +50,59 @@ void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 	}
 }
 
+// ============================================================================
+// HttplibClientAdapter - Real HTTP client wrapping httplib::Client
+// ============================================================================
+
+HttplibClientAdapter::HttplibClientAdapter(const std::string& url)
+	: m_url(url)
+{
+	m_client = std::make_unique<httplib::Client>(url);
+	m_client->set_connection_timeout(10, 0);
+	m_client->set_read_timeout(30, 0);
+	m_client->set_write_timeout(30, 0);
+}
+
+HttpResult HttplibClientAdapter::Post(const std::string& path, const std::string& body, const std::string& contentType)
+{
+	if (!m_client) return HttpResult{};
+	auto res = m_client->Post(path, body, contentType);
+	if (!res) return HttpResult{};
+	return HttpResult{res->status, res->body, true};
+}
+
+bool HttplibClientAdapter::IsValid() const
+{
+	return m_client != nullptr;
+}
+
+std::string HttplibClientAdapter::GetBaseUrl() const
+{
+	return m_url;
+}
+
+// ============================================================================
+// DoPost - Dispatch HTTP POST to either test client or real client
+// ============================================================================
+
+HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, const std::string& contentType)
+{
+	if (m_testClient)
+	{
+		return m_testClient->Post(path, body, contentType);
+	}
+	if (!m_httpClient)
+	{
+		return HttpResult{};
+	}
+	auto res = m_httpClient->Post(path, body, contentType);
+	if (!res)
+	{
+		return HttpResult{};
+	}
+	return HttpResult{res->status, res->body, true};
+}
+
 // Helper: convert std::string to CString
 static CString StdStringToCString(const std::string& str)
 {
@@ -63,7 +119,7 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 	try
 	{
 		EnsureHttpClient(serverUrl);
-		if (!m_httpClient)
+		if (!m_testClient && !m_httpClient)
 		{
 			result.error = _T("Failed to create HTTP client");
 			return result;
@@ -74,18 +130,18 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 		body["password"] = CStringToStdString(password);
 
 		std::string bodyStr = body.dump();
-		auto res = m_httpClient->Post("/api/v1/auth/login", bodyStr, "application/json");
-		if (!res)
+		HttpResult httpRes = DoPost("/api/v1/auth/login", bodyStr, "application/json");
+		if (!httpRes.success)
 		{
 			result.error = _T("Failed to connect to server (network error)");
 			return result;
 		}
 
-		if (res->status != 200)
+		if (httpRes.status != 200)
 		{
 			try
 			{
-				auto errJson = json::parse(res->body);
+				auto errJson = json::parse(httpRes.body);
 				if (errJson.contains("error"))
 				{
 					result.error = StdStringToCString(errJson["error"].get<std::string>());
@@ -96,18 +152,18 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 				}
 				else
 				{
-					result.error.Format(_T("Server returned HTTP %d"), res->status);
+					result.error.Format(_T("Server returned HTTP %d"), httpRes.status);
 				}
 			}
 			catch (const json::parse_error& e)
 			{
 				CString msg;
-				msg.Format(_T("HTTP %d, parse error: %hs"), res->status, e.what());
+				msg.Format(_T("HTTP %d, parse error: %hs"), httpRes.status, e.what());
 				result.error = msg;
 			}
 			catch (...)
 			{
-				result.error.Format(_T("Server returned HTTP %d"), res->status);
+				result.error.Format(_T("Server returned HTTP %d"), httpRes.status);
 			}
 			return result;
 		}
@@ -115,7 +171,7 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 		// Parse response: { "code": 0, "data": { "device_token": "...", "device_id": "..." } }
 		try
 		{
-			auto responseJson = json::parse(res->body);
+			auto responseJson = json::parse(httpRes.body);
 
 			// Check for error code
 			if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
@@ -183,7 +239,7 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 	try
 	{
 		EnsureHttpClient(serverUrl);
-		if (!m_httpClient)
+		if (!m_testClient && !m_httpClient)
 		{
 			result.error = _T("Failed to create HTTP client");
 			return result;
@@ -195,18 +251,18 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 		body["password"] = CStringToStdString(password);
 
 		std::string bodyStr = body.dump();
-		auto res = m_httpClient->Post("/api/v1/auth/register", bodyStr, "application/json");
-		if (!res)
+		HttpResult httpRes = DoPost("/api/v1/auth/register", bodyStr, "application/json");
+		if (!httpRes.success)
 		{
 			result.error = _T("Failed to connect to server (network error)");
 			return result;
 		}
 
-		if (res->status != 200 && res->status != 201)
+		if (httpRes.status != 200 && httpRes.status != 201)
 		{
 			try
 			{
-				auto errJson = json::parse(res->body);
+				auto errJson = json::parse(httpRes.body);
 				if (errJson.contains("error"))
 				{
 					result.error = StdStringToCString(errJson["error"].get<std::string>());
@@ -217,18 +273,18 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 				}
 				else
 				{
-					result.error.Format(_T("Server returned HTTP %d"), res->status);
+					result.error.Format(_T("Server returned HTTP %d"), httpRes.status);
 				}
 			}
 			catch (const json::parse_error& e)
 			{
 				CString msg;
-				msg.Format(_T("HTTP %d, parse error: %hs"), res->status, e.what());
+				msg.Format(_T("HTTP %d, parse error: %hs"), httpRes.status, e.what());
 				result.error = msg;
 			}
 			catch (...)
 			{
-				result.error.Format(_T("Server returned HTTP %d"), res->status);
+				result.error.Format(_T("Server returned HTTP %d"), httpRes.status);
 			}
 			return result;
 		}
@@ -236,7 +292,7 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 		// Parse response: { "code": 0, "data": { "user_id": 1 } }
 		try
 		{
-			auto responseJson = json::parse(res->body);
+			auto responseJson = json::parse(httpRes.body);
 
 			// Check for error code
 			if (responseJson.contains("code") && responseJson["code"].get<int>() != 0)
@@ -297,4 +353,14 @@ BOOL CCloudAuth::IsLoggedIn()
 void CCloudAuth::Logout()
 {
 	CGetSetOptions::SetCloudDeviceToken("");
+}
+
+void CCloudAuth::SetHttpClientForTest(std::shared_ptr<IHttpClient> mockClient)
+{
+	m_testClient = std::move(mockClient);
+}
+
+void CCloudAuth::ResetHttpClientForTest()
+{
+	m_testClient.reset();
 }

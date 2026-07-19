@@ -167,7 +167,7 @@ func (h *Hub) runLoop() {
 }
 
 // Register adds a new WebSocket connection for a user.
-func (h *Hub) Register(userID int64, conn *websocket.Conn) *Client {
+func (h *Hub) Register(userID int64, conn *websocket.Conn) ClientInterface {
 	client := &Client{
 		hub:      h,
 		conn:     conn,

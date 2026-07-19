@@ -14,7 +14,7 @@ import (
 
 // WSHub interface abstracts the hub for dependency injection.
 type WSHub interface {
-	Register(userID int64, conn *websocket.Conn) *hub.Client
+	Register(userID int64, conn *websocket.Conn) hub.ClientInterface
 }
 
 var upgrader = websocket.Upgrader{
