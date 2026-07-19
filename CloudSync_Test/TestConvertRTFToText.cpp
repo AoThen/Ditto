@@ -31,12 +31,25 @@ static std::string StripRtfTags(const std::string& rtf)
                 }
                 else
                 {
+                    size_t start = i;
                     while (i < rtf.size() && (isalpha(static_cast<unsigned char>(rtf[i])) || rtf[i] == '*'))
                         ++i;
                     while (i < rtf.size() && isdigit(static_cast<unsigned char>(rtf[i])))
                         ++i;
-                    if (i < rtf.size() && rtf[i] == ' ')
+                    if (i == start)
+                    {
+                        if (rtf[i] == '{' || rtf[i] == '}' || rtf[i] == '\\')
+                            result += rtf[i];
+                        else if (rtf[i] == '~')
+                            result += ' ';
+                        else if (rtf[i] == '-' || rtf[i] == '_')
+                            result += '-';
                         ++i;
+                    }
+                    else if (i < rtf.size() && rtf[i] == ' ')
+                    {
+                        ++i;
+                    }
                 }
             }
         }
@@ -161,4 +174,29 @@ TEST(ConvertRTFToText, StripRtfTags_ControlWordNoDigits)
 TEST(ConvertRTFToText, StripRtfTags_Tab)
 {
     EXPECT_EQ(StripRtfTags("{\\rtf1 col1\\tab col2}"), "col1col2");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_EscapedBrace)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 \\{hello\\}}"), "{hello}");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_EscapedBackslash)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 path\\\\to}"), "path\\to");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_NonBreakingSpace)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 a\\~b}"), "a b");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_OptionalHyphen)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 a\\-b}"), "a-b");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_NonBreakingHyphen)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 a\\_b}"), "a-b");
 }
