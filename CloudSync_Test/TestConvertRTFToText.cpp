@@ -107,3 +107,58 @@ TEST(ConvertRTFToText, StripRtfTags_NestedBraces)
 {
     EXPECT_EQ(StripRtfTags("{\\rtf1 Outer {\\b Inner}}"), "Outer Inner");
 }
+
+TEST(ConvertRTFToText, StripRtfTags_ControlWordWithDigits)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1\\fs24 text}"), "text");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_LongNumberParam)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1\\trpaddl108 text}"), "text");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_TrailingBackslash)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 text\\}"), "text");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_EmptyGroup)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 a{}b}"), "ab");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_OnlyWhitespace)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1   }"), "");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_LeadingTrailingWhitespace)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1  hello  }"), "hello");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_LoneR)
+{
+    EXPECT_EQ(StripRtfTags("line1\rend"), "line1end");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_LoneN)
+{
+    EXPECT_EQ(StripRtfTags("line1\nend"), "line1end");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_CrLf)
+{
+    EXPECT_EQ(StripRtfTags("line1\r\nline2"), "line1line2");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_ControlWordNoDigits)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1\\par text}"), "text");
+}
+
+TEST(ConvertRTFToText, StripRtfTags_Tab)
+{
+    EXPECT_EQ(StripRtfTags("{\\rtf1 col1\\tab col2}"), "col1col2");
+}
