@@ -207,6 +207,11 @@ BOOL CCloudSyncManager::Initialize()
 	}
 
 	// Create stop event
+	if (m_hStopEvent != nullptr)
+	{
+		CloseHandle(m_hStopEvent);
+		m_hStopEvent = nullptr;
+	}
 	m_hStopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (m_hStopEvent == nullptr)
 	{
@@ -2923,6 +2928,7 @@ void CCloudSyncManager::PullGroups()
 	}
 	catch (...)
 	{
+		LogMessage(_T("PullGroups: unknown error in cleanup"));
 	}
 }
 
@@ -3140,9 +3146,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		{
 			LogMessage(_T("WsThreadProc: invalid WS URL, retrying later."));
 			EnterCriticalSection(&pThis->m_csWsClient);
+			bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
-			delete wsClient;
+			if (!bAlreadyCleanedUp)
+				delete wsClient;
 			LONG curDelay1 = pThis->m_wsReconnectDelay;
 			Sleep(curDelay1);
 			LONG newDelay1 = min(curDelay1 * 2, 30000L);
@@ -3157,9 +3165,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
 			LogMessage(msg);
 			EnterCriticalSection(&pThis->m_csWsClient);
+			bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 			pThis->m_pWsClient = nullptr;
 			LeaveCriticalSection(&pThis->m_csWsClient);
-			delete wsClient;
+			if (!bAlreadyCleanedUp)
+				delete wsClient;
 			LONG curDelay2 = pThis->m_wsReconnectDelay;
 			Sleep(curDelay2);
 			LONG newDelay2 = min(curDelay2 * 2, 30000L);
@@ -3202,9 +3212,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			wsClient->close(httplib::ws::CloseStatus::Normal, "Client shutting down");
 		}
 		EnterCriticalSection(&pThis->m_csWsClient);
+		bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 		pThis->m_pWsClient = nullptr;
 		LeaveCriticalSection(&pThis->m_csWsClient);
-		delete wsClient;
+		if (!bAlreadyCleanedUp)
+			delete wsClient;
 
 		// Check stop before reconnecting
 		if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)

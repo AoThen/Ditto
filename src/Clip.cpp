@@ -894,8 +894,8 @@ bool CClip::SetDescFromText(HGLOBAL hgData, bool unicode)
 			return false;
 		}
 		bufLen = GlobalSize(hgData);
-	
-		m_Desc = CString(text, (int)bufLen);
+		size_t realLen = strnlen_s(text, bufLen);
+		m_Desc = CString(text, (int)realLen);
 		bRet = true;
 	}
 		
