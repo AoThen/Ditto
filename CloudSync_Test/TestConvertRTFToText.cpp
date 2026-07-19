@@ -33,6 +33,8 @@ static std::string StripRtfTags(const std::string& rtf)
                 {
                     while (i < rtf.size() && (isalpha(static_cast<unsigned char>(rtf[i])) || rtf[i] == '*'))
                         ++i;
+                    while (i < rtf.size() && isdigit(static_cast<unsigned char>(rtf[i])))
+                        ++i;
                     if (i < rtf.size() && rtf[i] == ' ')
                         ++i;
                 }
@@ -98,7 +100,7 @@ TEST(ConvertRTFToText, StripRtfTags_UnicodeEscape)
 
 TEST(ConvertRTFToText, StripRtfTags_MultipleTags)
 {
-    EXPECT_EQ(StripRtfTags("{\\rtf1\\i\\b Mixed\\i0 Normal}"), "Mixed Normal");
+    EXPECT_EQ(StripRtfTags("{\\rtf1\\i\\b Mixed\\i0 Normal}"), "MixedNormal");
 }
 
 TEST(ConvertRTFToText, StripRtfTags_NestedBraces)
