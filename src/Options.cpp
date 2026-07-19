@@ -1075,7 +1075,7 @@ long CGetSetOptions::GetMaxEntries()
 {
 	long lMax = 500;
 	if(GetIsPortableDitto())
-		lMax = 100;
+		lMax = 600;
 	return GetProfileLong("MaxEntries", lMax);
 }
 
