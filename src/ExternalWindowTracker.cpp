@@ -37,7 +37,13 @@ bool ExternalWindowTracker::TrackActiveWnd(bool force)
 {
 	if(force == false && IdleSeconds() < (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0))
 	{
-		Log(StrF(_T("Not Idle for long enough, IdleTime: %f, MinIdle %f"), IdleSeconds(), (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0)));
+		static DWORD lastNotIdleLog = 0;
+		DWORD now = GetTickCount();
+		if (now - lastNotIdleLog > 5000)
+		{
+			Log(StrF(_T("Not Idle for long enough, IdleTime: %f, MinIdle %f"), IdleSeconds(), (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0)));
+			lastNotIdleLog = now;
+		}
 		return false;
 	}
 

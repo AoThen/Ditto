@@ -47,4 +47,7 @@
 	<CaptionSize>25</CaptionSize>
 	<CaptionFontSize>19</CaptionFontSize>
 
+	<DescriptionWindowBG>RGB(12,12,12)</DescriptionWindowBG>
+	<DescriptionWindowText>RGB(200,200,200)</DescriptionWindowText>
+
 </Ditto_Theme_File>
