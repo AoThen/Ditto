@@ -131,9 +131,9 @@ TEST(ConvertRTFToText, StripRtfTags_LongNumberParam)
     EXPECT_EQ(StripRtfTags("{\\rtf1\\trpaddl108 text}"), "text");
 }
 
-TEST(ConvertRTFToText, StripRtfTags_TrailingBackslash)
+TEST(ConvertRTFToText, StripRtfTags_EscapedBraceAtEnd)
 {
-    EXPECT_EQ(StripRtfTags("{\\rtf1 text\\}"), "text");
+    EXPECT_EQ(StripRtfTags("{\\rtf1 text\\}"), "text}");
 }
 
 TEST(ConvertRTFToText, StripRtfTags_EmptyGroup)
