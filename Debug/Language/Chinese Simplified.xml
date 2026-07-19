@@ -168,6 +168,7 @@
 		<Item English_Text = "View as RTF" ID = "32973">以RTF查看</Item>
 		<Item English_Text = "View as HTML" ID = "32974">以HTML查看</Item>
 		<Item English_Text = "View as Image" ID = "32975">以图片查看</Item>
+		<Item English_Text = "Dont Sync" ID = "33003">不同步</Item>
 		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
@@ -187,6 +188,8 @@
 		<Item English_Text = "Last Used" ID = "2043">最后使用</Item>
 		<Item English_Text = "Quick Paste Text" ID = "2125">快速粘贴文本</Item>
 		<Item English_Text = "Selected format MD5" ID = "2167">选择MD5格式</Item>
+		<Item English_Text = "Dont Sync" ID = "2176">不同步</Item>
+		<Item English_Text = "This will also mark all sub-groups and content under this group as not synced. Are you sure?" ID = "GroupDontSyncConfirm">将同时标记该组下所有子分组和内容为不同步，确定？</Item>
 				
 	</Ditto_Clip_Properties>
 	<Ditto_Options_General>

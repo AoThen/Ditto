@@ -2721,33 +2721,49 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 	EnsureHttpClient();
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
-		CppSQLite3Query q = theApp.m_db.execQuery(
-			_T("SELECT lID, mText, m_Description, lParentID FROM Main WHERE bIsGroup = 1 AND (lDontSync IS NULL OR lDontSync = 0)"));
-
-		while (!q.eof())
+		// Collect all groups first (under DB lock), then release lock before HTTP calls
+		struct GroupInfo {
+			int localId;
+			CString name;
+			CString desc;
+			int localParentId;
+			std::string remoteId;
+			std::string parentRemoteId;
+		};
+		std::vector<GroupInfo> groups;
 		{
-			int localId = q.getIntField(_T("lID"));
-			CString name = q.getStringField(_T("mText"));
-			CString desc = q.getStringField(_T("m_Description"));
-			int localParentId = q.getIntField(_T("lParentID"));
-			std::string remoteId = GetRemoteGroupIdByLocalId(localId);
+			CSingleLock lockDb(&m_csDb, TRUE);
+			CppSQLite3Query q = theApp.m_db.execQuery(
+				_T("SELECT lID, mText, m_Description, lParentID FROM Main WHERE bIsGroup = 1 AND (lDontSync IS NULL OR lDontSync = 0)"));
 
-			// Build parent_id
-			std::string parentId;
-			if (localParentId > 0)
-				parentId = GetRemoteGroupIdByLocalId(localParentId);
+			while (!q.eof())
+			{
+				GroupInfo gi;
+				gi.localId = q.getIntField(_T("lID"));
+				gi.name = q.getStringField(_T("mText"));
+				gi.desc = q.getStringField(_T("m_Description"));
+				gi.localParentId = q.getIntField(_T("lParentID"));
+				gi.remoteId = GetRemoteGroupIdByLocalId(gi.localId);
+				if (gi.localParentId > 0)
+					gi.parentRemoteId = GetRemoteGroupIdByLocalId(gi.localParentId);
+				groups.push_back(gi);
+				q.nextRow();
+			}
+		}
 
-			std::string groupName = CStringToStdString(name);
-			std::string groupDesc = CStringToStdString(desc);
+		// Process each group (HTTP calls outside DB lock)
+		for (const auto& gi : groups)
+		{
+			std::string groupName = CStringToStdString(gi.name);
+			std::string groupDesc = CStringToStdString(gi.desc);
 
 			nlohmann::json body;
 			body["name"] = groupName;
 			body["description"] = groupDesc;
-			if (!parentId.empty())
-				body["parent_id"] = parentId;
+			if (!gi.parentRemoteId.empty())
+				body["parent_id"] = gi.parentRemoteId;
 
-			if (remoteId.empty())
+			if (gi.remoteId.empty())
 			{
 				// Create new group
 				EnterCriticalSection(&m_csHttpClient);
@@ -2760,7 +2776,8 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 						auto resp = nlohmann::json::parse(res->body);
 						if (resp.contains("data") && resp["data"].contains("id"))
 						{
-							SaveRemoteGroupIdMapping(localId, resp["data"]["id"].get<std::string>());
+							CSingleLock lockDb(&m_csDb, TRUE);
+							SaveRemoteGroupIdMapping(gi.localId, resp["data"]["id"].get<std::string>());
 							newGroupIds.push_back(resp["data"]["id"].get<std::string>());
 						}
 					}
@@ -2774,16 +2791,15 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			{
 				// Update existing group
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient->Put(("/api/v1/groups/" + remoteId).c_str(), body.dump(), "application/json");
+				auto res = m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json");
 				LeaveCriticalSection(&m_csHttpClient);
 				if (!res || res->status != 200)
 				{
 					CString err;
-					err.Format(_T("PushGroups: failed to update group %hs (HTTP %d)"), remoteId.c_str(), res ? res->status : 0);
+					err.Format(_T("PushGroups: failed to update group %hs (HTTP %d)"), gi.remoteId.c_str(), res ? res->status : 0);
 					LogMessage(err);
 				}
 			}
-			q.nextRow();
 		}
 	}
 	catch (const std::exception& e)
@@ -3043,7 +3059,10 @@ void CCloudSyncManager::StartWebSocket()
 		return;
 	}
 
-	if (m_deviceToken.IsEmpty())
+	EnterCriticalSection(&m_csHttpClient);
+	bool hasToken = !m_deviceToken.IsEmpty();
+	LeaveCriticalSection(&m_csHttpClient);
+	if (!hasToken)
 	{
 		LogMessage(_T("StartWebSocket: no device token, skipping."));
 		return;
@@ -3133,8 +3152,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		std::string wsUrl(wsUrlA.GetString());
 
 		// Prepare auth headers: pass device_token as Sec-WebSocket-Protocol
+		EnterCriticalSection(&pThis->m_csHttpClient);
+		std::string token(pThis->m_deviceToken);
+		LeaveCriticalSection(&pThis->m_csHttpClient);
 		httplib::Headers headers = {
-			{"Authorization", "Bearer " + std::string(CStringA(pThis->m_deviceToken))}
+			{"Authorization", "Bearer " + token}
 		};
 
 		auto* wsClient = new httplib::ws::WebSocketClient(wsUrl, headers);

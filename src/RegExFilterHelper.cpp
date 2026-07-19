@@ -58,7 +58,7 @@ bool CRegExFilterData::MatchesRegEx(std::wstring &copiedText)
 		try 
 		{
 			std::wregex integer(m_regEx);
-			if (regex_search(copiedText, integer))
+			if (regex_match(copiedText, integer))
 			{
 				return true;
 			}

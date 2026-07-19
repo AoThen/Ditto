@@ -16,7 +16,7 @@ TEST(RegExFilter, PartialMatch)
 	filter.m_regEx = L"world";
 	filter.ParseFilters();
 	std::wstring text = L"hello world";
-	EXPECT_TRUE(filter.MatchesRegEx(text));
+	EXPECT_FALSE(filter.MatchesRegEx(text));
 }
 
 TEST(RegExFilter, NoMatch)

@@ -196,7 +196,7 @@ bool CGroupTree::DoActionToggleDontSync()
 	{
 		CString msg;
 		msg.Format(theApp.m_Language.GetString("GroupDontSyncConfirm",
-			_T("将同时标记该组下所有子分组和内容为不同步，确定？")));
+			_T("This will also mark all sub-groups and content under this group as not synced. Are you sure?")));
 		if (AfxMessageBox(msg, MB_YESNO | MB_ICONQUESTION) != IDYES)
 			return false;
 

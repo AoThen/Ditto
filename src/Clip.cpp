@@ -1050,8 +1050,10 @@ bool CClip::AddToDB(bool bCheckForDuplicates)
 			RemoveStickySetting(removeStickySettingClipId, m_parentId);
 		}
 
-		// Trigger cloud sync for this new clip (fire-and-forget)
-		theApp.m_CloudSyncManager.OnClipAdded(this);
+		// Trigger cloud sync for this new clip via async message to avoid
+		// spawning a DB-reading thread from within AddToDB
+		if (AfxGetMainWnd())
+			::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_CLOUD_TRIGGER_SYNC, m_id, 0);
 	}
 	
 	// should be emptied by AddToDataTable

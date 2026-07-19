@@ -168,6 +168,7 @@
 		<Item English_Text = "View as RTF" ID = "32973"></Item>
 		<Item English_Text = "View as HTML" ID = "32974"></Item>
 		<Item English_Text = "View as Image" ID = "32975"></Item>
+		<Item English_Text = "Dont Sync" ID = "33003"></Item>
 		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
@@ -187,6 +188,8 @@
 		<Item English_Text = "Last Used" ID = "2043"></Item>
 		<Item English_Text = "Quick Paste Text" ID = "2125"></Item>
 		<Item English_Text = "Selected format MD5" ID = "2167"></Item>
+		<Item English_Text = "Dont Sync" ID = "2176"></Item>
+		<Item English_Text = "This will also mark all sub-groups and content under this group as not synced. Are you sure?" ID = "GroupDontSyncConfirm"></Item>
 				
 	</Ditto_Clip_Properties>
 	<Ditto_Options_General>

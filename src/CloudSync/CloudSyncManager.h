@@ -17,6 +17,11 @@
 #define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
 #endif
 
+// Custom Windows message for async cloud sync trigger (avoid calling OnClipAdded from within AddToDB)
+#ifndef WM_CLOUD_TRIGGER_SYNC
+#define WM_CLOUD_TRIGGER_SYNC (WM_USER + 1003)
+#endif
+
 // Default cloud server URL (when none configured)
 #define CLOUD_DEFAULT_SERVER_URL _T("https://localhost:8080")
 

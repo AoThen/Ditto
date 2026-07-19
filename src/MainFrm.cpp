@@ -81,6 +81,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_COMMAND(ID_FIRST_DELETEALLNONUSEDCLIPS, &CMainFrame::OnFirstDeleteallnonusedclips)
 	ON_MESSAGE(WM_PASTE_CLIP, OnPasteClip)
 	ON_MESSAGE(WM_EDIT_CLIP, OnEditClip)
+	ON_MESSAGE(WM_CLOUD_TRIGGER_SYNC, OnTriggerCloudSync)
 
 	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
@@ -1608,4 +1609,10 @@ void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 	//int nRet = MessageBox(_T("focused"), _T("Ditto"), MB_YESNO | MB_TOPMOST);
 
 	// TODO: Add your message handler code here
+}
+
+LRESULT CMainFrame::OnTriggerCloudSync(WPARAM wParam, LPARAM lParam)
+{
+	theApp.m_CloudSyncManager.OnClipAdded(nullptr);
+	return 0;
 }
