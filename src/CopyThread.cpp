@@ -84,6 +84,14 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 	}
 
 	Log(_T("LoadFromClipboard - Before"));
+
+	// XYplorer/XYcopy 使用延迟渲染，提前等待避免首次读取冲突
+	if(activeWindow.Find(_T("xyplorer")) != -1 || activeWindow.Find(_T("xycopy")) != -1)
+	{
+		Log(_T("XYplorer/XYcopy detected, waiting 200ms for delayed rendering"));
+		Sleep(200);
+	}
+
 	int bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
 	Log(_T("LoadFromClipboard - After"));
 
@@ -92,12 +100,17 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 		DWORD delay = CGetSetOptions::GetNoFormatsRetryDelay();
 		if(delay > 0)
 		{
-			Log(StrF(_T("LoadFromClipboard didn't find any clips to save, sleeping %dms, then trying again"), delay));
-			Sleep(delay);
+			int maxRetries = 3;
+			for (int retry = 1; retry <= maxRetries && bResult == FALSE; retry++)
+			{
+				Log(StrF(_T("LoadFromClipboard didn't find any clips to save, sleeping %dms, then trying again (retry %d/%d)"), delay, retry, maxRetries));
+				Sleep(delay);
+				delay *= 2;
 
-			Log(_T("LoadFromClipboard #2 - Before"));
-			bResult = pClip->LoadFromClipboard(pSupportedTypes, activeWindow);
-			Log(_T("LoadFromClipboard #2 - After"));
+				Log(StrF(_T("LoadFromClipboard #%d - Before"), retry + 1));
+				bResult = pClip->LoadFromClipboard(pSupportedTypes, activeWindow);
+				Log(StrF(_T("LoadFromClipboard #%d - After"), retry + 1));
+			}
 		}
 		else
 		{
