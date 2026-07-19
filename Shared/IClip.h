@@ -9,6 +9,7 @@
 class IClipFormat
 {
 public:
+	virtual ~IClipFormat() = default;
 	virtual CLIPFORMAT Type() = 0;
 	virtual HGLOBAL Data() = 0;
 	virtual bool AutoDeleteData() = 0;
@@ -26,6 +27,7 @@ public:
 class IClipFormats
 {
 public:
+	virtual ~IClipFormats() = default;
 	virtual int Size() = 0;
 	virtual IClipFormat *GetAt(int nPos) = 0;
 	virtual void DeleteAt(int nPos) = 0;
@@ -38,6 +40,7 @@ public:
 class IClip
 {
 public:
+	virtual ~IClip() = default;
 	virtual CString Description() = 0;
 	virtual void Description(CString csValue) = 0;
 	virtual CTime PasteTime() = 0;

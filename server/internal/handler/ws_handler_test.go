@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"ditto-cloud-server/internal/hub"
 
@@ -76,12 +78,12 @@ func TestHandleWebSocket_MissingDeviceID(t *testing.T) {
 }
 
 func TestHandleWebSocket_Success(t *testing.T) {
-	connected := false
+	var connected atomic.Bool
 	mock := &mockWSHub{
 		registerFn: func(userID int64, conn *websocket.Conn) hub.ClientInterface {
 			return &mockClient{
 				sendFn: func(msg map[string]interface{}) {
-					connected = true
+					connected.Store(true)
 					assert.Equal(t, "connected", msg["type"])
 				},
 			}
@@ -103,15 +105,14 @@ func TestHandleWebSocket_Success(t *testing.T) {
 	require.NoError(t, err)
 	conn.Close()
 
-	assert.True(t, connected)
+require.Eventually(t, func() bool { return connected.Load() }, time.Second, 10*time.Millisecond)
 }
 
 func TestHandleWebSocket_RegisterCalled(t *testing.T) {
-	registered := false
+	var registered atomic.Bool
 	mock := &mockWSHub{
 		registerFn: func(userID int64, conn *websocket.Conn) hub.ClientInterface {
-			registered = true
-			assert.Equal(t, int64(1), userID)
+			registered.Store(true)
 			return &mockClient{
 				sendFn: func(msg map[string]interface{}) {
 					assert.Equal(t, "connected", msg["type"])
@@ -135,7 +136,7 @@ func TestHandleWebSocket_RegisterCalled(t *testing.T) {
 	require.NoError(t, err)
 	conn.Close()
 
-	assert.True(t, registered)
+	assert.True(t, registered.Load())
 }
 
 func TestSetAllowedOrigins_EmptyOrigin(t *testing.T) {

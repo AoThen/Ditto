@@ -46,7 +46,7 @@ TEST(ClipCompare, CompareBinaryData_LengthMismatch) {
 }
 
 TEST(ClipCompare, CompareBinaryData_IdenticalBinary) {
-	const char a[] = { 0x00, 0x01, 0x02, 0xFF };
-	const char b[] = { 0x00, 0x01, 0x02, 0xFF };
-	EXPECT_FALSE(IsClipDataDifferent(a, sizeof(a), b, sizeof(b)));
+	const unsigned char a[] = { 0x00, 0x01, 0x02, 0xFF };
+	const unsigned char b[] = { 0x00, 0x01, 0x02, 0xFF };
+	EXPECT_FALSE(IsClipDataDifferent(reinterpret_cast<const char*>(a), sizeof(a), reinterpret_cast<const char*>(b), sizeof(b)));
 }
