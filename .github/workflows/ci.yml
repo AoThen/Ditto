@@ -148,6 +148,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
@@ -224,6 +226,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
@@ -275,7 +279,7 @@ jobs:
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
           if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
-          if not exist DittoPortable\Addins\DittoOCR\models\ppocrv3_det.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\ch_PP-OCRv3_det_infer.onnx exit /b 1
           if not exist DittoPortable\portable exit /b 1
           if not exist DittoPortable\vcruntime140d.dll exit /b 1
           if not exist DittoPortable\vcruntime140_1d.dll exit /b 1
