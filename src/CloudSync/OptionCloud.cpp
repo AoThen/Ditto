@@ -11,6 +11,7 @@
 #include "../CP_Main.h"
 #include <thread>
 #include <atomic>
+#include "../ClipboardOCR.h"
 #include "../Pinyin_Convert.h"
 
 #ifdef _DEBUG

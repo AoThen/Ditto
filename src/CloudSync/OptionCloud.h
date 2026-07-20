@@ -58,7 +58,6 @@
 #define IDC_CLOUD_FORCE_OCR  2239
 
 #ifndef RC_INVOKED
-#include "../ClipboardOCR.h"
 #include <vector>
 
 class COptionCloud : public CPropertyPage
