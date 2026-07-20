@@ -158,6 +158,15 @@ jobs:
       - name: Build (Release x64) and dependencies
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
 
+      - name: Download OCR models
+        shell: cmd
+        run: |
+          cd Addins\DittoOCR
+          if not exist models mkdir models
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/RapidOcrOnnx/releases/download/init/models.7z' -OutFile 'models.7z'"
+          7z x models.7z -omodels
+          del models.7z
+
       - name: Package portable zip
         shell: cmd
         run: |
@@ -169,6 +178,8 @@ jobs:
           copy Release64\Ditto.exe DittoPortable\
           copy Release64\ICU_Loader.dll DittoPortable\
           copy Release64\Addins\*.dll DittoPortable\Addins\
+          mkdir DittoPortable\Addins\DittoOCR
+          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
           copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
           copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
           copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
@@ -183,6 +194,8 @@ jobs:
           if not exist DittoPortable\Ditto.exe exit /b 1
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
           if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\ppocrv3_det.onnx exit /b 1
           if not exist DittoPortable\portable exit /b 1
           if not exist DittoPortable\vcruntime140.dll exit /b 1
           if not exist DittoPortable\vcruntime140_1.dll exit /b 1
@@ -218,6 +231,15 @@ jobs:
       - name: Build (Debug x64) and dependencies
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
 
+      - name: Download OCR models
+        shell: cmd
+        run: |
+          cd Addins\DittoOCR
+          if not exist models mkdir models
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/RapidOcrOnnx/releases/download/init/models.7z' -OutFile 'models.7z'"
+          7z x models.7z -omodels
+          del models.7z
+
       - name: Package portable zip
         shell: cmd
         run: |
@@ -229,6 +251,8 @@ jobs:
           copy Debug64\Ditto.exe DittoPortable\
           copy Debug64\ICU_Loader.dll DittoPortable\
           copy Debug64\Addins\*.dll DittoPortable\Addins\
+          mkdir DittoPortable\Addins\DittoOCR
+          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
           copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
           copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
           copy "%WINDIR%\System32\msvcp140d.dll" DittoPortable\
@@ -244,6 +268,8 @@ jobs:
           if not exist DittoPortable\Ditto.exe exit /b 1
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
           if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\ppocrv3_det.onnx exit /b 1
           if not exist DittoPortable\portable exit /b 1
           if not exist DittoPortable\vcruntime140d.dll exit /b 1
           if not exist DittoPortable\vcruntime140_1d.dll exit /b 1
