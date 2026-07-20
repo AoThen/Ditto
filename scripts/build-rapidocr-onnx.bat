@@ -23,7 +23,8 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
         del "%TEMP%\onnx.7z"
         exit /b 1
     )
-    7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static\windows-x64" -y
+    7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static" -y
+    for /d %%i in ("%RAPID_DIR%\onnxruntime-static\*") do move "%%i" "%RAPID_DIR%\onnxruntime-static\windows-x64"
     del "%TEMP%\onnx.7z"
 )
 
@@ -37,7 +38,8 @@ if not exist "%RAPID_DIR%\opencv-static\windows-x64" (
         del "%TEMP%\opencv.7z"
         exit /b 1
     )
-    7z x "%TEMP%\opencv.7z" -o"%RAPID_DIR%\opencv-static\windows-x64" -y
+    7z x "%TEMP%\opencv.7z" -o"%RAPID_DIR%\opencv-static" -y
+    for /d %%i in ("%RAPID_DIR%\opencv-static\*") do move "%%i" "%RAPID_DIR%\opencv-static\windows-x64"
     del "%TEMP%\opencv.7z"
 )
 
