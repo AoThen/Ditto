@@ -150,6 +150,7 @@ void CMainFrmThread::OnSaveClips()
 				CClip* pClip = pLocalClips->GetNext(posOcr);
 				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
 				{
+					Log(StrF(_T("OCR: MainFrmThread launching OCR thread, id=%d, image size=%d"), pClip->m_id, (int)pClip->m_ocrImageData.size()));
 					std::thread([id = pClip->m_id,
 					             data = std::move(pClip->m_ocrImageData),
 					             w = pClip->m_ocrWidth,

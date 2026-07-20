@@ -97,9 +97,11 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 	Log(_T("LoadFromClipboard - After"));
 
 	// [OCR] Extract image pixel data for later OCR processing
+	Log(StrF(_T("OCR: CopyThread GetEnableOCR=%d"), CGetSetOptions::GetEnableOCR()));
 	if (CGetSetOptions::GetEnableOCR())
 	{
 		ExtractClipImageData(pClip);
+		Log(StrF(_T("OCR: CopyThread after ExtractClipImageData, image data size=%d"), (int)pClip->m_ocrImageData.size()));
 	}
 
 	if(bResult == FALSE)

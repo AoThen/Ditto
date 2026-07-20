@@ -27,17 +27,24 @@ bool ExtractClipImageData(CClip* pClip)
     if (!fmt)
         fmt = pClip->m_Formats.FindFormat(theApp.m_PNG_Format);
     if (!fmt)
+    {
+        Log(StrF(_T("OCR: ExtractClipImageData - no CF_DIB or PNG format in clip")));
         return false;
+    }
 
     Gdiplus::Bitmap* bmp = fmt->CreateGdiplusBitmap();
     if (!bmp)
+    {
+        Log(StrF(_T("OCR: ExtractClipImageData - CreateGdiplusBitmap failed")));
         return false;
+    }
 
     Gdiplus::Rect r(0, 0, bmp->GetWidth(), bmp->GetHeight());
     Gdiplus::BitmapData bd;
     if (bmp->LockBits(&r, Gdiplus::ImageLockModeRead,
             PixelFormat32bppARGB, &bd) != Gdiplus::Ok)
     {
+        Log(StrF(_T("OCR: ExtractClipImageData - LockBits failed")));
         delete bmp;
         return false;
     }
@@ -58,12 +65,18 @@ bool ExtractClipImageData(CClip* pClip)
 CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
 {
     if (data.empty() || w <= 0 || h <= 0)
+    {
+        Log(StrF(_T("OCR: RunOCR called with empty data or invalid dimensions")));
         return L"";
+    }
 
     CSingleLock lock(&g_cs, TRUE);
 
     if (g_ocrState == 2)
+    {
+        Log(StrF(_T("OCR: RunOCR - state=2 (previously failed), skip")));
         return L"";
+    }
 
     // First-time initialization
     if (!g_hDll)
@@ -72,6 +85,7 @@ CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
         g_hDll = ::LoadLibrary(path);
         if (!g_hDll)
         {
+            Log(StrF(_T("OCR: LoadLibrary OcrDll.dll failed, path=%s"), path));
             g_ocrState = 2;
             return L"";
         }
@@ -81,6 +95,7 @@ CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
         g_pfnOcrDestroy     = (PFN_OcrDestroy)::GetProcAddress(g_hDll, "OcrDestroy");
         if (!g_pfnOcrInit || !g_pfnOcrRecognize || !g_pfnOcrFreeString || !g_pfnOcrDestroy)
         {
+            Log(StrF(_T("OCR: OcrDll.dll missing required exports")));
             ::FreeLibrary(g_hDll);
             g_hDll = nullptr;
             g_ocrState = 2;
@@ -95,6 +110,7 @@ CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
         g_ocrHandle = g_pfnOcrInit(modelsDirA);
         if (!g_ocrHandle)
         {
+            Log(StrF(_T("OCR: OcrInit returned null, modelsDir=%s"), modelsDir));
             g_ocrState = 2;
             return L"";
         }
@@ -106,10 +122,14 @@ CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
 
     char* text = g_pfnOcrRecognize(g_ocrHandle, data.data(), w, h, stride);
     if (!text)
+    {
+        Log(StrF(_T("OCR: OcrRecognize returned null")));
         return L"";
+    }
 
     CStringW result = CA2W(text, CP_UTF8);
     g_pfnOcrFreeString(text);
+    Log(StrF(_T("OCR: RunOCR success, text=%s"), result));
     return result;
 }
 
