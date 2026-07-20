@@ -55,8 +55,11 @@
 #define IDC_REBUILD_PINYIN  2236
 #define IDC_CLOUD_ENABLE_DEBUG_LOGGING  2237
 #define IDC_CLOUD_ENABLE_OCR  2238
+#define IDC_CLOUD_FORCE_OCR  2239
 
 #ifndef RC_INVOKED
+#include "ClipboardOCR.h"
+#include <vector>
 
 class COptionCloud : public CPropertyPage
 {
@@ -109,12 +112,21 @@ protected:
 	afx_msg void OnBtnForceDownload();
 	afx_msg void OnBtnForceUpload();
 	afx_msg void OnRebuildPinyinIndex();
+	afx_msg void OnForceReOcr();
 
 	// Handler for cloud authentication required message
 	afx_msg LRESULT OnCloudAuthRequired(WPARAM wParam, LPARAM lParam);
 
 	// Async reinitialize sync (avoids UI thread blocking during Stop)
 	afx_msg LRESULT OnReinitSync(WPARAM wParam, LPARAM lParam);
+};
+
+struct OcrWorkItem {
+    int clipId;
+    std::vector<BYTE> imageData;
+    int width;
+    int height;
+    int stride;
 };
 
 #endif

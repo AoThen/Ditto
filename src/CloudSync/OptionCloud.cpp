@@ -9,6 +9,8 @@
 #include "../json.hpp"
 #include "../Options.h"
 #include "../CP_Main.h"
+#include <thread>
+#include <atomic>
 #include "../Pinyin_Convert.h"
 
 #ifdef _DEBUG
@@ -134,6 +136,7 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_DOWNLOAD, &COptionCloud::OnBtnForceDownload)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_UPLOAD, &COptionCloud::OnBtnForceUpload)
 	ON_BN_CLICKED(IDC_REBUILD_PINYIN, &COptionCloud::OnRebuildPinyinIndex)
+	ON_BN_CLICKED(IDC_CLOUD_FORCE_OCR, &COptionCloud::OnForceReOcr)
 	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
 	ON_MESSAGE(WM_CLOUD_REINIT_SYNC, &COptionCloud::OnReinitSync)
 END_MESSAGE_MAP()
@@ -730,6 +733,86 @@ void COptionCloud::OnRebuildPinyinIndex()
 	CString msg;
 	msg.Format(_T("Pinyin index rebuilt. %d entries processed."), batch);
 	AfxMessageBox(msg);
+}
+
+// ---------------------------------------------------------------------------
+// OnForceReOcr: re-run OCR for all images in clipboard history
+// ---------------------------------------------------------------------------
+void COptionCloud::OnForceReOcr()
+{
+    static std::atomic<bool> running = false;
+    bool expected = false;
+    if (!running.compare_exchange_strong(expected, true))
+    {
+        AfxMessageBox(_T("OCR re-run is already in progress."));
+        return;
+    }
+
+    if (AfxMessageBox(_T("Force re-run OCR for all images?"), MB_YESNO) != IDYES)
+    {
+        running = false;
+        return;
+    }
+
+    CppSQLite3Query q = theApp.m_db.execQuery(
+        _T("SELECT DISTINCT d.lParentID FROM Data d ")
+        _T("WHERE d.strClipBoardFormat = 'CF_DIB' OR d.strClipBoardFormat = 'PNG'"));
+
+    std::vector<int> ids;
+    while (!q.eof())
+    {
+        ids.push_back(q.getIntField(0));
+        q.nextRow();
+    }
+
+    if (ids.empty())
+    {
+        running = false;
+        AfxMessageBox(_T("No images found in clipboard history."));
+        return;
+    }
+
+    CWaitCursor wait;
+    std::vector<OcrWorkItem> items;
+    items.reserve(ids.size());
+
+    for (int clipId : ids)
+    {
+        CClip clip;
+        if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
+        {
+            items.push_back({clipId, std::move(clip.m_ocrImageData),
+                             clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
+        }
+    }
+
+    wait.Restore();
+
+    if (items.empty())
+    {
+        running = false;
+        AfxMessageBox(_T("No images could be loaded for OCR processing."));
+        return;
+    }
+
+    HWND hMainWnd = AfxGetMainWnd()->GetSafeHwnd();
+    std::thread([items = std::move(items), hMainWnd, &running]()
+    {
+        int success = 0;
+        for (const auto& item : items)
+        {
+            CStringW text = RunOCR(item.imageData, item.width, item.height, item.stride);
+            if (!text.IsEmpty())
+            {
+                ::PostMessage(hMainWnd, WM_OCR_COMPLETED,
+                              item.clipId, (LPARAM)new CStringW(text));
+                success++;
+            }
+        }
+        ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE,
+                      (WPARAM)items.size(), (LPARAM)success);
+        running = false;
+    }).detach();
 }
 
 // ---------------------------------------------------------------------------

@@ -191,6 +191,7 @@ __int64 GetLastWriteTime(const CString &csFile);
 #define WM_PASTE_CLIP WM_USER + 233
 #define WM_EDIT_CLIP WM_USER + 234
 #define WM_OCR_COMPLETED WM_USER + 235
+#define WM_OCR_BATCH_DONE WM_USER + 236
 
 
 #if !defined(_BITSET_)

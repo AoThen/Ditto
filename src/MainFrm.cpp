@@ -84,6 +84,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_MESSAGE(WM_EDIT_CLIP, OnEditClip)
 	ON_MESSAGE(WM_CLOUD_TRIGGER_SYNC, OnTriggerCloudSync)
 	ON_MESSAGE(WM_OCR_COMPLETED, OnOcrCompleted)
+	ON_MESSAGE(WM_OCR_BATCH_DONE, OnOcrBatchDone)
 
 	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
@@ -1633,9 +1634,12 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 	{
 		CStringW existing = q.getStringField(0);
 		CStringW combined = existing;
-		if (!existing.IsEmpty())
-			combined += L" ";
-		combined += *pOcrText;
+		if (existing.Find(*pOcrText) < 0)
+		{
+			if (!existing.IsEmpty())
+				combined += L" ";
+			combined += *pOcrText;
+		}
 
 		combined.Replace(L"'", L"''");
 
@@ -1649,5 +1653,15 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 	}
 
 	delete pOcrText;
+	return 0;
+}
+
+LRESULT CMainFrame::OnOcrBatchDone(WPARAM wParam, LPARAM lParam)
+{
+	int total = (int)wParam;
+	int success = (int)lParam;
+	CString msg;
+	msg.Format(_T("OCR re-run completed.\n%d images processed, %d updated."), total, success);
+	AfxMessageBox(msg);
 	return 0;
 }
