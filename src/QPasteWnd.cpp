@@ -2503,7 +2503,18 @@ void CQPasteWnd::OnToggleDontSync()
 		std::vector<int> localIds;
 		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
 			localIds.push_back(static_cast<int>(IDs[i]));
-		theApp.m_CloudSyncManager.MarkClipsDontSync(localIds);
+		try
+		{
+			theApp.m_CloudSyncManager.MarkClipsDontSync(localIds);
+		}
+		catch (std::exception& e)
+		{
+			Log(StrF(_T("MarkClipsDontSync failed (non-fatal): %hs"), e.what()));
+		}
+		catch (...)
+		{
+			Log(_T("MarkClipsDontSync failed (non-fatal): unknown exception"));
+		}
 	}
 
 	theApp.RefreshView();

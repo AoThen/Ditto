@@ -2954,13 +2954,26 @@ void CCloudSyncManager::PullGroups()
 void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 {
 	if (remoteGroupId.empty()) return;
-	EnsureHttpClient();
-	EnterCriticalSection(&m_csHttpClient);
-	auto res = m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str());
-	LeaveCriticalSection(&m_csHttpClient);
-	if (res && (res->status == 200 || res->status == 404))
+	try
 	{
-		DeleteRemoteGroupIdMappingByRemote(remoteGroupId);
+		EnsureHttpClient();
+		EnterCriticalSection(&m_csHttpClient);
+		auto res = m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str());
+		LeaveCriticalSection(&m_csHttpClient);
+		if (res && (res->status == 200 || res->status == 404))
+		{
+			DeleteRemoteGroupIdMappingByRemote(remoteGroupId);
+		}
+	}
+	catch (const std::exception& e)
+	{
+		CString err;
+		err.Format(_T("DeleteRemoteGroup error: %hs"), e.what());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("DeleteRemoteGroup: unknown error"));
 	}
 }
 
@@ -2970,24 +2983,37 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 {
 	if (localClipIds.empty()) return;
-	EnsureHttpClient();
-
-	std::vector<std::string> remoteIds;
-	for (int localId : localClipIds)
+	try
 	{
-		std::string remoteId = GetRemoteIdByLocalId(localId);
-		if (!remoteId.empty())
-			remoteIds.push_back(remoteId);
+		EnsureHttpClient();
+
+		std::vector<std::string> remoteIds;
+		for (int localId : localClipIds)
+		{
+			std::string remoteId = GetRemoteIdByLocalId(localId);
+			if (!remoteId.empty())
+				remoteIds.push_back(remoteId);
+		}
+
+		if (remoteIds.empty()) return;
+
+		nlohmann::json body;
+		body["ids"] = remoteIds;
+
+		EnterCriticalSection(&m_csHttpClient);
+		auto res = m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json");
+		LeaveCriticalSection(&m_csHttpClient);
 	}
-
-	if (remoteIds.empty()) return;
-
-	nlohmann::json body;
-	body["ids"] = remoteIds;
-
-	EnterCriticalSection(&m_csHttpClient);
-	auto res = m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json");
-	LeaveCriticalSection(&m_csHttpClient);
+	catch (const std::exception& e)
+	{
+		CString err;
+		err.Format(_T("MarkClipsDontSync error: %hs"), e.what());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("MarkClipsDontSync: unknown error"));
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -2996,40 +3022,53 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 {
 	if (localClipIds.empty()) return;
-	EnsureHttpClient();
-
-	std::vector<std::string> remoteIds;
-	for (int localId : localClipIds)
+	try
 	{
-		std::string remoteId = GetRemoteIdByLocalId(localId);
-		if (!remoteId.empty())
-			remoteIds.push_back(remoteId);
-	}
+		EnsureHttpClient();
 
-	if (remoteIds.empty()) return;
-
-	nlohmann::json body;
-	body["ids"] = remoteIds;
-
-	EnterCriticalSection(&m_csHttpClient);
-	auto res = m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json");
-	LeaveCriticalSection(&m_csHttpClient);
-	if (res && (res->status == 200 || res->status == 404))
-	{
+		std::vector<std::string> remoteIds;
 		for (int localId : localClipIds)
 		{
-			try
+			std::string remoteId = GetRemoteIdByLocalId(localId);
+			if (!remoteId.empty())
+				remoteIds.push_back(remoteId);
+		}
+
+		if (remoteIds.empty()) return;
+
+		nlohmann::json body;
+		body["ids"] = remoteIds;
+
+		EnterCriticalSection(&m_csHttpClient);
+		auto res = m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json");
+		LeaveCriticalSection(&m_csHttpClient);
+		if (res && (res->status == 200 || res->status == 404))
+		{
+			for (int localId : localClipIds)
 			{
-				CSingleLock lockDb(&m_csDb, TRUE);
-				CString csSQL;
-				csSQL.Format(_T("DELETE FROM CloudClipMap WHERE local_id = %d"), localId);
-				theApp.m_db.execDML(csSQL);
-			}
-			catch (...)
-			{
-				LogMessage(_T("MarkClipsDontSync: failed to delete mapping"));
+				try
+				{
+					CSingleLock lockDb(&m_csDb, TRUE);
+					CString csSQL;
+					csSQL.Format(_T("DELETE FROM CloudClipMap WHERE local_id = %d"), localId);
+					theApp.m_db.execDML(csSQL);
+				}
+				catch (...)
+				{
+					LogMessage(_T("DeleteRemoteClips: failed to delete mapping"));
+				}
 			}
 		}
+	}
+	catch (const std::exception& e)
+	{
+		CString err;
+		err.Format(_T("DeleteRemoteClips error: %hs"), e.what());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("DeleteRemoteClips: unknown error"));
 	}
 }
 
@@ -3340,12 +3379,25 @@ void CCloudSyncManager::TriggerQuickSync()
 void CCloudSyncManager::OnGroupDeleted(int localGroupId)
 {
 	LogMessage(_T("OnGroupDeleted: notifying server and removing group mapping."));
-	// Notify server about the deletion
-	std::string remoteGroupId = GetRemoteGroupIdByLocalId(localGroupId);
-	if (!remoteGroupId.empty())
+	try
 	{
-		DeleteRemoteGroup(remoteGroupId);
+		// Notify server about the deletion
+		std::string remoteGroupId = GetRemoteGroupIdByLocalId(localGroupId);
+		if (!remoteGroupId.empty())
+		{
+			DeleteRemoteGroup(remoteGroupId);
+		}
+		DeleteRemoteGroupIdMapping(localGroupId);
+		TriggerQuickSync();
 	}
-	DeleteRemoteGroupIdMapping(localGroupId);
-	TriggerQuickSync();
+	catch (const std::exception& e)
+	{
+		CString err;
+		err.Format(_T("OnGroupDeleted error: %hs"), e.what());
+		LogMessage(err);
+	}
+	catch (...)
+	{
+		LogMessage(_T("OnGroupDeleted: unknown error"));
+	}
 }

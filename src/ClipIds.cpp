@@ -415,7 +415,18 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	// Notify server about deleted non-group clips for cross-device sync
 	if (!remoteDeleteIds.empty())
 	{
-		theApp.m_CloudSyncManager.DeleteRemoteClips(remoteDeleteIds);
+		try
+		{
+			theApp.m_CloudSyncManager.DeleteRemoteClips(remoteDeleteIds);
+		}
+		catch (std::exception& e)
+		{
+			Log(StrF(_T("DeleteRemoteClips failed (non-fatal): %hs"), e.what()));
+		}
+		catch (...)
+		{
+			Log(_T("DeleteRemoteClips failed (non-fatal): unknown exception"));
+		}
 	}
 
 	Log(StrF(_T("End delete clips, Count: %d"), count));

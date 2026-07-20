@@ -231,8 +231,19 @@ bool CGroupTree::DoActionToggleDontSync()
 		}
 		CATCH_SQLITE_EXCEPTION
 
-		theApp.m_CloudSyncManager.MarkClipsDontSync(affectedIds);
-		theApp.m_CloudSyncManager.TriggerQuickSync();
+		try
+		{
+			theApp.m_CloudSyncManager.MarkClipsDontSync(affectedIds);
+			theApp.m_CloudSyncManager.TriggerQuickSync();
+		}
+		catch (std::exception& e)
+		{
+			Log(StrF(_T("MarkClipsDontSync/TriggerQuickSync failed (non-fatal): %hs"), e.what()));
+		}
+		catch (...)
+		{
+			Log(_T("MarkClipsDontSync/TriggerQuickSync failed (non-fatal): unknown exception"));
+		}
 	}
 	else
 	{
