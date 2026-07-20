@@ -297,8 +297,6 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 													0.3025f, 0.3025f, 0.3025f, 0.00f, 0.00f,
 													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
-													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
 				pStdMat = &DarkMat;
 				HotMat = DarkHotMat;
 				GrayMat = DarkGrayMat;
