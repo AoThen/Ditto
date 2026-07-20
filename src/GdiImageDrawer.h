@@ -18,13 +18,11 @@ public:
 	UINT ImageWidth() { return m_pStdImage->m_pBitmap->GetWidth(); }
 	UINT ImageHeight() { return m_pStdImage->m_pBitmap->GetHeight(); }
 
+	void SetDarkMode(BOOL bDark = TRUE) { m_bDarkMode = bDark; }
+
 	void Reset();
 
 protected:
 	CGdiPlusBitmapResource* m_pStdImage;
-	//CDC*	m_pCurBtn;		// current pointer to one of the above
-	//CDC		m_dcStd;		// standard button
-
-	//CDC m_dcBk;
+	BOOL m_bDarkMode;
 };
-

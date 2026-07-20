@@ -6,6 +6,7 @@
 CGdiImageDrawer::CGdiImageDrawer()
 {
 	m_pStdImage = NULL;
+	m_bDarkMode = FALSE;
 }
 
 CGdiImageDrawer::~CGdiImageDrawer()
@@ -135,7 +136,23 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int 
 	//ia.SetRemapTable(1, &blackToRed);
 
 	Gdiplus::Graphics graphics(pScreenDC->m_hDC);
-	graphics.DrawImage(*m_pStdImage, posX, posY, width, height);	
+
+	if (m_bDarkMode)
+	{
+		static Gdiplus::ColorMatrix DarkMat = { 2.75f, 0.00f, 0.00f, 0.00f, 0.00f,
+												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
+												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
+												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+												0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
+		Gdiplus::ImageAttributes ia;
+		ia.SetColorMatrix(&DarkMat);
+		Gdiplus::RectF grect((Gdiplus::REAL)posX, (Gdiplus::REAL)posY, (Gdiplus::REAL)width, (Gdiplus::REAL)height);
+		graphics.DrawImage(*m_pStdImage, grect, 0, 0, (Gdiplus::REAL)width, (Gdiplus::REAL)height, Gdiplus::UnitPixel, &ia);
+	}
+	else
+	{
+		graphics.DrawImage(*m_pStdImage, posX, posY, width, height);
+	}	
 
 	//RectF grect; grect.X = posX, grect.Y = posY; grect.Width = width; grect.Height = height;
 	//graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &ia);

@@ -178,6 +178,11 @@ void CGdipButton::Reset()
 	m_dcStdP.DeleteDC();
 	m_dcStdH.DeleteDC();
 	m_dcBk.DeleteDC();
+
+	m_dcGS.DeleteDC();
+	m_dcAlt.DeleteDC();
+	m_dcAltP.DeleteDC();
+	m_dcAltH.DeleteDC();
 }
 
 void CGdipButton::Test(CString c)
@@ -277,19 +282,21 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 
 			if (m_bDarkMode)
 			{
-				static ColorMatrix DarkMat = {	2.25f, 0.00f, 0.00f, 0.00f, 0.00f,
-												0.00f, 2.25f, 0.00f, 0.00f, 0.00f,
-												0.00f, 0.00f, 2.25f, 0.00f, 0.00f,
+				static ColorMatrix DarkMat = {	2.75f, 0.00f, 0.00f, 0.00f, 0.00f,
+												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
+												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
 												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 												0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
-				static ColorMatrix DarkHotMat = { 2.3625f, 0.00f, 0.00f, 0.00f, 0.1125f,
-													0.00f, 2.3625f, 0.00f, 0.00f, 0.1125f,
-													0.00f, 0.00f, 2.3625f, 0.00f, 0.1125f,
+				static ColorMatrix DarkHotMat = { 2.875f, 0.00f, 0.00f, 0.00f, 0.10f,
+													0.00f, 2.875f, 0.00f, 0.00f, 0.10f,
+													0.00f, 0.00f, 2.875f, 0.00f, 0.10f,
 													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
-				static ColorMatrix DarkGrayMat = { 0.675f, 0.675f, 0.675f, 0.00f, 0.00f,
-													1.3275f, 1.3275f, 1.3275f, 0.00f, 0.00f,
-													0.2475f, 0.2475f, 0.2475f, 0.00f, 0.00f,
+				static ColorMatrix DarkGrayMat = { 0.825f, 0.825f, 0.825f, 0.00f, 0.00f,
+													1.6225f, 1.6225f, 1.6225f, 0.00f, 0.00f,
+													0.3025f, 0.3025f, 0.3025f, 0.00f, 0.00f,
+													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
 													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
 				pStdMat = &DarkMat;

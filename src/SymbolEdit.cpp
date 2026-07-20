@@ -829,6 +829,13 @@ void CSymbolEdit::OnDpiChanged()
 	SetDpiInfo(m_windowDpi);
 }
 
+void CSymbolEdit::SetDarkMode(BOOL bDark)
+{
+	m_closeButton.SetDarkMode(bDark);
+	m_searchesButton.SetDarkMode(bDark);
+	Invalidate();
+}
+
 void CSymbolEdit::SetDpiInfo(CDPI *dpi)
 { 
 	m_windowDpi = dpi; 

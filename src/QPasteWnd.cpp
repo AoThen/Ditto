@@ -420,6 +420,9 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		return -1;
 	}
 
+	// Ensure theme is loaded before creating controls that depend on it
+	CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
+
 	HICON b = (HICON)LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, 64, 64, LR_SHARED);
 	SetIcon(b, TRUE);
 
@@ -431,6 +434,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_search.SetDpiInfo(&m_DittoWindow.m_dpi);
 	m_search.SetPromptText(theApp.m_Language.GetString(_T("Search"), _T("Search")));
 	::SHAutoComplete(m_search.m_hWnd, SHACF_AUTOSUGGEST_FORCE_OFF);
+	m_search.SetDarkMode(IsDarkModeActive());
 	SetSearchImages();
 	m_search.LoadPastSearches(CGetSetOptions::GetPastSearchXml());
 
@@ -1026,6 +1030,12 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 		m_BackButton.Reset();
 		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
 		m_BackButton.SetDarkMode(bDark);
+
+		m_search.SetDarkMode(bDark);
+
+		m_systemMenu.Invalidate();
+		m_ShowGroupsFolderBottom.Invalidate();
+		m_BackButton.Invalidate();
 	}
 
 	SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
@@ -7739,6 +7749,7 @@ LRESULT CQPasteWnd::OnDpiChanged(WPARAM wParam, LPARAM lParam)
 	m_bPrevDarkMode = IsDarkModeActive();
 
 	m_search.OnDpiChanged();
+	m_search.SetDarkMode(IsDarkModeActive());
 	m_lstHeader.OnDpiChanged();
 
 	UpdateFont();
@@ -8290,6 +8301,8 @@ void CQPasteWnd::RefreshThemeColors()
 		m_BackButton.Reset();
 		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
 		m_BackButton.SetDarkMode(bDark);
+
+		m_search.SetDarkMode(bDark);
 	}
 
 	// Force repaint of the entire window including non-client area
