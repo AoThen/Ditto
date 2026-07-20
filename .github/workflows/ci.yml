@@ -162,8 +162,9 @@ jobs:
         shell: cmd
         run: |
           cd Addins\DittoOCR
-          if not exist rapidocr_onnx (
-            git clone --depth 1 --branch 1.2.2 https://github.com/RapidAI/RapidOcrOnnx.git rapidocr_onnx
+          if not exist rapidocr_onnx\CMakeLists.txt (
+            if exist rapidocr_onnx rmdir /s /q rapidocr_onnx
+            git clone --depth 1 --single-branch --branch 1.2.2 https://github.com/RapidAI/RapidOcrOnnx.git rapidocr_onnx
           )
           call ..\..\scripts\build-rapidocr-onnx.bat
 
@@ -249,8 +250,9 @@ jobs:
         shell: cmd
         run: |
           cd Addins\DittoOCR
-          if not exist rapidocr_onnx (
-            git clone --depth 1 --branch 1.2.2 https://github.com/RapidAI/RapidOcrOnnx.git rapidocr_onnx
+          if not exist rapidocr_onnx\CMakeLists.txt (
+            if exist rapidocr_onnx rmdir /s /q rapidocr_onnx
+            git clone --depth 1 --single-branch --branch 1.2.2 https://github.com/RapidAI/RapidOcrOnnx.git rapidocr_onnx
           )
           call ..\..\scripts\build-rapidocr-onnx.bat
 
