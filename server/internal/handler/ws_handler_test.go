@@ -136,7 +136,7 @@ func TestHandleWebSocket_RegisterCalled(t *testing.T) {
 	require.NoError(t, err)
 	conn.Close()
 
-	assert.True(t, registered.Load())
+	require.Eventually(t, func() bool { return registered.Load() }, time.Second, 10*time.Millisecond)
 }
 
 func TestSetAllowedOrigins_EmptyOrigin(t *testing.T) {
