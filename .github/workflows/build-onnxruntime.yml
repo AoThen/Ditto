@@ -43,8 +43,12 @@ jobs:
         shell: powershell
         run: |
           copy onnxbuilder\build-onnxruntime.bat onnxsrc\
-          # 创建只构建 x64 的版本（原脚本会构建 x64+Win32）
-          (Get-Content onnxsrc\build-onnxruntime.bat) -replace 'call :cmakeParams "Win32" %VS_VER% %CRT%', '' | Set-Content onnxsrc\build-onnxruntime.bat
+          $content = Get-Content onnxsrc\build-onnxruntime.bat
+          # 移除 Win32 构建（原脚本会构建 x64+Win32）
+          $content = $content -replace 'call :cmakeParams "Win32" %VS_VER% %CRT%', ''
+          # 修复 pushd 到 Release 子目录导致 CMake 找不到 build 根目录的问题
+          $content = $content -replace 'pushd "build-%~1-%~2-%~3"\\Release', 'pushd "build-%~1-%~2-%~3"'
+          $content | Set-Content onnxsrc\build-onnxruntime.bat
 
       - name: Cache ONNX Runtime build
         id: cache-onnx
@@ -69,7 +73,7 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          7z a onnxruntime-static-windows-x64-1.15.1.7z onnxsrc\build-x64-v143-mt\Release\install-static\*
+          7z a onnxruntime-static-windows-x64-1.15.1.7z onnxsrc\build-x64-v143-mt\install-static\*
 
       - name: Create Release
         uses: ncipollo/release-action@v1
