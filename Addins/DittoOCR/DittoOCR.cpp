@@ -23,7 +23,7 @@ static void (*s_OcrDestroy)(void*) = nullptr;
 static bool LoadRapidOcr()
 {
     if (s_rapidLib) return true;
-    s_rapidLib = LoadLibraryA("OcrLiteCApi.dll");
+    s_rapidLib = LoadLibraryA("RapidOcrOnnx.dll");
     if (!s_rapidLib) return false;
     s_OcrInit = (void*(*)(const char*, const char*, const char*, const char*, int))GetProcAddress(s_rapidLib, "OcrInit");
     s_OcrDetectInput = (int(*)(void*, OCR_INPUT*, OCR_PARAM*, OCR_RESULT*))GetProcAddress(s_rapidLib, "OcrDetectInput");
