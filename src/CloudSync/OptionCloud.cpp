@@ -797,7 +797,7 @@ void COptionCloud::OnForceReOcr()
     }
 
     HWND hMainWnd = AfxGetMainWnd()->GetSafeHwnd();
-    std::thread([items = std::move(items), hMainWnd, &running]()
+    std::thread([items = std::move(items), hMainWnd]()
     {
         int success = 0;
         for (const auto& item : items)
