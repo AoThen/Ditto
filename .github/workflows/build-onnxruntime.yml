@@ -50,6 +50,14 @@ jobs:
           $content = $content -replace 'pushd "build-%~1-%~2-%~3"\\Release', 'pushd "build-%~1-%~2-%~3"'
           $content | Set-Content onnxsrc\build-onnxruntime.bat
 
+      - name: Patch ort_mutex.h for MSVC 19.44+
+        shell: powershell
+        run: |
+          $file = "onnxsrc\include\onnxruntime\core\platform\ort_mutex.h"
+          $content = Get-Content $file
+          $content = $content -replace '#include <mutex>', "#include <mutex>`n#include <chrono>"
+          Set-Content $file -Value $content
+
       - name: Cache ONNX Runtime build
         id: cache-onnx
         uses: actions/cache@v4
