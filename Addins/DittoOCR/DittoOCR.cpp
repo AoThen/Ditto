@@ -237,8 +237,10 @@ OCR_API void* OcrInit(const char* modelsDir)
         sessionOptions.SetIntraOpNumThreads(4);
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
-        auto detSession = std::make_shared<Ort::Session>(*env, detPath.c_str(), sessionOptions);
-        auto recSession = std::make_shared<Ort::Session>(*env, recPath.c_str(), sessionOptions);
+        std::wstring detPathW(detPath.begin(), detPath.end());
+        std::wstring recPathW(recPath.begin(), recPath.end());
+        auto detSession = std::make_shared<Ort::Session>(*env, detPathW.c_str(), sessionOptions);
+        auto recSession = std::make_shared<Ort::Session>(*env, recPathW.c_str(), sessionOptions);
 
         Ort::AllocatorWithDefaultOptions allocator;
         auto detInputName = std::string(detSession->GetInputNameAllocated(0, allocator).get());
