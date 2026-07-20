@@ -48,7 +48,8 @@ cmake -S "%RAPID_DIR%" -B "%BUILD_DIR%" ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DOCR_OUTPUT="CLIB" ^
     -DOCR_BUILD_CRT="True" ^
-    -DOCR_ONNX="CPU"
+    -DOCR_ONNX="CPU" ^
+    -DOpenCV_RUNTIME=vc17 -DOpenCV_ARCH=x64
 
 echo Building RapidOcrOnnx...
 cmake --build "%BUILD_DIR%" --config Release -j %NUMBER_OF_PROCESSORS%
