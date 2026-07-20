@@ -158,12 +158,18 @@ jobs:
       - name: Build (Release x64) and dependencies
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
 
-      - name: Download RapidOcrOnnx source
+      - name: Download RapidOcrOnnx clib
         shell: cmd
         run: |
-          if not exist Addins\DittoOCR\rapidocr_onnx (
-            git clone --depth 1 https://github.com/RapidAI/RapidOcrOnnx.git Addins\DittoOCR\rapidocr_onnx
+          if not exist Addins\DittoOCR\rapidocr_onnx mkdir Addins\DittoOCR\rapidocr_onnx
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/RapidOcrOnnx/releases/download/1.2.2/windows-clib.7z' -OutFile '%TEMP%\clib.7z'"
+          7z x "%TEMP%\clib.7z" -oAddins\DittoOCR\rapidocr_onnx -y
+          del "%TEMP%\clib.7z"
+          for /r Addins\DittoOCR\rapidocr_onnx %%i in (*.dll) do (
+            copy "%%i" Addins\DittoOCR\rapidocr_onnx\OcrLiteCApi.dll
+            goto :found
           )
+          :found
 
       - name: Build DittoOCR
         run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64
@@ -189,6 +195,7 @@ jobs:
           copy Release64\ICU_Loader.dll DittoPortable\
           copy Release64\Addins\*.dll DittoPortable\Addins\
           xcopy /s /e /i Release64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          copy Addins\DittoOCR\rapidocr_onnx\OcrLiteCApi.dll DittoPortable\Addins\DittoOCR\
           xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
           copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
           copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
@@ -205,6 +212,7 @@ jobs:
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
           if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrLiteCApi.dll exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\models\ch_PP-OCRv3_det_infer.onnx exit /b 1
           if not exist DittoPortable\portable exit /b 1
           if not exist DittoPortable\vcruntime140.dll exit /b 1
@@ -241,12 +249,18 @@ jobs:
       - name: Build (Debug x64) and dependencies
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
 
-      - name: Download RapidOcrOnnx source
+      - name: Download RapidOcrOnnx clib
         shell: cmd
         run: |
-          if not exist Addins\DittoOCR\rapidocr_onnx (
-            git clone --depth 1 https://github.com/RapidAI/RapidOcrOnnx.git Addins\DittoOCR\rapidocr_onnx
+          if not exist Addins\DittoOCR\rapidocr_onnx mkdir Addins\DittoOCR\rapidocr_onnx
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/RapidOcrOnnx/releases/download/1.2.2/windows-clib.7z' -OutFile '%TEMP%\clib.7z'"
+          7z x "%TEMP%\clib.7z" -oAddins\DittoOCR\rapidocr_onnx -y
+          del "%TEMP%\clib.7z"
+          for /r Addins\DittoOCR\rapidocr_onnx %%i in (*.dll) do (
+            copy "%%i" Addins\DittoOCR\rapidocr_onnx\OcrLiteCApi.dll
+            goto :found
           )
+          :found
 
       - name: Build DittoOCR
         run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64
@@ -272,6 +286,7 @@ jobs:
           copy Debug64\ICU_Loader.dll DittoPortable\
           copy Debug64\Addins\*.dll DittoPortable\Addins\
           xcopy /s /e /i Debug64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          copy Addins\DittoOCR\rapidocr_onnx\OcrLiteCApi.dll DittoPortable\Addins\DittoOCR\
           xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
           copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
           copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
@@ -289,6 +304,7 @@ jobs:
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
           if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrLiteCApi.dll exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\models\ch_PP-OCRv3_det_infer.onnx exit /b 1
           if not exist DittoPortable\portable exit /b 1
           if not exist DittoPortable\vcruntime140d.dll exit /b 1
