@@ -25,6 +25,11 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     )
     7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static" -y
     del "%TEMP%\onnx.7z"
+    REM RapidAI 归档的 include 是平铺结构，代码需要 onnxruntime/core/session/ 子目录
+    if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session" (
+        mkdir "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session"
+        copy "%RAPID_DIR%\onnxruntime-static\windows-x64\include\*.h" "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\"
+    )
 )
 
 REM 下载 OpenCV 静态库（如果不存在）
