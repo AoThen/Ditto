@@ -89,7 +89,7 @@ CQPasteWnd::CQPasteWnd()
 	m_extraDataCounter = 0;
 	m_noSearchResults = false;
 	m_bShowStarredClips = false;
-	m_bPrevDarkMode = false;
+	m_bPrevDarkMode = FALSE;
 	m_lastDbWrite = 0;
 	m_pendingRefresh = false;
 	m_lastNonActiveMouseMove = 0;
@@ -405,6 +405,12 @@ HBRUSH CQPasteWnd::CtlColor(CDC* pDC, UINT nCtlColor)
 BOOL CQPasteWnd::Create(CRect rect, CWnd* pParentWnd)
 {
 	return CWndEx::Create(rect, pParentWnd);
+}
+
+static BOOL IsDarkModeActive()
+{
+	COLORREF clr = CGetSetOptions::m_Theme.MainWindowBG();
+	return (GetRValue(clr) < 128);
 }
 
 int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
@@ -993,11 +999,6 @@ void CQPasteWnd::SaveWindowSize()
 		CGetSetOptions::SetQuickPasteSize(CSize(m_DittoWindow.m_dpi.UnScale(s.cx), m_DittoWindow.m_dpi.UnScale(s.cy)));
 		CGetSetOptions::SetQuickPastePoint(rect.TopLeft());
 	}
-}
-
-static BOOL IsDarkModeActive()
-{
-	return (CGetSetOptions::m_Theme.MainWindowBG().GetRValue() < 128);
 }
 
 BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
