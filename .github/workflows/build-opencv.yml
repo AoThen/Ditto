@@ -1,0 +1,58 @@
+name: Build OpenCV static libs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [scripts/build-rapidocr-onnx.bat]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Checkout OpenCVBuilder
+        uses: actions/checkout@v5
+        with:
+          repository: RapidAI/OpenCVBuilder
+          ref: 4.8.1
+          path: opencvbuilder
+
+      - name: Checkout opencv source
+        uses: actions/checkout@v5
+        with:
+          repository: opencv/opencv
+          ref: 4.8.1
+          path: opencvsrc
+
+      - name: Copy build files
+        shell: cmd
+        run: |
+          copy opencvbuilder\build-opencv4.bat opencvsrc\
+          copy opencvbuilder\opencv4_cmake_options.txt opencvsrc\
+
+      - name: Build
+        shell: cmd
+        run: |
+          cd opencvsrc
+          call build-opencv4.bat v143 mt
+
+      - name: Package static libs
+        shell: cmd
+        run: |
+          7z a opencv-static-windows-x64-4.8.1.7z opencvsrc\build-x64-v143-mt\install\*
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: opencv-4.8.1
+          name: "OpenCV 4.8.1 static libs (Windows x64, VS2022, mt)"
+          prerelease: true
+          artifacts: opencv-static-windows-x64-4.8.1.7z
+          allowUpdates: true
+          artifactContentType: application/x-7z-compressed
+          token: ${{ secrets.GITHUB_TOKEN }}
