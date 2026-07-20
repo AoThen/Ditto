@@ -1631,7 +1631,7 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 		_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
 	if (!q.eof())
 	{
-		CStringW existing = q.getStringFieldW(0);
+		CStringW existing = q.getStringField(0);
 		CStringW combined = existing;
 		if (!existing.IsEmpty())
 			combined += L" ";
