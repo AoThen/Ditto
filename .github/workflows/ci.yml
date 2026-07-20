@@ -168,7 +168,7 @@ jobs:
           call ..\..\scripts\build-rapidocr-onnx.bat
 
       - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\"
 
       - name: Download OCR models
         shell: cmd
@@ -255,7 +255,7 @@ jobs:
           call ..\..\scripts\build-rapidocr-onnx.bat
 
       - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\"
 
       - name: Download OCR models
         shell: cmd
