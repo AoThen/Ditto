@@ -701,7 +701,7 @@ void COptionCloud::OnRebuildPinyinIndex()
 	CWaitCursor wait;
 
 	CppSQLite3Query q = theApp.m_db.execQuery(
-		_T("SELECT lID, mText FROM Main WHERE pinyin IS NULL OR pinyin = ''"));
+		_T("SELECT lID, mText FROM Main"));
 
 	int batch = 0;
 	theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
