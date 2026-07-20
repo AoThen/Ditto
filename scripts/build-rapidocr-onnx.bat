@@ -1,21 +1,17 @@
 @echo off
-set RAPID_DIR=%~dp0..\Addins\DittoOCR\rapidocr_onnx
-set BUILD_DIR=%RAPID_DIR%\build
+set OCR_DIR=%~dp0..\Addins\DittoOCR
+set RAPID_DIR=%OCR_DIR%\rapidocr_onnx
 
 where 7z >nul 2>nul
 if errorlevel 1 (
-    echo 7-Zip not found in PATH. Please install 7-Zip or add it to PATH.
+    echo 7-Zip not found in PATH.
     exit /b 1
 )
 
-if not exist "%RAPID_DIR%\CMakeLists.txt" (
-    echo RapidOcrOnnx source not found at %RAPID_DIR%
-    exit /b 1
-)
-
-REM 下载 ONNX Runtime 静态库（如果不存在）
+REM 1. 下载 ONNX Runtime 静态库（如果不存在）
 if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     echo Downloading ONNX Runtime static libs...
+    if not exist "%RAPID_DIR%" mkdir "%RAPID_DIR%"
     powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OnnxruntimeBuilder/releases/download/1.15.1/onnxruntime-v1.15.1-windows-vs2022-static-mt.7z' -OutFile '%TEMP%\onnx.7z'"
     7z t "%TEMP%\onnx.7z" >nul
     if errorlevel 1 (
@@ -25,14 +21,13 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     )
     7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static" -y
     del "%TEMP%\onnx.7z"
-    REM RapidAI 归档的 include 是平铺结构，代码需要 onnxruntime/core/session/ 子目录
     if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session" (
         mkdir "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session"
         copy "%RAPID_DIR%\onnxruntime-static\windows-x64\include\*.h" "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\"
     )
 )
 
-REM 下载 OpenCV 静态库（如果不存在）
+REM 2. 下载 OpenCV 静态库（如果不存在）
 if not exist "%RAPID_DIR%\opencv-static\windows-x64" (
     echo Downloading OpenCV static libs...
     powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OpenCVBuilder/releases/download/4.8.1/opencv-4.8.1-windows-vs2022-mt.7z' -OutFile '%TEMP%\opencv.7z'"
@@ -46,17 +41,7 @@ if not exist "%RAPID_DIR%\opencv-static\windows-x64" (
     del "%TEMP%\opencv.7z"
 )
 
-REM CMake 构建 CLIB 目标
-echo Configuring CMake...
-cmake -S "%RAPID_DIR%" -B "%BUILD_DIR%" ^
-    -T "v143,host=x64" -A "x64" ^
-    -DCMAKE_BUILD_TYPE=Release ^
-    -DOCR_OUTPUT="CLIB" ^
-    -DOCR_BUILD_CRT="True" ^
-    -DOCR_ONNX="CPU" ^
-    -DOpenCV_RUNTIME=vc17 -DOpenCV_ARCH=x64
+REM 3. 下载 PP-OCRv6_small 模型
+call "%OCR_DIR%\download-models.bat"
 
-echo Building RapidOcrOnnx...
-cmake --build "%BUILD_DIR%" --config Release -j %NUMBER_OF_PROCESSORS%
-
-echo Build complete. Output: %BUILD_DIR%\Release\RapidOcrOnnx.dll
+echo Dependency setup complete.

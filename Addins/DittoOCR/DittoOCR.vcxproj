@@ -79,13 +79,33 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DittoOCR.cpp" />
+    <ClCompile Include="clipper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OcrDllInterface.h" />
+    <ClInclude Include="clipper.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="vcpkg.json" />
   </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\include;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\lib;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;opencv_world480.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\include;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\lib;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;opencv_world480d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
