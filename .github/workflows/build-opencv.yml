@@ -14,6 +14,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
 
       - name: Checkout OpenCVBuilder
         uses: actions/checkout@v5
@@ -21,6 +23,7 @@ jobs:
           repository: RapidAI/OpenCVBuilder
           ref: 4.8.1
           path: opencvbuilder
+          fetch-depth: 1
 
       - name: Checkout opencv source
         uses: actions/checkout@v5
@@ -28,12 +31,19 @@ jobs:
           repository: opencv/opencv
           ref: 4.8.1
           path: opencvsrc
+          fetch-depth: 1
 
-      - name: Copy build files
-        shell: cmd
+      - name: Copy build files and create x64-only wrapper
+        shell: powershell
         run: |
           copy opencvbuilder\build-opencv4.bat opencvsrc\
           copy opencvbuilder\opencv4_cmake_options.txt opencvsrc\
+          # 创建只构建 x64 的版本
+          (Get-Content opencvsrc\build-opencv4.bat) -replace 'call :cmakeParams "Win32" %VS_VER% %CRT%', '' | Set-Content opencvsrc\build-opencv4.bat
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Build
         shell: cmd
