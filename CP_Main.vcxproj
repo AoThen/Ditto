@@ -540,6 +540,7 @@
     <ClCompile Include="src\ChaiScriptOnCopy.cpp" />
     <ClCompile Include="src\ChaiScriptXml.cpp" />
     <ClCompile Include="src\Client.cpp" />
+    <ClCompile Include="src\ClipboardOCR.cpp" />
     <ClCompile Include="src\CloudSync\CloudAuth.cpp" />
     <ClCompile Include="src\CloudSync\CloudCrypto.cpp" />
     <ClCompile Include="src\CloudSync\CloudEncryption.cpp" />
@@ -815,6 +816,7 @@
     <ClInclude Include="src\ChaiScriptOnCopy.h" />
     <ClInclude Include="src\ChaiScriptXml.h" />
     <ClInclude Include="src\Client.h" />
+    <ClInclude Include="src\ClipboardOCR.h" />
     <ClInclude Include="src\CloudSync\CloudAuth.h" />
     <ClInclude Include="src\CloudSync\CloudCrypto.h" />
     <ClInclude Include="src\CloudSync\CloudEncryption.h" />

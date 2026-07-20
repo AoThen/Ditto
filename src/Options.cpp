@@ -61,6 +61,7 @@ long CGetSetOptions::m_lMaxClipSizeInBytes;
 DWORD CGetSetOptions::m_dwSaveClipDelay;
 long CGetSetOptions::m_lProcessDrawClipboardDelay;
 BOOL CGetSetOptions::m_bEnableDebugLogging;
+BOOL CGetSetOptions::m_bEnableOCR;
 BOOL CGetSetOptions::m_bEnsureConnectToClipboard;
 BOOL CGetSetOptions::m_outputDebugStringLogging;
 bool CGetSetOptions::m_bInConversion = false;
@@ -286,6 +287,7 @@ void CGetSetOptions::LoadSettings()
 	m_dwSaveClipDelay = GetSaveClipDelay();
 	m_lProcessDrawClipboardDelay = GetProcessDrawClipboardDelay();
 	m_bEnableDebugLogging = GetEnableDebugLogging();
+	m_bEnableOCR = GetEnableOCR();
 	m_outputDebugStringLogging = GetEnableOutputDebugStringLogging();
 	m_bEnsureConnectToClipboard = GetEnsureConnectToClipboard();
 	m_showScrollBar = GetShowScrollBar();
@@ -1960,6 +1962,17 @@ void CGetSetOptions::SetEnableDebugLogging(BOOL bEnable)
 {
 	m_bEnableDebugLogging = bEnable;
 	SetProfileLong("EnableDebugLogging", bEnable);
+}
+
+BOOL CGetSetOptions::GetEnableOCR()
+{
+	return GetProfileLong("Cloud\\EnableOCR", FALSE);
+}
+
+void CGetSetOptions::SetEnableOCR(BOOL bEnable)
+{
+	m_bEnableOCR = bEnable;
+	SetProfileLong("Cloud\\EnableOCR", bEnable);
 }
 
 BOOL CGetSetOptions::GetEnableOutputDebugStringLogging()

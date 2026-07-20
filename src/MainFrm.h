@@ -154,5 +154,6 @@ DECLARE_MESSAGE_MAP()public:
     afx_msg LRESULT OnPasteClip(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnEditClip(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTriggerCloudSync(WPARAM wParam, LPARAM lParam);
+    afx_msg LRESULT OnOcrCompleted(WPARAM wParam, LPARAM lParam);
     afx_msg void OnSetFocus(CWnd* pOldWnd);
 };

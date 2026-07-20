@@ -54,6 +54,7 @@
 // Rebuild pinyin index
 #define IDC_REBUILD_PINYIN  2236
 #define IDC_CLOUD_ENABLE_DEBUG_LOGGING  2237
+#define IDC_CLOUD_ENABLE_OCR  2238
 
 #ifndef RC_INVOKED
 
@@ -83,6 +84,7 @@ public:
 	CString m_csKeyFilePath;
 	UINT_PTR m_nStatusTimer;
 	BOOL    m_bEnableDebugLogging;
+	BOOL    m_bEnableOCR;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);

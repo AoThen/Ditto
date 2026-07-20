@@ -328,10 +328,14 @@ CClip::CClip() :
 	m_clipGroupOrder(0),
 	m_globalShortCut(FALSE),
 	m_moveToGroupShortCut(0),
-	m_globalMoveToGroupShortCut(FALSE)
+	m_globalMoveToGroupShortCut(FALSE),
+	m_ocrWidth(0),
+	m_ocrHeight(0),
+	m_ocrStride(0)
 {
 	m_copyReason = CopyReasonEnum::COPY_TO_UNKOWN;
 	m_addToDbStickyEnum = AddToDbStickyEnum::INVALID;
+	m_ocrImageData.clear();
 }
 
 CClip::~CClip()
@@ -359,6 +363,11 @@ void CClip::Clear()
 	m_moveToGroupShortCut = 0;
 	m_globalMoveToGroupShortCut = 0;
 	
+	m_ocrImageData.clear();
+	m_ocrWidth = 0;
+	m_ocrHeight = 0;
+	m_ocrStride = 0;
+
 	EmptyFormats();
 }
 
@@ -381,6 +390,11 @@ const CClip& CClip::operator=(const CClip &clip)
 	m_globalMoveToGroupShortCut = clip.m_globalMoveToGroupShortCut;
 	m_clipOrder = clip.m_clipOrder;
 	m_clipGroupOrder = clip.m_clipGroupOrder;
+
+	m_ocrImageData = clip.m_ocrImageData;
+	m_ocrWidth = clip.m_ocrWidth;
+	m_ocrHeight = clip.m_ocrHeight;
+	m_ocrStride = clip.m_ocrStride;
 
 	INT_PTR nCount = clip.m_Formats.GetSize();
 	

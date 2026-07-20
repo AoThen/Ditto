@@ -155,6 +155,11 @@ public:
 	BOOL m_globalMoveToGroupShortCut;
 	CopyReasonEnum::CopyReason m_copyReason;
 
+	std::vector<BYTE> m_ocrImageData;
+	int m_ocrWidth;
+	int m_ocrHeight;
+	int m_ocrStride;
+
 	virtual CString Description() { return m_Desc; }
 	virtual void Description(CString csValue) { m_Desc = csValue; }
 	virtual CTime PasteTime() { return m_Time; }

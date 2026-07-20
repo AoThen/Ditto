@@ -4,6 +4,8 @@
 #include "Options.h"
 #include "Misc.h"
 #include "cp_main.h"
+#include "ClipboardOCR.h"
+#include <thread>
 
 CMainFrmThread::CMainFrmThread(void)
 {
@@ -139,6 +141,33 @@ void CMainFrmThread::OnSaveClips()
 
 	if(count > 0)
 	{
+		// [OCR] Launch OCR for clips with image data
+		if (CGetSetOptions::GetEnableOCR())
+		{
+			POSITION posOcr = pLocalClips->GetHeadPosition();
+			while (posOcr)
+			{
+				CClip* pClip = pLocalClips->GetNext(posOcr);
+				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
+				{
+					std::thread([id = pClip->m_id,
+					             data = std::move(pClip->m_ocrImageData),
+					             w = pClip->m_ocrWidth,
+					             h = pClip->m_ocrHeight,
+					             s = pClip->m_ocrStride]()
+					{
+						CStringW text = RunOCR(data, w, h, s);
+						if (!text.IsEmpty())
+						{
+							::PostMessage(AfxGetMainWnd()->GetSafeHwnd(),
+							              WM_OCR_COMPLETED, id,
+							              (LPARAM)new CStringW(text));
+						}
+					}).detach();
+				}
+			}
+		}
+
 		int Id = pLocalClips->GetTail()->m_id;
 
 		Log(StrF(_T("SaveCopyclips After AddToDb, Id: %d Before OnCopyCopyCompleted"), Id));

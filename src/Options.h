@@ -782,6 +782,10 @@ public:
 	static void SetEnforceClipboardIgnoreFormats(BOOL val);
 	static BOOL GetEnforceClipboardIgnoreFormats();
 
+	static BOOL		m_bEnableOCR;
+	static BOOL		GetEnableOCR();
+	static void		SetEnableOCR(BOOL bEnable);
+
 	static BOOL GlobMatch(LPCTSTR str, LPCTSTR pattern);
 	static void GetProfileKeyNames(CString csSection, CStringArray &rNames);
 };

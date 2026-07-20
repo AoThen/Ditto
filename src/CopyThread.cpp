@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "cp_main.h"
 #include "CopyThread.h"
+#include "ClipboardOCR.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -94,6 +95,12 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 
 	int bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
 	Log(_T("LoadFromClipboard - After"));
+
+	// [OCR] Extract image pixel data for later OCR processing
+	if (CGetSetOptions::GetEnableOCR())
+	{
+		ExtractClipImageData(pClip);
+	}
 
 	if(bResult == FALSE)
 	{

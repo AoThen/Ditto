@@ -13,6 +13,7 @@
 #include "Path.h"
 #include "DittoCopyBuffer.h"
 #include "HotKeys.h"
+#include "Pinyin_Convert.h"
 #include "GlobalClips.h"
 #include "OptionsSheet.h"
 #include "DeleteClipData.h"
@@ -82,6 +83,7 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_MESSAGE(WM_PASTE_CLIP, OnPasteClip)
 	ON_MESSAGE(WM_EDIT_CLIP, OnEditClip)
 	ON_MESSAGE(WM_CLOUD_TRIGGER_SYNC, OnTriggerCloudSync)
+	ON_MESSAGE(WM_OCR_COMPLETED, OnOcrCompleted)
 
 	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
@@ -1614,5 +1616,38 @@ void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 LRESULT CMainFrame::OnTriggerCloudSync(WPARAM wParam, LPARAM lParam)
 {
 	theApp.m_CloudSyncManager.OnClipAdded(nullptr);
+	return 0;
+}
+
+LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
+{
+	int clipId = (int)wParam;
+	CStringW* pOcrText = (CStringW*)lParam;
+	if (!pOcrText)
+		return 0;
+
+	// Read current mText from DB
+	CppSQLite3Query q = theApp.m_db.execQueryEx(
+		_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
+	if (!q.eof())
+	{
+		CStringW existing = q.getStringFieldW(0);
+		CStringW combined = existing;
+		if (!existing.IsEmpty())
+			combined += L" ";
+		combined += *pOcrText;
+
+		combined.Replace(L"'", L"''");
+
+		auto py = CPinyinConvert::TextToPinyin(combined);
+		CStringW pinyinW = py.first;
+		CStringW abbrW = py.second;
+
+		theApp.m_db.execDMLEx(
+			_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
+			combined, pinyinW, abbrW, clipId);
+	}
+
+	delete pOcrText;
 	return 0;
 }

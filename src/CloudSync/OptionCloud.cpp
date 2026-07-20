@@ -92,6 +92,7 @@ COptionCloud::COptionCloud()
 	, m_bEncryptionEnabled(FALSE)
 	, m_nStatusTimer(0)
 	, m_bEnableDebugLogging(FALSE)
+	, m_bEnableOCR(FALSE)
 {
 	m_csTitle = theApp.m_Language.GetString("CloudSyncTitle", "Cloud Sync");
 	m_psp.pszTitle = m_csTitle;
@@ -119,6 +120,7 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_CLOUD_BTN_ENABLE_ENCRYPTION, m_bEncryptionEnabled);
 	DDX_Text(pDX, IDC_CLOUD_KEY_FILE_PATH, m_csKeyFilePath);
 	DDX_Check(pDX, IDC_CLOUD_ENABLE_DEBUG_LOGGING, m_bEnableDebugLogging);
+	DDX_Check(pDX, IDC_CLOUD_ENABLE_OCR, m_bEnableOCR);
 }
 
 BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
@@ -207,7 +209,8 @@ BOOL COptionCloud::OnInitDialog()
 		}
 	}
 
-	m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
+m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
+	m_bEnableOCR = CGetSetOptions::GetEnableOCR();
 
 	UpdateData(FALSE);
 
@@ -262,6 +265,7 @@ BOOL COptionCloud::OnApply()
 	}
 
 	CGetSetOptions::SetEnableDebugLogging(m_bEnableDebugLogging);
+	CGetSetOptions::SetEnableOCR(m_bEnableOCR);
 
 	return CPropertyPage::OnApply();
 }

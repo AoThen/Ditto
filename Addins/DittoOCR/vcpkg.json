@@ -1,0 +1,7 @@
+{
+  "name": "ditto-ocr",
+  "version": "1.0.0",
+  "dependencies": [
+    "opencv4"
+  ]
+}
