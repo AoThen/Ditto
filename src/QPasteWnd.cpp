@@ -89,6 +89,7 @@ CQPasteWnd::CQPasteWnd()
 	m_extraDataCounter = 0;
 	m_noSearchResults = false;
 	m_bShowStarredClips = false;
+	m_bPrevDarkMode = false;
 	m_lastDbWrite = 0;
 	m_pendingRefresh = false;
 	m_lastNonActiveMouseMove = 0;
@@ -470,19 +471,24 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_ShowGroupsFolderBottom.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_SHOW_GROUPS_BOTTOM);
 	//m_ShowGroupsFolderBottom.LoadBitmaps(IDB_CLOSED_FOLDER, IDB_CLOSED_FOLDER_PRESSED, IDB_CLOSED_FOLDER_FOCUSED);
 	m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+	m_ShowGroupsFolderBottom.SetDarkMode(IsDarkModeActive());
 	m_ShowGroupsFolderBottom.ShowWindow(SW_SHOW);
 	m_ShowGroupsFolderBottom.SetToolTipText(theApp.m_Language.GetString(_T("GroupsTooltip"), _T("Groups")));
 	m_ShowGroupsFolderBottom.ModifyStyle(WS_TABSTOP, 0);
 
 	m_BackButton.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_BACK_BUTTON);
 	m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+	m_BackButton.SetDarkMode(IsDarkModeActive());
 	m_BackButton.ModifyStyle(WS_TABSTOP, 0);
 	m_BackButton.ShowWindow(SW_SHOW);
 
 	m_systemMenu.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_SYSTEM_BUTTON);
 	m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+	m_systemMenu.SetDarkMode(IsDarkModeActive());
 	m_systemMenu.ModifyStyle(WS_TABSTOP, 0);
 	m_systemMenu.ShowWindow(SW_SHOW);
+
+	m_bPrevDarkMode = IsDarkModeActive();
 
 	m_stGroup.Create(_T(""), WS_CHILD | WS_VISIBLE, CRect(0, 0, 0, 0), this, ID_GROUP_TEXT);
 
@@ -989,6 +995,11 @@ void CQPasteWnd::SaveWindowSize()
 	}
 }
 
+static BOOL IsDarkModeActive()
+{
+	return (CGetSetOptions::m_Theme.MainWindowBG().GetRValue() < 128);
+}
+
 BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 {
 	theApp.m_bShowingQuickPaste = true;
@@ -997,6 +1008,24 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 
 	//Ensure we have the latest theme file, this checks the last write time so it doesn't read the file each time
 	CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
+
+	// detect dark mode change and reload button icons if needed
+	BOOL bDark = IsDarkModeActive();
+	if (bDark != m_bPrevDarkMode)
+	{
+		m_bPrevDarkMode = bDark;
+		m_systemMenu.Reset();
+		m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+		m_systemMenu.SetDarkMode(bDark);
+
+		m_ShowGroupsFolderBottom.Reset();
+		m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+		m_ShowGroupsFolderBottom.SetDarkMode(bDark);
+
+		m_BackButton.Reset();
+		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+		m_BackButton.SetDarkMode(bDark);
+	}
 
 	SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
 	SetCaptionOn(CGetSetOptions::GetCaptionPos(), true, CGetSetOptions::m_Theme.GetCaptionSize(), CGetSetOptions::m_Theme.GetCaptionFontSize());
@@ -7685,12 +7714,17 @@ LRESULT CQPasteWnd::OnDpiChanged(WPARAM wParam, LPARAM lParam)
 
 	m_systemMenu.Reset();
 	m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+	m_systemMenu.SetDarkMode(IsDarkModeActive());
 
 	m_BackButton.Reset();
 	m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+	m_BackButton.SetDarkMode(IsDarkModeActive());
 
 	m_ShowGroupsFolderBottom.Reset();
 	m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+	m_ShowGroupsFolderBottom.SetDarkMode(IsDarkModeActive());
+
+	m_bPrevDarkMode = IsDarkModeActive();
 
 	m_search.OnDpiChanged();
 	m_lstHeader.OnDpiChanged();
@@ -8227,7 +8261,25 @@ void CQPasteWnd::RefreshThemeColors()
 	
 	// Refresh scrollbar colors
 	RefreshScrollBarColors();
-	
+
+	// Reload button icons if dark mode state changed
+	BOOL bDark = IsDarkModeActive();
+	if (bDark != m_bPrevDarkMode)
+	{
+		m_bPrevDarkMode = bDark;
+		m_systemMenu.Reset();
+		m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+		m_systemMenu.SetDarkMode(bDark);
+
+		m_ShowGroupsFolderBottom.Reset();
+		m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+		m_ShowGroupsFolderBottom.SetDarkMode(bDark);
+
+		m_BackButton.Reset();
+		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+		m_BackButton.SetDarkMode(bDark);
+	}
+
 	// Force repaint of the entire window including non-client area
 	SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME);

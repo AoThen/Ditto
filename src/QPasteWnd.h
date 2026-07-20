@@ -174,6 +174,7 @@ public:
 	CCustomFriendsHelper m_customFriendsHelper;
 	bool m_noSearchResults;
 	bool m_bShowStarredClips;
+	bool m_bPrevDarkMode;	// tracks dark/light theme for button reload
 	CAccel m_timerAction;
 	__int64 m_lastDbWrite;
 	bool m_pendingRefresh;

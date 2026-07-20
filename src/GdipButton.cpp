@@ -58,6 +58,8 @@ CGdipButton::CGdipButton()
 
 	m_nCurType = STD_TYPE;
 
+	m_bDarkMode = FALSE;
+
 	m_pToolTip = NULL;
 
 }
@@ -259,20 +261,53 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 
 		PaintBk(pDC);
 
-			/*graphics.DrawImage(*m_pStdImage, 0, 0);
-		
-			m_dcStd.CreateCompatibleDC(pDC);
-			bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
-			pOldBitmap = m_dcStd.SelectObject(&bmp);
-			m_dcStd.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
-			bmp.DeleteObject();*/
+			// --- color matrices ---
+			ColorMatrix* pStdMat = NULL;
+			ColorMatrix HotMat = {	1.05f, 0.00f, 0.00f, 0.00f, 0.00f,
+									0.00f, 1.05f, 0.00f, 0.00f, 0.00f,
+									0.00f, 0.00f, 1.05f, 0.00f, 0.00f,
+									0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+									0.05f, 0.05f, 0.05f, 0.00f, 1.00f	};
+			ColorMatrix GrayMat = {	0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
+									0.59f, 0.59f, 0.59f, 0.00f, 0.00f,
+									0.11f, 0.11f, 0.11f, 0.00f, 0.00f,
+									0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+									0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};
+			ImageAttributes iaHot, iaGray;
+
+			if (m_bDarkMode)
+			{
+				static ColorMatrix DarkMat = {	2.25f, 0.00f, 0.00f, 0.00f, 0.00f,
+												0.00f, 2.25f, 0.00f, 0.00f, 0.00f,
+												0.00f, 0.00f, 2.25f, 0.00f, 0.00f,
+												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+												0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
+				static ColorMatrix DarkHotMat = { 2.3625f, 0.00f, 0.00f, 0.00f, 0.1125f,
+													0.00f, 2.3625f, 0.00f, 0.00f, 0.1125f,
+													0.00f, 0.00f, 2.3625f, 0.00f, 0.1125f,
+													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
+				static ColorMatrix DarkGrayMat = { 0.675f, 0.675f, 0.675f, 0.00f, 0.00f,
+													1.3275f, 1.3275f, 1.3275f, 0.00f, 0.00f,
+													0.2475f, 0.2475f, 0.2475f, 0.00f, 0.00f,
+													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+													0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
+				pStdMat = &DarkMat;
+				HotMat = DarkHotMat;
+				GrayMat = DarkGrayMat;
+			}
+
+			iaHot.SetColorMatrix(&HotMat);
+			iaGray.SetColorMatrix(&GrayMat);
 
 			float width = (float)m_pStdImage->m_pBitmap->GetWidth();
 			float height = (float)m_pStdImage->m_pBitmap->GetHeight();
 
 			RectF grect; grect.X = 0, grect.Y = 0; grect.Width = width; grect.Height = height;
 
-			graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel);
+			ImageAttributes iaStd;
+			if (pStdMat) iaStd.SetColorMatrix(pStdMat);
+			graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, pStdMat ? &iaStd : NULL);
 
 			m_dcStd.CreateCompatibleDC(pDC);
 			bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -299,7 +334,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 
 				RectF grect; grect.X = 0, grect.Y = 0; grect.Width = width; grect.Height = height;
 
-				graphics.DrawImage(*m_pStdImage, grect, -1, -1, width, height, UnitPixel);
+				graphics.DrawImage(*m_pStdImage, grect, -1, -1, width, height, UnitPixel, pStdMat ? &iaStd : NULL);
 
 				m_dcStdP.CreateCompatibleDC(pDC);
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -314,21 +349,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			{
 				PaintBk(pDC);
 
-				ColorMatrix HotMat = {	1.05f, 0.00f, 0.00f, 0.00f, 0.00f,
-										0.00f, 1.05f, 0.00f, 0.00f, 0.00f,
-										0.00f, 0.00f, 1.05f, 0.00f, 0.00f,
-										0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-										0.05f, 0.05f, 0.05f, 0.00f, 1.00f	};
-
-				ImageAttributes ia;
-				ia.SetColorMatrix(&HotMat);
-
-				float width = (float)m_pStdImage->m_pBitmap->GetWidth();
-				float height = (float)m_pStdImage->m_pBitmap->GetHeight();
-
-				RectF grect; grect.X=0, grect.Y=0; grect.Width = width; grect.Height = height;
-
-				graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &ia);
+				graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &iaHot);
 
 				m_dcStdH.CreateCompatibleDC(pDC);
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -343,21 +364,7 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			{
 				PaintBk(pDC);
 
-				ColorMatrix GrayMat = {	0.30f, 0.30f, 0.30f, 0.00f, 0.00f,
-										0.59f, 0.59f, 0.59f, 0.00f, 0.00f,
-										0.11f, 0.11f, 0.11f, 0.00f, 0.00f,
-										0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-										0.00f, 0.00f, 0.00f, 0.00f, 1.00f	};
-
-				ImageAttributes ia;
-				ia.SetColorMatrix(&GrayMat);
-
-				float width = (float)m_pStdImage->m_pBitmap->GetWidth();
-				float height = (float)m_pStdImage->m_pBitmap->GetHeight();
-
-				RectF grect; grect.X=0, grect.Y=0; grect.Width = width; grect.Height = height;
-
-				graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &ia);
+				graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &iaGray);
 
 				m_dcGS.CreateCompatibleDC(pDC);
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -372,7 +379,10 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 		{
 			PaintBk(pDC);
 
-			graphics.DrawImage(*m_pAltImage, 0, 0);
+			float altW = (float)m_pAltImage->m_pBitmap->GetWidth();
+			float altH = (float)m_pAltImage->m_pBitmap->GetHeight();
+			RectF altDest(0, 0, altW, altH);
+			graphics.DrawImage(*m_pAltImage, altDest, 0, 0, altW, altH, UnitPixel, pStdMat ? &iaStd : NULL);
 		
 			m_dcAlt.CreateCompatibleDC(pDC);
 			bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -386,7 +396,10 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			{
 				PaintBk(pDC);
 
-				graphics.DrawImage(*m_pAltImage, 1, 1);
+				float altW = (float)m_pAltImage->m_pBitmap->GetWidth();
+				float altH = (float)m_pAltImage->m_pBitmap->GetHeight();
+				RectF altDest(1, 1, altW, altH);
+				graphics.DrawImage(*m_pAltImage, altDest, 0, 0, altW, altH, UnitPixel, pStdMat ? &iaStd : NULL);
 			
 				m_dcAltP.CreateCompatibleDC(pDC);
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
@@ -401,21 +414,10 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			{
 				PaintBk(pDC);
 
-				ColorMatrix HotMat = {	1.05f, 0.00f, 0.00f, 0.00f, 0.00f,
-										0.00f, 1.05f, 0.00f, 0.00f, 0.00f,
-										0.00f, 0.00f, 1.05f, 0.00f, 0.00f,
-										0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-										0.05f, 0.05f, 0.05f, 0.00f, 1.00f	};
-
-				ImageAttributes ia;
-				ia.SetColorMatrix(&HotMat);
-
-				float width = (float)m_pStdImage->m_pBitmap->GetWidth();
-				float height = (float)m_pStdImage->m_pBitmap->GetHeight();
-
-				RectF grect; grect.X=0, grect.Y=0; grect.Width = width; grect.Height = height;
-
-				graphics.DrawImage(*m_pAltImage, grect, 0, 0, width, height, UnitPixel, &ia);
+				float altW = (float)m_pAltImage->m_pBitmap->GetWidth();
+				float altH = (float)m_pAltImage->m_pBitmap->GetHeight();
+				RectF altDest(0, 0, altW, altH);
+				graphics.DrawImage(*m_pAltImage, altDest, 0, 0, altW, altH, UnitPixel, &iaHot);
 
 				m_dcAltH.CreateCompatibleDC(pDC);
 				bmp.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
