@@ -40,4 +40,5 @@ CString CGetSetOptions::GetCopyAppSeparator() { return CString(); }
 // log / StrF stubs
 // -------------------------------------------------------------------
 void log(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
+void logclip(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
 CString StrF(const TCHAR* /*pszFormat*/, ...) { return CString(); }

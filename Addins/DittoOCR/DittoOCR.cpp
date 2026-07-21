@@ -390,8 +390,6 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         cv::Vec3b p1 = bgr.at<cv::Vec3b>(height-1, width-1);
         OCR_LOG("OcrRecognize image check: %dx%d stride=%d, pixel[0,0]=(%d,%d,%d), pixel[last]=(%d,%d,%d)",
             width, height, stride, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
-#endif
-
         cv::Mat padded = MakePadding(bgr, 50);
 
         ScaleParam scale = GetScaleParam(padded, 1024);
