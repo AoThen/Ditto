@@ -569,7 +569,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		}
 		bIsDescSet = SetDescFromText(cfDesc.m_hgData, true);
 
-		Log(StrF(_T("Tried to set description from cf_unicode text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
+		LogClip(StrF(_T("Tried to set description from cf_unicode text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
 	}
 
 	if(bIsDescSet == false)
@@ -593,7 +593,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 
 			bIsDescSet = SetDescFromText(cfDesc.m_hgData, false);
 
-			Log(StrF(_T("Tried to set description from cf_text text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
+			LogClip(StrF(_T("Tried to set description from cf_text text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
 		}
 	}
 
@@ -675,7 +675,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 							m_Desc = m_Desc.Left(CGetSetOptions::m_bDescTextSize);
 						}
 						bIsDescSet = true;
-						Log(StrF(_T("Set description from HTML Format, Desc: [%s]"), m_Desc.Left(30)));
+						LogClip(StrF(_T("Set description from HTML Format, Desc: [%s]"), m_Desc.Left(30)));
 					}
 				}
 				GlobalUnlock(hgHtml);
@@ -768,7 +768,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 	{
 		SetDescFromType();
 
-		Log(StrF(_T("Setting description from type, Desc: [%s]"), m_Desc.Left(30)));
+		LogClip(StrF(_T("Setting description from type, Desc: [%s]"), m_Desc.Left(30)));
 	}
 	
 	// if the description was in a type that is not supported,
@@ -862,7 +862,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 			}
 		}
 
-		Log(StrF(_T("Called on copy script, this could change the description, regenerated desc: %s"), m_Desc));
+		LogClip(StrF(_T("Called on copy script, this could change the description, regenerated desc: %s"), m_Desc));
 	}
 
 	if (this->m_Desc != _T(""))
@@ -1242,7 +1242,7 @@ bool CClip::AddToMainTable()
 
 		m_id = (long)theApp.m_db.lastRowId();
 
-		Log(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
+		LogClip(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
 
 		m_LastAddedCRC = m_CRC;
 		m_lastAddedID = m_id;
@@ -1699,7 +1699,7 @@ double CClip::GetNewTopSticky(int parentId, int clipId)
 		if (newOrder == 0.0)
 			newOrder += 1;
 
-		Log(StrF(_T("GetNewTopSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewTopSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1737,7 +1737,7 @@ double CClip::GetNewLastSticky(int parentId, int clipId)
 		if (newOrder == 0.0)
 			newOrder -= 1;
 
-		Log(StrF(_T("GetNewLastSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewLastSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1798,7 +1798,7 @@ double CClip::GetNewOrder(int parentId, int clipId)
 			}
 		}
 
-		Log(StrF(_T("GetNewOrder, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewOrder, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1833,7 +1833,7 @@ double CClip::GetNewLastOrder(int parentId, int clipId)
 			}
 		}
 
-		Log(StrF(_T("GetLastOrder, Id: %d, parentId: %d, CurrentMin: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMinOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetLastOrder, Id: %d, parentId: %d, CurrentMin: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMinOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 

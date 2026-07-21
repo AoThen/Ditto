@@ -2317,10 +2317,13 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			if (newClip.AddToDB(false))
 			{
 				SaveRemoteIdMapping(newClip.m_id, serverIdStr);
-				CString msg;
-				msg.Format(_T("MergeRemoteClipToLocal: clip added (ID=%d, CRC=%d, desc='%s')"),
-				           newClip.m_id, crc, newClip.m_Desc.Left(50).GetString());
-				LogMessage(msg);
+				if (CGetSetOptions::GetLogClipboardContent())
+				{
+					CString msg;
+					msg.Format(_T("MergeRemoteClipToLocal: clip added (ID=%d, CRC=%d, desc='%s')"),
+					           newClip.m_id, crc, newClip.m_Desc.Left(50).GetString());
+					LogMessage(msg);
+				}
 				return newClip.m_id;
 			}
 			else

@@ -62,6 +62,7 @@ DWORD CGetSetOptions::m_dwSaveClipDelay;
 long CGetSetOptions::m_lProcessDrawClipboardDelay;
 BOOL CGetSetOptions::m_bEnableDebugLogging;
 BOOL CGetSetOptions::m_bEnableOCR;
+BOOL CGetSetOptions::m_bLogClipboardContent;
 BOOL CGetSetOptions::m_bEnsureConnectToClipboard;
 BOOL CGetSetOptions::m_outputDebugStringLogging;
 bool CGetSetOptions::m_bInConversion = false;
@@ -287,6 +288,7 @@ void CGetSetOptions::LoadSettings()
 	m_dwSaveClipDelay = GetSaveClipDelay();
 	m_lProcessDrawClipboardDelay = GetProcessDrawClipboardDelay();
 	m_bEnableDebugLogging = GetEnableDebugLogging();
+	m_bLogClipboardContent = GetLogClipboardContent();
 	m_bEnableOCR = GetEnableOCR();
 	m_outputDebugStringLogging = GetEnableOutputDebugStringLogging();
 	m_bEnsureConnectToClipboard = GetEnsureConnectToClipboard();
@@ -1962,6 +1964,17 @@ void CGetSetOptions::SetEnableDebugLogging(BOOL bEnable)
 {
 	m_bEnableDebugLogging = bEnable;
 	SetProfileLong("EnableDebugLogging", bEnable);
+}
+
+BOOL CGetSetOptions::GetLogClipboardContent()
+{
+	return GetProfileLong("LogClipboardContent", FALSE);
+}
+
+void CGetSetOptions::SetLogClipboardContent(BOOL bEnable)
+{
+	m_bLogClipboardContent = bEnable;
+	SetProfileLong("LogClipboardContent", bEnable);
 }
 
 BOOL CGetSetOptions::GetEnableOCR()

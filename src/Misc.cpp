@@ -116,6 +116,13 @@ void log(const TCHAR* msg, bool bFromSendRecieve, CString csFile, long lLine)
 	AppendToFile(csExeFile, csText);
 }
 
+void logclip(const TCHAR* msg, bool bFromSendRecieve, CString csFile, long lLine)
+{
+	if(!CGetSetOptions::m_bLogClipboardContent)
+		return;
+	log(msg, bFromSendRecieve, csFile, lLine);
+}
+
 void logsendrecieveinfo(CString cs, CString csFile, long lLine)
 {
 	if(CGetSetOptions::m_bLogSendReceiveErrors)

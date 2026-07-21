@@ -7,6 +7,7 @@
 #include "Server.h"
 #include "..\Shared\Tokenizer.h"
 #include "WildCardMatch.h"
+#include "Options.h"
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -261,7 +262,8 @@ void CServer::OnStart(CSendInfo &info)
 	}
 	
 	info.m_cDesc[20] = 0;
-	LogSendRecieveInfo(StrF(_T("::START %s %s %s"), m_csDesc, m_csComputerName, m_csIP));
+	if (CGetSetOptions::GetLogClipboardContent())
+		LogSendRecieveInfo(StrF(_T("::START %s %s %s"), m_csDesc, m_csComputerName, m_csIP));
 }
 
 void CServer::OnDataStart(CSendInfo &info)

@@ -367,6 +367,10 @@ public:
 	static BOOL		GetEnableDebugLogging();
 	static void		SetEnableDebugLogging(BOOL bEnable);
 
+	static BOOL		m_bLogClipboardContent;
+	static BOOL		GetLogClipboardContent();
+	static void		SetLogClipboardContent(BOOL bEnable);
+
 	static BOOL		m_bEnsureConnectToClipboard;
 	static BOOL		GetEnsureConnectToClipboard();
 	static void		SetEnsureConnectToClipboard(BOOL bSet);

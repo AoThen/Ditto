@@ -103,6 +103,8 @@ CString GetComputerName();
 #define FUNCSIG		__FUNCSIG__
 void AppendToFile(const TCHAR* fn, const TCHAR *msg);
 #define Log(msg) log(msg, false, __FILE__, __LINE__)
+#define LogClip(msg) logclip(msg, false, __FILE__, __LINE__)
+void logclip(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
 void log(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
 CString GetErrorString(int err);
 

@@ -146,7 +146,7 @@ CStringW RunOCR(const std::vector<BYTE>& data, int w, int h, int stride)
 
     CStringW result = CA2W(text, CP_UTF8);
     g_pfnOcrFreeString(text);
-    Log(StrF(_T("OCR: RunOCR success, text=%s"), result));
+    LogClip(StrF(_T("OCR: RunOCR success, text=%s"), result));
     return result;
 }
 

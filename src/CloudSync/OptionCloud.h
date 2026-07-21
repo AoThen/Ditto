@@ -56,6 +56,7 @@
 #define IDC_CLOUD_ENABLE_DEBUG_LOGGING  2237
 #define IDC_CLOUD_ENABLE_OCR  2238
 #define IDC_CLOUD_FORCE_OCR  2239
+#define IDC_CLOUD_LOG_CLIPBOARD_CONTENT  2240
 
 #ifndef RC_INVOKED
 #include <vector>
@@ -86,6 +87,7 @@ public:
 	CString m_csKeyFilePath;
 	UINT_PTR m_nStatusTimer;
 	BOOL    m_bEnableDebugLogging;
+	BOOL    m_bLogClipboardContent;
 	BOOL    m_bEnableOCR;
 
 protected:

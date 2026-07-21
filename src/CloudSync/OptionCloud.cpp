@@ -123,6 +123,7 @@ void COptionCloud::DoDataExchange(CDataExchange* pDX)
 	DDX_Check(pDX, IDC_CLOUD_BTN_ENABLE_ENCRYPTION, m_bEncryptionEnabled);
 	DDX_Text(pDX, IDC_CLOUD_KEY_FILE_PATH, m_csKeyFilePath);
 	DDX_Check(pDX, IDC_CLOUD_ENABLE_DEBUG_LOGGING, m_bEnableDebugLogging);
+	DDX_Check(pDX, IDC_CLOUD_LOG_CLIPBOARD_CONTENT, m_bLogClipboardContent);
 	DDX_Check(pDX, IDC_CLOUD_ENABLE_OCR, m_bEnableOCR);
 }
 
@@ -214,6 +215,7 @@ BOOL COptionCloud::OnInitDialog()
 	}
 
 m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
+	m_bLogClipboardContent = CGetSetOptions::GetLogClipboardContent();
 	m_bEnableOCR = CGetSetOptions::GetEnableOCR();
 
 	UpdateData(FALSE);
@@ -269,6 +271,7 @@ BOOL COptionCloud::OnApply()
 	}
 
 	CGetSetOptions::SetEnableDebugLogging(m_bEnableDebugLogging);
+	CGetSetOptions::SetLogClipboardContent(m_bLogClipboardContent);
 	CGetSetOptions::SetEnableOCR(m_bEnableOCR);
 
 	return CPropertyPage::OnApply();
