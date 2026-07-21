@@ -190,13 +190,13 @@ static TextLine ScoreToTextLine(const float* outputData, size_t h, size_t w, std
         int maxIndex = (int)(std::max_element(outputData + start, outputData + stop) - (outputData + start));
         float maxValue = *std::max_element(outputData + start, outputData + stop);
 
-        if (maxIndex > 0 && maxIndex < (int)characterDict.size() && !(i > 0 && maxIndex == (int)lastIndex)) {
-            strRes += characterDict[maxIndex];
+        if (maxIndex > 0 && maxIndex <= (int)characterDict.size() && !(i > 0 && maxIndex == (int)lastIndex)) {
+            strRes += characterDict[maxIndex - 1];
             totalScore += maxValue;
             count++;
 #ifdef OCR_DEBUG
             OCR_LOG("  rec timestep[%zu]: maxIdx=%d maxVal=%.4f char=[%s]",
-                i, maxIndex, maxValue, characterDict[maxIndex].c_str());
+                i, maxIndex, maxValue, (maxIndex > 0 && maxIndex <= (int)characterDict.size()) ? characterDict[maxIndex - 1].c_str() : "?");
 #endif
         } else {
 #ifdef OCR_DEBUG
