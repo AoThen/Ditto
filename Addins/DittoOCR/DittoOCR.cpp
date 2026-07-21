@@ -1,5 +1,5 @@
 #define OCRDLL_EXPORTS
-#ifdef _DEBUG
+#ifdef OCR_DEBUG
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 #include "OcrDllInterface.h"
@@ -15,7 +15,7 @@
 #include <onnxruntime_cxx_api.h>
 #include "clipper.hpp"
 
-#ifdef _DEBUG
+#ifdef OCR_DEBUG
 static FILE* g_ocrLogFile = NULL;
 
 #define OCR_LOG(fmt, ...) do { \
@@ -242,7 +242,7 @@ static std::vector<std::string> ParseCharacterDict(const std::string& configPath
 OCR_API void* OcrInit(const char* modelsDir)
 {
     try {
-#ifdef _DEBUG
+#ifdef OCR_DEBUG
         g_ocrLogFile = fopen("ocr_debug.log", "w");
         OCR_LOG("OcrInit start, modelsDir=%s", modelsDir);
 #endif
@@ -286,7 +286,7 @@ OCR_API void* OcrInit(const char* modelsDir)
         return (void*)handle;
     } catch (const std::exception& e) {
         OCR_LOG("OcrInit exception: %s", e.what());
-#ifdef _DEBUG
+#ifdef OCR_DEBUG
         if (g_ocrLogFile) { fclose(g_ocrLogFile); g_ocrLogFile = NULL; }
 #endif
         return nullptr;
@@ -411,7 +411,7 @@ OCR_API void OcrDestroy(void* handle)
     if (handle) {
         delete (OcrHandle*)handle;
     }
-#ifdef _DEBUG
+#ifdef OCR_DEBUG
     if (g_ocrLogFile) {
         OCR_LOG("OcrDestroy");
         fclose(g_ocrLogFile);
