@@ -44,8 +44,7 @@ jobs:
         run: |
           copy onnxbuilder\build-onnxruntime.bat onnxsrc\
           $content = Get-Content onnxsrc\build-onnxruntime.bat
-          # 修复 pushd 到 Release 子目录导致 CMake 找不到 build 根目录的问题
-          $content = $content -replace 'pushd "build-%~1-%~2-%~3"\\Release', 'pushd "build-%~1-%~2-%~3"'
+          # 保留原始 pushd "build-%~1-%~2-%~3"\Release（collectLibs 需要从 cmake 构建目录运行）
           # 禁用 Java 构建（我们只需要 C++ 静态库）
           $content = $content -replace 'set MACHINE_FLAG="--build_java"', 'set MACHINE_FLAG='
           # 修复 collectLibs 中 header 扁平化：v1.23.2 的脚本只复制 onnxruntime\ 根目录，不递归子目录
@@ -75,7 +74,7 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\install-static\*
+          7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\Release\install-static\*
 
       - name: Create Release
         uses: ncipollo/release-action@v1
