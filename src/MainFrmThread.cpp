@@ -151,6 +151,7 @@ void CMainFrmThread::OnSaveClips()
 				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
 				{
 					Log(StrF(_T("OCR: MainFrmThread launching OCR thread, id=%d, image size=%d"), pClip->m_id, (int)pClip->m_ocrImageData.size()));
+					g_ocrThreadCount++;
 					std::thread([id = pClip->m_id,
 					             data = std::move(pClip->m_ocrImageData),
 					             w = pClip->m_ocrWidth,
@@ -160,10 +161,15 @@ void CMainFrmThread::OnSaveClips()
 						CStringW text = RunOCR(data, w, h, s);
 						if (!text.IsEmpty())
 						{
-							::PostMessage(AfxGetMainWnd()->GetSafeHwnd(),
-							              WM_OCR_COMPLETED, id,
-							              (LPARAM)new CStringW(text));
+							HWND hwnd = AfxGetMainWnd() ? AfxGetMainWnd()->GetSafeHwnd() : nullptr;
+							if (hwnd && ::IsWindow(hwnd))
+							{
+								CStringW* pText = new CStringW(text);
+								if (!::PostMessage(hwnd, WM_OCR_COMPLETED, id, (LPARAM)pText))
+									delete pText;
+							}
 						}
+						g_ocrThreadCount--;
 					}).detach();
 				}
 			}

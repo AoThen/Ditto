@@ -773,46 +773,54 @@ void COptionCloud::OnForceReOcr()
         return;
     }
 
-    CWaitCursor wait;
-    std::vector<OcrWorkItem> items;
-    items.reserve(ids.size());
-
-    for (int clipId : ids)
-    {
-        CClip clip;
-        if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
-        {
-            items.push_back({clipId, std::move(clip.m_ocrImageData),
-                             clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
-        }
-    }
-
-    wait.Restore();
-
-    if (items.empty())
-    {
-        running = false;
-        AfxMessageBox(_T("No images could be loaded for OCR processing."));
-        return;
-    }
-
     HWND hMainWnd = AfxGetMainWnd()->GetSafeHwnd();
-    std::thread([items = std::move(items), hMainWnd]()
+    // Load images and run OCR on background thread to avoid UI freeze
+    g_ocrThreadCount++;
+    std::thread([ids = std::move(ids), hMainWnd]()
     {
+        std::vector<OcrWorkItem> items;
+        for (int clipId : ids)
+        {
+            CClip clip;
+            if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
+            {
+                items.push_back({clipId, std::move(clip.m_ocrImageData),
+                                 clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
+            }
+        }
+
+        if (items.empty())
+        {
+            if (::IsWindow(hMainWnd))
+                ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE, 0, 0);
+            running = false;
+            g_ocrThreadCount--;
+            return;
+        }
+
         int success = 0;
         for (const auto& item : items)
         {
             CStringW text = RunOCR(item.imageData, item.width, item.height, item.stride);
             if (!text.IsEmpty())
             {
-                ::PostMessage(hMainWnd, WM_OCR_COMPLETED,
-                              item.clipId, (LPARAM)new CStringW(text));
+                if (::IsWindow(hMainWnd))
+                {
+                    auto* pText = new CStringW(text);
+                    if (!::PostMessage(hMainWnd, WM_OCR_COMPLETED,
+                                       item.clipId, (LPARAM)pText))
+                        delete pText;
+                }
                 success++;
             }
         }
-        ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE,
-                      (WPARAM)items.size(), (LPARAM)success);
+
+        if (::IsWindow(hMainWnd))
+            ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE,
+                          (WPARAM)items.size(), (LPARAM)success);
+
         running = false;
+        g_ocrThreadCount--;
     }).detach();
 }
 

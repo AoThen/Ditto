@@ -1634,7 +1634,7 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 	{
 		CStringW existing = q.getStringField(0);
 		CStringW combined = existing;
-		if (existing.Find(*pOcrText) < 0)
+		if (existing != *pOcrText)
 		{
 			if (!existing.IsEmpty())
 				combined += L" ";
@@ -1661,7 +1661,10 @@ LRESULT CMainFrame::OnOcrBatchDone(WPARAM wParam, LPARAM lParam)
 	int total = (int)wParam;
 	int success = (int)lParam;
 	CString msg;
-	msg.Format(_T("OCR re-run completed.\n%d images processed, %d updated."), total, success);
+	if (total == 0)
+		msg = _T("No images could be loaded for OCR processing.");
+	else
+		msg.Format(_T("OCR re-run completed.\n%d images processed, %d updated."), total, success);
 	AfxMessageBox(msg);
 	return 0;
 }

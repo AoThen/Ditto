@@ -21,6 +21,8 @@ static PFN_OcrRecognize   g_pfnOcrRecognize = nullptr;
 static PFN_OcrFreeString  g_pfnOcrFreeString = nullptr;
 static PFN_OcrDestroy     g_pfnOcrDestroy = nullptr;
 
+std::atomic<int> g_ocrThreadCount{0};
+
 bool ExtractClipImageData(CClip* pClip)
 {
     auto* fmt = pClip->m_Formats.FindFormat(CF_DIB);
@@ -49,9 +51,24 @@ bool ExtractClipImageData(CClip* pClip)
         return false;
     }
 
-    int size = bd.Height * bd.Stride;
-    pClip->m_ocrImageData.resize(size);
-    memcpy(pClip->m_ocrImageData.data(), bd.Scan0, size);
+    constexpr int kMaxOcrDim = 4096;
+    if (bd.Width > kMaxOcrDim || bd.Height > kMaxOcrDim)
+    {
+        Log(StrF(_T("OCR: ExtractClipImageData - image too large %dx%d, max allowed %d"), bd.Width, bd.Height, kMaxOcrDim));
+        bmp->UnlockBits(&bd);
+        delete bmp;
+        return false;
+    }
+    ULONGLONG sizeNeeded = (ULONGLONG)bd.Height * (ULONGLONG)bd.Stride;
+    if (sizeNeeded > 256ULL * 1024 * 1024)
+    {
+        Log(StrF(_T("OCR: ExtractClipImageData - image data too large %llu bytes"), sizeNeeded));
+        bmp->UnlockBits(&bd);
+        delete bmp;
+        return false;
+    }
+    pClip->m_ocrImageData.resize((size_t)sizeNeeded);
+    memcpy(pClip->m_ocrImageData.data(), bd.Scan0, (size_t)sizeNeeded);
     pClip->m_ocrWidth  = bd.Width;
     pClip->m_ocrHeight = bd.Height;
     pClip->m_ocrStride = bd.Stride;

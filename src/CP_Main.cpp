@@ -14,6 +14,7 @@
 #include "SendKeys.h"
 #include "MainTableFunctions.h"
 #include "ShowTaskBarIcon.h"
+#include "ClipboardOCR.h"
 #include "NoDbFrameWnd.h"
 #include <clocale>
 
@@ -955,6 +956,11 @@ int CCP_MainApp::ExitInstance()
 
 	// Stop Cloud Sync before database closes
 	m_CloudSyncManager.Stop();
+
+	// Wait for OCR threads to finish before cleanup
+	while (g_ocrThreadCount > 0)
+		Sleep(50);
+	CleanupOCR();
 
 	DeleteDittoTempFiles(FALSE);
 
