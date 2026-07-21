@@ -60,7 +60,7 @@ public:
 	void EnableButton(BOOL bEnable = TRUE) { m_bIsDisabled = !bEnable; }
 
 	// in dark mode, uses a lightening ColorMatrix to make dark icons visible
-	void SetDarkMode(BOOL bDark = TRUE) { m_bDarkMode = bDark; }
+	void SetDarkMode(BOOL bDark = TRUE);
 
 	// in toggle mode each press toggles between std and alt images
 	void EnableToggle(BOOL bEnable = TRUE);
