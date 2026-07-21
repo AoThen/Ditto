@@ -194,6 +194,18 @@ static TextLine ScoreToTextLine(const float* outputData, size_t h, size_t w, std
             strRes += characterDict[maxIndex];
             totalScore += maxValue;
             count++;
+#ifdef OCR_DEBUG
+            OCR_LOG("  rec timestep[%zu]: maxIdx=%d maxVal=%.4f char=[%s]",
+                i, maxIndex, maxValue, characterDict[maxIndex].c_str());
+#endif
+        } else {
+#ifdef OCR_DEBUG
+            OCR_LOG("  rec timestep[%zu]: maxIdx=%d maxVal=%.4f %s",
+                i, maxIndex, maxValue,
+                (maxIndex == 0) ? "(blank)" :
+                (maxIndex >= (int)characterDict.size()) ? "(out-of-range)" :
+                "(collapsed)");
+#endif
         }
         lastIndex = maxIndex;
     }
@@ -271,6 +283,20 @@ OCR_API void* OcrInit(const char* modelsDir)
 
         std::vector<std::string> characterDict = ParseCharacterDict(configPath);
 
+#ifdef OCR_DEBUG
+        OCR_LOG("charDict: size=%zu", characterDict.size());
+        for (int i = 0; i < 5 && i < (int)characterDict.size(); i++)
+            OCR_LOG("  charDict[%d] = [%s]", i, characterDict[i].c_str());
+        for (int i = std::max(0, (int)characterDict.size()-5); i < (int)characterDict.size(); i++)
+            OCR_LOG("  charDict[%d] = [%s]", i, characterDict[i].c_str());
+        for (int i = 0; i < (int)characterDict.size(); i++) {
+            if (characterDict[i] == "2") {
+                OCR_LOG("  char '2' at index %d", i);
+                break;
+            }
+        }
+#endif
+
         auto* handle = new OcrHandle();
         handle->env = env;
         handle->memInfo = memInfo;
@@ -310,6 +336,14 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
             }
         }
 
+#ifdef OCR_DEBUG
+        cv::imwrite("ocr_debug_input.png", bgr);
+        cv::Vec3b p0 = bgr.at<cv::Vec3b>(0, 0);
+        cv::Vec3b p1 = bgr.at<cv::Vec3b>(height-1, width-1);
+        OCR_LOG("OcrRecognize image check: %dx%d stride=%d, pixel[0,0]=(%d,%d,%d), pixel[last]=(%d,%d,%d)",
+            width, height, stride, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+#endif
+
         cv::Mat padded = MakePadding(bgr, 50);
 
         ScaleParam scale = GetScaleParam(padded, 1024);
@@ -340,6 +374,16 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
             predMat.at<float>(i) = 1.0f / (1.0f + std::exp(-detOutData[i]));
         }
 
+#ifdef OCR_DEBUG
+        double minVal, maxVal;
+        cv::minMaxLoc(predMat, &minVal, &maxVal);
+        cv::Scalar meanVal = cv::mean(predMat);
+        OCR_LOG("Det output shape=[%lld,%lld,%lld,%lld], outH=%d outW=%d",
+            detOutShape[0], detOutShape[1], detOutShape[2], detOutShape[3], outH, outW);
+        OCR_LOG("Det predMat sigmoid: min=%.4f max=%.4f mean=%.4f",
+            minVal, maxVal, meanVal[0]);
+#endif
+
         cv::Mat binaryMat;
         cv::threshold(predMat, binaryMat, 0.2f, 1.0f, cv::THRESH_BINARY);
         binaryMat.convertTo(binaryMat, CV_8UC1, 255.0);
@@ -349,6 +393,18 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         cv::dilate(binaryMat, dilateMat, kernel);
 
         std::vector<TextBox> boxes = FindRsBoxes(predMat, dilateMat, scale, 0.45f, 1.4f);
+
+#ifdef OCR_DEBUG
+        OCR_LOG("Det found %zu text boxes (score>=0.45)", boxes.size());
+        for (size_t i = 0; i < boxes.size() && i < 20; i++) {
+            OCR_LOG("  box[%zu]: score=%.4f [%d,%d][%d,%d][%d,%d][%d,%d]",
+                i, boxes[i].score,
+                boxes[i].boxPoint[0].x, boxes[i].boxPoint[0].y,
+                boxes[i].boxPoint[1].x, boxes[i].boxPoint[1].y,
+                boxes[i].boxPoint[2].x, boxes[i].boxPoint[2].y,
+                boxes[i].boxPoint[3].x, boxes[i].boxPoint[3].y);
+        }
+#endif
 
         std::string result;
         float recMean[3] = {127.5f, 127.5f, 127.5f};
@@ -381,6 +437,11 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 
             size_t recH_out = (recOutShape.size() == 3) ? (size_t)recOutShape[1] : (size_t)recOutShape[0];
             size_t recW_out = (recOutShape.size() == 3) ? (size_t)recOutShape[2] : (size_t)recOutShape[1];
+
+#ifdef OCR_DEBUG
+            OCR_LOG("Rec output shape dims=%zu, seq_len=%zu num_classes=%zu",
+                recOutShape.size(), recH_out, recW_out);
+#endif
 
             TextLine textLine = ScoreToTextLine(recOutData, recH_out, recW_out, ocr->characterDict);
             result += textLine.text;
