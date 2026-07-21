@@ -889,7 +889,7 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 
 BOOL CQPasteWnd::HideQPasteWindow(bool releaseFocus, BOOL clearSearchData)
 {
-	if (clearSearchData = -1)
+	if (clearSearchData == -1)
 	{
 		if ((CGetSetOptions::m_maintainSearchView || CGetSetOptions::m_refreshViewAfterPasting == false) &&
 			m_strSearch != _T(""))
@@ -1053,6 +1053,9 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 
 	if (bFillList)
 	{
+		m_bHandleSearchTextChange = false;
+		m_search.SetWindowText(_T(""));
+		m_bHandleSearchTextChange = true;
 		FillList();
 	}
 	else
@@ -1752,7 +1755,10 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 	m_lstHeader.RefreshVisibleRows();
 
 	CPoint loadItem(-1, m_lstHeader.GetCountPerPage() + 2);
-	m_loadItems.push_back(loadItem);
+	{
+		ATL::CCritSecLock csLock(m_CritSection.m_sect);
+		m_loadItems.push_back(loadItem);
+	}
 
 	m_thread.SetSearchSql(sql, countSql);
 	m_thread.FireLoadItems(true);
@@ -5879,6 +5885,9 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 
 					bool addToLoadItems = true;
 
+				{
+					ATL::CCritSecLock csLock(m_CritSection.m_sect);
+
 					for (std::list<CPoint>::iterator it = m_loadItems.begin(); it != m_loadItems.end(); it++)
 					{
 						if (pItem->iItem >= it->x && pItem->iItem <= it->y)
@@ -5892,9 +5901,9 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 					{
 						CPoint loadItem(pItem->iItem, (m_lstHeader.GetTopIndex() + (m_lstHeader.GetCountPerPage() * 2)));
 
-						//Log(StrF(_T("DrawItem index %d, add: %d"), loadItem.x, loadItem.y));
 						m_loadItems.push_back(loadItem);
 					}
+				}
 
 					m_thread.FireLoadItems(false);
 				}
