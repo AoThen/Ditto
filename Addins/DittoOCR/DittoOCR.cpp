@@ -291,6 +291,26 @@ OCR_API void* OcrInit(const char* modelsDir)
         std::vector<std::string> characterDict = ParseCharacterDict(configPath);
 
 #ifdef OCR_DEBUG
+        {
+            auto detInputTypeInfo = detSession->GetInputTypeInfo(0);
+            auto detInputShapeInfo = detInputTypeInfo.GetTensorTypeAndShapeInfo();
+            auto detInputShape = detInputShapeInfo.GetShape();
+            std::string detShapeStr;
+            for (size_t i = 0; i < detInputShape.size(); i++)
+                detShapeStr += (i ? "," : "") + std::to_string(detInputShape[i]);
+            OCR_LOG("Det model: input='%s' shape=[%s] output='%s'",
+                detInputName.c_str(), detShapeStr.c_str(), detOutputName.c_str());
+        }
+        {
+            auto recInputTypeInfo = recSession->GetInputTypeInfo(0);
+            auto recInputShapeInfo = recInputTypeInfo.GetTensorTypeAndShapeInfo();
+            auto recInputShape = recInputShapeInfo.GetShape();
+            std::string recShapeStr;
+            for (size_t i = 0; i < recInputShape.size(); i++)
+                recShapeStr += (i ? "," : "") + std::to_string(recInputShape[i]);
+            OCR_LOG("Rec model: input='%s' shape=[%s] output='%s'",
+                recInputName.c_str(), recShapeStr.c_str(), recOutputName.c_str());
+        }
         OCR_LOG("charDict: size=%zu", characterDict.size());
         for (int i = 0; i < 5 && i < (int)characterDict.size(); i++)
             OCR_LOG("  charDict[%d] = [%s]", i, characterDict[i].c_str());
@@ -377,10 +397,32 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         ScaleParam scale = GetScaleParam(padded, 1024);
         cv::Mat resizeImg;
         cv::resize(padded, resizeImg, cv::Size(scale.dstWidth, scale.dstHeight));
+#ifdef OCR_DEBUG
+        OCR_LOG("Det resize: padded=%dx%d resize=%dx%d targetSize=1024",
+            padded.cols, padded.rows, resizeImg.cols, resizeImg.rows);
+#endif
 
         float detMean[3] = {0.485f * 255.0f, 0.456f * 255.0f, 0.406f * 255.0f};
         float detNorm[3] = {1.0f/0.229f/255.0f, 1.0f/0.224f/255.0f, 1.0f/0.225f/255.0f};
         std::vector<float> detInput = SubstractMeanNormalize(resizeImg, detMean, detNorm);
+#ifdef OCR_DEBUG
+        {
+            double inpMin = 1e10, inpMax = -1e10;
+            double inpSum[3] = {0,0,0};
+            int totalPixels = scale.dstWidth * scale.dstHeight;
+            for (int ch = 0; ch < 3; ch++) {
+                for (int i = 0; i < totalPixels; i++) {
+                    float v = detInput[ch * totalPixels + i];
+                    inpMin = std::min(inpMin, (double)v);
+                    inpMax = std::max(inpMax, (double)v);
+                    inpSum[ch] += v;
+                }
+            }
+            OCR_LOG("Det input: min=%.4f max=%.4f B_mean=%.4f G_mean=%.4f R_mean=%.4f",
+                inpMin, inpMax,
+                inpSum[0]/totalPixels, inpSum[1]/totalPixels, inpSum[2]/totalPixels);
+        }
+#endif
 
         std::vector<int64_t> detShape = {1, 3, scale.dstHeight, scale.dstWidth};
         Ort::Value detInputTensor = Ort::Value::CreateTensor<float>(*ocr->memInfo, detInput.data(), detInput.size(), detShape.data(), detShape.size());
@@ -396,6 +438,21 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 
         int outH = (detOutShape.size() == 4) ? (int)detOutShape[2] : (int)detOutShape[1];
         int outW = (detOutShape.size() == 4) ? (int)detOutShape[3] : (int)detOutShape[2];
+
+        #ifdef OCR_DEBUG
+        {
+            double rawMin = 1e10, rawMax = -1e10, rawSum = 0;
+            int rawCount = outH * outW;
+            for (int i = 0; i < rawCount; i++) {
+                float v = detOutData[i];
+                rawMin = std::min(rawMin, (double)v);
+                rawMax = std::max(rawMax, (double)v);
+                rawSum += v;
+            }
+            OCR_LOG("Det raw logit: min=%.4f max=%.4f mean=%.4f",
+                rawMin, rawMax, rawSum/rawCount);
+        }
+#endif
 
         cv::Mat predMat(outH, outW, CV_32FC1);
         for (int i = 0; i < outH * outW; i++) {
