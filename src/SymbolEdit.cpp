@@ -833,6 +833,10 @@ void CSymbolEdit::SetDarkMode(BOOL bDark)
 {
 	m_closeButton.SetDarkMode(bDark);
 	m_searchesButton.SetDarkMode(bDark);
+	if (bDark)
+		m_colorPromptText = RGB(200, 200, 200);
+	else
+		m_colorPromptText = RGB(127, 127, 127);
 	Invalidate();
 }
 
