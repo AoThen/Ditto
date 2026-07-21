@@ -74,6 +74,7 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
+          xcopy /y onnxsrc\build-x64-v143-mt\Release\install\lib\*.lib onnxsrc\build-x64-v143-mt\Release\install-static\lib\
           7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\Release\install-static\*
 
       - name: Create Release
