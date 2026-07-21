@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: RapidAI/OnnxruntimeBuilder
-          ref: 1.15.1
+          ref: 1.23.2
           path: onnxbuilder
           fetch-depth: 1
 
@@ -34,38 +34,28 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: microsoft/onnxruntime
-          ref: v1.15.1
+          ref: v1.23.2
           path: onnxsrc
           submodules: recursive
           fetch-depth: 1
 
-      - name: Copy build script and create x64-only wrapper
+      - name: Copy build script and fix pushd path
         shell: powershell
         run: |
           copy onnxbuilder\build-onnxruntime.bat onnxsrc\
           $content = Get-Content onnxsrc\build-onnxruntime.bat
-          # 移除 Win32 构建（原脚本会构建 x64+Win32）
-          $content = $content -replace 'call :cmakeParams "Win32" %VS_VER% %CRT%', ''
           # 修复 pushd 到 Release 子目录导致 CMake 找不到 build 根目录的问题
           $content = $content -replace 'pushd "build-%~1-%~2-%~3"\\Release', 'pushd "build-%~1-%~2-%~3"'
           $content | Set-Content onnxsrc\build-onnxruntime.bat
-
-      - name: Patch ort_mutex.h for MSVC 19.44+
-        shell: powershell
-        run: |
-          $file = "onnxsrc\include\onnxruntime\core\platform\ort_mutex.h"
-          $content = Get-Content $file
-          $content = $content -replace '#include <mutex>', "#include <mutex>`n#include <chrono>"
-          Set-Content $file -Value $content
 
       - name: Cache ONNX Runtime build
         id: cache-onnx
         uses: actions/cache@v4
         with:
           path: onnxsrc/build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-1.15.1-${{ hashFiles('onnxbuilder/build-onnxruntime.bat') }}
+          key: onnxruntime-build-x64-v143-mt-1.23.2-${{ hashFiles('onnxbuilder/build-onnxruntime.bat') }}
           restore-keys: |
-            onnxruntime-build-x64-v143-mt-1.15.1-
+            onnxruntime-build-x64-v143-mt-1.23.2-
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -81,15 +71,15 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          7z a onnxruntime-static-windows-x64-1.15.1.7z onnxsrc\build-x64-v143-mt\install-static\*
+          7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\install-static\*
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: onnxruntime-1.15.1
-          name: "ONNX Runtime 1.15.1 static libs (Windows x64, VS2022, mt)"
+          tag: onnxruntime-1.23.2
+          name: "ONNX Runtime 1.23.2 static libs (Windows x64, VS2022, mt)"
           prerelease: true
-          artifacts: onnxruntime-static-windows-x64-1.15.1.7z
+          artifacts: onnxruntime-static-windows-x64-1.23.2.7z
           allowUpdates: true
           artifactContentType: application/x-7z-compressed
           token: ${{ secrets.GITHUB_TOKEN }}
