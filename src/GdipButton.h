@@ -131,6 +131,15 @@ private:
 
 	CDC*	m_pCurBtn;		// current pointer to one of the above
 
+	CBitmap m_bmpBk;
+	CBitmap m_bmpStd;
+	CBitmap m_bmpStdP;
+	CBitmap m_bmpStdH;
+	CBitmap m_bmpGS;
+	CBitmap m_bmpAlt;
+	CBitmap m_bmpAltP;
+	CBitmap m_bmpAltH;
+
 	BOOL	m_bDarkMode;	// dark mode: lighten icon for visibility
 
 };
