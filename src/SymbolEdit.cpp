@@ -533,6 +533,9 @@ void CSymbolEdit::OnPaint()
 
 	if (text.GetLength() == 0 && m_strPromptText.GetLength() > 0)
 	{
+		if (m_windowDpi == NULL)
+			return;
+
 		//if we aren't showing the close icon, then use the full space
 		textRect.right += m_windowDpi->Scale(16);
 		//textRect.right -= LOWORD(margins);
@@ -545,6 +548,9 @@ void CSymbolEdit::OnPaint()
 		dc.SetTextColor(color);
 		dc.SelectObject(oldFont);
 	}
+
+	if (m_windowDpi == NULL)
+		return;
 
 	int right = rect.right;
 	if ((text.GetLength() > 0 || this == GetFocus()))
@@ -941,6 +947,8 @@ void CSymbolEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSymbolEdit::OnNcPaint()
 {
+	if (m_windowDpi == NULL)
+		return;
 
 	CString text;
 	GetWindowText(text);

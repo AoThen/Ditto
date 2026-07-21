@@ -286,8 +286,8 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
 												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
 												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-												0.00f, 0.00f, 0.00f, 0.00f, 1.00f };
-				static ColorMatrix DarkHotMat = { 2.875f, 0.00f, 0.00f, 0.00f, 0.10f,
+0.20f, 0.20f, 0.20f, 0.00f, 1.00f };
+			static ColorMatrix DarkHotMat = { 2.875f, 0.00f, 0.00f, 0.00f, 0.10f,
 													0.00f, 2.875f, 0.00f, 0.00f, 0.10f,
 													0.00f, 0.00f, 2.875f, 0.00f, 0.10f,
 													0.00f, 0.00f, 0.00f, 1.00f, 0.00f,

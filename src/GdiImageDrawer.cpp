@@ -126,7 +126,7 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int 
 												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
 												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
 												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
-												0.20f, 0.20f, 0.20f, 0.00f, 1.00f };
+												0.35f, 0.35f, 0.35f, 0.00f, 1.00f };
 		Gdiplus::ImageAttributes ia;
 		ia.SetColorMatrix(&DarkMat);
 		Gdiplus::RectF grect((Gdiplus::REAL)posX, (Gdiplus::REAL)posY, (Gdiplus::REAL)width, (Gdiplus::REAL)height);
