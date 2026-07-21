@@ -1,4 +1,7 @@
 #define OCRDLL_EXPORTS
+#ifdef _DEBUG
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include "OcrDllInterface.h"
 #include <string>
 #include <cstring>
@@ -11,6 +14,20 @@
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include "clipper.hpp"
+
+#ifdef _DEBUG
+static FILE* g_ocrLogFile = NULL;
+
+#define OCR_LOG(fmt, ...) do { \
+    if (g_ocrLogFile) { \
+        fprintf(g_ocrLogFile, "[%.3f] " fmt "\n", \
+            (double)GetTickCount64() / 1000.0, ##__VA_ARGS__); \
+        fflush(g_ocrLogFile); \
+    } \
+} while(0)
+#else
+#define OCR_LOG(fmt, ...) ((void)0)
+#endif
 
 struct ScaleParam {
     int srcWidth, srcHeight, dstWidth, dstHeight;
@@ -225,6 +242,10 @@ static std::vector<std::string> ParseCharacterDict(const std::string& configPath
 OCR_API void* OcrInit(const char* modelsDir)
 {
     try {
+#ifdef _DEBUG
+        g_ocrLogFile = fopen("ocr_debug.log", "w");
+        OCR_LOG("OcrInit start, modelsDir=%s", modelsDir);
+#endif
         std::string dir(modelsDir);
         std::string detPath = dir + "/PP-OCRv6_small_det_infer.onnx";
         std::string recPath = dir + "/PP-OCRv6_small_rec_infer.onnx";
@@ -259,10 +280,15 @@ OCR_API void* OcrInit(const char* modelsDir)
         handle->detOutputName = detOutputName;
         handle->recInputName = recInputName;
         handle->recOutputName = recOutputName;
+        OCR_LOG("OcrInit success, charDict=%zu entries", characterDict.size());
         handle->characterDict = std::move(characterDict);
 
         return (void*)handle;
     } catch (const std::exception& e) {
+        OCR_LOG("OcrInit exception: %s", e.what());
+#ifdef _DEBUG
+        if (g_ocrLogFile) { fclose(g_ocrLogFile); g_ocrLogFile = NULL; }
+#endif
         return nullptr;
     }
 }
@@ -270,6 +296,7 @@ OCR_API void* OcrInit(const char* modelsDir)
 OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int width, int height, int stride)
 {
     try {
+        OCR_LOG("OcrRecognize start, %dx%d stride=%d", width, height, stride);
         auto* ocr = (OcrHandle*)handle;
 
         cv::Mat bgr(height, width, CV_8UC3);
@@ -359,12 +386,17 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
             result += textLine.text;
         }
 
-        if (result.empty()) return nullptr;
+        if (result.empty()) {
+            OCR_LOG("OcrRecognize no text found");
+            return nullptr;
+        }
         char* ret = (char*)malloc(result.length() + 1);
         if (ret) memcpy(ret, result.c_str(), result.length() + 1);
+        OCR_LOG("OcrRecognize success, text=%s", ret);
         return ret;
 
     } catch (const std::exception& e) {
+        OCR_LOG("OcrRecognize exception: %s", e.what());
         return nullptr;
     }
 }
@@ -379,4 +411,11 @@ OCR_API void OcrDestroy(void* handle)
     if (handle) {
         delete (OcrHandle*)handle;
     }
+#ifdef _DEBUG
+    if (g_ocrLogFile) {
+        OCR_LOG("OcrDestroy");
+        fclose(g_ocrLogFile);
+        g_ocrLogFile = NULL;
+    }
+#endif
 }
