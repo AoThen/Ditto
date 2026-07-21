@@ -2423,7 +2423,7 @@ int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, 
 		}
 		else
 		{
-			len = 1;
+			len = 0;
 		}
 		charOffsets[i] = accum;
 		charLengths[i] = len;
