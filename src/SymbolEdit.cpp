@@ -67,7 +67,7 @@ BEGIN_MESSAGE_MAP(CSymbolEdit, CEdit)
 	ON_WM_MOUSEMOVE()
 	ON_COMMAND_RANGE(RANGE_START, (RANGE_START + LIST_MAX_COUNT), OnSelectSearchString)
 	ON_WM_EXITSIZEMOVE()
-	//ON_WM_ERASEBKGND()
+	ON_WM_ERASEBKGND()
 	ON_WM_NCCALCSIZE()
 	ON_WM_NCPAINT()
 	ON_WM_TIMER()
@@ -581,12 +581,6 @@ void CSymbolEdit::OnPaint()
 
 	//OutputDebugString(_T("OnPaint"));
 
-	if (text != m_lastTextOnPaint &&
-		text == _T(""))
-	{
-		::SetWindowPos(m_hWnd, NULL, 0, 0, 0, 0, SWP_DRAWFRAME | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-	}
-
 	m_lastTextOnPaint = text;
 
 	//OutputDebugString(_T("OnPaint \r\n"));
@@ -863,10 +857,7 @@ void CSymbolEdit::SetDpiInfo(CDPI *dpi)
 
 BOOL CSymbolEdit::OnEraseBkgnd(CDC* pDC)
 {
-	// TODO: Add your message handler code here and/or call default
-
-	//return CEdit::OnEraseBkgnd(pDC);
-	return FALSE;
+	return TRUE;
 }
 
 
