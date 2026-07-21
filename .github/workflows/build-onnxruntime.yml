@@ -48,6 +48,8 @@ jobs:
           $content = $content -replace 'pushd "build-%~1-%~2-%~3"\\Release', 'pushd "build-%~1-%~2-%~3"'
           # 禁用 Java 构建（我们只需要 C++ 静态库）
           $content = $content -replace 'set MACHINE_FLAG="--build_java"', 'set MACHINE_FLAG='
+          # 修复 collectLibs 中 header 扁平化：v1.23.2 的脚本只复制 onnxruntime\ 根目录，不递归子目录
+          $content = $content -replace 'copy install\\include\\onnxruntime\\\* install\\include', 'xcopy install\include\onnxruntime install\include /s /e /y'
           $content | Set-Content onnxsrc\build-onnxruntime.bat
 
       - name: Cache ONNX Runtime build

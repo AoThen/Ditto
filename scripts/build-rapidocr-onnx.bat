@@ -34,9 +34,11 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
         echo ERROR: ONNX Runtime extraction failed - windows-x64 directory not found
         exit /b 1
     )
-    if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session" (
-        mkdir "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session"
-        copy "%RAPID_DIR%\onnxruntime-static\windows-x64\include\*.h" "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\"
+    REM 兼容不同版本：headers 可能在 include\ 根目录（旧版）或 include\onnxruntime\core\session\（新版）
+    if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime_cxx_api.h" (
+        if exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\onnxruntime_cxx_api.h" (
+            copy "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\*.h" "%RAPID_DIR%\onnxruntime-static\windows-x64\include\"
+        )
     )
 )
 
