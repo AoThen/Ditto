@@ -76,7 +76,8 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\Release\install-static\*
+          cd onnxsrc\build-x64-v143-mt\Release\install-static
+          7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.23.2.7z *
 
       - name: Create Release
         uses: ncipollo/release-action@v1
