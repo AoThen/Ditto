@@ -1627,29 +1627,51 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 	if (!pOcrText)
 		return 0;
 
-	// Read current mText from DB
-	CppSQLite3Query q = theApp.m_db.execQueryEx(
-		_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
-	if (!q.eof())
+	try
 	{
-		CStringW existing = q.getStringField(0);
-		CStringW combined = existing;
-		if (existing != *pOcrText)
+		Log(StrF(_T("OCR: OnOcrCompleted start, clipId=%d, textLen=%d"), clipId, pOcrText->GetLength()));
+
+		CppSQLite3Query q = theApp.m_db.execQueryEx(
+			_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
+		if (!q.eof())
 		{
-			if (!existing.IsEmpty())
-				combined += L" ";
-			combined += *pOcrText;
+			CStringW existing = q.getStringField(0);
+			CStringW combined = existing;
+			if (existing != *pOcrText)
+			{
+				if (!existing.IsEmpty())
+					combined += L" ";
+				combined += *pOcrText;
+			}
+
+			combined.Replace(L"'", L"''");
+
+			auto py = CPinyinConvert::TextToPinyin(combined);
+			CStringW pinyinW = py.first;
+			CStringW abbrW = py.second;
+
+			theApp.m_db.execDMLEx(
+				_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
+				combined, pinyinW, abbrW, clipId);
+
+			Log(StrF(_T("OCR: OnOcrCompleted updated clip %d, mText len=%d"), clipId, combined.GetLength()));
 		}
-
-		combined.Replace(L"'", L"''");
-
-		auto py = CPinyinConvert::TextToPinyin(combined);
-		CStringW pinyinW = py.first;
-		CStringW abbrW = py.second;
-
-		theApp.m_db.execDMLEx(
-			_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
-			combined, pinyinW, abbrW, clipId);
+		else
+		{
+			Log(StrF(_T("OCR: OnOcrCompleted clip %d not found in DB"), clipId));
+		}
+	}
+	catch (CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted SQL error for clip %d: %s"), clipId, e.errorMessage()));
+	}
+	catch (std::exception& e)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted exception for clip %d: %S"), clipId, e.what()));
+	}
+	catch (...)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted unknown exception for clip %d"), clipId));
 	}
 
 	delete pOcrText;

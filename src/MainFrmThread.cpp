@@ -161,12 +161,23 @@ void CMainFrmThread::OnSaveClips()
 						CStringW text = RunOCR(data, w, h, s);
 						if (!text.IsEmpty())
 						{
-							HWND hwnd = AfxGetMainWnd() ? AfxGetMainWnd()->GetSafeHwnd() : nullptr;
-							if (hwnd && ::IsWindow(hwnd))
+							HWND hwnd = theApp.m_pMainWnd ? theApp.m_pMainWnd->GetSafeHwnd() : nullptr;
+							if (!hwnd)
+							{
+								Log(StrF(_T("OCR: AfxGetMainWnd returned null, cannot post OCR result for clip %d"), id));
+							}
+							else if (!::IsWindow(hwnd))
+							{
+								Log(StrF(_T("OCR: main window handle invalid, cannot post OCR result for clip %d"), id));
+							}
+							else
 							{
 								CStringW* pText = new CStringW(text);
 								if (!::PostMessage(hwnd, WM_OCR_COMPLETED, id, (LPARAM)pText))
+								{
+									Log(StrF(_T("OCR: PostMessage failed for clip %d"), id));
 									delete pText;
+								}
 							}
 						}
 						g_ocrThreadCount--;

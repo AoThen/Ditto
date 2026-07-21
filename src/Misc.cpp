@@ -50,8 +50,12 @@ CString GetComputerName()
 	return cs;
 }
 
+static CCriticalSection g_csLog;
+
 void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 {
+	CSingleLock lock(&g_csLog, TRUE);
+
 #ifdef _UNICODE
 	FILE *file = _wfopen(fn, L"ab");
 #else
