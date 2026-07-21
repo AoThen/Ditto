@@ -19,8 +19,21 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
         del "%TEMP%\onnx.7z"
         exit /b 1
     )
-    7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static" -y
+    REM 解压到临时目录，再移动到 windows-x64，兼容不同版本归档的目录结构
+    7z x "%TEMP%\onnx.7z" -o"%RAPID_DIR%\onnxruntime-static\tmp" -y
+    if exist "%RAPID_DIR%\onnxruntime-static\tmp\windows-x64" (
+        move "%RAPID_DIR%\onnxruntime-static\tmp\windows-x64" "%RAPID_DIR%\onnxruntime-static\"
+    ) else (
+        for /d %%i in ("%RAPID_DIR%\onnxruntime-static\tmp\*") do (
+            move "%%i" "%RAPID_DIR%\onnxruntime-static\windows-x64"
+        )
+    )
+    rmdir /s /q "%RAPID_DIR%\onnxruntime-static\tmp"
     del "%TEMP%\onnx.7z"
+    if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
+        echo ERROR: ONNX Runtime extraction failed - windows-x64 directory not found
+        exit /b 1
+    )
     if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session" (
         mkdir "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session"
         copy "%RAPID_DIR%\onnxruntime-static\windows-x64\include\*.h" "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\"
