@@ -56,9 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: onnxsrc/build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-1.23.2-${{ hashFiles('onnxbuilder/build-onnxruntime.bat') }}
-          restore-keys: |
-            onnxruntime-build-x64-v143-mt-1.23.2-
+          key: onnxruntime-build-x64-v143-mt-1.23.2-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('onnxbuilder/build-onnxruntime.bat') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
