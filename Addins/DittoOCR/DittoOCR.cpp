@@ -378,8 +378,8 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         cv::Mat resizeImg;
         cv::resize(padded, resizeImg, cv::Size(scale.dstWidth, scale.dstHeight));
 
-        float detMean[3] = {0.406f * 255.0f, 0.456f * 255.0f, 0.485f * 255.0f};
-        float detNorm[3] = {1.0f/0.225f/255.0f, 1.0f/0.224f/255.0f, 1.0f/0.229f/255.0f};
+        float detMean[3] = {0.485f * 255.0f, 0.456f * 255.0f, 0.406f * 255.0f};
+        float detNorm[3] = {1.0f/0.229f/255.0f, 1.0f/0.224f/255.0f, 1.0f/0.225f/255.0f};
         std::vector<float> detInput = SubstractMeanNormalize(resizeImg, detMean, detNorm);
 
         std::vector<int64_t> detShape = {1, 3, scale.dstHeight, scale.dstWidth};
