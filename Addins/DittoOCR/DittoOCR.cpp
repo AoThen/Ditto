@@ -114,7 +114,7 @@ static std::vector<cv::Point> GetMinBoxes(cv::RotatedRect& rect) {
     std::vector<float> sums(4), diffs(4);
     for (int i = 0; i < 4; i++) {
         sums[i] = pts[i].x + pts[i].y;
-        diffs[i] = pts[i].x - pts[i].y;
+        diffs[i] = pts[i].y - pts[i].x;
     }
     box[0] = pts[std::min_element(sums.begin(), sums.end()) - sums.begin()];
     box[2] = pts[std::max_element(sums.begin(), sums.end()) - sums.begin()];
@@ -509,6 +509,9 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 
             cv::Mat recResize;
             cv::resize(cropImg, recResize, cv::Size(recW, recH));
+#ifdef OCR_DEBUG
+            OCR_LOG("Rec crop: original=%dx%d resize=%dx%d", cropImg.cols, cropImg.rows, recResize.cols, recResize.rows);
+#endif
 
             std::vector<float> recInput = SubstractMeanNormalize(recResize, recMean, recNorm);
 
