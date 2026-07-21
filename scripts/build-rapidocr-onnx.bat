@@ -8,11 +8,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 1. 下载 ONNX Runtime 静态库（如果不存在）
+REM 1. 下载 ONNX Runtime 静态库（如果不存在，v1.23.2）
 if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     echo Downloading ONNX Runtime static libs...
     if not exist "%RAPID_DIR%" mkdir "%RAPID_DIR%"
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OnnxruntimeBuilder/releases/download/1.15.1/onnxruntime-v1.15.1-windows-vs2022-static-mt.7z' -OutFile '%TEMP%\onnx.7z'"
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OnnxruntimeBuilder/releases/download/1.23.2/onnxruntime-v1.23.2-windows-vs2022-x64-static-mt.7z' -OutFile '%TEMP%\onnx.7z'"
     7z t "%TEMP%\onnx.7z" >nul
     if errorlevel 1 (
         echo ONNX Runtime archive is corrupted, aborting
