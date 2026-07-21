@@ -49,6 +49,10 @@ jobs:
           $content = $content -replace 'set MACHINE_FLAG="--build_java"', 'set MACHINE_FLAG='
           # 修复 collectLibs 中 header 扁平化：v1.23.2 的脚本只复制 onnxruntime\ 根目录，不递归子目录
           $content = $content -replace 'copy install\\include\\onnxruntime\\\* install\\include', 'xcopy install\include\onnxruntime install\include /s /e /y'
+          # 取消注释 lib.exe /OUT 合并命令，并将 %libs% 改为 !libs!（延迟扩展，否则变量为空）
+          $content = $content.Replace('::IF "%libexe_exists%" == "true" (', 'IF "%libexe_exists%" == "true" (')
+          $content = $content.Replace('::    lib.exe /OUT:install-static\lib\onnxruntime.lib %libs%', '    lib.exe /OUT:install-static\lib\onnxruntime.lib !libs!')
+          $content = $content.Replace('::)', ')')
           $content | Set-Content onnxsrc\build-onnxruntime.bat
 
       - name: Cache ONNX Runtime build
@@ -72,7 +76,6 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          xcopy /y onnxsrc\build-x64-v143-mt\Release\install\lib\*.lib onnxsrc\build-x64-v143-mt\Release\install-static\lib\
           7z a onnxruntime-static-windows-x64-1.23.2.7z onnxsrc\build-x64-v143-mt\Release\install-static\*
 
       - name: Create Release
