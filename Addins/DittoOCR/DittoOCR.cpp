@@ -456,7 +456,7 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 
         cv::Mat predMat(outH, outW, CV_32FC1);
         for (int i = 0; i < outH * outW; i++) {
-            predMat.at<float>(i) = 1.0f / (1.0f + std::exp(-detOutData[i]));
+            predMat.at<float>(i) = detOutData[i];
         }
 
 #ifdef OCR_DEBUG
@@ -470,14 +470,14 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 #endif
 
         cv::Mat binaryMat;
-        cv::threshold(predMat, binaryMat, 0.2f, 1.0f, cv::THRESH_BINARY);
+        cv::threshold(predMat, binaryMat, 0.3f, 1.0f, cv::THRESH_BINARY);
         binaryMat.convertTo(binaryMat, CV_8UC1, 255.0);
 
         cv::Mat dilateMat;
         cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(2, 2));
         cv::dilate(binaryMat, dilateMat, kernel);
 
-        std::vector<TextBox> boxes = FindRsBoxes(predMat, dilateMat, scale, 0.45f, 1.4f);
+        std::vector<TextBox> boxes = FindRsBoxes(predMat, dilateMat, scale, 0.6f, 1.5f);
 
 #ifdef OCR_DEBUG
         OCR_LOG("Det found %zu text boxes (score>=0.45)", boxes.size());
