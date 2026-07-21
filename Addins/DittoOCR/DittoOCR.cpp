@@ -337,7 +337,28 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         }
 
 #ifdef OCR_DEBUG
-        cv::imwrite("ocr_debug_input.png", bgr);
+        {
+            // BMP file (no codec dependency)
+            std::ofstream f("ocr_debug_input.bmp", std::ios::binary);
+            if (f.is_open()) {
+                int w = bgr.cols, h = bgr.rows;
+                int rowSize = (w * 3 + 3) & ~3;
+                int dataSize = rowSize * h;
+                int fileSize = 14 + 40 + dataSize;
+                uint8_t hdr[14] = {'B','M', 0,0,0,0, 0,0, 0,0, 54,0,0,0};
+                memcpy(hdr + 2, &fileSize, 4);
+                uint8_t info[40] = {40,0,0,0};
+                int tmp = w; memcpy(info + 4, &tmp, 4);
+                tmp = h; memcpy(info + 8, &tmp, 4);
+                info[12] = 1; info[14] = 24;
+                f.write((char*)hdr, 14);
+                f.write((char*)info, 40);
+                for (int y = h - 1; y >= 0; y--) {
+                    f.write((char*)bgr.ptr(y), w * 3);
+                    for (int p = w * 3; p < rowSize; p++) f.put(0);
+                }
+            }
+        }
         cv::Vec3b p0 = bgr.at<cv::Vec3b>(0, 0);
         cv::Vec3b p1 = bgr.at<cv::Vec3b>(height-1, width-1);
         OCR_LOG("OcrRecognize image check: %dx%d stride=%d, pixel[0,0]=(%d,%d,%d), pixel[last]=(%d,%d,%d)",

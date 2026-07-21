@@ -581,6 +581,12 @@ void CSymbolEdit::OnPaint()
 
 	//OutputDebugString(_T("OnPaint"));
 
+	if (text != m_lastTextOnPaint &&
+		text == _T(""))
+	{
+		::SetWindowPos(m_hWnd, NULL, 0, 0, 0, 0, SWP_DRAWFRAME | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+	}
+
 	m_lastTextOnPaint = text;
 
 	//OutputDebugString(_T("OnPaint \r\n"));
@@ -857,7 +863,10 @@ void CSymbolEdit::SetDpiInfo(CDPI *dpi)
 
 BOOL CSymbolEdit::OnEraseBkgnd(CDC* pDC)
 {
-	return TRUE;
+	// TODO: Add your message handler code here and/or call default
+
+	//return CEdit::OnEraseBkgnd(pDC);
+	return FALSE;
 }
 
 
