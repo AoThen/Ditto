@@ -432,6 +432,10 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         float recNorm[3] = {1.0f/127.5f, 1.0f/127.5f, 1.0f/127.5f};
 
         for (auto& box : boxes) {
+            for (auto& pt : box.boxPoint) {
+                pt.x -= 50;
+                pt.y -= 50;
+            }
             cv::Mat cropImg = GetRotateCropImage(bgr, box.boxPoint);
             if (cropImg.empty()) continue;
 
