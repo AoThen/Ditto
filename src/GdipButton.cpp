@@ -282,9 +282,9 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 
 			if (m_bDarkMode)
 			{
-				static ColorMatrix DarkMat = {	2.75f, 0.00f, 0.00f, 0.00f, 0.00f,
-												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
-												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
+				static ColorMatrix DarkMat = {	2.75f, 0.00f, 0.00f, 0.00f, 0.15f,
+												0.00f, 2.75f, 0.00f, 0.00f, 0.15f,
+												0.00f, 0.00f, 2.75f, 0.00f, 0.15f,
 												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 0.20f, 0.20f, 0.20f, 0.00f, 1.00f };
 			static ColorMatrix DarkHotMat = { 2.875f, 0.00f, 0.00f, 0.00f, 0.10f,

@@ -122,9 +122,9 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int 
 
 	if (m_bDarkMode)
 	{
-		static Gdiplus::ColorMatrix DarkMat = { 2.75f, 0.00f, 0.00f, 0.00f, 0.00f,
-												0.00f, 2.75f, 0.00f, 0.00f, 0.00f,
-												0.00f, 0.00f, 2.75f, 0.00f, 0.00f,
+		static Gdiplus::ColorMatrix DarkMat = { 2.75f, 0.00f, 0.00f, 0.00f, 0.15f,
+												0.00f, 2.75f, 0.00f, 0.00f, 0.15f,
+												0.00f, 0.00f, 2.75f, 0.00f, 0.15f,
 												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
 												0.35f, 0.35f, 0.35f, 0.00f, 1.00f };
 		Gdiplus::ImageAttributes ia;
