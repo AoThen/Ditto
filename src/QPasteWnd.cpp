@@ -6570,6 +6570,7 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 	m_lstHeader.Scroll(CSize(-x, -y));
 
 	m_lstHeader.SetItemCountEx((int)wParam);
+	m_lstHeader.Invalidate();
 
 	if ((int)wParam == 0 &&
 		(m_strSearch != _T("") || m_bShowStarredClips))
@@ -6591,6 +6592,7 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 	UpdateStatus(false);
 
 	MoveControls();
+	m_search.Invalidate();
 
 	return TRUE;
 }
