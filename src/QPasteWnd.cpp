@@ -3043,8 +3043,6 @@ bool CQPasteWnd::DeleteClips(CClipIDs& IDs, ARRAY& Indexs)
 		}
 	}
 
-	CClip::m_LastAddedCRC = 0;
-
 	m_extraDataThread.FireLoadAccelerators();
 
 	m_lstHeader.SetItemCountEx(m_lstHeader.GetItemCount() - erasedCount);

@@ -1081,25 +1081,50 @@ int CClip::FindDuplicate()
 {
 	try
 	{
-		//If they are allowing duplicates still check 
-		//the last copied item
-		if(CGetSetOptions::m_bAllowDuplicates)
-		{
-			if (CGetSetOptions::m_allowBackToBackDuplicates == FALSE)
-			{
-				if (m_CRC == m_LastAddedCRC)
-					return m_lastAddedID;
-			}
-		}
-		else
+		//Allow duplicates and allow back to back duplicates, skip all checks
+		if(CGetSetOptions::m_bAllowDuplicates && 
+			CGetSetOptions::m_allowBackToBackDuplicates)
+			return -1;
+
+		//1. CRC match in database
+		int nID = -1;
 		{
 			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Main WHERE CRC = %d"), m_CRC);
-				
 			if(q.eof() == false)
+				nID = q.getIntField(_T("lID"));
+		}
+
+		//2. CRC miss, fallback to text content comparison on recent 50 entries
+		//   Fixes: same text from different sources has different CRC (different format sets)
+		if(nID < 0 && !m_Desc.IsEmpty())
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(
+				_T("SELECT lID, mText FROM Main ORDER BY clipOrder DESC LIMIT 50"));
+			while(!q.eof())
 			{
-				return q.getIntField(_T("lID"));
+				if(m_Desc == q.getStringField(_T("mText")))
+				{
+					nID = q.getIntField(_T("lID"));
+					break;
+				}
+				q.nextRow();
 			}
 		}
+
+		if(nID < 0)
+			return -1;
+
+		//Allow duplicates but disallow back to back duplicates
+		//Only block if the matched entry is the most recent one
+		if(CGetSetOptions::m_bAllowDuplicates)
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(
+				_T("SELECT lID FROM Main ORDER BY clipOrder DESC LIMIT 1"));
+			if(q.eof() || nID != q.getIntField(_T("lID")))
+				return -1;
+		}
+
+		return nID;
 	}
 	CATCH_SQLITE_EXCEPTION
 		
