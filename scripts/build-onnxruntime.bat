@@ -33,15 +33,11 @@ python tools\ci_build\build.py ^
     --enable_msvc_static_runtime ^
     --cmake_extra_defines "CMAKE_INSTALL_PREFIX=install" "onnxruntime_BUILD_UNIT_TESTS=OFF" "onnxruntime_ENABLE_PYTHON=OFF"
 
-set BUILD_PY_EXIT=!errorlevel!
-echo [BUILD] build.py exit code: !BUILD_PY_EXIT!
-
-if !BUILD_PY_EXIT! neq 0 (
-    echo [BUILD] ERROR: ORT build.py failed (exit code !BUILD_PY_EXIT!)
-    endlocal
-    exit /b !BUILD_PY_EXIT!
+if errorlevel 1 (
+    set ERR=!errorlevel!
+    echo [BUILD] ERROR: ORT build.py failed with exit code !ERR!
+    endlocal & exit /b !ERR!
 )
-
 echo [BUILD] Step 1/6 complete.
 
 REM -------------------------------------------------------------------
@@ -50,15 +46,11 @@ REM -------------------------------------------------------------------
 echo [BUILD] Step 2/6: cmake --install...
 
 cmake --install "%BUILD_DIR%" --config %CONFIG%
-set INSTALL_EXIT=!errorlevel!
-echo [BUILD] cmake --install exit code: !INSTALL_EXIT!
-
-if !INSTALL_EXIT! neq 0 (
-    echo [BUILD] ERROR: cmake --install failed (exit code !INSTALL_EXIT!)
-    endlocal
-    exit /b !INSTALL_EXIT!
+if errorlevel 1 (
+    set ERR=!errorlevel!
+    echo [BUILD] ERROR: cmake --install failed with exit code !ERR!
+    endlocal & exit /b !ERR!
 )
-
 echo [BUILD] Step 2/6 complete.
 
 REM Check install directory
@@ -192,7 +184,9 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     exit /b 0
 )
 
-if exist "%STATIC_INSTALL_DIR%\lib\*.lib" (
+REM Check for any .lib files in install-static
+dir "%STATIC_INSTALL_DIR%\lib\*.lib" >nul 2>nul
+if not errorlevel 1 (
     echo [BUILD] ===================================================================
     echo [BUILD] ONNX Runtime static libs built (individual libs, no merge)
     echo [BUILD]   Output: %STATIC_INSTALL_DIR%
