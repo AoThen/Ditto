@@ -8,7 +8,7 @@ if "%CRT%" == "" set CRT=mt
 
 set BUILD_DIR=build-x64-%VS_VER%-%CRT%
 set CONFIG=Release
-set INSTALL_DIR=%BUILD_DIR%\install
+set INSTALL_DIR=%BUILD_DIR%\%CONFIG%\install
 set STATIC_INSTALL_DIR=%BUILD_DIR%\install-static
 
 echo [BUILD] ===================================================================
@@ -45,7 +45,7 @@ REM 2. CMake --install (build.py already built, now install)
 REM -------------------------------------------------------------------
 echo [BUILD] Step 2/6: cmake --install...
 
-cmake --install "%BUILD_DIR%" --config %CONFIG%
+cmake --install "%BUILD_DIR%\%CONFIG%" --config %CONFIG%
 if errorlevel 1 (
     set ERR=!errorlevel!
     echo [BUILD] ERROR: cmake --install failed with exit code !ERR!

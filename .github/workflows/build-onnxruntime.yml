@@ -65,10 +65,10 @@ jobs:
             cd onnxsrc\build-x64-v143-mt\install-static
             7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
           ) else (
-            if exist "onnxsrc\build-x64-v143-mt\install\lib" (
+            if exist "onnxsrc\build-x64-v143-mt\Release\install\lib" (
               echo WARNING: install-static empty, packaging install dir instead
-              dir onnxsrc\build-x64-v143-mt\install /s /b
-              cd onnxsrc\build-x64-v143-mt\install
+              dir onnxsrc\build-x64-v143-mt\Release\install /s /b
+              cd onnxsrc\build-x64-v143-mt\Release\install
               7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
             ) else (
               echo ERROR: No output artifacts found!
