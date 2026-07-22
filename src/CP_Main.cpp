@@ -185,6 +185,8 @@ CCP_MainApp::CCP_MainApp()
 	m_databaseOnNetworkShare = false;
 
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
+
+	m_hMutex = NULL;
 }
 
 CCP_MainApp::~CCP_MainApp()
@@ -390,10 +392,15 @@ BOOL CCP_MainApp::InitInstance()
 	{
 		Log(StrF(_T("Ditto is already running, closing, mutex: %s"), csMutex));
 		HWND hWnd = (HWND)(LONG_PTR)CGetSetOptions::GetMainHWND();
-		if(hWnd)
-			::SendMessage(hWnd, WM_SHOW_TRAY_ICON, TRUE, TRUE);
+		if (hWnd && IsWindow(hWnd))
+			::SendMessageTimeout(hWnd, WM_SHOW_TRAY_ICON, TRUE, TRUE, SMTO_ABORTIFHUNG, 2000, NULL);
 
-		return TRUE;
+		if(m_hMutex)
+		{
+			CloseHandle(m_hMutex);
+			m_hMutex = NULL;
+		}
+		return FALSE;
 	}
 
 	Log(StrF(_T("Starting up ditto with mutex: %s"), csMutex));
@@ -982,6 +989,9 @@ int CCP_MainApp::ExitInstance()
 	}
 
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+
+	if(m_hMutex)
+		CloseHandle(m_hMutex);
 
 	return CWinApp::ExitInstance();
 }
