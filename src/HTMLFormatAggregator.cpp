@@ -6,13 +6,6 @@
 CHTMLFormatAggregator::CHTMLFormatAggregator(CStringA csSepator) :
 	m_csSeparator(csSepator)
 {
-	//Remove the first line feed
-//	if(m_csSeparator.GetLength() > 1 && m_csSeparator[0] == '\r' && m_csSeparator[1] == '\n')
-//	{
-//		m_csSeparator.Delete(0);
-//		m_csSeparator.Delete(0);
-//	}
-
 	m_csSeparator.Replace("\r\n", "<br>");
 }
 

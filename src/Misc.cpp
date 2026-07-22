@@ -129,27 +129,6 @@ void logsendrecieveinfo(CString cs, CString csFile, long lLine)
 		log(cs, true, csFile, lLine);
 }
 
-CString GetErrorString( int err )
-{
-	CString str;
-	LPVOID lpMsgBuf;
-	
-	::FormatMessage( 
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-		NULL,
-		err,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-		(LPTSTR) &lpMsgBuf,
-		0,
-		NULL 
-		);
-	str = (LPCTSTR) lpMsgBuf;
-	// Display the string.
-	//  ::MessageBox( NULL, lpMsgBuf, "GetLastError", MB_OK|MB_ICONINFORMATION );
-	::LocalFree( lpMsgBuf );
-	return str;
-}
-
 int g_funnyGetTickCountAdjustment = -1;
 
 double IdleSeconds()
@@ -196,49 +175,6 @@ CString StrF(const TCHAR * pszFormat, ...)
 	str.FormatV( pszFormat, argList );
 	va_end( argList );
 	return str;
-}
-
-BYTE GetEscapeChar( BYTE ch )
-{
-	switch(ch)
-	{
-	case '\'':	return '\''; // Single quotation mark (') = 39 or 0x27
-	case '\"':	return '\"'; // Double quotation mark (") = 34 or 0x22
-	case '?':	return '\?'; // Question mark (?) = 63 or 0x3f
-	case '\\':	return '\\'; // Backslash (\) = 92 or 0x5c
-	case 'a':	return '\a'; // Alert (BEL) = 7
-	case 'b':	return '\b'; // Backspace (BS) = 8
-	case 'f':	return '\f'; // Formfeed (FF) = 12 or 0x0c
-	case 'n':	return '\n'; // Newline (NL or LF) = 10 or 0x0a
-	case 'r':	return '\r'; // Carriage Return (CR) = 13 or 0x0d
-	case 't':	return '\t'; // Horizontal tab (HT) = 9
-	case 'v':	return '\v'; // Vertical tab (VT) = 11 or 0x0b
-	case '0':	return '\0'; // Null character (NUL) = 0
-	}
-	return 0; // invalid
-}
-
-CString RemoveEscapes( const TCHAR* str )
-{
-	ASSERT( str );
-	CString ret;
-	TCHAR* pSrc = (TCHAR*) str;
-	TCHAR* pDest = ret.GetBuffer((int)STRLEN(pSrc));
-	TCHAR* pStart = pDest;
-	while( *pSrc != '\0' )
-	{
-		if( *pSrc == '\\' )
-		{
-			pSrc++;
-                       *pDest = GetEscapeChar((BYTE)*pSrc );
-		}
-		else
-			*pDest = *pSrc;
-		pSrc++;
-		pDest++;
-	}
-	ret.ReleaseBuffer((int)(pDest - pStart));
-	return ret;
 }
 
 CString GetWndText(HWND hWnd)
@@ -312,7 +248,7 @@ bool IsAppWnd( HWND hWnd )
 Global Memory Helper Functions
 \*----------------------------------------------------------------------------*/
 
-// make sure the given HGLOBAL is valid.
+// asserts if hDest isn't big enough
 BOOL IsValid(HGLOBAL hGlobal)
 {
 	void* pvData = ::GlobalLock(hGlobal);
@@ -320,7 +256,6 @@ BOOL IsValid(HGLOBAL hGlobal)
 	return (pvData != NULL);
 }
 
-// asserts if hDest isn't big enough
 void CopyToGlobalHP(HGLOBAL hDest, LPVOID pBuf, SIZE_T ulBufLen)
 {
 	ASSERT(hDest && pBuf && ulBufLen);
@@ -367,33 +302,6 @@ HGLOBAL NewGlobalH(HGLOBAL hSource, SIZE_T nLen)
 	HGLOBAL hDest = NewGlobalP(pvData, nLen);
 	GlobalUnlock(hSource);
 	return hDest;
-}
-
-int CompareGlobalHP(HGLOBAL hLeft, LPVOID pBuf, SIZE_T ulBufLen)
-{
-	ASSERT(hLeft && pBuf && ulBufLen);
-
-	LPVOID pvData = GlobalLock(hLeft);
-	
-	ASSERT(pvData);
-	ASSERT(ulBufLen <= GlobalSize(hLeft));
-
-	int result = memcmp(pvData, pBuf, ulBufLen);
-	
-	GlobalUnlock(hLeft);
-
-	return result;
-}
-
-int CompareGlobalHH( HGLOBAL hLeft, HGLOBAL hRight, SIZE_T ulBufLen)
-{
-	ASSERT(hLeft && hRight && ulBufLen);
-	ASSERT(ulBufLen <= GlobalSize(hRight));
-	LPVOID pvData = GlobalLock(hRight);
-	ASSERT(pvData);
-	int result = CompareGlobalHP(hLeft, pvData, ulBufLen);
-	GlobalUnlock(hLeft);
-	return result;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/dataxchg/standard-clipboard-formats
@@ -1059,36 +967,6 @@ BOOL IsVista()
 	return TRUE;
 }
 
-bool IsRunningLimited()
-{
-	LPCTSTR pszSubKey = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System");
-	LPCTSTR pszValue = _T("EnableLUA");
-	DWORD dwType = 0;
-	DWORD dwValue = 0;
-	DWORD dwValueSize = sizeof(DWORD);
-
-	if(ERROR_SUCCESS != SHGetValue(HKEY_LOCAL_MACHINE, pszSubKey, pszValue, &dwType, &dwValue, &dwValueSize))
-	{
-		//failed to read the reg key, either it's not there or we don't have access to the registry
-		//If we are vista then assume we don't have access and we are running as a limited app
-		//otherwise we are xp and the reg key probably doesn't exist and we are not a limited running app
-		if(IsVista())
-		{
-			OutputDebugString(_T("Ditto - Failed to read registry entry finding UAC, Running as limited application"));
-			return true;
-		}
-	}
-
-	if(dwValue == 1)
-	{
-		OutputDebugString(_T("Ditto - UAC ENABLED, Running as limited application"));
-		return true;
-	}
-
-	OutputDebugString(_T("Ditto - Running as standard application"));	
-	return false;
-}
-
 void DeleteDittoTempFiles(BOOL checkFileLastAccess)
 {
 	CString csDir = CGetSetOptions::GetPath(PATH_REMOTE_FILES);
@@ -1577,31 +1455,6 @@ DWORD Windows10AccentColor()
 	}
 
 	return color;
-}
-
-BOOL Windows10ColorTitleBar()
-{
-	BOOL colorTitleBar = FALSE;
-	BOOL darkMode = false;
-	HKEY hkKey;
-	long lResult = ::RegOpenKeyEx(HKEY_CURRENT_USER, _T("Software\\Microsoft\\Windows\\DWM"), NULL, KEY_READ, &hkKey);
-	if (lResult == ERROR_SUCCESS)
-	{
-		DWORD buffer;
-		DWORD len = sizeof(buffer);
-		DWORD type;
-
-		lResult = ::RegQueryValueEx(hkKey, _T("ColorPrevalence"), 0, &type, (LPBYTE)&buffer, &len);
-
-		if (lResult == ERROR_SUCCESS)
-		{
-			colorTitleBar = (buffer == 1);
-		}
-
-		RegCloseKey(hkKey);
-	}
-
-	return colorTitleBar;
 }
 
 BOOL RestoreDbPrompt(HWND hwnd)

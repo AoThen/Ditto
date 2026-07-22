@@ -94,7 +94,6 @@ void CMoveToGroupDlg::OnSize(UINT nType, int cx, int cy)
 {
 	CDialog::OnSize(nType, cx, cy);
 	
-	// TODO: Add your message handler code here
 	
 }
 

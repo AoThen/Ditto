@@ -872,12 +872,6 @@ void CToolTipEx::SetRTFText(const CStringA &rtf)
 	HighlightSearchText();
 }
 
-//void CToolTipEx::SetRTFText(const CString &csRTF)
-//{
-//	m_RichEdit.SetRTF(csRTF);
-//	m_csRTF = csRTF;
-//}
-
 void CToolTipEx::SetToolTipText(const CString &csText)
 {
 	//OutputDebugString(_T("SetRTF-") + csText.Left(20) + "\r\n");
@@ -1517,7 +1511,6 @@ void CToolTipEx::OnMoving(UINT fwSide, LPRECT pRect)
 	CWnd::OnMoving(fwSide, pRect); 
 
 	m_snap.OnSnapMoving(m_hWnd, pRect);
-	// TODO: Add your message handler code here
 }
 
 

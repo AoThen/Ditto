@@ -327,7 +327,6 @@ void CWndEx::OnMoving(UINT fwSide, LPRECT pRect)
 	CWnd::OnMoving(fwSide, pRect);
 
 	m_snap.OnSnapMoving(m_hWnd, pRect);
-	// TODO: Add your message handler code here
 }
 
 

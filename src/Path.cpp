@@ -694,7 +694,7 @@ CString CPath::GetStr(DWORD packing) const
         str = QuoteSpaces(str);
 
     if (packing & eppBackslashToSlash)
-        str.Replace('\\', '/');  // TODO: suport server-share and protocol correctly
+        str.Replace('\\', '/');  // TODO: support server-share and protocol correctly
 
     return str;
 }

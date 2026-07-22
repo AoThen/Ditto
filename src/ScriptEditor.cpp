@@ -308,7 +308,6 @@ void CScriptEditor::OnBnClickedButtonRun()
 
 BOOL CScriptEditor::PreTranslateMessage(MSG* pMsg)
 {
-	// TODO: Add your specialized code here and/or call the base class
 
 	if ((pMsg->message == WM_KEYDOWN) && (pMsg->wParam == VK_TAB) && (pMsg->hwnd == m_rich.GetSafeHwnd()))
 	{

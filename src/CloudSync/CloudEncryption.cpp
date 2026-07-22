@@ -9,6 +9,7 @@ using json = nlohmann::json;
 // Static member definitions
 std::unique_ptr<httplib::Client> CCloudEncryption::m_httpClient;
 CString CCloudEncryption::m_httpClientUrl;
+CCriticalSection CCloudEncryption::m_csHttpClient;
 
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
@@ -23,6 +24,7 @@ static std::string CStringToStdString(const CString& str)
 
 void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString& deviceToken)
 {
+	CSingleLock lock(&m_csHttpClient, TRUE);
 	std::string url = CStringToStdString(serverUrl);
 	// Enforce HTTPS: reject plain http for security
 	if (url.find("https://") != 0)

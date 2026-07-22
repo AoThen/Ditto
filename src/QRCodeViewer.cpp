@@ -255,7 +255,6 @@ HBRUSH QRCodeViewer::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 		return m_descBackground;
 	}
 
-	// TODO:  Return a different brush if the default is not desired
 	return hbr;
 }
 void QRCodeViewer::OnWindowPosChanging(WINDOWPOS* lpwndpos)

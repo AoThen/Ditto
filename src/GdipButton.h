@@ -50,7 +50,6 @@ public:
 	// sets the image type
 	void SetImage(int type);
 
-	void CGdipButton::Test(CString c);
 	BOOL LoadAltImage(UINT id, LPCTSTR pType);
 	BOOL LoadStdImage(UINT id, LPCTSTR pType);
 

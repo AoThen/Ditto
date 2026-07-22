@@ -380,7 +380,6 @@ bool CDeleteClipData::MatchesFilter(CDeleteData *pdata)
 void CDeleteClipData::OnLvnKeydownList2(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLVKEYDOWN pLVKeyDow = reinterpret_cast<LPNMLVKEYDOWN>(pNMHDR);
-	// TODO: Add your control notification handler code here
 
 	switch(pLVKeyDow->wVKey)
 	{

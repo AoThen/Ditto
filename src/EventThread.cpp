@@ -182,13 +182,23 @@ void CEventThread::Stop(int waitTime)
 
 		if(waitTime > 0)
 		{
-			if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEvt, waitTime))
+			const int SEGMENT_MS = 200;
+			int elapsed = 0;
+			while (elapsed < waitTime)
 			{
-				Log(_T("Start of TerminateThread CEventThread::Stop(int waitTime) "));
-				TerminateThread(m_thread, 0);
-				Log(_T("End of TerminateThread CEventThread::Stop(int waitTime) "));
-				m_threadRunning = false;
+				DWORD ret = WaitForSingleObject(m_hEvt, SEGMENT_MS);
+				if (ret == WAIT_OBJECT_0)
+				{
+					m_threadRunning = false;
+					Log(StrF(_T("CEventThread::Stop graceful exit - Name: %s"), m_threadName));
+					return;
+				}
+				elapsed += SEGMENT_MS;
 			}
+			Log(_T("Start of TerminateThread CEventThread::Stop(int waitTime) "));
+			TerminateThread(m_thread, 0);
+			Log(_T("End of TerminateThread CEventThread::Stop(int waitTime) "));
+			m_threadRunning = false;
 		}
 	}
 

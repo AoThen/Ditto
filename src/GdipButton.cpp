@@ -217,12 +217,6 @@ void CGdipButton::ClearBitmaps()
 	m_bHaveBitmaps = FALSE;
 }
 
-void CGdipButton::Test(CString c)
-{
-	m_pStdImage = new CGdiPlusBitmapResource;
-	m_pStdImage->Loads(c);
-}
-
 //=============================================================================
 //
 // LoadAltImage()

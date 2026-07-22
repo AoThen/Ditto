@@ -527,7 +527,6 @@ int CRichEditCtrlEx::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	if (CRichEditCtrl::OnCreate(lpCreateStruct) == -1)
 		return -1;
 	
-	// TODO: Add your specialized creation code here
 	
 	return 0;
 }

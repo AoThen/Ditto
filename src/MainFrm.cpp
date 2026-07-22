@@ -1247,6 +1247,7 @@ void CMainFrame::OnDestroy()
 	}
 
     CFrameWnd::OnDestroy();
+	theApp.m_pMainWnd = NULL;
 }
 
 void CMainFrame::OnFirstNewclip()
@@ -1611,7 +1612,6 @@ void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 
 	//int nRet = MessageBox(_T("focused"), _T("Ditto"), MB_YESNO | MB_TOPMOST);
 
-	// TODO: Add your message handler code here
 }
 
 LRESULT CMainFrame::OnTriggerCloudSync(WPARAM wParam, LPARAM lParam)

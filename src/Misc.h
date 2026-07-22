@@ -106,7 +106,6 @@ void AppendToFile(const TCHAR* fn, const TCHAR *msg);
 #define LogClip(msg) logclip(msg, false, __FILE__, __LINE__)
 void logclip(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
 void log(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
-CString GetErrorString(int err);
 
 double IdleSeconds();
 
@@ -115,9 +114,6 @@ void logsendrecieveinfo(CString cs, CString csFile = _T(""), long lLine = -1);
 
 // Utility Functions
 CString StrF(const TCHAR * pszFormat, ...);
-// called after determining that the preceding character is a backslash
-BYTE GetEscapeChar( BYTE ch );
-CString RemoveEscapes( const TCHAR* str );
 
 CString GetWndText( HWND hWnd );
 // returns true if the given window is owned by this process
@@ -130,11 +126,6 @@ void CopyToGlobalHH(HGLOBAL hDest, HGLOBAL hSource, SIZE_T ulBufLen);
 HGLOBAL NewGlobalP(LPVOID pBuf, SIZE_T nLen);
 HGLOBAL NewGlobalH(HGLOBAL hSource, SIZE_T nLen);
 HGLOBAL NewGlobal(SIZE_T nLen);
-int CompareGlobalHP(HGLOBAL hLeft, LPVOID pBuf, SIZE_T ulBufLen);
-int CompareGlobalHH(HGLOBAL hLeft, HGLOBAL hRight, SIZE_T ulBufLen);
-
-BOOL EncryptString(CString &csString, UCHAR*& pOutput, int &nLenOutput);
-BOOL DecryptString(UCHAR *pData, int nLenIn, UCHAR*& pOutput, int &nLenOutput);
 
 int GetScreenWidth();
 int GetScreenHeight();
@@ -142,7 +133,6 @@ int GetScreenHeight();
 std::vector<CLIPFORMAT> GetSystemClipFormats();
 CLIPFORMAT GetFormatID(LPCTSTR cbName);
 CString GetFormatName(CLIPFORMAT cbType);
-BOOL PreTranslateGuiDll(MSG *pMsg);
 
 CString GetFilePath(CString csFullPath);
 CString GetFileName(CString csFileName);
@@ -209,7 +199,6 @@ __inline BOOL FileExists(LPCTSTR pszFile)
 	return (GetFileAttributes(pszFile) != 0xffffffff); 
 }
 
-bool IsRunningLimited();
 BOOL IsVista();
 
 void DeleteDittoTempFiles(BOOL checkFileLastAccess);
@@ -237,7 +226,6 @@ CString TopLevelWindowText(DWORD pid);
 
 BOOL DarkAppWindows10Setting();
 DWORD Windows10AccentColor();
-BOOL Windows10ColorTitleBar();
 
 BOOL BackupDbPrompt(HWND hwnd);
 BOOL RestoreDbPrompt(HWND hwnd);

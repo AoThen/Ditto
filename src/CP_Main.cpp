@@ -958,8 +958,14 @@ int CCP_MainApp::ExitInstance()
 	m_CloudSyncManager.Stop();
 
 	// Wait for OCR threads to finish before cleanup
-	while (g_ocrThreadCount > 0)
+	int ocrWait = 0;
+	while (g_ocrThreadCount > 0 && ocrWait < 30000)
+	{
 		Sleep(50);
+		ocrWait += 50;
+	}
+	if (g_ocrThreadCount > 0)
+		Log(_T("ExitInstance: OCR threads did not finish in 30s, proceeding"));
 	CleanupOCR();
 
 	DeleteDittoTempFiles(FALSE);

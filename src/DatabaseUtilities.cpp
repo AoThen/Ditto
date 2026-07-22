@@ -10,6 +10,7 @@
 #include "Path.h"
 #include "zlib.h"
 #include "..\Shared\TextConvert.h"
+#include <vector>
 using namespace nsPath;
 
 //////////////////////////////////////////////////////////////////////
@@ -17,55 +18,9 @@ using namespace nsPath;
 //////////////////////////////////////////////////////////////////////
 
 
-BOOL CreateBackup(CString csPath)
-{
-	CString csOriginal;
-	int count = 0;
-	// create a backup of the existing database
-	do
-	{
-		count++;
-		csOriginal = csPath + StrF(_T(".%03d"), count);
-		// in case of some weird infinite loop
-		if (count > 50)
-		{
-			ASSERT(0);
-			return FALSE;
-		}
-	} while (!::CopyFile(csPath, csOriginal, TRUE));
-
-	return TRUE;
-}
-
 CString GetDBName()
 {
 	return CGetSetOptions::GetDBPath();
-}
-
-CString GetOLDDefaultDBName()
-{
-	CString csDefaultPath;
-	LPMALLOC pMalloc;
-
-	if (SUCCEEDED(::SHGetMalloc(&pMalloc)))
-	{
-		LPITEMIDLIST pidlPrograms;
-
-		SHGetSpecialFolderLocation(NULL, CSIDL_APPDATA, &pidlPrograms);
-
-		TCHAR string[MAX_PATH];
-		SHGetPathFromIDList(pidlPrograms, string);
-
-		pMalloc->Free(pidlPrograms);
-		pMalloc->Release();
-
-		csDefaultPath = string;
-		csDefaultPath += "\\Ditto\\";
-
-		csDefaultPath += "DittoDB.mdb";
-	}
-
-	return csDefaultPath;
 }
 
 CString GetDefaultDBName()
@@ -591,34 +546,32 @@ BOOL BackupDB(CString dbPath, CString backupPath)
 			ULONGLONG totalReadSize = 0;
 			int percentageComplete = 0;
 			UINT readBytes = 0;
-			char* pBuffer = new char[65536];
-			if (pBuffer != NULL)
+			std::vector<char> buf(65536);
+			char* pBuffer = buf.data();
+			gzFile f = gzopen(CTextConvert::UnicodeToAnsi(backupPath), "w");
+
+			if (f != NULL)
 			{
-				gzFile f = gzopen(CTextConvert::UnicodeToAnsi(backupPath), "w");
-
-				if (f != NULL)
+				do
 				{
-					do
+					readBytes = file.Read(pBuffer, 65536);
+					gzwrite(f, pBuffer, readBytes);
+					totalReadSize += readBytes;
+
+					int percent = (int)((totalReadSize * 100) / fileSize);
+					if (percent != percentageComplete)
 					{
-						readBytes = file.Read(pBuffer, 65536);
-						gzwrite(f, pBuffer, readBytes);
-						totalReadSize += readBytes;
+						percentageComplete = percent;
+						Log(StrF(_T("backing up db percent done: %d"), percentageComplete));
 
-						int percent = (int)((totalReadSize * 100) / fileSize);
-						if (percent != percentageComplete)
-						{
-							percentageComplete = percent;
-							Log(StrF(_T("backing up db percent done: %d"), percentageComplete));
+						status.Show(StrF(_T("Ditto - %02d%% %s - %s"), percentageComplete, msg, backupPath));
+					}
 
-							status.Show(StrF(_T("Ditto - %02d%% %s - %s"), percentageComplete, msg, backupPath));
-						}
+				} while (readBytes >= 65536);
 
-					} while (readBytes >= 65536);
+				gzclose(f);
 
-					gzclose(f);
-
-					ret = TRUE;
-				}
+				ret = TRUE;
 			}
 
 			file.Close();
@@ -680,7 +633,8 @@ BOOL RestoreDB(CString backupPath)
 			{
 				ULONGLONG totalReadSize = 0;
 				int readBytes = 0;
-				char* pBuffer = new char[65536];
+				std::vector<char> buf(65536);
+				char* pBuffer = buf.data();
 				int percentageComplete = 0;
 
 				do
@@ -1074,137 +1028,6 @@ BOOL DeleteNonUsedClips(bool fromAppWindow)
 	return TRUE;
 }
 
-BOOL EnsureDirectory(CString csPath)
-{
-	TCHAR drive[_MAX_DRIVE];
-	TCHAR dir[_MAX_DIR];
-	TCHAR fname[_MAX_FNAME];
-	TCHAR ext[_MAX_EXT];
-
-	SPLITPATH(csPath, drive, dir, fname, ext);
-
-	CString csDir(drive);
-	csDir += dir;
-
-	if (FileExists(csDir) == FALSE)
-	{
-		if (CreateDirectory(csDir, NULL))
-			return TRUE;
-	}
-	else
-		return TRUE;
-
-	return FALSE;
-}
-
-// BOOL RunZippApp(CString csCommandLine)
-// {
-// 	CString csLocalPath = GETENV(_T("U3_HOST_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csLocalPath);
-// 
-// 	CString csZippApp = GETENV(_T("U3_DEVICE_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csZippApp);
-// 	csZippApp += "7za.exe";
-// 
-// 	csZippApp += " ";
-// 	csZippApp += csCommandLine;
-// 
-// 	Log(csZippApp);
-// 
-// 	STARTUPINFO			StartupInfo;
-// 	PROCESS_INFORMATION	ProcessInformation;
-// 
-// 	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
-// 	StartupInfo.cb = sizeof(StartupInfo);
-// 	ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
-// 
-// 	StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
-// 	StartupInfo.wShowWindow = SW_HIDE;
-// 
-// 	BOOL bRet = CreateProcess(NULL, csZippApp.GetBuffer(csZippApp.GetLength()), NULL, NULL, FALSE,
-// 			CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL, csLocalPath,
-// 			&StartupInfo, &ProcessInformation);
-// 
-// 	if(bRet)
-// 	{
-// 		WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
-// 
-// 		DWORD dwExitCode;
-// 		GetExitCodeProcess(ProcessInformation.hProcess, &dwExitCode);
-// 
-// 		CString cs;
-// 		cs.Format(_T("Exit code from unzip = %d"), dwExitCode);
-// 		Log(cs);
-// 
-// 		if(dwExitCode != 0)
-// 		{
-// 			bRet = FALSE;
-// 		}
-// 	}
-// 	else
-// 	{
-// 		bRet = FALSE;
-// 		Log(_T("Create Process Failed"));
-// 	}
-// 
-// 	csZippApp.ReleaseBuffer();
-// 
-// 	return bRet;
-// }
-
-// BOOL CopyDownDatabase()
-// {
-// 	BOOL bRet = FALSE;
-// 
-// 	CString csZippedPath = GETENV(_T("U3_APP_DATA_PATH"));
-// 	FIX_CSTRING_PATH(csZippedPath);
-// 	
-// 	CString csUnZippedPath = csZippedPath;
-// 	csUnZippedPath += "Ditto.db";
-// 
-// 	csZippedPath += "Ditto.7z";
-// 	
-// 	CString csLocalPath = GETENV(_T("U3_HOST_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csLocalPath);
-// 
-// 	if(FileExists(csZippedPath))
-// 	{
-// 		CString csCommandLine;
-// 
-// 		//e = extract
-// 		//surround command line arguments with quotes
-// 		//-aoa = overight files with extracted files
-// 
-// 		csCommandLine += "e ";
-// 		csCommandLine += "\"";
-// 		csCommandLine += csZippedPath;
-// 		csCommandLine += "\"";
-// 		csCommandLine += " -o";
-// 		csCommandLine += "\"";
-// 		csCommandLine += csLocalPath;
-// 		csCommandLine += "\"";
-// 		csCommandLine += " -aoa";
-// 
-// 		bRet = RunZippApp(csCommandLine);
-// 
-// 		csLocalPath += "Ditto.db";
-// 	}
-// 	else if(FileExists(csUnZippedPath))
-// 	{
-// 		csLocalPath += "Ditto.db";
-// 		bRet = CopyFile(csUnZippedPath, csLocalPath, FALSE);
-// 	}
-// 
-// 	if(FileExists(csLocalPath) == FALSE)
-// 	{
-// 		Log(_T("Failed to copy files from device zip file"));
-// 	}
-// 
-// 	CGetSetOptions::nLastDbWriteTime = GetLastWriteTime(csLocalPath);
-// 
-// 	return bRet;
-// }
-
 BOOL MigrateDatabaseSchema()
 {
 	try
@@ -1238,26 +1061,6 @@ BOOL MigrateDatabaseSchema()
 		}
 
 		return TRUE;
-	}
+}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
 }
-
-//BOOL CopyUpDatabase()
-//{
-//	CStringA csZippedPath = "C:\\";//getenv("U3_APP_DATA_PATH");
-//	FIX_CSTRING_PATH(csZippedPath);
-//	csZippedPath += "Ditto.zip";
-
-//	CStringA csLocalPath = GetDBName();//getenv("U3_HOST_EXEC_PATH");
-//	//FIX_CSTRING_PATH(csLocalPath);
-//	//csLocalPath += "Ditto.db";
-//
-//	CZipper Zip;
-//
-//	if(Zip.OpenZip(csZippedPath))
-//	{
-//		Zip.AddFileToZip(csLocalPath);
-//	}
-//
-//	return TRUE;
-//}

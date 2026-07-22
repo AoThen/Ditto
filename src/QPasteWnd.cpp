@@ -2686,7 +2686,6 @@ void CQPasteWnd::OnMenuSenttoFriendone()
 
 void CQPasteWnd::OnMenuSenttoPromptforip()
 {
-	// TODO: Add your command handler code here
 
 }
 
@@ -6840,51 +6839,8 @@ LRESULT CQPasteWnd::OnUpdateScrollBar(WPARAM wParam, LPARAM lParam)
 			m_modernScrollBarHorz.UpdateScrollBar();
 		}
 	}
-	return 0;
+return 0;
 }
-
-//HBRUSH CQPasteWnd::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
-//{
-//	// Call the base class implementation first! Otherwise, it may 
-//	// undo what we're trying to accomplish here.
-//	HBRUSH hbr = CWnd::OnCtlColor(pDC, pWnd, nCtlColor);
-//
-//	switch (nCtlColor) 
-//	{
-//	case CTLCOLOR_STATIC:
-//		switch (pWnd->GetDlgCtrlID())
-//		{
-//			case ON_TOP_WARNING:
-//			{
-//				pDC->SetBkMode(TRANSPARENT);
-//				pDC->SetBkColor(RGB(0, 0, 255));
-//
-//				CBrush brush;
-//				brush.CreateSolidBrush(COLORREF(RGB(255, 0, 0)));
-//				return brush;
-//			}
-//			break;
-//		}
-//	}
-//
-//	return hbr;
-//}
-
-//void CQPasteWnd::OnPaint()
-//{
-//	/*CBrush brush;
-//	brush.CreateSolidBrush(COLORREF(RGB(255, 0, 0)));
-//
-//	CRect clientRect;
-//	GetClientRect(clientRect);
-//
-//	CPaintDC dc(this);
-//	dc.FillRect(clientRect, &brush);*/
-//
-//	
-//		CQPasteWnd::OnPaint();
-//	
-//}
 
 BOOL CQPasteWnd::OnEraseBkgnd(CDC* pDC)
 {
@@ -6897,7 +6853,6 @@ BOOL CQPasteWnd::OnEraseBkgnd(CDC* pDC)
 	return bRes;                       // CDialog::OnEraseBkgnd(pDC);
 
 	//return TRUE;
-	// TODO: Add your message handler code here and/or call default
 
 	//return CWndEx::OnEraseBkgnd(pDC);
 }

@@ -74,6 +74,7 @@ private:
 	// Reusable HTTP client for encryption API calls
 	static std::unique_ptr<httplib::Client> m_httpClient;
 	static CString m_httpClientUrl;
+	static CCriticalSection m_csHttpClient;
 
 	// Create or reuse HTTP client for the given server URL and device token
 	static void EnsureHttpClient(const CString& serverUrl, const CString& deviceToken);

@@ -20,6 +20,7 @@
 
 #include <Mmsystem.h>
 #include <memory>
+#include <vector>
 
 #include "Path.h"
 #include <set>
@@ -948,7 +949,10 @@ bool CClip::SetDescFromType()
 		if (m_Formats[nCF_HDROPIndex].m_hgData == NULL)
 			return false;
 
-		HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
+HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
+	struct GlobalUnlockGuard {
+		HGLOBAL hg; ~GlobalUnlockGuard() { GlobalUnlock(hg); }
+	} _unlockGuard = { m_Formats[nCF_HDROPIndex].m_hgData };
 		if (drop == NULL)
 		{
 			Log(_T("CClip::SetDescFromType: GlobalLock failed for HDROP"));
@@ -2333,7 +2337,8 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 		//data contents
 		//original file<null terminator>md5<null terminator>file data
 		int bufferSize = (int)fileSize + csFilePath.GetLength() + 1 + md5StringLength + 1;;
-		char* pBuffer = new char[bufferSize]();
+		std::vector<char> buf(bufferSize);
+		char* pBuffer = buf.data();
 		strncpy(pBuffer, csFilePath, csFilePath.GetLength());
 
 		//move the buffer start past the file path and md5 string
@@ -2356,8 +2361,6 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 
 		Log(StrF(_T("Saving file contents to Ditto Database, file: %s, size: %d, md5: %s"), filePath, fileSize, md5String));
 	}
-
-	GlobalUnlock(m_Formats[nCF_HDROPIndex].m_hgData);
 
 	if (!addedFileData)
 		return false;

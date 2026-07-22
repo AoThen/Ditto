@@ -266,7 +266,6 @@ CString CQuickPasteKeyboard::GetShortCutText(KeyboardArray ar)
 void CQuickPasteKeyboard::OnLvnItemActivateList1(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMIA = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
-	// TODO: Add your control notification handler code here
 	*pResult = 0;
 }
 
@@ -763,13 +762,11 @@ void CQuickPasteKeyboard::SelectMouseTypeCombo(CComboBox &combo, int value)
 
 void CQuickPasteKeyboard::OnCbnKillfocusComboEnterModifier()
 {
-	// TODO: Add your control notification handler code here
 }
 
 
 void CQuickPasteKeyboard::OnEnKillfocusEdit1()
 {
-	// TODO: Add your control notification handler code here
 }
 
 
@@ -777,7 +774,6 @@ void CQuickPasteKeyboard::OnKillFocus(CWnd* pNewWnd)
 {
 	CPropertyPage::OnKillFocus(pNewWnd);
 
-	// TODO: Add your message handler code here
 }
 
 
@@ -881,7 +877,6 @@ void CQuickPasteKeyboard::OnBnClickedButtonEnter2()
 
 void CQuickPasteKeyboard::OnKeyUp(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-	// TODO: Add your message handler code here and/or call default
 
 	CPropertyPage::OnKeyUp(nChar, nRepCnt, nFlags);
 }
