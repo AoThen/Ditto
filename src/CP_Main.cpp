@@ -957,6 +957,19 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 /////////////////////////////////////////////////////////////////////////////
 // CCP_MainApp message handlers
 
+static int SafeCallExitInstance()
+{
+	__try
+	{
+		return CWinApp::ExitInstance();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		::OutputDebugStringA("ExitInstance - EXCEPTION in CWinApp::ExitInstance\n");
+		return 0;
+	}
+}
+
 int CCP_MainApp::ExitInstance() 
 {
 	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
@@ -1006,15 +1019,7 @@ int CCP_MainApp::ExitInstance()
 		CloseHandle(m_hMutex);
 
 	Log(StrF(_T("ExitInstance - Step 13 - Before CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
-	__try
-	{
-		return CWinApp::ExitInstance();
-	}
-	__except(EXCEPTION_EXECUTE_HANDLER)
-	{
-		Log(StrF(_T("ExitInstance - Step 14 - EXCEPTION in CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
-		return 0;
-	}
+	return SafeCallExitInstance();
 }
 
 // return TRUE if there is more idle processing to do
