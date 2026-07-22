@@ -99,8 +99,8 @@ private:
 	CString   m_serverUrl;
 	HANDLE    m_hStopEvent;
 	HANDLE    m_hWsTrigger;    // Signaled by WS thread when clip_added received
-	CWinThread* m_pSyncThread;
-	CWinThread* m_pWsThread;   // WebSocket listener thread
+	HANDLE m_hSyncThread;
+	HANDLE m_hWsThread;   // WebSocket listener thread
 	BOOL      m_cryptoInitialized;
 	time_t    m_lastSyncTime;  // Track last successful sync time
 	time_t    m_lastPushTime;  // Track last successful push time (separate from pull sync time)
@@ -114,7 +114,7 @@ private:
 	volatile BOOL m_bSyncStopped;   // Set TRUE in destructor before CS deletion; SyncThreadProc relies on m_hStopEvent for timely exit
 
 	// Encryption retry state
-	CWinThread* m_pEncRetryThread;   // Encryption retry thread (when DEK lost at startup)
+	HANDLE m_hEncRetryThread;   // Encryption retry thread (when DEK lost at startup)
 	HANDLE      m_hEncRetryStop;     // Stop event for retry thread
 
 	// Atomic flags for one-shot force sync operations
@@ -136,19 +136,19 @@ private:
 	mutable CRITICAL_SECTION m_csStatus;
 
 	// Background sync thread proc
-	static UINT SyncThreadProc(LPVOID pParam);
+	static unsigned int __stdcall SyncThreadProc(void* pParam);
 
 	// WebSocket listener thread proc
-	static UINT WsThreadProc(LPVOID pParam);
+	static unsigned int __stdcall WsThreadProc(void* pParam);
 
 	// Quick sync thread proc (fire-and-forget)
-	static UINT QuickSyncThreadProc(LPVOID pParam);
+	static unsigned int __stdcall QuickSyncThreadProc(void* pParam);
 
 	// Force download thread proc (one-shot)
-	static UINT ForceSyncThreadProc(LPVOID pParam);
+	static unsigned int __stdcall ForceSyncThreadProc(void* pParam);
 
 	// Encryption retry thread proc (background retry when DEK lost)
-	static UINT EncryptionRetryThreadProc(LPVOID pParam);
+	static unsigned int __stdcall EncryptionRetryThreadProc(void* pParam);
 
 	// Start background retry of encryption initialization
 	void StartEncryptionRetry();
