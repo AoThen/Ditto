@@ -172,9 +172,9 @@ void CQPasteWndThread::OnLoadItems(void *param)
 						}
 					}
 
-					if(pasteWnd->m_bStopQuery)
+					if(pasteWnd->m_bStopQuery || IsCancelled())
 					{
-						Log(StrF(_T("StopQuery called exiting filling cache count = %d"), loadItemsIndex));
+						Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
 						break;
 					}
 
@@ -303,6 +303,12 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 	
 	for (std::list<CClipFormatQListCtrl>::iterator it = localFormats.begin(); it != localFormats.end(); it++)
     {
+		if (IsCancelled())
+		{
+			Log(_T("OnLoadExtraData cancelled during format processing"));
+			break;
+		}
+
 		bool loadClip = true;
 
 		if (it->m_cfType == CF_DIB)

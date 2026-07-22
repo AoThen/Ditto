@@ -133,11 +133,25 @@ void CMainFrmThread::OnSaveClips()
 		m_saveClips.RemoveAll();
 	}
 
-	Log(_T("SaveCopyClips Before AddToDb")); 
+Log(_T("SaveCopyClips Before AddToDb")); 
+
+	if (IsCancelled())
+	{
+		Log(_T("SaveCopyClips cancelled before AddToDb"));
+		delete pLocalClips;
+		return;
+	}
 
 	int count = pLocalClips->AddToDB(true);
 
 	Log(StrF(_T("SaveCopyclips After AddToDb, Count: %d"), count));
+
+	if (IsCancelled())
+	{
+		Log(_T("SaveCopyClips cancelled after AddToDb, skipping OCR and notifications"));
+		delete pLocalClips;
+		return;
+	}
 
 	if(count > 0)
 	{
@@ -147,6 +161,12 @@ void CMainFrmThread::OnSaveClips()
 			POSITION posOcr = pLocalClips->GetHeadPosition();
 			while (posOcr)
 			{
+				if (IsCancelled())
+				{
+					Log(_T("OCR: cancelled during clip processing"));
+					break;
+				}
+
 				CClip* pClip = pLocalClips->GetNext(posOcr);
 				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
 				{
@@ -245,9 +265,23 @@ void CMainFrmThread::OnSaveRemoteClips()
 
 	LogSendRecieveInfo("---------OnSaveRemoteClips - Before AddToDB");
 
+	if (IsCancelled())
+	{
+		Log(_T("OnSaveRemoteClips cancelled before AddToDB"));
+		delete pLocalClips;
+		return;
+	}
+
 	int count = pLocalClips->AddToDB(true);
 
 	LogSendRecieveInfo("---------OnSaveRemoteClips - After AddToDB");
+
+	if (IsCancelled())
+	{
+		Log(_T("OnSaveRemoteClips cancelled after AddToDB, skipping rest"));
+		delete pLocalClips;
+		return;
+	}
 
 	//are we supposed to add this clip to the clipboard
 	CClip *pLastClip = pLocalClips->GetTail();
