@@ -957,50 +957,28 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 /////////////////////////////////////////////////////////////////////////////
 // CCP_MainApp message handlers
 
-static int SafeCallExitInstance(CWinApp* pApp)
-{
-	__try
-	{
-		return pApp->CWinApp::ExitInstance();
-	}
-	__except(EXCEPTION_EXECUTE_HANDLER)
-	{
-		::OutputDebugStringA("ExitInstance - EXCEPTION in CWinApp::ExitInstance\n");
-		return 0;
-	}
-}
-
 int CCP_MainApp::ExitInstance() 
 {
 	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
 
-	// Stop Cloud Sync before database closes
-	Log(StrF(_T("ExitInstance - Step 1 - Before CloudSync Stop - PID: %d"), GetCurrentProcessId()));
-	m_CloudSyncManager.Stop();
-	Log(StrF(_T("ExitInstance - Step 2 - After CloudSync Stop - PID: %d"), GetCurrentProcessId()));
+	// Signal Cloud Sync to stop without waiting (process exit, OS handles cleanup)
+	m_CloudSyncManager.SignalStop();
 
-	// Wait for OCR threads to finish before cleanup
-	Log(StrF(_T("ExitInstance - Step 3 - Before OCR Wait - PID: %d"), GetCurrentProcessId()));
-	int ocrWait = 0;
-	while (g_ocrThreadCount > 0 && ocrWait < 30000)
+	// Quick wait for OCR threads to finish before DLL unload
 	{
-		Sleep(50);
-		ocrWait += 50;
+		int ocrWait = 0;
+		while (g_ocrThreadCount > 0 && ocrWait < 5000)
+		{
+			Sleep(50);
+			ocrWait += 50;
+		}
 	}
-	if (g_ocrThreadCount > 0)
-		Log(_T("ExitInstance: OCR threads did not finish in 30s, proceeding"));
 	CleanupOCR();
-	Log(StrF(_T("ExitInstance - Step 4 - After OCR Wait - PID: %d"), GetCurrentProcessId()));
 
-	Log(StrF(_T("ExitInstance - Step 5 - Before DeleteTemp - PID: %d"), GetCurrentProcessId()));
 	DeleteDittoTempFiles(FALSE);
-	Log(StrF(_T("ExitInstance - Step 6 - After DeleteTemp - PID: %d"), GetCurrentProcessId()));
 
-	Log(StrF(_T("ExitInstance - Step 7 - Before db.close - PID: %d"), GetCurrentProcessId()));
 	m_db.close();
-	Log(StrF(_T("ExitInstance - Step 8 - After db.close - PID: %d"), GetCurrentProcessId()));
 
-	Log(StrF(_T("ExitInstance - Step 9 - Before UAC Cleanup - PID: %d"), GetCurrentProcessId()));
 	if(m_pUacPasteThread != NULL)
 	{
 		if(m_pUacPasteThread->ThreadWasStarted() == false)
@@ -1009,17 +987,16 @@ int CCP_MainApp::ExitInstance()
 		}
 		delete m_pUacPasteThread;
 	}
-	Log(StrF(_T("ExitInstance - Step 10 - After UAC Cleanup - PID: %d"), GetCurrentProcessId()));
 
-	Log(StrF(_T("ExitInstance - Step 11 - Before GdiplusShutdown - PID: %d"), GetCurrentProcessId()));
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
-	Log(StrF(_T("ExitInstance - Step 12 - After GdiplusShutdown - PID: %d"), GetCurrentProcessId()));
 
 	if(m_hMutex)
 		CloseHandle(m_hMutex);
 
-	Log(StrF(_T("ExitInstance - Step 13 - Before CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
-	return SafeCallExitInstance(this);
+	// Skip CWinApp::ExitInstance() - it triggers CSingleLock assertion in debug builds
+	// for processes with partial initialization (second instance).
+	// OS handles all cleanup at process exit.
+	return 0;
 }
 
 // return TRUE if there is more idle processing to do

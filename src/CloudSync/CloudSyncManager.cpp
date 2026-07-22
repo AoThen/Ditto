@@ -446,6 +446,15 @@ void CCloudSyncManager::Stop()
 	// The event handle is a kernel object; the OS will clean it up on process exit.
 }
 
+void CCloudSyncManager::SignalStop()
+{
+	if (m_hStopEvent != nullptr)
+	{
+		SetEvent(m_hStopEvent);
+	}
+	// Do NOT wait for threads or close handles - process is exiting, OS handles cleanup
+}
+
 void CCloudSyncManager::OnClipAdded(void* pClip)
 {
 	UNREFERENCED_PARAMETER(pClip);

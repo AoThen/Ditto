@@ -47,6 +47,10 @@ public:
 	// Stop sync and cleanup thread
 	void Stop();
 
+	// Lightweight stop: signal threads to exit without waiting
+	// Used during process exit; OS handles cleanup
+	void SignalStop();
+
 	// Called when a new clip is added locally
 	void OnClipAdded(void* pClip);  // void* to avoid including CClip header yet
 
