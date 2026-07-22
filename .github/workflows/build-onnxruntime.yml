@@ -3,8 +3,8 @@ name: Build ONNX Runtime static libs
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths: [scripts/build-rapidocr-onnx.bat]
+    branches: [main, master]
+    paths: [scripts/build-rapidocr-onnx.bat, .github/workflows/build-onnxruntime.yml]
 
 permissions:
   contents: write
