@@ -142,4 +142,5 @@ private:
 
 	BOOL	m_bDarkMode;	// dark mode: lighten icon for visibility
 
+	void ClearBitmaps();
 };

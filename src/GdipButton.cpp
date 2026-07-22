@@ -194,6 +194,29 @@ void CGdipButton::Reset()
 	m_bmpAltH.DeleteObject();
 }
 
+void CGdipButton::ClearBitmaps()
+{
+	m_dcBk.DeleteDC();
+	m_dcStd.DeleteDC();
+	m_dcStdP.DeleteDC();
+	m_dcStdH.DeleteDC();
+	m_dcAlt.DeleteDC();
+	m_dcAltP.DeleteDC();
+	m_dcAltH.DeleteDC();
+	m_dcGS.DeleteDC();
+
+	m_bmpBk.DeleteObject();
+	m_bmpStd.DeleteObject();
+	m_bmpStdP.DeleteObject();
+	m_bmpStdH.DeleteObject();
+	m_bmpGS.DeleteObject();
+	m_bmpAlt.DeleteObject();
+	m_bmpAltP.DeleteObject();
+	m_bmpAltH.DeleteObject();
+
+	m_bHaveBitmaps = FALSE;
+}
+
 void CGdipButton::Test(CString c)
 {
 	m_pStdImage = new CGdiPlusBitmapResource;
@@ -323,8 +346,8 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 				m_dcStd.CreateCompatibleDC(pDC);
 				m_bmpStd.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
 				m_dcStd.SelectObject(&m_bmpStd);
+				m_dcStd.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 			}
-			m_dcStd.BitBlt(0, 0, rect.Width(), rect.Height(), pDC, 0, 0, SRCCOPY);
 
 			// standard image pressed
 			if (m_dcStdP.m_hDC == NULL)
@@ -721,7 +744,7 @@ void CGdipButton::DeleteToolTip()
 void CGdipButton::SetDarkMode(BOOL bDark)
 {
 	m_bDarkMode = bDark;
-	m_bHaveBitmaps = FALSE;
+	ClearBitmaps();
 	Invalidate();
 }
 
