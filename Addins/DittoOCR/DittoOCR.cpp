@@ -198,18 +198,6 @@ static TextLine ScoreToTextLine(const float* outputData, size_t h, size_t w, std
             strRes += characterDict[maxIndex - 1];
             totalScore += maxValue;
             count++;
-#ifdef OCR_DEBUG
-            OCR_LOG("  rec timestep[%zu]: maxIdx=%d maxVal=%.4f char=[%s]",
-                i, maxIndex, maxValue, (maxIndex > 0 && maxIndex <= (int)characterDict.size()) ? characterDict[maxIndex - 1].c_str() : "?");
-#endif
-        } else {
-#ifdef OCR_DEBUG
-            OCR_LOG("  rec timestep[%zu]: maxIdx=%d maxVal=%.4f %s",
-                i, maxIndex, maxValue,
-                (maxIndex == 0) ? "(blank)" :
-                (maxIndex >= (int)characterDict.size()) ? "(out-of-range)" :
-                "(collapsed)");
-#endif
         }
         lastIndex = maxIndex;
     }
@@ -357,16 +345,6 @@ OCR_API void* OcrInit(const char* modelsDir)
                 recInputName.c_str(), recShapeStr.c_str(), recOutputName.c_str());
         }
         OCR_LOG("charDict: size=%zu", characterDict.size());
-        for (int i = 0; i < 5 && i < (int)characterDict.size(); i++)
-            OCR_LOG("  charDict[%d] = [%s]", i, characterDict[i].c_str());
-        for (int i = std::max(0, (int)characterDict.size()-5); i < (int)characterDict.size(); i++)
-            OCR_LOG("  charDict[%d] = [%s]", i, characterDict[i].c_str());
-        for (int i = 0; i < (int)characterDict.size(); i++) {
-            if (characterDict[i] == "2") {
-                OCR_LOG("  char '2' at index %d", i);
-                break;
-            }
-        }
 #endif
 
         auto* handle = new OcrHandle();
@@ -431,10 +409,6 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 /* *                }*/
 /* *            }*/
 /* *        }*/
-        cv::Vec3b p0 = bgr.at<cv::Vec3b>(0, 0);
-        cv::Vec3b p1 = bgr.at<cv::Vec3b>(height-1, width-1);
-        OCR_LOG("OcrRecognize image check: %dx%d stride=%d, pixel[0,0]=(%d,%d,%d), pixel[last]=(%d,%d,%d)",
-            width, height, stride, p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
         cv::Mat padded = MakePadding(bgr, 50);
 
         ScaleParam scale = GetScaleParam(padded, 1024);
@@ -448,25 +422,6 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         float detMean[3] = {0.485f * 255.0f, 0.456f * 255.0f, 0.406f * 255.0f};
         float detNorm[3] = {1.0f/0.229f/255.0f, 1.0f/0.224f/255.0f, 1.0f/0.225f/255.0f};
         std::vector<float> detInput = SubstractMeanNormalize(resizeImg, detMean, detNorm);
-#ifdef OCR_DEBUG
-        {
-            double inpMin = 1e10, inpMax = -1e10;
-            double inpSum[3] = {0,0,0};
-            int totalPixels = scale.dstWidth * scale.dstHeight;
-            for (int ch = 0; ch < 3; ch++) {
-                for (int i = 0; i < totalPixels; i++) {
-                    float v = detInput[ch * totalPixels + i];
-                    inpMin = std::min(inpMin, (double)v);
-                    inpMax = std::max(inpMax, (double)v);
-                    inpSum[ch] += v;
-                }
-            }
-            OCR_LOG("Det input: min=%.4f max=%.4f B_mean=%.4f G_mean=%.4f R_mean=%.4f",
-                inpMin, inpMax,
-                inpSum[0]/totalPixels, inpSum[1]/totalPixels, inpSum[2]/totalPixels);
-        }
-#endif
-
         std::vector<int64_t> detShape = {1, 3, scale.dstHeight, scale.dstWidth};
         Ort::Value detInputTensor = Ort::Value::CreateTensor<float>(*ocr->memInfo, detInput.data(), detInput.size(), detShape.data(), detShape.size());
 
@@ -482,34 +437,24 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         int outH = (detOutShape.size() == 4) ? (int)detOutShape[2] : (int)detOutShape[1];
         int outW = (detOutShape.size() == 4) ? (int)detOutShape[3] : (int)detOutShape[2];
 
-        #ifdef OCR_DEBUG
-        {
-            double rawMin = 1e10, rawMax = -1e10, rawSum = 0;
-            int rawCount = outH * outW;
-            for (int i = 0; i < rawCount; i++) {
-                float v = detOutData[i];
-                rawMin = std::min(rawMin, (double)v);
-                rawMax = std::max(rawMax, (double)v);
-                rawSum += v;
-            }
-            OCR_LOG("Det raw logit: min=%.4f max=%.4f mean=%.4f",
-                rawMin, rawMax, rawSum/rawCount);
-        }
-#endif
-
         cv::Mat predMat(outH, outW, CV_32FC1);
         for (int i = 0; i < outH * outW; i++) {
             predMat.at<float>(i) = detOutData[i];
         }
 
 #ifdef OCR_DEBUG
+        double inpMin = 1e10, inpMax = -1e10;
+        int inpCount = scale.dstWidth * scale.dstHeight * 3;
+        for (int i = 0; i < inpCount; i++) {
+            float v = detInput[i];
+            inpMin = std::min(inpMin, (double)v);
+            inpMax = std::max(inpMax, (double)v);
+        }
         double minVal, maxVal;
         cv::minMaxLoc(predMat, &minVal, &maxVal);
         cv::Scalar meanVal = cv::mean(predMat);
-        OCR_LOG("Det output shape=[%lld,%lld,%lld,%lld], outH=%d outW=%d",
-            detOutShape[0], detOutShape[1], detOutShape[2], detOutShape[3], outH, outW);
-        OCR_LOG("Det predMat sigmoid: min=%.4f max=%.4f mean=%.4f",
-            minVal, maxVal, meanVal[0]);
+        OCR_LOG("Det: input[%.4f,%.4f] pred[%.4f,%.4f,%.4f]",
+            inpMin, inpMax, minVal, maxVal, meanVal[0]);
 #endif
 
         cv::Mat binaryMat;
@@ -523,14 +468,12 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         std::vector<TextBox> boxes = FindRsBoxes(predMat, dilateMat, scale, 0.6f, 1.5f);
 
 #ifdef OCR_DEBUG
-        OCR_LOG("Det found %zu text boxes (score>=0.45)", boxes.size());
-        for (size_t i = 0; i < boxes.size() && i < 20; i++) {
-            OCR_LOG("  box[%zu]: score=%.4f [%d,%d][%d,%d][%d,%d][%d,%d]",
+        OCR_LOG("Det found %zu text boxes (score>=0.6)", boxes.size());
+        for (size_t i = 0; i < boxes.size() && i < 5; i++) {
+            OCR_LOG("  box[%zu]: score=%.4f cx=%d cy=%d",
                 i, boxes[i].score,
-                boxes[i].boxPoint[0].x, boxes[i].boxPoint[0].y,
-                boxes[i].boxPoint[1].x, boxes[i].boxPoint[1].y,
-                boxes[i].boxPoint[2].x, boxes[i].boxPoint[2].y,
-                boxes[i].boxPoint[3].x, boxes[i].boxPoint[3].y);
+                (boxes[i].boxPoint[0].x + boxes[i].boxPoint[1].x + boxes[i].boxPoint[2].x + boxes[i].boxPoint[3].x) / 4,
+                (boxes[i].boxPoint[0].y + boxes[i].boxPoint[1].y + boxes[i].boxPoint[2].y + boxes[i].boxPoint[3].y) / 4);
         }
 #endif
 
@@ -552,9 +495,6 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 
             cv::Mat recResize;
             cv::resize(cropImg, recResize, cv::Size(recW, recH));
-#ifdef OCR_DEBUG
-            OCR_LOG("Rec crop: original=%dx%d resize=%dx%d", cropImg.cols, cropImg.rows, recResize.cols, recResize.rows);
-#endif
 
             std::vector<float> recInput = SubstractMeanNormalize(recResize, recMean, recNorm);
 
@@ -574,8 +514,9 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
             size_t recW_out = (recOutShape.size() == 3) ? (size_t)recOutShape[2] : (size_t)recOutShape[1];
 
 #ifdef OCR_DEBUG
-            OCR_LOG("Rec output shape dims=%zu, seq_len=%zu num_classes=%zu",
-                recOutShape.size(), recH_out, recW_out);
+            size_t boxIdx = &box - boxes.data();
+            OCR_LOG("Rec crop[%zu]: original=%dx%d resize=%dx%d seq=%zu classes=%zu",
+                boxIdx, cropImg.cols, cropImg.rows, recResize.cols, recResize.rows, recH_out, recW_out);
 #endif
 
             TextLine textLine = ScoreToTextLine(recOutData, recH_out, recW_out, ocr->characterDict);

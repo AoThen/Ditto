@@ -60,4 +60,43 @@ if not exist "%RAPID_DIR%\opencv-static\windows-x64" (
 REM 3. 下载 PP-OCRv6_small 模型
 call "%OCR_DIR%\download-models.bat"
 
-echo Dependency setup complete.
+REM 4. 诊断：验证提取的目录结构
+echo.
+echo === Diagnostic: verify extracted files ===
+if exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
+    echo [OK] ONNX Runtime directory found
+    dir "%RAPID_DIR%\onnxruntime-static\windows-x64"
+    if exist "%RAPID_DIR%\onnxruntime-static\windows-x64\include\onnxruntime_cxx_api.h" (
+        echo [OK] ONNX Runtime header found
+    ) else (
+        echo [WARN] ONNX Runtime header NOT found at include\onnxruntime_cxx_api.h
+        dir "%RAPID_DIR%\onnxruntime-static\windows-x64\include" /s 2>nul
+    )
+    if exist "%RAPID_DIR%\onnxruntime-static\windows-x64\lib\onnxruntime.lib" (
+        echo [OK] ONNX Runtime lib found
+    ) else (
+        echo [WARN] ONNX Runtime lib NOT found
+        dir "%RAPID_DIR%\onnxruntime-static\windows-x64\lib" 2>nul
+    )
+) else (
+    echo [WARN] ONNX Runtime directory NOT found
+)
+if exist "%RAPID_DIR%\opencv-static\windows-x64" (
+    echo [OK] OpenCV directory found
+    dir "%RAPID_DIR%\opencv-static\windows-x64"
+    if exist "%RAPID_DIR%\opencv-static\windows-x64\include\opencv2\opencv.hpp" (
+        echo [OK] OpenCV header found
+    ) else (
+        echo [WARN] OpenCV header NOT found
+        dir "%RAPID_DIR%\opencv-static\windows-x64\include" 2>nul
+    )
+    if exist "%RAPID_DIR%\opencv-static\windows-x64\x64\vc17\staticlib\opencv_core481.lib" (
+        echo [OK] OpenCV lib found
+    ) else (
+        echo [WARN] OpenCV lib NOT found
+        dir "%RAPID_DIR%\opencv-static\windows-x64\x64\vc17\staticlib" 2>nul
+    )
+) else (
+    echo [WARN] OpenCV directory NOT found
+)
+echo === Diagnostic end ===

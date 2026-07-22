@@ -163,7 +163,39 @@ jobs:
         run: call scripts\build-rapidocr-onnx.bat
 
       - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\"
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
+
+      - name: Diagnostic - verify extracted dependencies
+        if: always()
+        shell: cmd
+        run: |
+          echo === ONNX Runtime ===
+          if exist "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          ) else (
+            echo ONNX Runtime directory NOT found
+            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+          )
+          echo === OpenCV ===
+          if exist "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          ) else (
+            echo OpenCV directory NOT found
+            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+          )
+          echo === Diagnostic complete ===
+
+      - name: Upload diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-diagnostic-${{ github.run_id }}
+          path: |
+            Addins\DittoOCR\*.log
+            Addins\DittoOCR\rapidocr_onnx\**\*.log
+          retention-days: 7
 
       - name: Package portable zip
         shell: cmd
@@ -236,7 +268,39 @@ jobs:
         run: call scripts\build-rapidocr-onnx.bat
 
       - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\"
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
+
+      - name: Diagnostic - verify extracted dependencies
+        if: always()
+        shell: cmd
+        run: |
+          echo === ONNX Runtime ===
+          if exist "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          ) else (
+            echo ONNX Runtime directory NOT found
+            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+          )
+          echo === OpenCV ===
+          if exist "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          ) else (
+            echo OpenCV directory NOT found
+            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+          )
+          echo === Diagnostic complete ===
+
+      - name: Upload diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-diagnostic-${{ github.run_id }}
+          path: |
+            Addins\DittoOCR\*.log
+            Addins\DittoOCR\rapidocr_onnx\**\*.log
+          retention-days: 7
 
       - name: Package portable zip
         shell: cmd
