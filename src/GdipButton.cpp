@@ -214,6 +214,8 @@ void CGdipButton::ClearBitmaps()
 	m_bmpAltP.DeleteObject();
 	m_bmpAltH.DeleteObject();
 
+	m_pCurBtn = NULL;
+
 	m_bHaveBitmaps = FALSE;
 }
 
@@ -548,10 +550,25 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
-	if (m_dcStd.m_hDC == NULL && m_pStdImage)
+	CRect rect;
+	GetClientRect(rect);
+
+	if (m_pStdImage && rect.Width() > 0 && rect.Height() > 0)
 	{
-		m_bHaveBitmaps = FALSE;
-		CtlColor(pDC, WM_CTLCOLORBTN);
+		BOOL bNeedCreate = (m_dcStd.m_hDC == NULL);
+		if (!bNeedCreate)
+		{
+			BITMAP bm = {0};
+			if (m_bmpStd.GetBitmap(&bm))
+			{
+				bNeedCreate = (bm.bmWidth != rect.Width() || bm.bmHeight != rect.Height());
+			}
+		}
+		if (bNeedCreate)
+		{
+			ClearBitmaps();
+			CtlColor(pDC, WM_CTLCOLORBTN);
+		}
 	}
 
 	// handle disabled state
