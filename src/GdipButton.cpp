@@ -548,6 +548,12 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 {
 	CDC* pDC = CDC::FromHandle(lpDIS->hDC);
 
+	if (m_dcStd.m_hDC == NULL && m_pStdImage)
+	{
+		m_bHaveBitmaps = FALSE;
+		CtlColor(pDC, WM_CTLCOLORBTN);
+	}
+
 	// handle disabled state
 	if(m_bIsDisabled)
 	{
