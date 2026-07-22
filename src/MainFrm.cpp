@@ -1655,6 +1655,43 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 				combined, pinyinW, abbrW, clipId);
 
 			Log(StrF(_T("OCR: OnOcrCompleted updated clip %d, mText len=%d"), clipId, combined.GetLength()));
+
+			{
+				CppSQLite3Query qFormat = theApp.m_db.execQueryEx(
+					_T("SELECT COUNT(*) FROM Data WHERE lParentID = %d ")
+					_T("AND (strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"),
+					clipId);
+				if (!qFormat.eof() && qFormat.getIntField(0) == 0)
+				{
+					int byteLen = (pOcrText->GetLength() + 1) * sizeof(wchar_t);
+					HGLOBAL hGlobal = NewGlobalP((LPVOID)pOcrText->GetString(), byteLen);
+					if (hGlobal)
+					{
+						const unsigned char* pData = (const unsigned char*)GlobalLock(hGlobal);
+						if (pData)
+						{
+							try
+							{
+								CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+									_T("INSERT INTO Data(lParentID, strClipBoardFormat, ooData) VALUES(?, ?, ?);"));
+								stmt.bind(1, clipId);
+								stmt.bind(2, _T("CF_UNICODETEXT"));
+								stmt.bind(3, pData, byteLen);
+								stmt.execDML();
+							}
+							catch (...)
+							{
+								GlobalUnlock(hGlobal);
+								GlobalFree(hGlobal);
+								throw;
+							}
+							GlobalUnlock(hGlobal);
+						}
+						GlobalFree(hGlobal);
+					}
+					Log(StrF(_T("OCR: Inserted OCR text as CF_UNICODETEXT for clip %d"), clipId));
+				}
+			}
 		}
 		else
 		{
