@@ -65,14 +65,14 @@ jobs:
           cd opencvsrc\build-x64-v143-mt
           cmake --install . --config Release
 
-       - name: Package static libs
-         shell: cmd
-         run: |
-           mkdir windows-x64
-           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
-           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\x64\vc17\staticlib windows-x64\x64\vc17\staticlib\
-           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
-           7z a opencv-static-windows-x64-4.14.0.7z windows-x64\*
+      - name: Package static libs
+        shell: cmd
+        run: |
+          mkdir windows-x64
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\x64\vc17\staticlib windows-x64\x64\vc17\staticlib\
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
+          7z a opencv-static-windows-x64-4.14.0.7z windows-x64\*
 
       - name: Create Release
         uses: ncipollo/release-action@v1
