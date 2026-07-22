@@ -957,11 +957,11 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 /////////////////////////////////////////////////////////////////////////////
 // CCP_MainApp message handlers
 
-static int SafeCallExitInstance()
+static int SafeCallExitInstance(CWinApp* pApp)
 {
 	__try
 	{
-		return CWinApp::ExitInstance();
+		return pApp->CWinApp::ExitInstance();
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER)
 	{
@@ -1019,7 +1019,7 @@ int CCP_MainApp::ExitInstance()
 		CloseHandle(m_hMutex);
 
 	Log(StrF(_T("ExitInstance - Step 13 - Before CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
-	return SafeCallExitInstance();
+	return SafeCallExitInstance(this);
 }
 
 // return TRUE if there is more idle processing to do
