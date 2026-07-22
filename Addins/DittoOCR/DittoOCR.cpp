@@ -42,6 +42,10 @@ struct TextBox {
 struct TextLine {
     std::string text;
     float score;
+    int centerX;
+    int centerY;
+    int width;
+    int height;
 };
 
 struct OcrHandle {
@@ -210,6 +214,47 @@ static TextLine ScoreToTextLine(const float* outputData, size_t h, size_t w, std
         lastIndex = maxIndex;
     }
     return {strRes, count > 0 ? totalScore / count : 0};
+}
+
+static std::string LayoutTextLines(std::vector<TextLine>& lines) {
+    if (lines.empty())
+        return "";
+    if (lines.size() == 1)
+        return lines[0].text;
+
+    const float lineThreshold = 0.3f;
+
+    std::sort(lines.begin(), lines.end(), [](const TextLine& a, const TextLine& b) {
+        int avgH = (std::min)(a.height, b.height);
+        bool sameRow = (std::abs(a.centerY - b.centerY) <= (int)(avgH * lineThreshold));
+        if (!sameRow)
+            return a.centerY < b.centerY;
+        return a.centerX < b.centerX;
+    });
+
+    std::string result;
+    const TextLine* prev = nullptr;
+    for (auto& line : lines) {
+        if (!prev) {
+            result += line.text;
+        } else {
+            int avgH = (std::min)(prev->height, line.height);
+            bool sameRow = (std::abs(line.centerY - prev->centerY) <= (int)(avgH * lineThreshold));
+            if (!sameRow) {
+                result += "\n";
+            } else {
+                int gap = line.centerX - prev->centerX - prev->width / 2 - line.width / 2;
+                if (gap > avgH * 2) {
+                    result += "  ";
+                } else if (gap > avgH * 0.3) {
+                    result += " ";
+                }
+            }
+            result += line.text;
+        }
+        prev = &line;
+    }
+    return result;
 }
 
 static std::vector<std::string> ParseCharacterDict(const std::string& configPath) {
@@ -489,7 +534,7 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
         }
 #endif
 
-        std::string result;
+        std::vector<TextLine> textLines;
         float recMean[3] = {127.5f, 127.5f, 127.5f};
         float recNorm[3] = {1.0f/127.5f, 1.0f/127.5f, 1.0f/127.5f};
 
@@ -534,8 +579,14 @@ OCR_API char* OcrRecognize(void* handle, const unsigned char* imageData, int wid
 #endif
 
             TextLine textLine = ScoreToTextLine(recOutData, recH_out, recW_out, ocr->characterDict);
-            result += textLine.text;
+            textLine.centerX = (box.boxPoint[0].x + box.boxPoint[1].x + box.boxPoint[2].x + box.boxPoint[3].x) / 4;
+            textLine.centerY = (box.boxPoint[0].y + box.boxPoint[1].y + box.boxPoint[2].y + box.boxPoint[3].y) / 4;
+            textLine.width = (int)cv::norm(box.boxPoint[0] - box.boxPoint[1]);
+            textLine.height = (int)cv::norm(box.boxPoint[0] - box.boxPoint[3]);
+            textLines.push_back(textLine);
         }
+
+        std::string result = LayoutTextLines(textLines);
 
         if (result.empty()) {
             OCR_LOG("OcrRecognize no text found");
