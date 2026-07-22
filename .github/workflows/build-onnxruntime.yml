@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
-    paths: [scripts/build-rapidocr-onnx.bat, .github/workflows/build-onnxruntime.yml]
+    paths: [scripts/download-ocr-deps.bat, .github/workflows/build-onnxruntime.yml]
 
 permissions:
   contents: write

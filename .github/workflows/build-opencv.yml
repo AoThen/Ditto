@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [scripts/build-rapidocr-onnx.bat]
+    paths:
+      - scripts/download-ocr-deps.bat
+      - .github/workflows/build-opencv.yml
 
 permissions:
   contents: write

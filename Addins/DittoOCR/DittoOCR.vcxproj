@@ -91,19 +91,19 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\include;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\include;$(ProjectDir)ocr-deps\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\lib;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\lib;$(ProjectDir)ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>onnxruntime.lib;opencv_core481.lib;opencv_imgproc481.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\include;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\include;$(ProjectDir)ocr-deps\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)rapidocr_onnx\onnxruntime-static\windows-x64\lib;$(ProjectDir)rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\lib;$(ProjectDir)ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>onnxruntime.lib;opencv_core481.lib;opencv_imgproc481.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

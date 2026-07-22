@@ -160,7 +160,7 @@ jobs:
 
       - name: Build OCR dependencies and models
         shell: cmd
-        run: call scripts\build-rapidocr-onnx.bat
+        run: call scripts\download-ocr-deps.bat
 
       - name: Build DittoOCR
         run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
@@ -170,20 +170,20 @@ jobs:
         shell: cmd
         run: |
           echo === ONNX Runtime ===
-          if exist "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\include\*.h" 2>nul
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
           ) else (
             echo ONNX Runtime directory NOT found
-            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === OpenCV ===
-          if exist "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          if exist "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
           ) else (
             echo OpenCV directory NOT found
-            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === Diagnostic complete ===
 
@@ -194,7 +194,7 @@ jobs:
           name: ditto-diagnostic-${{ github.run_id }}
           path: |
             Addins\DittoOCR\*.log
-            Addins\DittoOCR\rapidocr_onnx\**\*.log
+            Addins\DittoOCR\ocr-deps\**\*.log
           retention-days: 7
 
       - name: Package portable zip
@@ -265,7 +265,7 @@ jobs:
 
       - name: Build OCR dependencies and models
         shell: cmd
-        run: call scripts\build-rapidocr-onnx.bat
+        run: call scripts\download-ocr-deps.bat
 
       - name: Build DittoOCR
         run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
@@ -275,20 +275,20 @@ jobs:
         shell: cmd
         run: |
           echo === ONNX Runtime ===
-          if exist "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\include\*.h" 2>nul
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
           ) else (
             echo ONNX Runtime directory NOT found
-            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === OpenCV ===
-          if exist "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
-            dir /s /b "Addins\DittoOCR\rapidocr_onnx\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          if exist "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
           ) else (
             echo OpenCV directory NOT found
-            dir /s "Addins\DittoOCR\rapidocr_onnx" 2>nul
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === Diagnostic complete ===
 
@@ -299,7 +299,7 @@ jobs:
           name: ditto-diagnostic-${{ github.run_id }}
           path: |
             Addins\DittoOCR\*.log
-            Addins\DittoOCR\rapidocr_onnx\**\*.log
+            Addins\DittoOCR\ocr-deps\**\*.log
           retention-days: 7
 
       - name: Package portable zip
