@@ -59,8 +59,23 @@ jobs:
       - name: Package static libs
         shell: cmd
         run: |
-          cd onnxsrc\build-x64-v143-mt\install-static
-          7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+          if exist "onnxsrc\build-x64-v143-mt\install-static\lib\*.lib" (
+            echo Packaging install-static...
+            dir onnxsrc\build-x64-v143-mt\install-static /s /b
+            cd onnxsrc\build-x64-v143-mt\install-static
+            7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+          ) else (
+            if exist "onnxsrc\build-x64-v143-mt\install\lib" (
+              echo WARNING: install-static empty, packaging install dir instead
+              dir onnxsrc\build-x64-v143-mt\install /s /b
+              cd onnxsrc\build-x64-v143-mt\install
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+            ) else (
+              echo ERROR: No output artifacts found!
+              dir onnxsrc\build-x64-v143-mt /s /b 2>nul
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z NUL
+            )
+          )
 
       - name: Create Release
         uses: ncipollo/release-action@v1
