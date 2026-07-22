@@ -12,7 +12,7 @@ REM 1. 下载 ONNX Runtime 静态库（如果不存在，v1.23.2）
 if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     echo Downloading ONNX Runtime static libs...
     if not exist "%RAPID_DIR%" mkdir "%RAPID_DIR%"
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OnnxruntimeBuilder/releases/download/1.23.2/onnxruntime-v1.23.2-windows-vs2022-x64-static-mt.7z' -OutFile '%TEMP%\onnx.7z'"
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/onnxruntime-1.23.2/onnxruntime-static-windows-x64-1.23.2.7z' -OutFile '%TEMP%\onnx.7z'"
     7z t "%TEMP%\onnx.7z" >nul
     if errorlevel 1 (
         echo ONNX Runtime archive is corrupted, aborting
@@ -24,8 +24,9 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
     if exist "%RAPID_DIR%\onnxruntime-static\tmp\windows-x64" (
         move "%RAPID_DIR%\onnxruntime-static\tmp\windows-x64" "%RAPID_DIR%\onnxruntime-static\"
     ) else (
+        mkdir "%RAPID_DIR%\onnxruntime-static\windows-x64"
         for /d %%i in ("%RAPID_DIR%\onnxruntime-static\tmp\*") do (
-            move "%%i" "%RAPID_DIR%\onnxruntime-static\windows-x64"
+            move "%%i" "%RAPID_DIR%\onnxruntime-static\windows-x64\"
         )
     )
     rmdir /s /q "%RAPID_DIR%\onnxruntime-static\tmp"
@@ -45,7 +46,7 @@ if not exist "%RAPID_DIR%\onnxruntime-static\windows-x64" (
 REM 2. 下载 OpenCV 静态库（如果不存在）
 if not exist "%RAPID_DIR%\opencv-static\windows-x64" (
     echo Downloading OpenCV static libs...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/RapidAI/OpenCVBuilder/releases/download/4.8.1/opencv-4.8.1-windows-vs2022-mt.7z' -OutFile '%TEMP%\opencv.7z'"
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/opencv-4.8.1/opencv-static-windows-x64-4.8.1.7z' -OutFile '%TEMP%\opencv.7z'"
     7z t "%TEMP%\opencv.7z" >nul
     if errorlevel 1 (
         echo OpenCV archive is corrupted, aborting
