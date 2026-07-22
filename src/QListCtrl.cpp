@@ -600,10 +600,14 @@ void CQListCtrl::OnCustomdrawList(NMHDR* pNMHDR, LRESULT* pResult)
 			{
 				DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
 			}
-			else if (m_bPinyinSearch &&
-				HighlightPinyinText(csText, m_searchText, highlightColor) > 0)
+			else if (m_bPinyinSearch)
 			{
-				DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
+				int matchPos = 0;
+				if (HighlightPinyinText(csText, m_searchText, highlightColor, &matchPos) > 0)
+				{
+					TruncateTextToMatchLine(csText, matchPos, m_linesPerRow);
+					DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
+				}
 			}
 			else
 			{
@@ -2350,7 +2354,7 @@ void CQListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	//CListCtrl::OnMouseHWheel(nFlags, zDelta, pt);
 }
 
-int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, COLORREF color)
+int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, COLORREF color, int* outMatchPos)
 {
 	CString cacheKey = csText;
 
@@ -2451,6 +2455,11 @@ int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, 
 
 	csText.Insert(lastChar + 1, postTag);
 	csText.Insert(firstChar, preTag);
+
+	if (outMatchPos)
+	{
+		*outMatchPos = firstChar + preTag.GetLength();
+	}
 
 	return 1;
 }

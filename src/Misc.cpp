@@ -1093,54 +1093,57 @@ int FindNoCaseAndInsert(CString& mainStr, CString& findStr, CString preInsert, C
 				break;
 		}
 
-		startFindPos = 0;
-		int line = 0;
-		int prevLinePos = 0;
-		int prevPrevLinePos = 0;
-
-		while (TRUE)
-		{
-			foundPos = mainStr.Find(_T("\n"), startFindPos);
-			if (foundPos < 0)
-				break;
-
-			if (firstFindPos < foundPos)
-			{
-				if (line > linesPerRow - 1)
-				{
-					int lineStart = prevLinePos;
-					if (linesPerRow > 1)
-					{
-						lineStart = prevPrevLinePos;
-					}
-
-					mainStr = _T("... ") + mainStr.Mid(lineStart + 1);
-				}
-
-				break;
-			}			
-
-			startFindPos = foundPos + 1;
-			prevPrevLinePos = prevLinePos;
-			prevLinePos = foundPos;
-
-			line++;
-
-			//safety check, make sure we don't look forever
-			if (line > 1000)
-				break;
-		}
-
 		if(replaceCount > 0)
 		{
-			//use unprintable characters so it doesn't find copied html to convert
-			mainStr.Replace(_T("\r\n"), _T("\x01\x05\x02"));
-			int l = mainStr.Replace(_T("\r"), _T("\x01\x05\x02"));
-			int m = mainStr.Replace(_T("\n"), _T("\x01\x05\x02"));
+			TruncateTextToMatchLine(mainStr, firstFindPos, linesPerRow);
 		}
 	}
 
 	return replaceCount;
+}
+
+void TruncateTextToMatchLine(CString& mainStr, int firstMatchPos, int linesPerRow)
+{
+	int startFindPos = 0;
+	int line = 0;
+	int prevLinePos = 0;
+	int prevPrevLinePos = 0;
+
+	while (TRUE)
+	{
+		int foundPos = mainStr.Find(_T("\n"), startFindPos);
+		if (foundPos < 0)
+			break;
+
+		if (firstMatchPos < foundPos)
+		{
+			if (line > linesPerRow - 1)
+			{
+				int lineStart = prevLinePos;
+				if (linesPerRow > 1)
+				{
+					lineStart = prevPrevLinePos;
+				}
+
+				mainStr = _T("... ") + mainStr.Mid(lineStart + 1);
+			}
+
+			break;
+		}
+
+		startFindPos = foundPos + 1;
+		prevPrevLinePos = prevLinePos;
+		prevLinePos = foundPos;
+
+		line++;
+
+		if (line > 1000)
+			break;
+	}
+
+	mainStr.Replace(_T("\r\n"), _T("\x01\x05\x02"));
+	mainStr.Replace(_T("\r"), _T("\x01\x05\x02"));
+	mainStr.Replace(_T("\n"), _T("\x01\x05\x02"));
 }
 
 void OnInitMenuPopupEx(CMenu *pPopupMenu, UINT nIndex, BOOL bSysMenu, CWnd *pWnd)

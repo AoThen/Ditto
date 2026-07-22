@@ -160,7 +160,7 @@ public:
 	void SetSearchText(CString text);
 	void SetPinyinSearch(bool bPinyin);
 	void ClearPinyinCache();
-	int HighlightPinyinText(CString& csText, const CString& searchText, COLORREF highlightColor);
+	int HighlightPinyinText(CString& csText, const CString& searchText, COLORREF highlightColor, int* outMatchPos = nullptr);
 
 	void SetDpiInfo(CDPI *dpi);
 
