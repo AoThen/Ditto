@@ -959,12 +959,15 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 
 int CCP_MainApp::ExitInstance() 
 {
-	Log(_T("ExitInstance"));
+	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
 
 	// Stop Cloud Sync before database closes
+	Log(StrF(_T("ExitInstance - Step 1 - Before CloudSync Stop - PID: %d"), GetCurrentProcessId()));
 	m_CloudSyncManager.Stop();
+	Log(StrF(_T("ExitInstance - Step 2 - After CloudSync Stop - PID: %d"), GetCurrentProcessId()));
 
 	// Wait for OCR threads to finish before cleanup
+	Log(StrF(_T("ExitInstance - Step 3 - Before OCR Wait - PID: %d"), GetCurrentProcessId()));
 	int ocrWait = 0;
 	while (g_ocrThreadCount > 0 && ocrWait < 30000)
 	{
@@ -974,11 +977,17 @@ int CCP_MainApp::ExitInstance()
 	if (g_ocrThreadCount > 0)
 		Log(_T("ExitInstance: OCR threads did not finish in 30s, proceeding"));
 	CleanupOCR();
+	Log(StrF(_T("ExitInstance - Step 4 - After OCR Wait - PID: %d"), GetCurrentProcessId()));
 
+	Log(StrF(_T("ExitInstance - Step 5 - Before DeleteTemp - PID: %d"), GetCurrentProcessId()));
 	DeleteDittoTempFiles(FALSE);
+	Log(StrF(_T("ExitInstance - Step 6 - After DeleteTemp - PID: %d"), GetCurrentProcessId()));
 
+	Log(StrF(_T("ExitInstance - Step 7 - Before db.close - PID: %d"), GetCurrentProcessId()));
 	m_db.close();
+	Log(StrF(_T("ExitInstance - Step 8 - After db.close - PID: %d"), GetCurrentProcessId()));
 
+	Log(StrF(_T("ExitInstance - Step 9 - Before UAC Cleanup - PID: %d"), GetCurrentProcessId()));
 	if(m_pUacPasteThread != NULL)
 	{
 		if(m_pUacPasteThread->ThreadWasStarted() == false)
@@ -987,13 +996,25 @@ int CCP_MainApp::ExitInstance()
 		}
 		delete m_pUacPasteThread;
 	}
+	Log(StrF(_T("ExitInstance - Step 10 - After UAC Cleanup - PID: %d"), GetCurrentProcessId()));
 
+	Log(StrF(_T("ExitInstance - Step 11 - Before GdiplusShutdown - PID: %d"), GetCurrentProcessId()));
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+	Log(StrF(_T("ExitInstance - Step 12 - After GdiplusShutdown - PID: %d"), GetCurrentProcessId()));
 
 	if(m_hMutex)
 		CloseHandle(m_hMutex);
 
-	return CWinApp::ExitInstance();
+	Log(StrF(_T("ExitInstance - Step 13 - Before CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
+	__try
+	{
+		return CWinApp::ExitInstance();
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+		Log(StrF(_T("ExitInstance - Step 14 - EXCEPTION in CWinApp::ExitInstance - PID: %d"), GetCurrentProcessId()));
+		return 0;
+	}
 }
 
 // return TRUE if there is more idle processing to do
