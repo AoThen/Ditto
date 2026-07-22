@@ -858,6 +858,8 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 	}
 	else if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
 	{
+		Log(StrF(_T("DBG_GDIP_OnActivate: ACTIVE bMin=%d m_bShowQP=%d"), bMinimized, theApp.m_bShowingQuickPaste));
+
 		if (bMinimized == FALSE)
 		{
 			if (theApp.m_bShowingQuickPaste == false)
@@ -1060,6 +1062,7 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 	}
 	else
 	{
+		Log(StrF(_T("DBG_GDIP_ShowQP: MoveControls bFill=%d"), bFillList));
 		MoveControls();
 	}
 
