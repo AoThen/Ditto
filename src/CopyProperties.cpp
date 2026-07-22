@@ -355,6 +355,8 @@ void CCopyProperties::OnOK()
 					{
 						std::vector<int> ids;
 						ids.push_back(m_lCopyID);
+
+						Log(StrF(_T("CopyProperties: clip %d set lDontSync=1"), m_lCopyID));
 						theApp.m_CloudSyncManager.MarkClipsDontSync(ids);
 					}
 					else

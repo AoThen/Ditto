@@ -207,6 +207,7 @@ bool CGroupTree::DoActionToggleDontSync()
 				_T("SELECT m.lID, m.bIsGroup FROM Main m JOIN descendants d ON m.lParentID = d.lID) ")
 				_T("UPDATE Main SET lDontSync = 1 WHERE lID IN (SELECT lID FROM descendants) OR lID = %d"),
 				groupId, groupId);
+
 		}
 		CATCH_SQLITE_EXCEPTION
 
@@ -230,6 +231,8 @@ bool CGroupTree::DoActionToggleDontSync()
 		}
 		CATCH_SQLITE_EXCEPTION
 
+		Log(StrF(_T("GroupTree DoActionToggleDontSync: groupId=%d, affected=%d clips, set lDontSync=1"), groupId, (int)affectedIds.size()));
+
 		try
 		{
 			theApp.m_CloudSyncManager.MarkClipsDontSync(affectedIds);
@@ -249,6 +252,8 @@ bool CGroupTree::DoActionToggleDontSync()
 		try
 		{
 			theApp.m_db.execDMLEx(_T("UPDATE Main SET lDontSync = 0 WHERE lID = %d"), groupId);
+
+		Log(StrF(_T("GroupTree DoActionToggleDontSync: groupId=%d, set lDontSync=0"), groupId));
 		}
 		CATCH_SQLITE_EXCEPTION
 	}

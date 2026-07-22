@@ -2511,6 +2511,8 @@ void CQPasteWnd::OnToggleDontSync()
 			idsStr += idStr;
 		}
 		theApp.m_db.execDMLEx(_T("UPDATE Main SET lDontSync = %d WHERE lID IN (%s)"), newVal, idsStr);
+
+		Log(StrF(_T("OnToggleDontSync: %d clips set to lDontSync=%d, ids=[%s]"), IDs.GetSize(), newVal, idsStr));
 	}
 	CATCH_SQLITE_EXCEPTION
 

@@ -1096,6 +1096,8 @@ int CClip::FindDuplicate()
 			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Main WHERE CRC = %d"), m_CRC);
 			if(q.eof() == false)
 				nID = q.getIntField(_T("lID"));
+
+		Log(StrF(_T("FindDuplicate: CRC hit, id=%d"), nID));
 		}
 
 		//2. CRC miss, fallback to text content comparison on recent 50 entries
@@ -1109,6 +1111,7 @@ int CClip::FindDuplicate()
 				if(m_Desc == q.getStringField(_T("mText")))
 				{
 					nID = q.getIntField(_T("lID"));
+					Log(StrF(_T("FindDuplicate: text fallback hit, id=%d"), nID));
 					break;
 				}
 				q.nextRow();
@@ -1116,7 +1119,10 @@ int CClip::FindDuplicate()
 		}
 
 		if(nID < 0)
+		{
+			Log(_T("FindDuplicate: no duplicate found"));
 			return -1;
+		}
 
 		//Allow duplicates but disallow back to back duplicates
 		//Only block if the matched entry is the most recent one
@@ -1125,7 +1131,10 @@ int CClip::FindDuplicate()
 			CppSQLite3Query q = theApp.m_db.execQueryEx(
 				_T("SELECT lID FROM Main ORDER BY clipOrder DESC LIMIT 1"));
 			if(q.eof() || nID != q.getIntField(_T("lID")))
+			{
+				Log(StrF(_T("FindDuplicate: back-to-back allowed, nID=%d"), nID));
 				return -1;
+			}
 		}
 
 		return nID;
@@ -1248,6 +1257,8 @@ bool CClip::AddToMainTable()
 
 		LogClip(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
 
+		Log(StrF(_T("AddToMainTable: id=%d, CRC=%d, lDontSync=%d, lModifiedDate=%lld"), m_id, m_CRC, m_dontSync, m_Time.GetTime()));
+
 		m_LastAddedCRC = m_CRC;
 		m_lastAddedID = m_id;
 	}
@@ -1307,6 +1318,8 @@ bool CClip::ModifyMainTable()
 			m_id);
 
 		bRet = true;
+
+		Log(StrF(_T("ModifyMainTable: id=%d, lDontSync=%d"), m_id, m_dontSync));
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
 
@@ -1333,6 +1346,8 @@ bool CClip::ModifyDescription()
 			m_id);
 
 		bRet = true;
+
+		Log(StrF(_T("ModifyDescription: id=%d"), m_id));
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
 

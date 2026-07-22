@@ -3000,12 +3000,24 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 
 		if (remoteIds.empty()) return;
 
+		{
+			CString msg;
+			msg.Format(_T("MarkClipsDontSync: sending %d remote IDs to server"), remoteIds.size());
+			LogMessage(msg);
+		}
+
 		nlohmann::json body;
 		body["ids"] = remoteIds;
 
 		EnterCriticalSection(&m_csHttpClient);
 		auto res = m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json");
 		LeaveCriticalSection(&m_csHttpClient);
+
+		{
+			CString msg;
+			msg.Format(_T("MarkClipsDontSync: server notified for %d local clips"), localClipIds.size());
+			LogMessage(msg);
+		}
 	}
 	catch (const std::exception& e)
 	{
