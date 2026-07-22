@@ -192,6 +192,8 @@ void CGdipButton::Reset()
 	m_bmpAlt.DeleteObject();
 	m_bmpAltP.DeleteObject();
 	m_bmpAltH.DeleteObject();
+
+	m_pCurBtn = NULL;
 }
 
 void CGdipButton::ClearBitmaps()
@@ -595,6 +597,17 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			Log(_T("DBG_GDIP_Skip: pImg==NULL"));
 		if (rect.Width() <= 0 || rect.Height() <= 0)
 			Log(StrF(_T("DBG_GDIP_Skip: r=(%d,%d)"), rect.Width(), rect.Height()));
+	}
+
+	// safety: if we have a valid image but pCurBtn is invalid, recreate bitmaps
+	if (m_pStdImage && rect.Width() > 0 && rect.Height() > 0)
+	{
+		if (m_pCurBtn == NULL || m_pCurBtn->m_hDC == NULL)
+		{
+			Log(_T("DBG_GDIP_Recover: pCurBtn invalid, recreating bitmaps"));
+			ClearBitmaps();
+			CtlColor(pDC, WM_CTLCOLORBTN);
+		}
 	}
 
 	// handle disabled state

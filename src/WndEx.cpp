@@ -88,7 +88,7 @@ BOOL CWndEx::Create(const CRect& crStart, CWnd* pParentWnd)
 	if (!AfxRegisterClass(&wc))
 		return FALSE;		
 	
-	return CWndEx::CreateEx(0, _T("QPasteClass"), _T("Quick Paste"), WS_POPUP,
+	return CWndEx::CreateEx(0, _T("QPasteClass"), _T("Quick Paste"), WS_POPUP | WS_CLIPCHILDREN,
 		crStart, pParentWnd, 0);
 }
 
