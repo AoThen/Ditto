@@ -270,8 +270,13 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 		CRect rect;
 		GetClientRect(rect);
 
-		// do everything with mem dc
-		CMemDCEx pDC(pScreenDC, rect);
+		// do everything with mem dc (manual, no auto-BitBlt on destruction)
+		CDC memDC;
+		CBitmap memBmp;
+		memDC.CreateCompatibleDC(pScreenDC);
+		memBmp.CreateCompatibleBitmap(pScreenDC, rect.Width(), rect.Height());
+		CBitmap* pOldMemBmp = memDC.SelectObject(&memBmp);
+		CDC* pDC = &memDC;
 
 		Gdiplus::Graphics graphics(pDC->m_hDC);
 
@@ -453,6 +458,9 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 		}
 
 		m_bHaveBitmaps = TRUE;
+
+		memDC.SelectObject(pOldMemBmp);
+		memBmp.DeleteObject();
 	}
 
 	return NULL;

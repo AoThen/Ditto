@@ -1066,6 +1066,11 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 		MoveControls();
 	}
 
+	// force button repaint to ensure icons are visible
+	m_systemMenu.Invalidate();
+	m_ShowGroupsFolderBottom.Invalidate();
+	m_BackButton.Invalidate();
+
 	// always on top... for persistent showing (CGetSetOptions::m_bShowPersistent)
 	// SHOWWINDOW was also integrated into this function rather than calling it separately
 	if (CGetSetOptions::GetShowPersistent())
