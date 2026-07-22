@@ -73,6 +73,35 @@ jobs:
           cd onnxsrc
           call build-onnxruntime.bat v143 mt
 
+      - name: Fix merged static lib (include absl libs)
+        if: steps.cache-onnx.outputs.cache-hit != 'true'
+        shell: powershell
+        run: |
+          $tlog = "onnxsrc\build-x64-v143-mt\Release\onnxruntime.dir\Release\onnxruntime.tlog\link.read.1.tlog"
+          if (-not (Test-Path $tlog)) {
+            Write-Error "link.read.1.tlog not found at $tlog"
+            exit 1
+          }
+          # Read all .LIB files from the tlog, handle both | and newline separators
+          $content = Get-Content -Path $tlog -Raw
+          $libs = $content -replace '^\^', '' -split '\||\r?\n' | Where-Object { $_ -match '\.LIB$' } | ForEach-Object { $_.Trim('"') }
+          Write-Output "Found $($libs.Count) .lib files"
+          if ($libs.Count -eq 0) {
+            Write-Error "No .lib files found in link.read.1.tlog"
+            exit 1
+          }
+          # Create install-static/lib directory
+          $outDir = "onnxsrc\build-x64-v143-mt\Release\install-static\lib"
+          if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+          # Run lib.exe to merge all .lib files into onnxruntime.lib
+          $outFile = Join-Path $outDir "onnxruntime.lib"
+          & lib.exe /OUT:$outFile $libs
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "lib.exe failed with exit code $LASTEXITCODE"
+            exit 1
+          }
+          Write-Output "onnxruntime.lib created: $((Get-Item $outFile).Length / 1MB) MB"
+
       - name: Package static libs
         shell: cmd
         run: |
