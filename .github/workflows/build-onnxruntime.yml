@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
-    paths: [scripts/download-ocr-deps.bat, .github/workflows/build-onnxruntime.yml]
+    paths:
+      - scripts/download-ocr-deps.bat
+      - .github/workflows/build-onnxruntime.yml
 
 permissions:
   contents: write
@@ -22,45 +24,26 @@ jobs:
         with:
           python-version: '3.10.11'
 
-      - name: Checkout OnnxruntimeBuilder
-        uses: actions/checkout@v5
-        with:
-          repository: RapidAI/OnnxruntimeBuilder
-          ref: 1.23.2
-          path: onnxbuilder
-          fetch-depth: 1
-
       - name: Checkout onnxruntime source
         uses: actions/checkout@v5
         with:
           repository: microsoft/onnxruntime
-          ref: v1.23.2
+          ref: v1.27.1
           path: onnxsrc
           submodules: recursive
           fetch-depth: 1
 
-      - name: Copy build script and fix pushd path, disable Java
-        shell: powershell
+      - name: Copy build script
+        shell: cmd
         run: |
-          copy onnxbuilder\build-onnxruntime.bat onnxsrc\
-          $content = Get-Content onnxsrc\build-onnxruntime.bat
-          # 保留原始 pushd "build-%~1-%~2-%~3"\Release（collectLibs 需要从 cmake 构建目录运行）
-          # 禁用 Java 构建（我们只需要 C++ 静态库）
-          $content = $content -replace 'set MACHINE_FLAG="--build_java"', 'set MACHINE_FLAG='
-          # 修复 collectLibs 中 header 扁平化：v1.23.2 的脚本只复制 onnxruntime\ 根目录，不递归子目录
-          $content = $content -replace 'copy install\\include\\onnxruntime\\\* install\\include', 'xcopy install\include\onnxruntime install\include /s /e /y'
-          # 取消注释 lib.exe /OUT 合并命令，并将 %libs% 改为 !libs!（延迟扩展，否则变量为空）
-          $content = $content.Replace('::IF "%libexe_exists%" == "true" (', 'IF "%libexe_exists%" == "true" (')
-          $content = $content.Replace('::    lib.exe /OUT:install-static\lib\onnxruntime.lib %libs%', '    lib.exe /OUT:install-static\lib\onnxruntime.lib !libs!')
-          $content = $content.Replace('::)', ')')
-          $content | Set-Content onnxsrc\build-onnxruntime.bat
+          copy scripts\build-onnxruntime.bat onnxsrc\
 
       - name: Cache ONNX Runtime build
         id: cache-onnx
         uses: actions/cache@v4
         with:
-          path: onnxsrc/build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-1.23.2-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('onnxbuilder/build-onnxruntime.bat') }}
+          path: onnxsrc\build-x64-v143-mt
+          key: onnxruntime-build-x64-v143-mt-1.27.1-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -73,48 +56,19 @@ jobs:
           cd onnxsrc
           call build-onnxruntime.bat v143 mt
 
-      - name: Fix merged static lib (include absl libs)
-        if: steps.cache-onnx.outputs.cache-hit != 'true'
-        shell: powershell
-        run: |
-          $tlog = "onnxsrc\build-x64-v143-mt\Release\onnxruntime.dir\Release\onnxruntime.tlog\link.read.1.tlog"
-          if (-not (Test-Path $tlog)) {
-            Write-Error "link.read.1.tlog not found at $tlog"
-            exit 1
-          }
-          # Read all .LIB files from the tlog, handle both | and newline separators
-          $content = Get-Content -Path $tlog -Raw
-          $libs = $content -replace '^\^', '' -split '\||\r?\n' | Where-Object { $_ -match '\.LIB$' } | ForEach-Object { $_.Trim('"') }
-          Write-Output "Found $($libs.Count) .lib files"
-          if ($libs.Count -eq 0) {
-            Write-Error "No .lib files found in link.read.1.tlog"
-            exit 1
-          }
-          # Create install-static/lib directory
-          $outDir = "onnxsrc\build-x64-v143-mt\Release\install-static\lib"
-          if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
-          # Run lib.exe to merge all .lib files into onnxruntime.lib
-          $outFile = Join-Path $outDir "onnxruntime.lib"
-          & lib.exe /OUT:$outFile $libs
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "lib.exe failed with exit code $LASTEXITCODE"
-            exit 1
-          }
-          Write-Output "onnxruntime.lib created: $((Get-Item $outFile).Length / 1MB) MB"
-
       - name: Package static libs
         shell: cmd
         run: |
-          cd onnxsrc\build-x64-v143-mt\Release\install-static
-          7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.23.2.7z *
+          cd onnxsrc\build-x64-v143-mt\install-static
+          7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: onnxruntime-1.23.2
-          name: "ONNX Runtime 1.23.2 static libs (Windows x64, VS2022, mt)"
+          tag: onnxruntime-1.27.1
+          name: "ONNX Runtime 1.27.1 static libs (Windows x64, VS2022, mt)"
           prerelease: true
-          artifacts: onnxruntime-static-windows-x64-1.23.2.7z
+          artifacts: onnxruntime-static-windows-x64-1.27.1.7z
           allowUpdates: true
           artifactContentType: application/x-7z-compressed
           token: ${{ secrets.GITHUB_TOKEN }}

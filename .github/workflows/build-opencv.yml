@@ -3,7 +3,7 @@ name: Build OpenCV static libs
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, master]
     paths:
       - scripts/download-ocr-deps.bat
       - .github/workflows/build-opencv.yml
@@ -19,56 +19,68 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Checkout OpenCVBuilder
-        uses: actions/checkout@v5
-        with:
-          repository: RapidAI/OpenCVBuilder
-          ref: 4.8.1
-          path: opencvbuilder
-          fetch-depth: 1
-
       - name: Checkout opencv source
         uses: actions/checkout@v5
         with:
           repository: opencv/opencv
-          ref: 4.8.1
+          ref: 4.14.0
           path: opencvsrc
           fetch-depth: 1
 
-      - name: Copy build files and create x64-only wrapper
-        shell: powershell
+      - name: Copy cmake options file
+        shell: cmd
         run: |
-          copy opencvbuilder\build-opencv4.bat opencvsrc\
-          copy opencvbuilder\opencv4_cmake_options.txt opencvsrc\
-          # 创建只构建 x64 的版本
-          (Get-Content opencvsrc\build-opencv4.bat) -replace 'call :cmakeParams "Win32" %VS_VER% %CRT%', '' | Set-Content opencvsrc\build-opencv4.bat
+          copy scripts\opencv4_cmake_options.txt opencvsrc\
+
+      - name: Cache OpenCV build
+        id: cache-opencv
+        uses: actions/cache@v4
+        with:
+          path: opencvsrc\build-x64-v143-mt
+          key: opencv-build-x64-v143-mt-4.14.0-${{ hashFiles('.github/workflows/build-opencv.yml') }}-${{ hashFiles('scripts/opencv4_cmake_options.txt') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      - name: Build
+      - name: Configure
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
         shell: cmd
         run: |
-          cd opencvsrc
-          call build-opencv4.bat v143 mt
+          mkdir opencvsrc\build-x64-v143-mt
+          cd opencvsrc\build-x64-v143-mt
+          cmake -G "Visual Studio 17 2022" -A x64 -T v143 @../opencv4_cmake_options.txt ..
 
-      - name: Package static libs
+      - name: Build
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
         shell: cmd
         run: |
-          mkdir windows-x64
-          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
-          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\staticlib windows-x64\x64\vc17\staticlib\
-          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
-          7z a opencv-static-windows-x64-4.8.1.7z windows-x64\*
+          cd opencvsrc\build-x64-v143-mt
+          cmake --build . --config Release -j %NUMBER_OF_PROCESSORS%
+
+      - name: Install
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          cd opencvsrc\build-x64-v143-mt
+          cmake --install . --config Release
+
+       - name: Package static libs
+         shell: cmd
+         run: |
+           mkdir windows-x64
+           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
+           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\x64\vc17\staticlib windows-x64\x64\vc17\staticlib\
+           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
+           7z a opencv-static-windows-x64-4.14.0.7z windows-x64\*
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: opencv-4.8.1
-          name: "OpenCV 4.8.1 static libs (Windows x64, VS2022, mt)"
+          tag: opencv-4.14.0
+          name: "OpenCV 4.14.0 static libs (Windows x64, VS2022, mt)"
           prerelease: true
-          artifacts: opencv-static-windows-x64-4.8.1.7z
+          artifacts: opencv-static-windows-x64-4.14.0.7z
           allowUpdates: true
           artifactContentType: application/x-7z-compressed
           token: ${{ secrets.GITHUB_TOKEN }}

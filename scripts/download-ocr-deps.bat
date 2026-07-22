@@ -8,11 +8,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 1. 下载 ONNX Runtime 静态库（如果不存在，v1.23.2）
+REM 1. 下载 ONNX Runtime 静态库（如果不存在，v1.27.1）
 if not exist "%DEPS_DIR%\onnxruntime-static\windows-x64" (
     echo Downloading ONNX Runtime static libs...
     if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/onnxruntime-1.23.2/onnxruntime-static-windows-x64-1.23.2.7z' -OutFile '%TEMP%\onnx.7z'"
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/onnxruntime-1.27.1/onnxruntime-static-windows-x64-1.27.1.7z' -OutFile '%TEMP%\onnx.7z'"
     7z t "%TEMP%\onnx.7z" >nul
     if errorlevel 1 (
         echo ONNX Runtime archive is corrupted, aborting
@@ -46,7 +46,7 @@ if not exist "%DEPS_DIR%\onnxruntime-static\windows-x64" (
 REM 2. 下载 OpenCV 静态库（如果不存在）
 if not exist "%DEPS_DIR%\opencv-static\windows-x64" (
     echo Downloading OpenCV static libs...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/opencv-4.8.1/opencv-static-windows-x64-4.8.1.7z' -OutFile '%TEMP%\opencv.7z'"
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/opencv-4.14.0/opencv-static-windows-x64-4.14.0.7z' -OutFile '%TEMP%\opencv.7z'"
     7z t "%TEMP%\opencv.7z" >nul
     if errorlevel 1 (
         echo OpenCV archive is corrupted, aborting
@@ -90,7 +90,7 @@ if exist "%DEPS_DIR%\opencv-static\windows-x64" (
         echo [WARN] OpenCV header NOT found
         dir "%DEPS_DIR%\opencv-static\windows-x64\include" 2>nul
     )
-    if exist "%DEPS_DIR%\opencv-static\windows-x64\x64\vc17\staticlib\opencv_core481.lib" (
+    if exist "%DEPS_DIR%\opencv-static\windows-x64\x64\vc17\staticlib\opencv_world4140.lib" (
         echo [OK] OpenCV lib found
     ) else (
         echo [WARN] OpenCV lib NOT found
