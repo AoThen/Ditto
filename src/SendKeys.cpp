@@ -275,50 +275,15 @@ void CSendKeys::SendKeyDown(BYTE VKey, WORD NumTimes, bool GenUpMsg, bool bDelay
  {
   WORD Cnt = 0;
   BYTE ScanCode = 0;
-  bool NumState = false;
 
   if (VKey == VK_NUMLOCK)
   {
-    DWORD dwVersion = ::GetVersion();
-
     for (Cnt=1; Cnt<=NumTimes; Cnt++)
     {
       if (bDelay)
         CarryDelay();
-      // snippet based on:
-      // http://www.codeproject.com/cpp/togglekeys.asp
-      if (dwVersion < 0x80000000)
-      {
-        ::keybd_event(VKey, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
-        ::keybd_event(VKey, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-      }
-      else
-      {
-        // Win98 and later
-        if ( ((DWORD)(HIBYTE(LOWORD(dwVersion))) >= 10) )
-        {
-          // Define _WIN32_WINNT > 0x0400
-          // to compile
-          INPUT input[2] = {0};
-          input[0].type = input[1].type = INPUT_KEYBOARD;
-          input[0].ki.wVk = input[1].ki.wVk = VKey;
-          input[1].ki.dwFlags = KEYEVENTF_KEYUP;
-          ::SendInput(sizeof(input) / sizeof(INPUT), input, sizeof(INPUT));
-        }
-        // Win95
-        else
-        {
-          KEYBOARDSTATE_t KeyboardState;
-          NumState = GetKeyState(VK_NUMLOCK) & 1 ? true : false;
-          GetKeyboardState(&KeyboardState[0]);
-          if (NumState)
-            KeyboardState[VK_NUMLOCK] &= ~1;
-          else
-            KeyboardState[VK_NUMLOCK] |= 1;
-
-          SetKeyboardState(&KeyboardState[0]);
-        }
-      }
+      ::keybd_event(VKey, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+      ::keybd_event(VKey, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
     }
     return;
   }
@@ -614,13 +579,13 @@ bool CSendKeys::SendKeys(LPCTSTR KeysString, bool Wait)
           {
             m_bLControlDown = (MKey == VK_LCONTROL);
             m_bRControlDown = (MKey == VK_RCONTROL);
-            SendKeyDown(MKey, 1, false);
+            SendKeyDown(static_cast<BYTE>(MKey), 1, false);
           }
           else if (MKey == VK_LSHIFT || MKey == VK_RSHIFT)
           {
             m_bLShiftDown = (MKey == VK_LSHIFT);
             m_bRShiftDown = (MKey == VK_RSHIFT);
-            SendKeyDown(MKey, 1, false);
+            SendKeyDown(static_cast<BYTE>(MKey), 1, false);
           }
           else
           {

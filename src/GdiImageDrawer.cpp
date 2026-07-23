@@ -6,6 +6,7 @@
 CGdiImageDrawer::CGdiImageDrawer()
 {
 	m_pStdImage = NULL;
+	m_bDarkMode = FALSE;
 }
 
 CGdiImageDrawer::~CGdiImageDrawer()
@@ -86,6 +87,9 @@ BOOL CGdiImageDrawer::LoadStdImageDPI(int dpi, UINT id96, UINT id120, UINT id144
 
 void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, CRect rc, bool mouseHover, bool mouseDown)
 {
+	if (m_pStdImage == NULL || m_pStdImage->m_pBitmap == NULL)
+		return;
+
 	int width = m_pStdImage->m_pBitmap->GetWidth();
 	int height = m_pStdImage->m_pBitmap->GetHeight();
 
@@ -97,6 +101,9 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, CRect rc, bool
 
 void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int posY, bool mouseHover, bool mouseDown, int forceWidth, int forceHeight)
 {
+	if (m_pStdImage == NULL || m_pStdImage->m_pBitmap == NULL)
+		return;
+
 	int width = m_pStdImage->m_pBitmap->GetWidth();
 	if (forceWidth != INT_MAX)
 		width = forceWidth;
@@ -104,21 +111,6 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int 
 	if (forceHeight != INT_MAX)
 		height = forceHeight;
 
-	CRect rectWithBorder(posX, posY, posX + width, posY + height);
-	
-	CDC dcBk;
-	CBitmap bmp;
-	CClientDC clDC(pWnd);
-		
-	//Copy the background over the entire area
-	dcBk.CreateCompatibleDC(&clDC);
-	bmp.CreateCompatibleBitmap(&clDC, 1, 1);
-	dcBk.SelectObject(&bmp);
-	dcBk.BitBlt(0, 0, 1, 1, &clDC, rectWithBorder.left-1, rectWithBorder.top, SRCCOPY);
-	
-	bmp.DeleteObject();		
-
-	//Draw the png file
 	if (mouseDown)
 	{
 		int one = dpi.Scale(1);
@@ -126,16 +118,24 @@ void CGdiImageDrawer::Draw(CDC* pScreenDC, CDPI &dpi, CWnd *pWnd, int posX, int 
 		posY += one;
 	}
 
-	//ImageAttributes ia;
-	//
-
-	//ColorMap blackToRed;
-	//blackToRed.oldColor = Color(255, 110, 114, 122);  // black
-	//blackToRed.newColor = Color(255, 255, 0, 0);// red
-	//ia.SetRemapTable(1, &blackToRed);
-
 	Gdiplus::Graphics graphics(pScreenDC->m_hDC);
-	graphics.DrawImage(*m_pStdImage, posX, posY, width, height);	
+
+	if (m_bDarkMode)
+	{
+		static Gdiplus::ColorMatrix DarkMat = { 2.75f, 0.00f, 0.00f, 0.00f, 0.35f,
+												0.00f, 2.75f, 0.00f, 0.00f, 0.35f,
+												0.00f, 0.00f, 2.75f, 0.00f, 0.35f,
+												0.00f, 0.00f, 0.00f, 1.00f, 0.00f,
+												0.35f, 0.35f, 0.35f, 0.00f, 1.00f };
+		Gdiplus::ImageAttributes ia;
+		ia.SetColorMatrix(&DarkMat);
+		Gdiplus::RectF grect((Gdiplus::REAL)posX, (Gdiplus::REAL)posY, (Gdiplus::REAL)width, (Gdiplus::REAL)height);
+		graphics.DrawImage(*m_pStdImage, grect, 0, 0, (Gdiplus::REAL)width, (Gdiplus::REAL)height, Gdiplus::UnitPixel, &ia);
+	}
+	else
+	{
+		graphics.DrawImage(*m_pStdImage, posX, posY, width, height);
+	}	
 
 	//RectF grect; grect.X = posX, grect.Y = posY; grect.Width = width; grect.Height = height;
 	//graphics.DrawImage(*m_pStdImage, grect, 0, 0, width, height, UnitPixel, &ia);

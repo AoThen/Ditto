@@ -261,7 +261,7 @@ BOOL CToolTipEx::Show(CPoint point)
 
 	if (m_imageViewer.m_pGdiplusBitmap)
 	{
-		int percent = (m_imageViewer.m_scale - 1.0) * 100.0;
+		int percent = static_cast<int>((m_imageViewer.m_scale - 1.0) * 100.0);
 		m_clipData = m_originalClipData + _T(" | ") + StrF(_T("%d x %d, %d%%"), m_imageViewer.m_pGdiplusBitmap->GetWidth(), m_imageViewer.m_pGdiplusBitmap->GetHeight(), percent);
 
 		//OutputDebugString(_T("Showing image editor\r\n"));
@@ -871,12 +871,6 @@ void CToolTipEx::SetRTFText(const CStringA &rtf)
 	
 	HighlightSearchText();
 }
-
-//void CToolTipEx::SetRTFText(const CString &csRTF)
-//{
-//	m_RichEdit.SetRTF(csRTF);
-//	m_csRTF = csRTF;
-//}
 
 void CToolTipEx::SetToolTipText(const CString &csText)
 {
@@ -1517,7 +1511,6 @@ void CToolTipEx::OnMoving(UINT fwSide, LPRECT pRect)
 	CWnd::OnMoving(fwSide, pRect); 
 
 	m_snap.OnSnapMoving(m_hWnd, pRect);
-	// TODO: Add your message handler code here
 }
 
 
@@ -1540,7 +1533,7 @@ LRESULT CToolTipEx::OnRefreshFooter(WPARAM wParam, LPARAM lParam)
 	m_clipData = m_originalClipData;
 	if (m_imageViewer.m_pGdiplusBitmap)
 	{
-		int percent = ((m_imageViewer.m_scale) * 100.0) + .5;	
+		int percent = static_cast<int>(((m_imageViewer.m_scale) * 100.0) + .5);	
 		m_clipData = m_originalClipData + _T(" | ") + StrF(_T("%d x %d, %d%%"), m_imageViewer.m_pGdiplusBitmap->GetWidth(), m_imageViewer.m_pGdiplusBitmap->GetHeight(), percent);
 	}
 

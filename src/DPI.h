@@ -61,8 +61,10 @@ private:
 								this->Update(x);
 								m_Initialized = true;
 							}
+							FreeLibrary(shCore);
 						}
 					}
+					FreeLibrary(hUser32);
 				}
 			}
 

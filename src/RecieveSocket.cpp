@@ -9,7 +9,7 @@ CRecieveSocket::CRecieveSocket(SOCKET sock)
 {
 	m_pDataReturnedFromDecrypt = NULL;
 	m_Sock = sock;
-	m_pEncryptor = new CEncryption; //CreateEncryptionInterface("encryptdecrypt.dll");
+	m_pEncryptor = new CEncryption;
 	m_pProgress = NULL;
 }
 
@@ -168,15 +168,12 @@ BOOL CRecieveSocket::RecieveExactSize(char *pData, long lSize)
 
 	while(lWanted > 0)
 	{		
-		fd_set readset;
-		int res;
-
 		int timeoutMs = CGetSetOptions::GetNetworkReadTimeoutMS();
 		int loops100msEach = (timeoutMs/100);
 
 		for(int i = 0; i < loops100msEach; i++)
 		{
-			lReceiveCount = recv_to(m_Sock, pData + lOffset, lWanted, 0, 100);
+			lReceiveCount = static_cast<long>(recv_to(m_Sock, pData + lOffset, lWanted, 0, 100));
 
 			if(lReceiveCount >= 0)
 			{
@@ -251,9 +248,15 @@ BOOL CRecieveSocket::RecieveCSendInfo(CSendInfo *pInfo)
 	LPVOID lpData = ReceiveEncryptedData(lRecieveSize, lOutSize);
 	if(lpData)
 	{
-		memcpy(pInfo, lpData, sizeof(CSendInfo));
-
-		bRet = (pInfo->m_nSize == sizeof(CSendInfo));
+		if (lOutSize >= (long)sizeof(CSendInfo))
+		{
+			memcpy(pInfo, lpData, sizeof(CSendInfo));
+			bRet = (pInfo->m_nSize == sizeof(CSendInfo));
+		}
+		else
+		{
+			Log(StrF(_T("CRecieveSocket::RecieveCSendInfo: decrypted size %ld < expected %zu"), lOutSize, sizeof(CSendInfo)));
+		}
 
 		FreeDecryptedData();
 	}

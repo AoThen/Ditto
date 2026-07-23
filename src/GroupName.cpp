@@ -20,6 +20,8 @@ CGroupName::CGroupName(CWnd* pParent /*=NULL*/)
 {
 	//{{AFX_DATA_INIT(CGroupName)
 	m_csName = _T("");
+	m_csDescription = _T("");
+	m_groupId = -1;
 	//}}AFX_DATA_INIT
 }
 
@@ -29,6 +31,7 @@ void CGroupName::DoDataExchange(CDataExchange* pDX)
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CGroupName)
 	DDX_Text(pDX, IDC_NAME, m_csName);
+	DDX_Text(pDX, IDC_GROUP_DESCRIPTION, m_csDescription);
 	//}}AFX_DATA_MAP
 }
 
@@ -45,6 +48,29 @@ void CGroupName::OnOK()
 {
 	UpdateData(TRUE);
 	
+	if (m_groupId > 0)
+	{
+		try
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT mText, m_Description FROM Main WHERE lID = %d"), m_groupId);
+			if (!q.eof())
+			{
+				CString origName = q.getStringField(_T("mText"));
+				CString origDesc = q.getStringField(_T("m_Description"));
+				if (m_csName != origName || m_csDescription != origDesc)
+				{
+					CString escName = m_csName;
+					CString escDesc = m_csDescription;
+					escName.Replace(_T("'"), _T("''"));
+					escDesc.Replace(_T("'"), _T("''"));
+					theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', m_Description = '%s', lModifiedDate = %lld WHERE lID = %d"),
+						escName, escDesc, CTime::GetCurrentTime().GetTime(), m_groupId);
+				}
+			}
+		}
+		CATCH_SQLITE_EXCEPTION
+	}
+
 	CDialog::OnOK();
 }
 

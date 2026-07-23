@@ -67,7 +67,7 @@ BEGIN_MESSAGE_MAP(CSymbolEdit, CEdit)
 	ON_WM_MOUSEMOVE()
 	ON_COMMAND_RANGE(RANGE_START, (RANGE_START + LIST_MAX_COUNT), OnSelectSearchString)
 	ON_WM_EXITSIZEMOVE()
-	//ON_WM_ERASEBKGND()
+	ON_WM_ERASEBKGND()
 	ON_WM_NCCALCSIZE()
 	ON_WM_NCPAINT()
 	ON_WM_TIMER()
@@ -75,7 +75,6 @@ END_MESSAGE_MAP()
 
 BOOL CSymbolEdit::PreTranslateMessage(MSG* pMsg)
 {
-	// TODO: Add your specialized code here and/or call the base class
 	// Intercept Ctrl + Z (Undo), Ctrl + X (Cut), Ctrl + C (Copy), Ctrl + V (Paste) and Ctrl + A (Select All)
 	// before CEdit base class gets a hold of them.
 	if (pMsg->message == WM_KEYDOWN &&
@@ -470,7 +469,7 @@ void CSymbolEdit::OnPaint()
 	textRect.right -= HIWORD(margins);
 
 	// Clearing the background
-	dc.FillSolidRect(rect, GetSysColor(COLOR_WINDOW));	
+	dc.FillSolidRect(rect, CGetSetOptions::m_Theme.MainWindowBG());	
 
 	if (m_hSymbolIcon)
 	{
@@ -533,6 +532,9 @@ void CSymbolEdit::OnPaint()
 
 	if (text.GetLength() == 0 && m_strPromptText.GetLength() > 0)
 	{
+		if (m_windowDpi == NULL)
+			return;
+
 		//if we aren't showing the close icon, then use the full space
 		textRect.right += m_windowDpi->Scale(16);
 		//textRect.right -= LOWORD(margins);
@@ -545,6 +547,9 @@ void CSymbolEdit::OnPaint()
 		dc.SetTextColor(color);
 		dc.SelectObject(oldFont);
 	}
+
+	if (m_windowDpi == NULL)
+		return;
 
 	int right = rect.right;
 	if ((text.GetLength() > 0 || this == GetFocus()))
@@ -574,12 +579,6 @@ void CSymbolEdit::OnPaint()
 	}
 
 	//OutputDebugString(_T("OnPaint"));
-
-	if (text != m_lastTextOnPaint &&
-		text == _T(""))
-	{
-		::SetWindowPos(m_hWnd, NULL, 0, 0, 0, 0, SWP_DRAWFRAME | SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-	}
 
 	m_lastTextOnPaint = text;
 
@@ -829,6 +828,17 @@ void CSymbolEdit::OnDpiChanged()
 	SetDpiInfo(m_windowDpi);
 }
 
+void CSymbolEdit::SetDarkMode(BOOL bDark)
+{
+	m_closeButton.SetDarkMode(bDark);
+	m_searchesButton.SetDarkMode(bDark);
+	if (bDark)
+		m_colorPromptText = RGB(200, 200, 200);
+	else
+		m_colorPromptText = RGB(127, 127, 127);
+	Invalidate();
+}
+
 void CSymbolEdit::SetDpiInfo(CDPI *dpi)
 { 
 	m_windowDpi = dpi; 
@@ -846,10 +856,7 @@ void CSymbolEdit::SetDpiInfo(CDPI *dpi)
 
 BOOL CSymbolEdit::OnEraseBkgnd(CDC* pDC)
 {
-	// TODO: Add your message handler code here and/or call default
-
-	//return CEdit::OnEraseBkgnd(pDC);
-	return FALSE;
+	return TRUE;
 }
 
 
@@ -894,7 +901,7 @@ void CSymbolEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 		m_centerTextDiff = (rectWnd.Height() - uiVClientHeight) / 2;
 
-		if (m_centerTextDiff < 0 || m_centerTextDiff > uiVClientHeight)
+		if (m_centerTextDiff < 0 || static_cast<UINT>(m_centerTextDiff) > uiVClientHeight)
 		{
 			m_centerTextDiff = 0;
 		}
@@ -930,6 +937,8 @@ void CSymbolEdit::OnNcCalcSize(BOOL bCalcValidRects, NCCALCSIZE_PARAMS* lpncsp)
 
 void CSymbolEdit::OnNcPaint()
 {
+	if (m_windowDpi == NULL)
+		return;
 
 	CString text;
 	GetWindowText(text);

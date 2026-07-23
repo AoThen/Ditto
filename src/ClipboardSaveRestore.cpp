@@ -114,9 +114,12 @@ bool CClipboardSaveRestore::RestoreTextOnly()
 			{
 				if(pCF->m_cfType == CF_TEXT || pCF->m_cfType == CF_UNICODETEXT)
 				{
-					//Make a copy of the data we are putting on the clipboard so we can still
-					//restore all clips later in Restore()
 					LPVOID localData = ::GlobalLock(pCF->m_hgData);
+					if (localData == NULL)
+					{
+						Log(_T("CClipboardSaveRestore::RestoreTextOnly: GlobalLock failed for text"));
+						continue;
+					}
 
 					HGLOBAL newData = NewGlobalP(localData, ::GlobalSize(pCF->m_hgData));	
 					::SetClipboardData(pCF->m_cfType, newData);
@@ -138,25 +141,32 @@ bool CClipboardSaveRestore::RestoreTextOnly()
 		{
 			CString hDropString;
 			CClipFormat *pCF = &m_Clipboard.ElementAt(hDropIndex);
-			if(pCF && pCF->m_hgData && ::GlobalSize(pCF->m_hgData) > 0) // Ensure clipboard data is valid
+			if(pCF && pCF->m_hgData && ::GlobalSize(pCF->m_hgData) > 0)
 			{
 				HDROP drop = (HDROP)GlobalLock(pCF->m_hgData);
-				int nNumFiles = DragQueryFile(drop, -1, NULL, 0);
-				TCHAR file[MAX_PATH];
-
-				for(int nFile = 0; nFile < nNumFiles; nFile++)
+				if (drop == NULL)
 				{
-					if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
+					Log(_T("CClipboardSaveRestore::RestoreTextOnly: GlobalLock failed for HDROP"));
+				}
+				else
+				{
+					int nNumFiles = DragQueryFile(drop, -1, NULL, 0);
+					TCHAR file[MAX_PATH];
+
+					for(int nFile = 0; nFile < nNumFiles; nFile++)
 					{
-						if(PathIsDirectory(file) == FALSE)
+						if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
 						{
-							hDropString += file;
-							hDropString += _T("\r\n");
+							if(PathIsDirectory(file) == FALSE)
+							{
+								hDropString += file;
+								hDropString += _T("\r\n");
+							}
 						}
 					}
-				}
 
-				GlobalUnlock(pCF->m_hgData);
+					GlobalUnlock(pCF->m_hgData);
+				}
 
 				HGLOBAL newData = NewGlobalP(hDropString.GetBuffer(), ((hDropString.GetLength() + 1) * sizeof(TCHAR)));	
 				::SetClipboardData(CF_UNICODETEXT, newData);

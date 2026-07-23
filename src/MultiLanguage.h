@@ -57,6 +57,7 @@ public:
 	bool UpdateMoveToGroups(CWnd *pParent);
 	bool UpdateOptionsSheet(CWnd *pParent);
 	bool UpdateOptionCopyBuffers(CWnd *pParent);
+	bool UpdateOptionCloud(CWnd *pParent);
 	bool UpdateGlobalHotKeys(CWnd *pParent);
 	bool UpdateDeleteClipData(CWnd *pParent);
 
@@ -72,6 +73,7 @@ public:
 	CString GetLangCode() { return m_csLangCode;	}
 
 	void	SetOnlyGetHeader(bool bVal)	{ m_bOnlyGetHeader = true;	}
+	static CString DetectSystemLanguage();
 	static CMenu* GetMenuPos(CMenu *pMenu, const CString &csLookingForMenuText, int &nMenuPos, bool returnChildIfOne = FALSE);
 
 	CString m_csLastError;
@@ -93,6 +95,7 @@ protected:
 	LANGUAGE_ARRAY m_MoveToGroups;
 	LANGUAGE_ARRAY m_OptionsSheet;
 	LANGUAGE_ARRAY m_OptionsCopyBuffers;
+	LANGUAGE_ARRAY m_OptionsCloud;
 	LANGUAGE_ARRAY m_GlobalHotKeys;
 	LANGUAGE_ARRAY m_DeleteClipData;
 

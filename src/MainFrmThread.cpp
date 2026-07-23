@@ -4,6 +4,8 @@
 #include "Options.h"
 #include "Misc.h"
 #include "cp_main.h"
+#include "ClipboardOCR.h"
+#include <thread>
 
 CMainFrmThread::CMainFrmThread(void)
 {
@@ -131,14 +133,79 @@ void CMainFrmThread::OnSaveClips()
 		m_saveClips.RemoveAll();
 	}
 
-	Log(_T("SaveCopyClips Before AddToDb")); 
+Log(_T("SaveCopyClips Before AddToDb")); 
+
+	if (IsCancelled())
+	{
+		Log(_T("SaveCopyClips cancelled before AddToDb"));
+		delete pLocalClips;
+		return;
+	}
 
 	int count = pLocalClips->AddToDB(true);
 
 	Log(StrF(_T("SaveCopyclips After AddToDb, Count: %d"), count));
 
+	if (IsCancelled())
+	{
+		Log(_T("SaveCopyClips cancelled after AddToDb, skipping OCR and notifications"));
+		delete pLocalClips;
+		return;
+	}
+
 	if(count > 0)
 	{
+		// [OCR] Launch OCR for clips with image data
+		if (CGetSetOptions::GetEnableOCR())
+		{
+			POSITION posOcr = pLocalClips->GetHeadPosition();
+			while (posOcr)
+			{
+				if (IsCancelled())
+				{
+					Log(_T("OCR: cancelled during clip processing"));
+					break;
+				}
+
+				CClip* pClip = pLocalClips->GetNext(posOcr);
+				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
+				{
+					Log(StrF(_T("OCR: MainFrmThread launching OCR thread, id=%d, image size=%d"), pClip->m_id, (int)pClip->m_ocrImageData.size()));
+					g_ocrThreadCount++;
+					std::thread([id = pClip->m_id,
+					             data = std::move(pClip->m_ocrImageData),
+					             w = pClip->m_ocrWidth,
+					             h = pClip->m_ocrHeight,
+					             s = pClip->m_ocrStride]()
+					{
+						CStringW text = RunOCR(data, w, h, s);
+						if (!text.IsEmpty())
+						{
+							HWND hwnd = theApp.m_pMainWnd ? theApp.m_pMainWnd->GetSafeHwnd() : nullptr;
+							if (!hwnd)
+							{
+								Log(StrF(_T("OCR: AfxGetMainWnd returned null, cannot post OCR result for clip %d"), id));
+							}
+							else if (!::IsWindow(hwnd))
+							{
+								Log(StrF(_T("OCR: main window handle invalid, cannot post OCR result for clip %d"), id));
+							}
+							else
+							{
+								CStringW* pText = new CStringW(text);
+								if (!::PostMessage(hwnd, WM_OCR_COMPLETED, id, (LPARAM)pText))
+								{
+									Log(StrF(_T("OCR: PostMessage failed for clip %d"), id));
+									delete pText;
+								}
+							}
+						}
+						g_ocrThreadCount--;
+					}).detach();
+				}
+			}
+		}
+
 		int Id = pLocalClips->GetTail()->m_id;
 
 		Log(StrF(_T("SaveCopyclips After AddToDb, Id: %d Before OnCopyCopyCompleted"), Id));
@@ -198,9 +265,23 @@ void CMainFrmThread::OnSaveRemoteClips()
 
 	LogSendRecieveInfo("---------OnSaveRemoteClips - Before AddToDB");
 
+	if (IsCancelled())
+	{
+		Log(_T("OnSaveRemoteClips cancelled before AddToDB"));
+		delete pLocalClips;
+		return;
+	}
+
 	int count = pLocalClips->AddToDB(true);
 
 	LogSendRecieveInfo("---------OnSaveRemoteClips - After AddToDB");
+
+	if (IsCancelled())
+	{
+		Log(_T("OnSaveRemoteClips cancelled after AddToDB, skipping rest"));
+		delete pLocalClips;
+		return;
+	}
 
 	//are we supposed to add this clip to the clipboard
 	CClip *pLastClip = pLocalClips->GetTail();

@@ -15,9 +15,12 @@
 #include "ChaiScriptOnCopy.h"
 #include "DittoChaiScript.h"
 #include "ImageHelper.h"
+#include "CloudSync/CloudSyncManager.h"
+#include "Pinyin_Convert.h"
 
 #include <Mmsystem.h>
 #include <memory>
+#include <vector>
 
 #include "Path.h"
 #include <set>
@@ -71,11 +74,23 @@ HGLOBAL COleDataObjectEx::GetGlobalData(CLIPFORMAT cfFormat, LPFORMATETC lpForma
 			
 			li.HighPart = li.LowPart = 0;
 			
-			if ( SUCCEEDED( stg.pstm->Seek ( li, STREAM_SEEK_END, &uli )))
+if ( SUCCEEDED( stg.pstm->Seek ( li, STREAM_SEEK_END, &uli )))
 			{
 				hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, uli.LowPart );
-				
+				if (hGlobal == NULL)
+				{
+					Log(StrF(_T("COleDataObjectEx::GetGlobalData: GlobalAlloc failed, size=%lu"), uli.LowPart));
+					break;
+				}
+
 				void* pv = GlobalLock(hGlobal);
+				if (pv == NULL)
+				{
+					Log(_T("COleDataObjectEx::GetGlobalData: GlobalLock failed"));
+					GlobalFree(hGlobal);
+					hGlobal = NULL;
+					break;
+				}
 				stg.pstm->Seek(li, STREAM_SEEK_SET, NULL);
 				HRESULT result = stg.pstm->Read(pv, uli.LowPart, (PULONG)&uDataSize);
 				GlobalUnlock(hGlobal);
@@ -139,6 +154,84 @@ CClipFormat::CClipFormat(CLIPFORMAT cfType, HGLOBAL hgData, int parentId)
 CClipFormat::~CClipFormat() 
 { 
 	Free(); 
+}
+
+CClipFormat::CClipFormat(const CClipFormat& other)
+	: m_cfType(other.m_cfType)
+	, m_hgData(NULL)
+	, m_autoDeleteData(true)
+	, m_dataId(other.m_dataId)
+	, m_parentId(other.m_parentId)
+{
+	if (other.m_hgData)
+	{
+		SIZE_T size = ::GlobalSize(other.m_hgData);
+		if (size > 0)
+		{
+			LPVOID pSrc = ::GlobalLock(other.m_hgData);
+			if (pSrc)
+			{
+				m_hgData = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, size);
+				if (m_hgData)
+				{
+					LPVOID pDst = ::GlobalLock(m_hgData);
+					if (pDst)
+					{
+						memcpy(pDst, pSrc, size);
+						::GlobalUnlock(m_hgData);
+					}
+					else
+					{
+						::GlobalFree(m_hgData);
+						m_hgData = NULL;
+					}
+				}
+				::GlobalUnlock(other.m_hgData);
+			}
+		}
+	}
+}
+
+CClipFormat& CClipFormat::operator=(const CClipFormat& other)
+{
+	if (this != &other)
+	{
+		Free();
+		m_cfType = other.m_cfType;
+		m_dataId = other.m_dataId;
+		m_parentId = other.m_parentId;
+		m_autoDeleteData = true;
+		m_hgData = NULL;
+
+		if (other.m_hgData)
+		{
+			SIZE_T size = ::GlobalSize(other.m_hgData);
+			if (size > 0)
+			{
+				LPVOID pSrc = ::GlobalLock(other.m_hgData);
+				if (pSrc)
+				{
+					m_hgData = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, size);
+					if (m_hgData)
+					{
+						LPVOID pDst = ::GlobalLock(m_hgData);
+						if (pDst)
+						{
+							memcpy(pDst, pSrc, size);
+							::GlobalUnlock(m_hgData);
+						}
+						else
+						{
+							::GlobalFree(m_hgData);
+							m_hgData = NULL;
+						}
+					}
+					::GlobalUnlock(other.m_hgData);
+				}
+			}
+		}
+	}
+	return *this;
 }
 
 void CClipFormat::Clear()
@@ -225,6 +318,8 @@ CClip::CClip() :
 	m_CRC(0),
 	m_parentId(-1),
 	m_dontAutoDelete(FALSE),
+	m_dontSync(FALSE),
+	m_description(_T("")),
 	m_shortCut(0),
 	m_bIsGroup(FALSE),
 	m_param1(0),
@@ -234,10 +329,14 @@ CClip::CClip() :
 	m_clipGroupOrder(0),
 	m_globalShortCut(FALSE),
 	m_moveToGroupShortCut(0),
-	m_globalMoveToGroupShortCut(FALSE)
+	m_globalMoveToGroupShortCut(FALSE),
+	m_ocrWidth(0),
+	m_ocrHeight(0),
+	m_ocrStride(0)
 {
 	m_copyReason = CopyReasonEnum::COPY_TO_UNKOWN;
 	m_addToDbStickyEnum = AddToDbStickyEnum::INVALID;
+	m_ocrImageData.clear();
 }
 
 CClip::~CClip()
@@ -253,14 +352,23 @@ void CClip::Clear()
 	m_CRC = 0;
 	m_parentId = -1;
 	m_dontAutoDelete = FALSE;
+	m_dontSync = FALSE;
+	m_description.Empty();
 	m_shortCut = 0;
 	m_bIsGroup = FALSE;
 	m_csQuickPaste = "";
+	m_clipOrder = 0;
+	m_clipGroupOrder = 0;
 	m_param1 = 0;
 	m_globalShortCut = FALSE;
 	m_moveToGroupShortCut = 0;
 	m_globalMoveToGroupShortCut = 0;
 	
+	m_ocrImageData.clear();
+	m_ocrWidth = 0;
+	m_ocrHeight = 0;
+	m_ocrStride = 0;
+
 	EmptyFormats();
 }
 
@@ -274,11 +382,20 @@ const CClip& CClip::operator=(const CClip &clip)
 	m_CRC = clip.m_CRC;
 	m_parentId = clip.m_parentId;
 	m_dontAutoDelete = clip.m_dontAutoDelete;
+	m_dontSync = clip.m_dontSync;
+	m_description = clip.m_description;
 	m_shortCut = clip.m_shortCut;
 	m_bIsGroup = clip.m_bIsGroup;
 	m_csQuickPaste = clip.m_csQuickPaste;
 	m_moveToGroupShortCut = clip.m_moveToGroupShortCut;
 	m_globalMoveToGroupShortCut = clip.m_globalMoveToGroupShortCut;
+	m_clipOrder = clip.m_clipOrder;
+	m_clipGroupOrder = clip.m_clipGroupOrder;
+
+	m_ocrImageData = clip.m_ocrImageData;
+	m_ocrWidth = clip.m_ocrWidth;
+	m_ocrHeight = clip.m_ocrHeight;
+	m_ocrStride = clip.m_ocrStride;
 
 	INT_PTR nCount = clip.m_Formats.GetSize();
 	
@@ -453,7 +570,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		}
 		bIsDescSet = SetDescFromText(cfDesc.m_hgData, true);
 
-		Log(StrF(_T("Tried to set description from cf_unicode text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
+		LogClip(StrF(_T("Tried to set description from cf_unicode text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
 	}
 
 	if(bIsDescSet == false)
@@ -477,7 +594,93 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 
 			bIsDescSet = SetDescFromText(cfDesc.m_hgData, false);
 
-			Log(StrF(_T("Tried to set description from cf_text text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
+			LogClip(StrF(_T("Tried to set description from cf_text text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
+		}
+	}
+
+	// Fallback: try to extract description from HTML Format
+	if(!bIsDescSet)
+	{
+		UINT htmlFormat = GetFormatID(_T("HTML Format"));
+		if(htmlFormat > 0 && oleData.IsDataAvailable(htmlFormat))
+		{
+			HGLOBAL hgHtml = oleData.GetGlobalData(htmlFormat);
+			if(hgHtml)
+			{
+				char* htmlData = (char*)GlobalLock(hgHtml);
+				if(htmlData)
+				{
+					INT_PTR htmlSize = GlobalSize(hgHtml);
+					CStringA html(htmlData, (int)htmlSize);
+
+					// Parse CF_HTML header to find content boundaries
+					int startHtml = 0, endHtml = 0;
+					int pos = html.Find("StartHTML:");
+					if(pos >= 0)
+					{
+						CStringA numStr = html.Mid(pos + 10, 10);
+						numStr.Trim();
+						startHtml = atoi(numStr);
+					}
+					pos = html.Find("EndHTML:");
+					if(pos >= 0)
+					{
+						CStringA numStr = html.Mid(pos + 8, 10);
+						numStr.Trim();
+						endHtml = atoi(numStr);
+					}
+
+					CStringA htmlContent;
+					if(startHtml > 0 && endHtml > startHtml && endHtml <= html.GetLength())
+					{
+						htmlContent = html.Mid(startHtml, endHtml - startHtml);
+					}
+					else
+					{
+						htmlContent = html;
+					}
+
+					// Strip HTML tags
+					CStringA plainText;
+					bool inTag = false;
+					INT_PTR len = htmlContent.GetLength();
+					for(int i = 0; i < len; i++)
+					{
+						char c = htmlContent[i];
+						if(c == '<')
+						{
+							inTag = true;
+						}
+						else if(c == '>')
+						{
+							inTag = false;
+						}
+						else if(!inTag)
+						{
+							plainText += c;
+						}
+					}
+
+					plainText.Replace("&nbsp;", " ");
+					plainText.Replace("&amp;", "&");
+					plainText.Replace("&lt;", "<");
+					plainText.Replace("&gt;", ">");
+					plainText.Replace("&quot;", "\"");
+					plainText.Trim();
+
+					if(!plainText.IsEmpty())
+					{
+						m_Desc = CString(plainText);
+						if(m_Desc.GetLength() > CGetSetOptions::m_bDescTextSize)
+						{
+							m_Desc = m_Desc.Left(CGetSetOptions::m_bDescTextSize);
+						}
+						bIsDescSet = true;
+						LogClip(StrF(_T("Set description from HTML Format, Desc: [%s]"), m_Desc.Left(30)));
+					}
+				}
+				GlobalUnlock(hgHtml);
+			}
 		}
 	}
 
@@ -566,7 +769,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 	{
 		SetDescFromType();
 
-		Log(StrF(_T("Setting description from type, Desc: [%s]"), m_Desc.Left(30)));
+		LogClip(StrF(_T("Setting description from type, Desc: [%s]"), m_Desc.Left(30)));
 	}
 	
 	// if the description was in a type that is not supported,
@@ -660,7 +863,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 			}
 		}
 
-		Log(StrF(_T("Called on copy script, this could change the description, regenerated desc: %s"), m_Desc));
+		LogClip(StrF(_T("Called on copy script, this could change the description, regenerated desc: %s"), m_Desc));
 	}
 
 	if (this->m_Desc != _T(""))
@@ -686,17 +889,28 @@ bool CClip::SetDescFromText(HGLOBAL hgData, bool unicode)
 	if(unicode)
 	{
 		TCHAR* text = (TCHAR *) GlobalLock(hgData);
+		if (text == NULL)
+		{
+			Log(_T("CClip::SetDescFromText: GlobalLock failed (unicode)"));
+			return false;
+		}
 		bufLen = GlobalSize(hgData);
+		size_t realLen = wcsnlen_s(text, bufLen / sizeof(wchar_t));
 
-		m_Desc = CString(text, (int)(bufLen/(sizeof(wchar_t))));
+		m_Desc = CString(text, (int)realLen);
 		bRet = true;
 	}
 	else
 	{
 		char* text = (char *) GlobalLock(hgData);
+		if (text == NULL)
+		{
+			Log(_T("CClip::SetDescFromText: GlobalLock failed (ansi)"));
+			return false;
+		}
 		bufLen = GlobalSize(hgData);
-	
-		m_Desc = CString(text, (int)bufLen);
+		size_t realLen = strnlen_s(text, bufLen);
+		m_Desc = CString(text, (int)realLen);
 		bRet = true;
 	}
 		
@@ -732,7 +946,18 @@ bool CClip::SetDescFromType()
 	{
 		using namespace nsPath;
 
-		HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
+		if (m_Formats[nCF_HDROPIndex].m_hgData == NULL)
+			return false;
+
+HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
+	struct GlobalUnlockGuard {
+		HGLOBAL hg; ~GlobalUnlockGuard() { GlobalUnlock(hg); }
+	} _unlockGuard = { m_Formats[nCF_HDROPIndex].m_hgData };
+		if (drop == NULL)
+		{
+			Log(_T("CClip::SetDescFromType: GlobalLock failed for HDROP"));
+			return false;
+		}
 		int nNumFiles = min(5, DragQueryFile(drop, -1, NULL, 0));
 
 		if(nNumFiles > 1)
@@ -842,6 +1067,11 @@ bool CClip::AddToDB(bool bCheckForDuplicates)
 		{
 			RemoveStickySetting(removeStickySettingClipId, m_parentId);
 		}
+
+		// Trigger cloud sync for this new clip via async message to avoid
+		// spawning a DB-reading thread from within AddToDB
+		if (AfxGetMainWnd())
+			::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_CLOUD_TRIGGER_SYNC, m_id, 0);
 	}
 	
 	// should be emptied by AddToDataTable
@@ -855,25 +1085,59 @@ int CClip::FindDuplicate()
 {
 	try
 	{
-		//If they are allowing duplicates still check 
-		//the last copied item
-		if(CGetSetOptions::m_bAllowDuplicates)
-		{
-			if (CGetSetOptions::m_allowBackToBackDuplicates == FALSE)
-			{
-				if (m_CRC == m_LastAddedCRC)
-					return m_lastAddedID;
-			}
-		}
-		else
+		//Allow duplicates and allow back to back duplicates, skip all checks
+		if(CGetSetOptions::m_bAllowDuplicates && 
+			CGetSetOptions::m_allowBackToBackDuplicates)
+			return -1;
+
+		//1. CRC match in database
+		int nID = -1;
 		{
 			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Main WHERE CRC = %d"), m_CRC);
-				
 			if(q.eof() == false)
+				nID = q.getIntField(_T("lID"));
+
+		Log(StrF(_T("FindDuplicate: CRC hit, id=%d"), nID));
+		}
+
+		//2. CRC miss, fallback to text content comparison on recent 50 entries
+		//   Fixes: same text from different sources has different CRC (different format sets)
+		if(nID < 0 && !m_Desc.IsEmpty())
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(
+				_T("SELECT lID, mText FROM Main ORDER BY clipOrder DESC LIMIT 50"));
+			while(!q.eof())
 			{
-				return q.getIntField(_T("lID"));
+				if(m_Desc == q.getStringField(_T("mText")))
+				{
+					nID = q.getIntField(_T("lID"));
+					Log(StrF(_T("FindDuplicate: text fallback hit, id=%d"), nID));
+					break;
+				}
+				q.nextRow();
 			}
 		}
+
+		if(nID < 0)
+		{
+			Log(_T("FindDuplicate: no duplicate found"));
+			return -1;
+		}
+
+		//Allow duplicates but disallow back to back duplicates
+		//Only block if the matched entry is the most recent one
+		if(CGetSetOptions::m_bAllowDuplicates)
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(
+				_T("SELECT lID FROM Main ORDER BY clipOrder DESC LIMIT 1"));
+			if(q.eof() || nID != q.getIntField(_T("lID")))
+			{
+				Log(StrF(_T("FindDuplicate: back-to-back allowed, nID=%d"), nID));
+				return -1;
+			}
+		}
+
+		return nID;
 	}
 	CATCH_SQLITE_EXCEPTION
 		
@@ -956,10 +1220,15 @@ bool CClip::AddToMainTable()
 	{
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
+		m_description.Replace(_T("'"), _T("''"));
+
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 
 		CString cs;
-		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut) ")
-						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d);"),
+		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate, pinyin, pinyinAbbr) ")
+						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %d, '%s', %lld, '%s', '%s');"),
 							m_Time.GetTime(),
 							m_Desc,
 							m_shortCut,
@@ -975,13 +1244,20 @@ bool CClip::AddToMainTable()
 							m_stickyClipOrder,
 							m_stickyClipGroupOrder,
 							m_moveToGroupShortCut,
-							m_globalMoveToGroupShortCut);
+							m_globalMoveToGroupShortCut,
+							m_dontSync,
+							m_description,
+							m_Time.GetTime(),
+							pinyinW,
+							abbrW);
 
 		theApp.m_db.execDML(cs);
 
 		m_id = (long)theApp.m_db.lastRowId();
 
-		Log(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
+		LogClip(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
+
+		Log(StrF(_T("AddToMainTable: id=%d, CRC=%d, lDontSync=%d, lModifiedDate=%lld"), m_id, m_CRC, m_dontSync, m_Time.GetTime()));
 
 		m_LastAddedCRC = m_CRC;
 		m_lastAddedID = m_id;
@@ -998,6 +1274,11 @@ bool CClip::ModifyMainTable()
 	{
 		m_Desc.Replace(_T("'"), _T("''"));
 		m_csQuickPaste.Replace(_T("'"), _T("''"));
+		m_description.Replace(_T("'"), _T("''"));
+
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
 
 		theApp.m_db.execDMLEx(_T("UPDATE Main SET lShortCut = %d, ")
 			_T("mText = '%s', ")
@@ -1010,12 +1291,17 @@ bool CClip::ModifyMainTable()
 			_T("stickyClipOrder = %f, ")
 			_T("stickyClipGroupOrder = %f, ")
 			_T("MoveToGroupShortCut = %d, ")
-			_T("GlobalMoveToGroupShortCut = %d ")
-			_T("WHERE lID = %d;"), 
-			m_shortCut, 
-			m_Desc, 
-			m_parentId, 
-			m_dontAutoDelete, 
+			_T("GlobalMoveToGroupShortCut = %d, ")
+			_T("lDontSync = %d, ")
+			_T("m_Description = '%s', ")
+			_T("pinyin = '%s', ")
+			_T("pinyinAbbr = '%s', ")
+			_T("lModifiedDate = %lld ")
+			_T("WHERE lID = %d;"),
+			m_shortCut,
+			m_Desc,
+			m_parentId,
+			m_dontAutoDelete,
 			m_csQuickPaste,
 			m_clipOrder,
 			m_clipGroupOrder,
@@ -1024,9 +1310,16 @@ bool CClip::ModifyMainTable()
 			m_stickyClipGroupOrder,
 			m_moveToGroupShortCut,
 			m_globalMoveToGroupShortCut,
+			m_dontSync,
+			m_description,
+			pinyinW,
+			abbrW,
+			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
 		bRet = true;
+
+		Log(StrF(_T("ModifyMainTable: id=%d, lDontSync=%d"), m_id, m_dontSync));
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
 
@@ -1040,12 +1333,21 @@ bool CClip::ModifyDescription()
 	{
 		m_Desc.Replace(_T("'"), _T("''"));
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s' ")
+		auto py = CPinyinConvert::TextToPinyin(m_Desc);
+		CString pinyinW = py.first;
+		CString abbrW = py.second;
+
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld ")
 			_T("WHERE lID = %d;"),
 			m_Desc,
+			pinyinW,
+			abbrW,
+			CTime::GetCurrentTime().GetTime(),  // Update modification time
 			m_id);
 
 		bRet = true;
+
+		Log(StrF(_T("ModifyDescription: id=%d"), m_id));
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
 
@@ -1416,7 +1718,7 @@ double CClip::GetNewTopSticky(int parentId, int clipId)
 		if (newOrder == 0.0)
 			newOrder += 1;
 
-		Log(StrF(_T("GetNewTopSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewTopSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1454,7 +1756,7 @@ double CClip::GetNewLastSticky(int parentId, int clipId)
 		if (newOrder == 0.0)
 			newOrder -= 1;
 
-		Log(StrF(_T("GetNewLastSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewLastSticky, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1515,7 +1817,7 @@ double CClip::GetNewOrder(int parentId, int clipId)
 			}
 		}
 
-		Log(StrF(_T("GetNewOrder, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetNewOrder, Id: %d, parentId: %d, CurrentMax: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMaxOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1550,7 +1852,7 @@ double CClip::GetNewLastOrder(int parentId, int clipId)
 			}
 		}
 
-		Log(StrF(_T("GetLastOrder, Id: %d, parentId: %d, CurrentMin: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMinOrder, existingDesc, newOrder));
+		LogClip(StrF(_T("GetLastOrder, Id: %d, parentId: %d, CurrentMin: %f, CurrentDesc: %s, NewMax: %f"), clipId, parentId, existingMinOrder, existingDesc, newOrder));
 	}
 	CATCH_SQLITE_EXCEPTION
 
@@ -1571,6 +1873,8 @@ BOOL CClip::LoadMainTable(int id)
 			m_CRC = q.getIntField(_T("CRC"));
 			m_parentId = q.getIntField(_T("lParentID"));
 			m_dontAutoDelete = q.getIntField(_T("lDontAutoDelete"));
+			m_dontSync = q.getIntField(_T("lDontSync"));
+			m_description = q.getStringField(_T("m_Description"));
 			m_shortCut = q.getIntField(_T("lShortCut"));
 			m_bIsGroup = q.getIntField(_T("bIsGroup"));
 			m_csQuickPaste = q.getStringField(_T("QuickPasteText"));
@@ -1871,12 +2175,12 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 
 	if (cf_dibBytes != nullptr && cf_dibBytes->size() > 0)
 	{
-		AddFormat(CF_DIB, cf_dibBytes->data(), cf_dibBytes->size(), false);
+		AddFormat(CF_DIB, cf_dibBytes->data(), static_cast<UINT>(cf_dibBytes->size()), false);
 	}
 
 	if (pngBytes != nullptr && pngBytes->size() > 0)
 	{
-		AddFormat(theApp.m_PNG_Format, pngBytes->data(), pngBytes->size(), false);
+		AddFormat(theApp.m_PNG_Format, pngBytes->data(), static_cast<UINT>(pngBytes->size()), false);
 	}
 
 	if (rtf != nullptr)
@@ -1927,7 +2231,27 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 
 		theApp.m_db.execDML(_T("commit transaction;"));
 	}
-	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
+	catch (CppSQLite3Exception& e)
+	{
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+		return false;
+	}
+	catch (std::bad_alloc&)
+	{
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		Log(_T("SaveFormats: std::bad_alloc"));
+		ASSERT(FALSE);
+		return false;
+	}
+	catch (...)
+	{
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		Log(_T("SaveFormats: unknown exception"));
+		ASSERT(FALSE);
+		return false;
+	}
 
 	return TRUE;
 }
@@ -1939,12 +2263,14 @@ BOOL CClip::WriteImageToFile(CString path)
 	if (!bitmap && !png) return false;
 	
 	std::shared_ptr<CImage> i;
-	// png is more closer to original
-	if (png)
+	if (png && png->m_hgData)
 		i = PNGImageHelper::CImageFromHGLOBAL(png->m_hgData);
-	else
+	else if (bitmap && bitmap->m_hgData)
 		i = DIBImageHelper::CImageFromHGLOBAL(bitmap->m_hgData);
+	else
+		return FALSE;
 
+	if (!i) return FALSE;
 	return i->Save(path) == S_OK;
 }
 
@@ -2026,7 +2352,8 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 		//data contents
 		//original file<null terminator>md5<null terminator>file data
 		int bufferSize = (int)fileSize + csFilePath.GetLength() + 1 + md5StringLength + 1;;
-		char* pBuffer = new char[bufferSize]();
+		std::vector<char> buf(bufferSize);
+		char* pBuffer = buf.data();
 		strncpy(pBuffer, csFilePath, csFilePath.GetLength());
 
 		//move the buffer start past the file path and md5 string
@@ -2049,8 +2376,6 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 
 		Log(StrF(_T("Saving file contents to Ditto Database, file: %s, size: %d, md5: %s"), filePath, fileSize, md5String));
 	}
-
-	GlobalUnlock(m_Formats[nCF_HDROPIndex].m_hgData);
 
 	if (!addedFileData)
 		return false;
@@ -2102,12 +2427,17 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		AddToDataTable();
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d WHERE lID = %d"), CRC, m_id);
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET CRC = %d, lModifiedDate = %lld WHERE lID = %d"), CRC, CTime::GetCurrentTime().GetTime(), m_id);
 
 		if (bUpdateDesc)
 		{
 			m_Desc.Replace(_T("'"), _T("''"));
-			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s' WHERE lID = %d"), m_Desc, m_id);
+
+			auto py = CPinyinConvert::TextToPinyin(m_Desc);
+			CString pinyinW = py.first;
+			CString abbrW = py.second;
+
+			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, pinyinW, abbrW, CTime::GetCurrentTime().GetTime(), m_id);
 		}
 
 		bRet = true;

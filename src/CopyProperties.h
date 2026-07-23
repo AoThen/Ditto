@@ -33,6 +33,7 @@ public:
 	CString	m_eDate;
 	CString m_lastPasteDate;
 	BOOL	m_bNeverAutoDelete;
+	BOOL	m_bDontSync;
 	BOOL m_hotKeyGlobal;
 	BOOL m_moveToGroupHotKeyGlobal;
 	//}}AFX_DATA

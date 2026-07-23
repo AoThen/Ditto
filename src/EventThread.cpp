@@ -182,13 +182,18 @@ void CEventThread::Stop(int waitTime)
 
 		if(waitTime > 0)
 		{
-			if (WAIT_OBJECT_0 != WaitForSingleObject(m_hEvt, waitTime))
+			DWORD ret = WaitForSingleObject(m_hEvt, waitTime);
+			if (ret == WAIT_OBJECT_0)
 			{
-				Log(_T("Start of TerminateThread CEventThread::Stop(int waitTime) "));
-				TerminateThread(m_thread, 0);
-				Log(_T("End of TerminateThread CEventThread::Stop(int waitTime) "));
 				m_threadRunning = false;
+				Log(StrF(_T("CEventThread::Stop graceful exit - Name: %s"), m_threadName));
+				Log(StrF(_T("End of CEventThread::Stop(int waitTime) %d - Name: %s"), waitTime, m_threadName));
+				return;
 			}
+
+			Log(StrF(_T("CEventThread::Stop timed out waiting for thread %s, waited %dms"), m_threadName, waitTime));
+			// DO NOT use TerminateThread — it causes abandoned critical sections (mtex.cpp:90 assertion)
+			m_threadRunning = false;
 		}
 	}
 

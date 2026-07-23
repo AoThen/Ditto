@@ -34,6 +34,7 @@ CCopyProperties::CCopyProperties(long lCopyID, CWnd* pParent, CClip *pMemoryClip
 	m_eDate = _T("");
 	m_lastPasteDate = _T("");
 	m_bNeverAutoDelete = FALSE;
+	m_bDontSync = FALSE;
 	//}}AFX_DATA_INIT
 }
 
@@ -50,6 +51,7 @@ void CCopyProperties::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX, IDC_DATE, m_eDate);
 	DDX_Text(pDX, IDC_DATE_LAST_USED, m_lastPasteDate);
 	DDX_Check(pDX, IDC_NEVER_AUTO_DELETE, m_bNeverAutoDelete);
+	DDX_Check(pDX, IDC_CHECK_DONTSYNC, m_bDontSync);
 	DDX_Check(pDX, IDC_HOT_KEY_GLOBAL, m_hotKeyGlobal);
 	DDX_Control(pDX, IDC_HOTKEY_MOVE_TO_GROUP, m_MoveToGrouHotKey);
 	DDX_Check(pDX, IDC_HOT_KEY_GLOBAL_MOVE_TO_GROUP, m_moveToGroupHotKeyGlobal);
@@ -157,6 +159,8 @@ void CCopyProperties::LoadDataFromCClip(CClip &Clip)
 	{
 		m_bNeverAutoDelete = FALSE;
 	}
+
+	m_bDontSync = Clip.m_dontSync ? TRUE : FALSE;
 
 	m_hotKeyGlobal = Clip.m_globalShortCut;
 
@@ -326,7 +330,7 @@ void CCopyProperties::OnOK()
 
 				if(CheckGlobalHotKey(clip) == FALSE)
 				{
-					if(MessageBox(_T("Error registering global hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
+					if(MessageBox(theApp.m_Language.GetString("MsgErrorRegisterHotKey", "Error registering global hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
 					{
 						return;
 					}
@@ -334,7 +338,7 @@ void CCopyProperties::OnOK()
 
 				if(CheckMoveToGroupGlobalHotKey(clip) == FALSE)
 				{
-					if(MessageBox(_T("Error registering global move to group hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
+					if(MessageBox(theApp.m_Language.GetString("MsgErrorRegisterMoveToGroupHotKey", "Error registering global move to group hot key\n\nContinue?"), _T(""), MB_OKCANCEL |MB_ICONWARNING) != IDOK)
 					{
 						return;
 					}
@@ -345,6 +349,19 @@ void CCopyProperties::OnOK()
 					if(m_bDeletedData)
 					{    
 						DeleteFormats(m_lCopyID, m_DeletedData);
+					}
+
+					if (m_bDontSync)
+					{
+						std::vector<int> ids;
+						ids.push_back(m_lCopyID);
+
+						Log(StrF(_T("CopyProperties: clip %d set lDontSync=1"), m_lCopyID));
+						theApp.m_CloudSyncManager.MarkClipsDontSync(ids);
+					}
+					else
+					{
+						theApp.m_CloudSyncManager.TriggerQuickSync();
 					}
 				}
 			}
@@ -445,6 +462,8 @@ void CCopyProperties::LoadDataIntoCClip(CClip &Clip)
 		Clip.m_dontAutoDelete = FALSE;
 	}
 
+	Clip.m_dontSync = m_bDontSync ? 1 : 0;
+
 	Clip.m_globalShortCut = m_hotKeyGlobal;
 
 	Clip.m_globalMoveToGroupShortCut = m_moveToGroupHotKeyGlobal;
@@ -514,9 +533,7 @@ HBRUSH CCopyProperties::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
 	HBRUSH hbr = CDialog::OnCtlColor(pDC, pWnd, nCtlColor);
 
-	// TODO:  Change any attributes of the DC here
 
-	// TODO:  Return a different brush if the default is not desired
 	return hbr;
 }
 

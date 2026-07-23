@@ -322,7 +322,7 @@ BOOL CRulerRichEditCtrl::CreateRTFControl( BOOL autohscroll )
  		cf.dwMask = CFM_SIZE | CFM_FACE | CFM_BOLD | CFM_ITALIC | CFM_UNDERLINE | CFM_LINK;
  		cf.yHeight = CGetSetOptions::GetEditorDefaultFontSize() * 20;
  		cf.dwEffects = 0;
- 		lstrcpy( cf.szFaceName, _T( "Segoe UI" ) );
+ 		_tcscpy_s( cf.szFaceName, LF_FACESIZE, _T( "Segoe UI" ) );
  		m_rtf.SendMessage(EM_SETCHARFORMAT, 0, (LPARAM)&cf);
 
 #ifndef SES_HYPERLINKTOOLTIPS
@@ -1323,7 +1323,7 @@ void CRulerRichEditCtrl::DoFont()
 
 	// Font
 	if( cf.dwMask & CFM_FACE )
-		lstrcpy( lf.lfFaceName, cf.szFaceName );
+		_tcscpy_s( lf.lfFaceName, LF_FACESIZE, cf.szFaceName );
 
 	if( cf.dwMask & CFM_SIZE )
 	{
@@ -1357,7 +1357,7 @@ void CRulerRichEditCtrl::DoFont()
 	{
 		// Apply new font
 		cf.yHeight = dlg.GetSize() * 2;
-		lstrcpy(cf.szFaceName, dlg.GetFaceName());
+		_tcscpy_s(cf.szFaceName, LF_FACESIZE, dlg.GetFaceName());
 
 		cf.dwMask = CFM_FACE | CFM_SIZE;
 		cf.dwEffects = 0;
@@ -1405,7 +1405,7 @@ void CRulerRichEditCtrl::SetCurrentFontName( const CString& font )
 	CharFormat	cf;
 	cf.dwMask = CFM_FACE;
 
-	lstrcpy( cf.szFaceName, font );
+	_tcscpy_s( cf.szFaceName, LF_FACESIZE, font );
 
 	m_rtf.SendMessage( EM_SETCHARFORMAT, SCF_SELECTION, ( LPARAM ) &cf );
 }

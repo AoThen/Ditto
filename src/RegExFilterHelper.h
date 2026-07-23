@@ -1,5 +1,6 @@
 #pragma once
 
+#include <afxmt.h>  // For CCriticalSection
 #include <vector>
 #include <string>
 

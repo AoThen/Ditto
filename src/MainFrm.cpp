@@ -13,6 +13,7 @@
 #include "Path.h"
 #include "DittoCopyBuffer.h"
 #include "HotKeys.h"
+#include "Pinyin_Convert.h"
 #include "GlobalClips.h"
 #include "OptionsSheet.h"
 #include "DeleteClipData.h"
@@ -81,6 +82,9 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_COMMAND(ID_FIRST_DELETEALLNONUSEDCLIPS, &CMainFrame::OnFirstDeleteallnonusedclips)
 	ON_MESSAGE(WM_PASTE_CLIP, OnPasteClip)
 	ON_MESSAGE(WM_EDIT_CLIP, OnEditClip)
+	ON_MESSAGE(WM_CLOUD_TRIGGER_SYNC, OnTriggerCloudSync)
+	ON_MESSAGE(WM_OCR_COMPLETED, OnOcrCompleted)
+	ON_MESSAGE(WM_OCR_BATCH_DONE, OnOcrBatchDone)
 
 	ON_WM_SETFOCUS()
 END_MESSAGE_MAP()
@@ -197,7 +201,13 @@ LRESULT CMainFrame::OnTrayNotification(WPARAM wParam, LPARAM lParam)
 {
 	if (WM_MOUSEFIRST <= LOWORD(lParam) && LOWORD(lParam) <= WM_MOUSELAST)
 	{
-		theApp.m_activeWnd.TrackActiveWnd(true);
+		static DWORD s_lastTrayTrack = 0;
+		DWORD now = GetTickCount();
+		if (now - s_lastTrayTrack >= 200)
+		{
+			theApp.m_activeWnd.TrackActiveWnd(true);
+			s_lastTrayTrack = now;
+		}
 	}
 
 	//click on balloon
@@ -976,6 +986,7 @@ void CMainFrame::OnClose()
 	m_PowerManager.Close();
 
     CFrameWnd::OnClose();
+    PostQuitMessage(0);
 }
 
 bool CMainFrame::CloseAllOpenDialogs()
@@ -1237,6 +1248,7 @@ void CMainFrame::OnDestroy()
 	}
 
     CFrameWnd::OnDestroy();
+	theApp.m_pMainWnd = NULL;
 }
 
 void CMainFrame::OnFirstNewclip()
@@ -1601,5 +1613,118 @@ void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 
 	//int nRet = MessageBox(_T("focused"), _T("Ditto"), MB_YESNO | MB_TOPMOST);
 
-	// TODO: Add your message handler code here
+}
+
+LRESULT CMainFrame::OnTriggerCloudSync(WPARAM wParam, LPARAM lParam)
+{
+	theApp.m_CloudSyncManager.OnClipAdded(nullptr);
+	return 0;
+}
+
+LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
+{
+	int clipId = (int)wParam;
+	CStringW* pOcrText = (CStringW*)lParam;
+	if (!pOcrText)
+		return 0;
+
+	try
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted start, clipId=%d, textLen=%d"), clipId, pOcrText->GetLength()));
+
+		CppSQLite3Query q = theApp.m_db.execQueryEx(
+			_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
+		if (!q.eof())
+		{
+			CStringW existing = q.getStringField(0);
+			CStringW combined = existing;
+			if (existing != *pOcrText)
+			{
+				if (!existing.IsEmpty())
+					combined += L" ";
+				combined += *pOcrText;
+			}
+
+			combined.Replace(L"'", L"''");
+
+			auto py = CPinyinConvert::TextToPinyin(combined);
+			CStringW pinyinW = py.first;
+			CStringW abbrW = py.second;
+
+			theApp.m_db.execDMLEx(
+				_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
+				combined, pinyinW, abbrW, clipId);
+
+			Log(StrF(_T("OCR: OnOcrCompleted updated clip %d, mText len=%d"), clipId, combined.GetLength()));
+
+			{
+				CppSQLite3Query qFormat = theApp.m_db.execQueryEx(
+					_T("SELECT COUNT(*) FROM Data WHERE lParentID = %d ")
+					_T("AND (strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"),
+					clipId);
+				if (!qFormat.eof() && qFormat.getIntField(0) == 0)
+				{
+					int byteLen = (pOcrText->GetLength() + 1) * sizeof(wchar_t);
+					HGLOBAL hGlobal = NewGlobalP((LPVOID)pOcrText->GetString(), byteLen);
+					if (hGlobal)
+					{
+						const unsigned char* pData = (const unsigned char*)GlobalLock(hGlobal);
+						if (pData)
+						{
+							try
+							{
+								CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+									_T("INSERT INTO Data(lParentID, strClipBoardFormat, ooData) VALUES(?, ?, ?);"));
+								stmt.bind(1, clipId);
+								stmt.bind(2, _T("CF_UNICODETEXT"));
+								stmt.bind(3, pData, byteLen);
+								stmt.execDML();
+							}
+							catch (...)
+							{
+								GlobalUnlock(hGlobal);
+								GlobalFree(hGlobal);
+								throw;
+							}
+							GlobalUnlock(hGlobal);
+						}
+						GlobalFree(hGlobal);
+					}
+					Log(StrF(_T("OCR: Inserted OCR text as CF_UNICODETEXT for clip %d"), clipId));
+				}
+			}
+		}
+		else
+		{
+			Log(StrF(_T("OCR: OnOcrCompleted clip %d not found in DB"), clipId));
+		}
+	}
+	catch (CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted SQL error for clip %d: %s"), clipId, e.errorMessage()));
+	}
+	catch (std::exception& e)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted exception for clip %d: %S"), clipId, e.what()));
+	}
+	catch (...)
+	{
+		Log(StrF(_T("OCR: OnOcrCompleted unknown exception for clip %d"), clipId));
+	}
+
+	delete pOcrText;
+	return 0;
+}
+
+LRESULT CMainFrame::OnOcrBatchDone(WPARAM wParam, LPARAM lParam)
+{
+	int total = (int)wParam;
+	int success = (int)lParam;
+	CString msg;
+	if (total == 0)
+		msg = _T("No images could be loaded for OCR processing.");
+	else
+		msg.Format(_T("OCR re-run completed.\n%d images processed, %d updated."), total, success);
+	AfxMessageBox(msg);
+	return 0;
 }

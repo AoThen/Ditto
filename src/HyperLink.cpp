@@ -6,7 +6,7 @@
 // Copyright (C) 1997, 1998 Chris Maunder
 // All rights reserved. May not be sold for profit.
 //
-// Thanks to Pål K. Tønder for auto-size and window caption changes.
+// Thanks to Pï¿½l K. Tï¿½nder for auto-size and window caption changes.
 //
 // "GotoURL" function by Stuart Patterson
 // As seen in the August, 1997 Windows Developer's Journal.
@@ -19,6 +19,7 @@
 #include "stdafx.h"
 #include "HyperLink.h"
 #include "..\Shared\TextConvert.h"
+#include "CP_Main.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -69,11 +70,11 @@ BOOL CHyperLink::PreTranslateMessage(MSG* pMsg)
 
 void CHyperLink::OnClicked()
 {
-    int result = (int)GotoURL(m_strURL, SW_SHOW);
+    INT_PTR result = reinterpret_cast<INT_PTR>(GotoURL(m_strURL, SW_SHOW));
     m_bVisited = (result > HINSTANCE_ERROR);
     if (!m_bVisited) {
         MessageBeep(MB_ICONEXCLAMATION);     // Unable to follow link
-        ReportError(result);
+        ReportError(static_cast<int>(result));
     } else 
         SetVisited();                        // Repaint to show visited colour
 }
@@ -282,7 +283,7 @@ BOOL CHyperLink::GetAutoSize() const
 // then the window is merely shrunk, but if it is centred or right
 // justified then the window will have to be moved as well.
 //
-// Suggested by Pål K. Tønder 
+// Suggested by Pï¿½l K. Tï¿½nder 
 
 void CHyperLink::PositionWindow()
 {
@@ -353,79 +354,34 @@ void CHyperLink::SetDefaultCursor()
     }
 }
 
-LONG CHyperLink::GetRegKey(HKEY key, LPCTSTR subkey, LPTSTR retdata)
-{
-    HKEY hkey;
-    LONG retval = RegOpenKeyEx(key, subkey, 0, KEY_QUERY_VALUE, &hkey);
-
-    if (retval == ERROR_SUCCESS) {
-        long datasize = MAX_PATH;
-        TCHAR data[MAX_PATH];
-        RegQueryValue(hkey, NULL, data, &datasize);
-        lstrcpy(retdata,data);
-        RegCloseKey(hkey);
-    }
-
-    return retval;
-}
-
 void CHyperLink::ReportError(int nError)
 {
     CString str;
     switch (nError) {
-        case 0:                       str = "The operating system is out\nof memory or resources."; break;
-        case SE_ERR_PNF:              str = "The specified path was not found."; break;
-        case SE_ERR_FNF:              str = "The specified file was not found."; break;
-        case ERROR_BAD_FORMAT:        str = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)."; break;
-        case SE_ERR_ACCESSDENIED:     str = "The operating system denied\naccess to the specified file."; break;
-        case SE_ERR_ASSOCINCOMPLETE:  str = "The filename association is\nincomplete or invalid."; break;
-        case SE_ERR_DDEBUSY:          str = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed."; break;
-        case SE_ERR_DDEFAIL:          str = "The DDE transaction failed."; break;
-        case SE_ERR_DDETIMEOUT:       str = "The DDE transaction could not\nbe completed because the request timed out."; break;
-        case SE_ERR_DLLNOTFOUND:      str = "The specified dynamic-link library was not found."; break;
-        case SE_ERR_NOASSOC:          str = "There is no application associated\nwith the given filename extension."; break;
-        case SE_ERR_OOM:              str = "There was not enough memory to complete the operation."; break;
-        case SE_ERR_SHARE:            str = "A sharing violation occurred. ";
-        default:                      str.Format(_T("Unknown Error (%d) occurred."), nError); break;
+        case 0:                       str = theApp.m_Language.GetString("HyperlinkErrorOsOom", "The operating system is out\nof memory or resources."); break;
+        case SE_ERR_PNF:              str = theApp.m_Language.GetString("HyperlinkErrorPNF", "The specified path was not found."); break;
+        case SE_ERR_FNF:              str = theApp.m_Language.GetString("HyperlinkErrorFNF", "The specified file was not found."); break;
+        case ERROR_BAD_FORMAT:        str = theApp.m_Language.GetString("HyperlinkErrorBadFormat", "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)."); break;
+        case SE_ERR_ACCESSDENIED:     str = theApp.m_Language.GetString("HyperlinkErrorAccessDenied", "The operating system denied\naccess to the specified file."); break;
+        case SE_ERR_ASSOCINCOMPLETE:  str = theApp.m_Language.GetString("HyperlinkErrorAssocIncomplete", "The filename association is\nincomplete or invalid."); break;
+        case SE_ERR_DDEBUSY:          str = theApp.m_Language.GetString("HyperlinkErrorDdeBusy", "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed."); break;
+        case SE_ERR_DDEFAIL:          str = theApp.m_Language.GetString("HyperlinkErrorDdeFail", "The DDE transaction failed."); break;
+        case SE_ERR_DDETIMEOUT:       str = theApp.m_Language.GetString("HyperlinkErrorDdeTimeout", "The DDE transaction could not\nbe completed because the request timed out."); break;
+        case SE_ERR_DLLNOTFOUND:      str = theApp.m_Language.GetString("HyperlinkErrorDllNotFound", "The specified dynamic-link library was not found."); break;
+        case SE_ERR_NOASSOC:          str = theApp.m_Language.GetString("HyperlinkErrorNoAssoc", "There is no application associated\nwith the given filename extension."); break;
+        case SE_ERR_OOM:              str = theApp.m_Language.GetString("HyperlinkErrorOom", "There was not enough memory to complete the operation."); break;
+        case SE_ERR_SHARE:            str = theApp.m_Language.GetString("HyperlinkErrorShare", "A sharing violation occurred. ");
+        default:                      str.Format(theApp.m_Language.GetString("HyperlinkErrorUnknown", _T("Unknown Error (%d) occurred.")), nError); break;
     }
-    str = "Unable to open hyperlink:\n\n" + str;
+    str = theApp.m_Language.GetString("HyperlinkErrorPrefix", "Unable to open hyperlink:\n\n") + str;
     AfxMessageBox(str, MB_ICONEXCLAMATION | MB_OK);
 }
 
 HINSTANCE CHyperLink::GotoURL(LPCTSTR url, int showcmd)
 {
-    TCHAR key[MAX_PATH + MAX_PATH];
-
-    // First try ShellExecute()
-    HINSTANCE result = ShellExecute(NULL, _T("open"), url, NULL,NULL, showcmd);
-
-    // If it failed, get the .htm regkey and lookup the program
-    if ((UINT)result <= HINSTANCE_ERROR) {
-
-        if (GetRegKey(HKEY_CLASSES_ROOT, _T(".htm"), key) == ERROR_SUCCESS) {
-            lstrcat(key, _T("\\shell\\open\\command"));
-
-            if (GetRegKey(HKEY_CLASSES_ROOT,key,key) == ERROR_SUCCESS) {
-                TCHAR *pos;
-                pos = _tcsstr(key, _T("\"%1\""));
-                if (pos == NULL) {                     // No quotes found
-                    pos = STRSTR(key, _T("%1"));       // Check for %1, without quotes 
-                    if (pos == NULL)                   // No parameter at all...
-                        pos = key+lstrlen(key)-1;
-                    else
-                        *pos = '\0';                   // Remove the parameter
-                }
-                else
-                    *pos = '\0';                       // Remove the parameter
-
-                lstrcat(pos, _T(" "));
-                lstrcat(pos, url);
-				
-				CStringA keyA = CTextConvert::UnicodeToAnsi(key);
-                result = (HINSTANCE)WinExec(keyA, showcmd);
-            }
-        }
+    HINSTANCE result = ShellExecute(NULL, _T("open"), url, NULL, NULL, showcmd);
+    if (reinterpret_cast<INT_PTR>(result) <= HINSTANCE_ERROR) {
+        ReportError(static_cast<int>(reinterpret_cast<INT_PTR>(result)));
     }
-
     return result;
 }

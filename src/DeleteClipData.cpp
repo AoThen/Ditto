@@ -380,7 +380,6 @@ bool CDeleteClipData::MatchesFilter(CDeleteData *pdata)
 void CDeleteClipData::OnLvnKeydownList2(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLVKEYDOWN pLVKeyDow = reinterpret_cast<LPNMLVKEYDOWN>(pNMHDR);
-	// TODO: Add your control notification handler code here
 
 	switch(pLVKeyDow->wVKey)
 	{
@@ -518,40 +517,34 @@ void CDeleteClipData::OnLvnGetdispinfoList2(NMHDR *pNMHDR, LRESULT *pResult)
 			{
 				case 0:
 				{
-					lstrcpyn(pDispInfo->item.pszText, StrF(_T("%d"), m_data[pDispInfo->item.iItem].m_lID), pDispInfo->item.cchTextMax);
-					pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					_tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, StrF(_T("%d"), m_data[pDispInfo->item.iItem].m_lID), _TRUNCATE);
 				}
 				break;
 				case 1:
 				{
-					  lstrcpyn(pDispInfo->item.pszText, m_data[pDispInfo->item.iItem].m_Desc, pDispInfo->item.cchTextMax);
-					  pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					_tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, m_data[pDispInfo->item.iItem].m_Desc, _TRUNCATE);
 				}
 				break;
 				case 2:
 				{
-					lstrcpyn(pDispInfo->item.pszText, m_data[pDispInfo->item.iItem].m_quickPasteText, pDispInfo->item.cchTextMax);
-					pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					_tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, m_data[pDispInfo->item.iItem].m_quickPasteText, _TRUNCATE);
 				}
 				break;
 				case 3:
 				{
 					  COleDateTime dtTime(m_data[pDispInfo->item.iItem].m_createdDateTime.GetTime());
-					  lstrcpyn(pDispInfo->item.pszText, dtTime.Format(), pDispInfo->item.cchTextMax);
-					  pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					  _tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, dtTime.Format(), _TRUNCATE);
 				}
 				break;
 				case 4:
 				{	
 					  COleDateTime dtTime(m_data[pDispInfo->item.iItem].m_lastUsedDateTime.GetTime());
-					  lstrcpyn(pDispInfo->item.pszText, dtTime.Format(), pDispInfo->item.cchTextMax);
-					  pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					  _tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, dtTime.Format(), _TRUNCATE);
 				}
 				break;
 				case 5:
 				{
-					  lstrcpyn(pDispInfo->item.pszText, m_data[pDispInfo->item.iItem].m_clipboardFormat, pDispInfo->item.cchTextMax);
-					  pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					_tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, m_data[pDispInfo->item.iItem].m_clipboardFormat, _TRUNCATE);
 				}
 				break;
 				case 6:
@@ -560,8 +553,7 @@ void CDeleteClipData::OnLvnGetdispinfoList2(NMHDR *pNMHDR, LRESULT *pResult)
 					  TCHAR szFileSize[MAX_FILE_SIZE_BUFFER];
 					  StrFormatByteSize(m_data[pDispInfo->item.iItem].m_dataSize, szFileSize, MAX_FILE_SIZE_BUFFER);
 
-					  lstrcpyn(pDispInfo->item.pszText, szFileSize, pDispInfo->item.cchTextMax);
-					  pDispInfo->item.pszText[pDispInfo->item.cchTextMax - 1] = '\0';
+					  _tcsncpy_s(pDispInfo->item.pszText, pDispInfo->item.cchTextMax, szFileSize, _TRUNCATE);
 				}
 				break;
 			}
@@ -589,7 +581,7 @@ void CDeleteClipData::ApplyDelete()
 	if (m_applyingDelete)
 		return;
 
-	if (MessageBox(_T("Delete selected items?  This cannot be undone!"), _T(""), MB_OKCANCEL | MB_ICONWARNING) == IDOK)
+	if (MessageBox(theApp.m_Language.GetString("MsgDeleteSelectedItems", "Delete selected items?  This cannot be undone!"), _T(""), MB_OKCANCEL | MB_ICONWARNING) == IDOK)
 	{
 		m_clipList.EnableWindow(FALSE);
 		m_applyingDelete = true;
@@ -988,7 +980,7 @@ void CDeleteClipData::SetDescriptionWindowText(INT_PTR row)
 
 	if (theApp.m_GroupID > 0)
 	{
-		int sticky = selectedClip.m_stickyClipGroupOrder;
+		int sticky = static_cast<int>(selectedClip.m_stickyClipGroupOrder);
 		if (sticky != INVALID_STICKY)
 		{
 			clipData += _T(" | ");
@@ -997,7 +989,7 @@ void CDeleteClipData::SetDescriptionWindowText(INT_PTR row)
 	}
 	else
 	{
-		int sticky = selectedClip.m_stickyClipOrder;
+		int sticky = static_cast<int>(selectedClip.m_stickyClipOrder);
 		if (sticky != INVALID_STICKY)
 		{
 			clipData += _T(" | ");
@@ -1158,7 +1150,7 @@ void CDeleteClipData::SaveClipDataItemToFile(CDeleteData item)
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;

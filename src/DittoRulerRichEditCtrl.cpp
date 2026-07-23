@@ -191,7 +191,13 @@ int CDittoRulerRichEditCtrl::SaveToDB(BOOL bUpdateDesc)
 		if(bUpdateDesc)
 			theApp.RefreshView();
 	}
-	CATCH_SQLITE_EXCEPTION
+	catch (CppSQLite3Exception& e)
+	{
+		theApp.m_db.execDML(_T("ROLLBACK;"));
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+		nRet = 0;
+	}
 
 	if(bSetModifyToFalse)
 		m_rtf.SetModify(FALSE);

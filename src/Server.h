@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Winsock2.h"
-#include "..\EncryptDecrypt\Encryption.h"
+#include "..\Shared\Encryption.h"
 #include "..\Shared\TextConvert.h"
 #include "RecieveSocket.h"
 #include "FileSend.h"
@@ -40,7 +40,7 @@ protected:
 	BOOL m_bSetToClipBoard;
 	CString m_csIP;
 	bool m_manualSend;
-	short m_respondPort;
+	unsigned short m_respondPort;
 	CString m_csComputerName;
 	CString m_csDesc;
 	CRecieveSocket m_Sock;

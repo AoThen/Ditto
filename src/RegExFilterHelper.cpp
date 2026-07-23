@@ -121,7 +121,7 @@ bool CRegExFilterHelper::TextMatchFilters(CString &activeApp, std::wstring &copi
 		{
 			if (m_filters[i].MatchesRegEx(copiedText))
 			{
-				Log(StrF(_T("regex matches copied text NOT SAVING CLIP, regex: %s, text: %s, active app: %s"), m_filters[i].m_regEx.c_str(), copiedText.c_str(), activeApp));
+				LogClip(StrF(_T("regex matches copied text NOT SAVING CLIP, regex: %s, text: %s, active app: %s"), m_filters[i].m_regEx.c_str(), copiedText.c_str(), activeApp));
 				return true;
 			}
 		}

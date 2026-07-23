@@ -20,33 +20,21 @@
 #endif
 
 #ifdef _UNICODE				
-	#define STRTOK(a, b)	wcstok(a, b)
+	#define STRCPY_S(a, sz, b)	wcscpy_s(a, sz, b)
 #else
-	#define STRTOK(a, b)	strtok(a, b)
+	#define STRCPY_S(a, sz, b)	strcpy_s(a, sz, b)
 #endif
 
 #ifdef _UNICODE				
-	#define STRCPY(a, b)	wcscpy(a, b)
+	#define STRNCPY_S(a, sz, b, l)	wcsncpy_s(a, sz, b, l)
 #else
-	#define STRCPY(a, b)	strcpy(a, b)
+	#define STRNCPY_S(a, sz, b, l)	strncpy_s(a, sz, b, l)
 #endif
 
-#ifdef _UNICODE				
-	#define STRNCPY(a, b, l)	wcsncpy(a, b, l)
-#else
-	#define STRNCPY(a, b, l)	strncpy(a, b, l)
-#endif
-
-#ifdef _UNICODE				
+#ifdef _UNICODE
 	#define SPRINTF	wsprintf
 #else
 	#define SPRINTF	sprintf
-#endif
-
-#ifdef _UNICODE				
-	#define STRNCPY(a, b, t)	wcsncpy(a, b, t)
-#else
-	#define STRNCPY(a, b, t)	strncpy(a, b, t)
 #endif
 
 #ifdef _UNICODE				

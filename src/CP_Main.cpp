@@ -14,6 +14,7 @@
 #include "SendKeys.h"
 #include "MainTableFunctions.h"
 #include "ShowTaskBarIcon.h"
+#include "ClipboardOCR.h"
 #include "NoDbFrameWnd.h"
 #include <clocale>
 
@@ -184,6 +185,8 @@ CCP_MainApp::CCP_MainApp()
 	m_databaseOnNetworkShare = false;
 
 	m_dwRestartManagerSupportFlags = AFX_RESTART_MANAGER_SUPPORT_RESTART;
+
+	m_hMutex = NULL;
 }
 
 CCP_MainApp::~CCP_MainApp()
@@ -201,13 +204,6 @@ BOOL CCP_MainApp::InitInstance()
 	InitCommonControlsEx(&InitCtrls);
 
 	AfxEnableControlContainer();
-	AfxOleInit();
-	AfxInitRichEditEx();	
-
-	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
-
-	LoadLibrary(TEXT("MSFTEDIT.DLL"));
 
 	setlocale(LC_TIME, ".OCP"); // defines the date/time formatting
 
@@ -389,27 +385,50 @@ BOOL CCP_MainApp::InitInstance()
 	{
 		Log(StrF(_T("Ditto is already running, closing, mutex: %s"), csMutex));
 		HWND hWnd = (HWND)(LONG_PTR)CGetSetOptions::GetMainHWND();
-		if(hWnd)
-			::SendMessage(hWnd, WM_SHOW_TRAY_ICON, TRUE, TRUE);
+		if (hWnd && IsWindow(hWnd))
+			::SendMessageTimeout(hWnd, WM_SHOW_TRAY_ICON, TRUE, TRUE, SMTO_ABORTIFHUNG, 2000, NULL);
 
-		return TRUE;
+		if(m_hMutex)
+		{
+			CloseHandle(m_hMutex);
+			m_hMutex = NULL;
+		}
+		return FALSE;
 	}
+
+	AfxOleInit();
+	AfxInitRichEditEx();	
+
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
+
+	LoadLibrary(TEXT("MSFTEDIT.DLL"));
 
 	Log(StrF(_T("Starting up ditto with mutex: %s"), csMutex));
 
 	CString csFile = CGetSetOptions::GetLanguageFile();
+
+	if(csFile.IsEmpty())
+	{
+		csFile = CMultiLanguage::DetectSystemLanguage();
+	}
+
 	if(m_Language.LoadLanguageFile(csFile) == false)
 	{
 		CString cs;
 		cs.Format(_T("Error loading language file - %s - \n\n%s"), csFile, m_Language.m_csLastError);
 		Log(cs);
 
-		m_Language.LoadLanguageFile(_T("English.xml"));
+		m_Language.LoadLanguageFile(_T("English"));
 	}
 
 	m_icuString.Load();
 	
+	Log(_T("InitInstance - calling CheckDBExists"));
+	OutputDebugString(_T("InitInstance - calling CheckDBExists\n"));
 	int nRet = CheckDBExists(CGetSetOptions::GetDBPath());
+	Log(StrF(_T("InitInstance - CheckDBExists returned %d"), nRet));
+	OutputDebugString(StrF(_T("InitInstance - CheckDBExists returned %d\n"), nRet));
 	if(nRet == FALSE)
 	{
 		m_pNoDbMainFrame = new CNoDbFrameWnd();
@@ -425,7 +444,36 @@ BOOL CCP_MainApp::InitInstance()
 		CreateMainWnd();
 	}
 
+	// Initialize Cloud Sync (best effort, non-blocking)
+	Log(_T("InitInstance - calling CloudSyncManager.Initialize"));
+	OutputDebugString(_T("InitInstance - calling CloudSyncManager.Initialize\n"));
+	m_CloudSyncManager.Initialize();
+
 	return TRUE;
+}
+
+int CCP_MainApp::Run()
+{
+	try
+	{
+		return CWinApp::Run();
+	}
+	catch (CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("Unhandled SQLite exception in message loop: %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+	}
+	catch (std::exception& e)
+	{
+		Log(StrF(_T("Unhandled C++ exception in message loop: %hs"), e.what()));
+		ASSERT(FALSE);
+	}
+	catch (...)
+	{
+		Log(_T("Unhandled unknown exception in message loop"));
+		ASSERT(FALSE);
+	}
+	return EXIT_FAILURE;
 }
 
 void CCP_MainApp::CreateMainWnd()
@@ -901,7 +949,7 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 	// give some visual indication
 	if(m_bShowingQuickPaste)
 	{
-		ASSERT(QPasteWnd());
+		if (!QPasteWnd()) return;
 		QPasteWnd()->SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
 		QPasteWnd()->RefreshNc();
 	}
@@ -912,7 +960,24 @@ void CCP_MainApp::ShowPersistent(bool bVal)
 
 int CCP_MainApp::ExitInstance() 
 {
-	Log(_T("ExitInstance"));
+	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
+
+	// Signal Cloud Sync to stop without waiting (process exit, OS handles cleanup)
+	m_CloudSyncManager.SignalStop();
+
+	// Quick wait for OCR threads to finish before DLL unload
+	{
+		int ocrWait = 0;
+		while (g_ocrThreadCount > 0 && ocrWait < 200)
+		{
+			Sleep(50);
+			ocrWait += 50;
+		}
+	}
+	if (g_ocrThreadCount == 0)
+	{
+		CleanupOCR();
+	}
 
 	DeleteDittoTempFiles(FALSE);
 
@@ -929,6 +994,12 @@ int CCP_MainApp::ExitInstance()
 
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
 
+	if(m_hMutex)
+		CloseHandle(m_hMutex);
+
+	// Let CWinApp::ExitInstance() handle OLE cleanup and MFC internal state cleanup.
+	// Previously skipped due to second-instance AfxOleInit() issues;
+	// now safe because AfxOleInit() is moved after the mutex check.
 	return CWinApp::ExitInstance();
 }
 
@@ -987,7 +1058,7 @@ bool CCP_MainApp::ImportClips(HWND hWnd)
 	memset(&szDir, 0, sizeof(szDir));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	FileName.lStructSize = sizeof(FileName);
 	FileName.lpstrTitle = _T("Import Clips");

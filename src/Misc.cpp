@@ -50,12 +50,16 @@ CString GetComputerName()
 	return cs;
 }
 
+static CCriticalSection g_csLog;
+
 void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 {
+	CSingleLock lock(&g_csLog, TRUE);
+
 #ifdef _UNICODE
-	FILE *file = _wfopen(fn, _T("a"));
+	FILE *file = _wfopen(fn, L"ab");
 #else
-	FILE *file = fopen(fn, _T("a"));
+	FILE *file = fopen(fn, _T("ab"));
 #endif
 
 	ASSERT( file );
@@ -63,9 +67,10 @@ void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 	if(file != NULL)
 	{
 		#ifdef _UNICODE
-			fwprintf(file, _T("%s"), msg);
+			CStringA utf8Msg = CW2A(msg, CP_UTF8);
+			fwrite((LPCSTR)utf8Msg, 1, utf8Msg.GetLength(), file);
 		#else
-			fprintf(file, _T("%s"),msg);
+			fprintf(file, _T("%s"), msg);
 		#endif
 
 		fclose(file);	
@@ -111,31 +116,17 @@ void log(const TCHAR* msg, bool bFromSendRecieve, CString csFile, long lLine)
 	AppendToFile(csExeFile, csText);
 }
 
+void logclip(const TCHAR* msg, bool bFromSendRecieve, CString csFile, long lLine)
+{
+	if(!CGetSetOptions::m_bLogClipboardContent)
+		return;
+	log(msg, bFromSendRecieve, csFile, lLine);
+}
+
 void logsendrecieveinfo(CString cs, CString csFile, long lLine)
 {
 	if(CGetSetOptions::m_bLogSendReceiveErrors)
 		log(cs, true, csFile, lLine);
-}
-
-CString GetErrorString( int err )
-{
-	CString str;
-	LPVOID lpMsgBuf;
-	
-	::FormatMessage( 
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-		NULL,
-		err,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-		(LPTSTR) &lpMsgBuf,
-		0,
-		NULL 
-		);
-	str = (LPCTSTR) lpMsgBuf;
-	// Display the string.
-	//  ::MessageBox( NULL, lpMsgBuf, "GetLastError", MB_OK|MB_ICONINFORMATION );
-	::LocalFree( lpMsgBuf );
-	return str;
 }
 
 int g_funnyGetTickCountAdjustment = -1;
@@ -184,49 +175,6 @@ CString StrF(const TCHAR * pszFormat, ...)
 	str.FormatV( pszFormat, argList );
 	va_end( argList );
 	return str;
-}
-
-BYTE GetEscapeChar( BYTE ch )
-{
-	switch(ch)
-	{
-	case '\'':	return '\''; // Single quotation mark (') = 39 or 0x27
-	case '\"':	return '\"'; // Double quotation mark (") = 34 or 0x22
-	case '?':	return '\?'; // Question mark (?) = 63 or 0x3f
-	case '\\':	return '\\'; // Backslash (\) = 92 or 0x5c
-	case 'a':	return '\a'; // Alert (BEL) = 7
-	case 'b':	return '\b'; // Backspace (BS) = 8
-	case 'f':	return '\f'; // Formfeed (FF) = 12 or 0x0c
-	case 'n':	return '\n'; // Newline (NL or LF) = 10 or 0x0a
-	case 'r':	return '\r'; // Carriage Return (CR) = 13 or 0x0d
-	case 't':	return '\t'; // Horizontal tab (HT) = 9
-	case 'v':	return '\v'; // Vertical tab (VT) = 11 or 0x0b
-	case '0':	return '\0'; // Null character (NUL) = 0
-	}
-	return 0; // invalid
-}
-
-CString RemoveEscapes( const TCHAR* str )
-{
-	ASSERT( str );
-	CString ret;
-	TCHAR* pSrc = (TCHAR*) str;
-	TCHAR* pDest = ret.GetBuffer((int)STRLEN(pSrc));
-	TCHAR* pStart = pDest;
-	while( *pSrc != '\0' )
-	{
-		if( *pSrc == '\\' )
-		{
-			pSrc++;
-                       *pDest = GetEscapeChar((BYTE)*pSrc );
-		}
-		else
-			*pDest = *pSrc;
-		pSrc++;
-		pDest++;
-	}
-	ret.ReleaseBuffer((int)(pDest - pStart));
-	return ret;
 }
 
 CString GetWndText(HWND hWnd)
@@ -300,7 +248,7 @@ bool IsAppWnd( HWND hWnd )
 Global Memory Helper Functions
 \*----------------------------------------------------------------------------*/
 
-// make sure the given HGLOBAL is valid.
+// asserts if hDest isn't big enough
 BOOL IsValid(HGLOBAL hGlobal)
 {
 	void* pvData = ::GlobalLock(hGlobal);
@@ -308,7 +256,6 @@ BOOL IsValid(HGLOBAL hGlobal)
 	return (pvData != NULL);
 }
 
-// asserts if hDest isn't big enough
 void CopyToGlobalHP(HGLOBAL hDest, LPVOID pBuf, SIZE_T ulBufLen)
 {
 	ASSERT(hDest && pBuf && ulBufLen);
@@ -355,33 +302,6 @@ HGLOBAL NewGlobalH(HGLOBAL hSource, SIZE_T nLen)
 	HGLOBAL hDest = NewGlobalP(pvData, nLen);
 	GlobalUnlock(hSource);
 	return hDest;
-}
-
-int CompareGlobalHP(HGLOBAL hLeft, LPVOID pBuf, SIZE_T ulBufLen)
-{
-	ASSERT(hLeft && pBuf && ulBufLen);
-
-	LPVOID pvData = GlobalLock(hLeft);
-	
-	ASSERT(pvData);
-	ASSERT(ulBufLen <= GlobalSize(hLeft));
-
-	int result = memcmp(pvData, pBuf, ulBufLen);
-	
-	GlobalUnlock(hLeft);
-
-	return result;
-}
-
-int CompareGlobalHH( HGLOBAL hLeft, HGLOBAL hRight, SIZE_T ulBufLen)
-{
-	ASSERT(hLeft && hRight && ulBufLen);
-	ASSERT(ulBufLen <= GlobalSize(hRight));
-	LPVOID pvData = GlobalLock(hRight);
-	ASSERT(pvData);
-	int result = CompareGlobalHP(hLeft, pvData, ulBufLen);
-	GlobalUnlock(hLeft);
-	return result;
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/dataxchg/standard-clipboard-formats
@@ -616,99 +536,69 @@ BOOL CALLBACK MyMonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMo
 
 int GetScreenWidth(void)
 {
-	OSVERSIONINFO OS_Version_Info;
-	DWORD dwPlatform = 0;
+	int width, height;
 	
-	if(GetVersionEx(&OS_Version_Info) != 0)
+	width = GetSystemMetrics(SM_CXSCREEN);
+	height = GetSystemMetrics(SM_CYSCREEN);
+	switch(width)
 	{
-		dwPlatform = OS_Version_Info.dwPlatformId;
-	}
-	
-	if(dwPlatform == VER_PLATFORM_WIN32_NT)
-	{
-		int width, height;
-		
-		width = GetSystemMetrics(SM_CXSCREEN);
-		height = GetSystemMetrics(SM_CYSCREEN);
-		switch(width)
+	default:
+	case 640:
+	case 800:
+	case 1024:
+		return(width);
+	case 1280:
+		if(height == 480)
 		{
-		default:
-		case 640:
-		case 800:
-		case 1024:
-			return(width);
-		case 1280:
-			if(height == 480)
-			{
-				return(width / 2);
-			}
-			return(width);
-		case 1600:
-			if(height == 600)
-			{
-				return(width / 2);
-			}
-			return(width);
-		case 2048:
-			if(height == 768)
-			{
-				return(width / 2);
-			}
-			return(width);
+			return(width / 2);
 		}
-	}
-	else
-	{
-		return(GetSystemMetrics(SM_CXVIRTUALSCREEN));
+		return(width);
+	case 1600:
+		if(height == 600)
+		{
+			return(width / 2);
+		}
+		return(width);
+	case 2048:
+		if(height == 768)
+		{
+			return(width / 2);
+		}
+		return(width);
 	}
 }
 
 int GetScreenHeight(void)
 {
-	OSVERSIONINFO OS_Version_Info;
-	DWORD dwPlatform = 0;
+	int width, height;
 	
-	if(GetVersionEx(&OS_Version_Info) != 0)
+	width = GetSystemMetrics(SM_CXSCREEN);
+	height = GetSystemMetrics(SM_CYSCREEN);
+	switch(height)
 	{
-		dwPlatform = OS_Version_Info.dwPlatformId;
-	}
-	
-	if(dwPlatform == VER_PLATFORM_WIN32_NT)
-	{
-		int width, height;
-		
-		width = GetSystemMetrics(SM_CXSCREEN);
-		height = GetSystemMetrics(SM_CYSCREEN);
-		switch(height)
+	default:
+	case 480:
+	case 600:
+	case 768:
+		return(height);
+	case 960:
+		if(width == 640)
 		{
-		default:
-		case 480:
-		case 600:
-		case 768:
-			return(height);
-		case 960:
-			if(width == 640)
-			{
-				return(height / 2);
-			}
-			return(height);
-		case 1200:
-			if(width == 800)
-			{
-				return(height / 2);
-			}
-			return(height);
-		case 1536:
-			if(width == 1024)
-			{
-				return(height / 2);
-			}
-			return(height);
+			return(height / 2);
 		}
-	}
-	else
-	{
-		return(GetSystemMetrics(SM_CYVIRTUALSCREEN));
+		return(height);
+	case 1200:
+		if(width == 800)
+		{
+			return(height / 2);
+		}
+		return(height);
+	case 1536:
+		if(width == 1024)
+		{
+			return(height / 2);
+		}
+		return(height);
 	}
 }
 
@@ -716,7 +606,7 @@ int GetScreenHeight(void)
 ID based Globals
 \*------------------------------------------------------------------*/
 
-long NewGroupID(int parentID, CString text)
+long NewGroupID(int parentID, CString text, CString description)
 {
 	long lID=0;
 	CTime time;
@@ -731,9 +621,10 @@ long NewGroupID(int parentID, CString text)
 
 		CString cs;
 
-		cs.Format(_T("insert into Main (lDate, mText, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(%d, '%s', %d, 1, %d, -(2147483647), -(2147483647));"),
+		cs.Format(_T("insert into Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(%d, '%s', '%s', %d, 1, %d, -(2147483647), -(2147483647));"),
 							(int)time.GetTime(),
 							text,
+							description,
 							(int)time.GetTime(),
 							parentID);
 
@@ -1073,48 +964,7 @@ CString GetProcessName(HWND hWnd, DWORD processId)
 
 BOOL IsVista()
 {
-	OSVERSIONINFO osver;
-
-	osver.dwOSVersionInfoSize = sizeof( OSVERSIONINFO );
-
-	if (::GetVersionEx( &osver ) && 
-		osver.dwPlatformId == VER_PLATFORM_WIN32_NT && 
-		(osver.dwMajorVersion >= 6 ) )
-	{
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
-bool IsRunningLimited()
-{
-	LPCTSTR pszSubKey = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System");
-	LPCTSTR pszValue = _T("EnableLUA");
-	DWORD dwType = 0;
-	DWORD dwValue = 0;
-	DWORD dwValueSize = sizeof(DWORD);
-
-	if(ERROR_SUCCESS != SHGetValue(HKEY_LOCAL_MACHINE, pszSubKey, pszValue, &dwType, &dwValue, &dwValueSize))
-	{
-		//failed to read the reg key, either it's not there or we don't have access to the registry
-		//If we are vista then assume we don't have access and we are running as a limited app
-		//otherwise we are xp and the reg key probably doesn't exist and we are not a limited running app
-		if(IsVista())
-		{
-			OutputDebugString(_T("Ditto - Failed to read registry entry finding UAC, Running as limited application"));
-			return true;
-		}
-	}
-
-	if(dwValue == 1)
-	{
-		OutputDebugString(_T("Ditto - UAC ENABLED, Running as limited application"));
-		return true;
-	}
-
-	OutputDebugString(_T("Ditto - Running as standard application"));	
-	return false;
+	return TRUE;
 }
 
 void DeleteDittoTempFiles(BOOL checkFileLastAccess)
@@ -1243,54 +1093,57 @@ int FindNoCaseAndInsert(CString& mainStr, CString& findStr, CString preInsert, C
 				break;
 		}
 
-		startFindPos = 0;
-		int line = 0;
-		int prevLinePos = 0;
-		int prevPrevLinePos = 0;
-
-		while (TRUE)
-		{
-			foundPos = mainStr.Find(_T("\n"), startFindPos);
-			if (foundPos < 0)
-				break;
-
-			if (firstFindPos < foundPos)
-			{
-				if (line > linesPerRow - 1)
-				{
-					int lineStart = prevLinePos;
-					if (linesPerRow > 1)
-					{
-						lineStart = prevPrevLinePos;
-					}
-
-					mainStr = _T("... ") + mainStr.Mid(lineStart + 1);
-				}
-
-				break;
-			}			
-
-			startFindPos = foundPos + 1;
-			prevPrevLinePos = prevLinePos;
-			prevLinePos = foundPos;
-
-			line++;
-
-			//safety check, make sure we don't look forever
-			if (line > 1000)
-				break;
-		}
-
 		if(replaceCount > 0)
 		{
-			//use unprintable characters so it doesn't find copied html to convert
-			mainStr.Replace(_T("\r\n"), _T("\x01\x05\x02"));
-			int l = mainStr.Replace(_T("\r"), _T("\x01\x05\x02"));
-			int m = mainStr.Replace(_T("\n"), _T("\x01\x05\x02"));
+			TruncateTextToMatchLine(mainStr, firstFindPos, linesPerRow);
 		}
 	}
 
 	return replaceCount;
+}
+
+void TruncateTextToMatchLine(CString& mainStr, int firstMatchPos, int linesPerRow)
+{
+	int startFindPos = 0;
+	int line = 0;
+	int prevLinePos = 0;
+	int prevPrevLinePos = 0;
+
+	while (TRUE)
+	{
+		int foundPos = mainStr.Find(_T("\n"), startFindPos);
+		if (foundPos < 0)
+			break;
+
+		if (firstMatchPos < foundPos)
+		{
+			if (line > linesPerRow - 1)
+			{
+				int lineStart = prevLinePos;
+				if (linesPerRow > 1)
+				{
+					lineStart = prevPrevLinePos;
+				}
+
+				mainStr = _T("... ") + mainStr.Mid(lineStart + 1);
+			}
+
+			break;
+		}
+
+		startFindPos = foundPos + 1;
+		prevPrevLinePos = prevLinePos;
+		prevLinePos = foundPos;
+
+		line++;
+
+		if (line > 1000)
+			break;
+	}
+
+	mainStr.Replace(_T("\r\n"), _T("\x01\x05\x02"));
+	mainStr.Replace(_T("\r"), _T("\x01\x05\x02"));
+	mainStr.Replace(_T("\n"), _T("\x01\x05\x02"));
 }
 
 void OnInitMenuPopupEx(CMenu *pPopupMenu, UINT nIndex, BOOL bSysMenu, CWnd *pWnd)
@@ -1546,7 +1399,7 @@ CString FolderPath(int folderId)
 			}
 
 			folder = _T("Group Path: \\");
-			for (int folderPos = arr.GetCount() - 1; folderPos >= 0; folderPos--)
+			for (INT_PTR folderPos = arr.GetCount() - 1; folderPos >= 0; folderPos--)
 			{
 				folder += _T("\\");
 				folder += arr[folderPos];
@@ -1605,31 +1458,6 @@ DWORD Windows10AccentColor()
 	}
 
 	return color;
-}
-
-BOOL Windows10ColorTitleBar()
-{
-	BOOL colorTitleBar = FALSE;
-	BOOL darkMode = false;
-	HKEY hkKey;
-	long lResult = ::RegOpenKeyEx(HKEY_CURRENT_USER, _T("Software\\Microsoft\\Windows\\DWM"), NULL, KEY_READ, &hkKey);
-	if (lResult == ERROR_SUCCESS)
-	{
-		DWORD buffer;
-		DWORD len = sizeof(buffer);
-		DWORD type;
-
-		lResult = ::RegQueryValueEx(hkKey, _T("ColorPrevalence"), 0, &type, (LPBYTE)&buffer, &len);
-
-		if (lResult == ERROR_SUCCESS)
-		{
-			colorTitleBar = (buffer == 1);
-		}
-
-		RegCloseKey(hkKey);
-	}
-
-	return colorTitleBar;
 }
 
 BOOL RestoreDbPrompt(HWND hwnd)
@@ -1698,6 +1526,7 @@ BOOL BackupDbPrompt(HWND hwnd)
 
 		CString dbPath = CGetSetOptions::GetDBPath();
 		CString backupPath(ofn.lpstrFile);
+		theApp.m_db.execDML(_T("PRAGMA wal_checkpoint(TRUNCATE);"));
 		ret = BackupDB(dbPath, backupPath);
 	}
 
@@ -1706,10 +1535,9 @@ BOOL BackupDbPrompt(HWND hwnd)
 
 int WordCount(const CString &text)
 {
-	#define OUT 0
-	#define IN 1
+	enum { STATE_OUT = 0, STATE_IN = 1 };
 
-	int state = OUT;
+	int state = STATE_OUT;
 	unsigned wc = 0; // word count
 
 	// Scan all characters one by one
@@ -1719,11 +1547,11 @@ int WordCount(const CString &text)
 		
 		if (str == ' ' || str == '\r' || str == '\n' || str == '\t')
 		{
-			state = OUT;
+			state = STATE_OUT;
 		}
-		else if (state == OUT)
+		else if (state == STATE_OUT)
 		{
-			state = IN;
+			state = STATE_IN;
 			wc++;
 		}
 	}

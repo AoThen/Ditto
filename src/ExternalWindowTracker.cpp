@@ -14,6 +14,7 @@ ExternalWindowTracker::ExternalWindowTracker(void)
 	m_desktopHasFocus = false;
 
 	m_AccessibleObjectFromWindow = NULL;
+	m_lastTrackTime = 0;
 	m_hOleacc = LoadLibrary(_T("oleacc.dll"));
 	if (m_hOleacc)
 	{
@@ -36,8 +37,24 @@ bool ExternalWindowTracker::TrackActiveWnd(bool force)
 {
 	if(force == false && IdleSeconds() < (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0))
 	{
-		Log(StrF(_T("Not Idle for long enough, IdleTime: %f, MinIdle %f"), IdleSeconds(), (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0)));
+		static DWORD lastNotIdleLog = 0;
+		DWORD now = GetTickCount();
+		if (now - lastNotIdleLog > 5000)
+		{
+			Log(StrF(_T("Not Idle for long enough, IdleTime: %f, MinIdle %f"), IdleSeconds(), (CGetSetOptions::GetMinIdleTimeBeforeTrackFocus() / 1000.0)));
+			lastNotIdleLog = now;
+		}
 		return false;
+	}
+
+	if(force == false)
+	{
+		DWORD now = GetTickCount();
+		if(now - m_lastTrackTime < 50)
+		{
+			return false;
+		}
+		m_lastTrackTime = now;
 	}
 
 	m_desktopHasFocus = false;

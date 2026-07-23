@@ -19,7 +19,7 @@ UINT WritePrivateProfileInt(LPCTSTR lpAppName, LPCTSTR lpKeyName, INT nValue, LP
 	TCHAR	szBuff[25];
 
 	// Format
-	SPRINTF(szBuff, _T("%d"), nValue);
+	_stprintf_s(szBuff, 25, _T("%d"), nValue);
 
 	// Write
 	return WritePrivateProfileString(lpAppName, lpKeyName, szBuff, lpFileName);
@@ -61,6 +61,8 @@ long CGetSetOptions::m_lMaxClipSizeInBytes;
 DWORD CGetSetOptions::m_dwSaveClipDelay;
 long CGetSetOptions::m_lProcessDrawClipboardDelay;
 BOOL CGetSetOptions::m_bEnableDebugLogging;
+BOOL CGetSetOptions::m_bEnableOCR;
+BOOL CGetSetOptions::m_bLogClipboardContent;
 BOOL CGetSetOptions::m_bEnsureConnectToClipboard;
 BOOL CGetSetOptions::m_outputDebugStringLogging;
 bool CGetSetOptions::m_bInConversion = false;
@@ -286,6 +288,8 @@ void CGetSetOptions::LoadSettings()
 	m_dwSaveClipDelay = GetSaveClipDelay();
 	m_lProcessDrawClipboardDelay = GetProcessDrawClipboardDelay();
 	m_bEnableDebugLogging = GetEnableDebugLogging();
+	m_bLogClipboardContent = GetLogClipboardContent();
+	m_bEnableOCR = GetEnableOCR();
 	m_outputDebugStringLogging = GetEnableOutputDebugStringLogging();
 	m_bEnsureConnectToClipboard = GetEnsureConnectToClipboard();
 	m_showScrollBar = GetShowScrollBar();
@@ -631,7 +635,7 @@ CString CGetSetOptions::GetProfileString(CString csName, CString csDefault, CStr
 		bool setMaxSize = false;
 		while (true)
 		{
-			if (maxSize > -1 && maxSize < dwBufLen)
+			if (maxSize >= 0 && static_cast<DWORD>(maxSize) < dwBufLen)
 			{
 				dwBufLen = maxSize;
 				setMaxSize = true;
@@ -677,7 +681,7 @@ CString CGetSetOptions::GetProfileString(CString csName, CString csDefault, CStr
 		if (lResult == ERROR_SUCCESS &&
 			dwBufLen > 0)
 		{
-			if (maxSize > -1 && maxSize < dwBufLen)
+			if (maxSize >= 0 && static_cast<DWORD>(maxSize) < dwBufLen)
 			{
 				dwBufLen = maxSize;
 			}
@@ -1075,7 +1079,7 @@ long CGetSetOptions::GetMaxEntries()
 {
 	long lMax = 500;
 	if(GetIsPortableDitto())
-		lMax = 100;
+		lMax = 600;
 	return GetProfileLong("MaxEntries", lMax);
 }
 
@@ -1532,7 +1536,7 @@ BOOL CGetSetOptions::GetFont(LOGFONT &font)
 	font.lfHeight = -13;
 	font.lfWeight = 400;
 	font.lfCharSet = 1;
-	STRCPY(font.lfFaceName, _T("Segoe UI"));
+	STRCPY_S(font.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
 	return TRUE;
 }
 
@@ -1587,11 +1591,12 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 
 		TCHAR seps[]   = _T(",");
 		TCHAR *token;
+		TCHAR* context = nullptr;
 
 		TCHAR *pString = cs.GetBuffer(cs.GetLength());
 
 		/* Establish string and get the first token: */
-		token = STRTOK(pString, seps);
+		token = _tcstok_s(pString, seps, &context);
 		while(token != NULL)
 		{
 			CString cs(token);
@@ -1601,7 +1606,7 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 			m_csNetworkPasswordArray.Add(cs);
 
 			// Get next token
-			token = STRTOK(NULL, seps);
+			token = _tcstok_s(nullptr, seps, &context);
 		}
 
 		cs.ReleaseBuffer();
@@ -1621,6 +1626,211 @@ CStringA CGetSetOptions::GetNetworkPassword()
 	CString cs = GetProfileString("NetworkStringPassword", "LetMeIn");
 	CStringA csReturn = CTextConvert::UnicodeToUTF8(cs);
 	return csReturn;
+}
+
+// Cloud sync settings
+
+CString CGetSetOptions::GetCloudServerUrl()
+{
+	return GetProfileString("CloudServerUrl", _T(""));
+}
+
+void CGetSetOptions::SetCloudServerUrl(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudServerUrl", lpszValue);
+}
+
+CStringA CGetSetOptions::GetCloudDeviceToken()
+{
+	CString cs = GetProfileString("CloudDeviceToken", _T(""));
+	CT2A utf8(cs, CP_UTF8);
+	return CStringA(utf8);
+}
+
+void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
+{
+	CString wide(lpszValue);
+	SetProfileString("CloudDeviceToken", wide);
+}
+
+CStringA CGetSetOptions::GetCloudDeviceId()
+{
+	CString cs = GetProfileString("CloudDeviceId", _T(""));
+	CT2A utf8(cs, CP_UTF8);
+	return CStringA(utf8);
+}
+
+void CGetSetOptions::SetCloudDeviceId(LPCSTR lpszValue)
+{
+	CString wide(lpszValue);
+	SetProfileString("CloudDeviceId", wide);
+}
+
+BOOL CGetSetOptions::GetCloudSyncEnabled()
+{
+	return GetProfileLong("CloudSyncEnabled", FALSE);
+}
+
+void CGetSetOptions::SetCloudSyncEnabled(BOOL bValue)
+{
+	SetProfileLong("CloudSyncEnabled", bValue);
+}
+
+BOOL CGetSetOptions::GetCloudPushOnCopy()
+{
+	return GetProfileLong("CloudPushOnCopy", TRUE);
+}
+
+void CGetSetOptions::SetCloudPushOnCopy(BOOL bValue)
+{
+	SetProfileLong("CloudPushOnCopy", bValue);
+}
+
+BOOL CGetSetOptions::GetCloudPeriodicSync()
+{
+	return GetProfileLong("CloudPeriodicSync", TRUE);
+}
+
+void CGetSetOptions::SetCloudPeriodicSync(BOOL bValue)
+{
+	SetProfileLong("CloudPeriodicSync", bValue);
+}
+
+int CGetSetOptions::GetCloudSyncInterval()
+{
+	int val = (int)GetProfileLong("CloudSyncInterval", 30);
+	if (val < 5) val = 5;
+	if (val > 300) val = 300;
+	return val;
+}
+
+void CGetSetOptions::SetCloudSyncInterval(int nSeconds)
+{
+	if (nSeconds < 5) nSeconds = 5;
+	if (nSeconds > 300) nSeconds = 300;
+	SetProfileLong("CloudSyncInterval", nSeconds);
+}
+
+CString CGetSetOptions::GetCloudDeviceName()
+{
+	return GetProfileString("CloudDeviceName", _T(""));
+}
+
+void CGetSetOptions::SetCloudDeviceName(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudDeviceName", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudEncryptionKey()
+{
+	return GetProfileString("CloudEncryptionKey", _T(""));
+}
+
+void CGetSetOptions::SetCloudEncryptionKey(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudEncryptionKey", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudEncryptionSalt()
+{
+	return GetProfileString("CloudEncryptionSalt", "");
+}
+
+void CGetSetOptions::SetCloudEncryptionSalt(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudEncryptionSalt", lpszValue);
+}
+
+BOOL CGetSetOptions::GetCloudSyncEncryptionEnabled()
+{
+	return GetProfileLong("CloudSyncEncryptionEnabled", 0);
+}
+
+void CGetSetOptions::SetCloudSyncEncryptionEnabled(BOOL bValue)
+{
+	SetProfileLong("CloudSyncEncryptionEnabled", bValue);
+}
+
+BOOL CGetSetOptions::GetCloudEncryptionNeedsRecovery()
+{
+	return GetProfileLong("CloudEncryptionNeedsRecovery", 0);
+}
+
+void CGetSetOptions::SetCloudEncryptionNeedsRecovery(BOOL bValue)
+{
+	SetProfileLong("CloudEncryptionNeedsRecovery", bValue);
+}
+
+__int64 CGetSetOptions::GetCloudLastSyncTime()
+{
+	CString csValue = GetProfileString("CloudLastSyncTime", _T("0"));
+	return _ttoi64(csValue);
+}
+
+void CGetSetOptions::SetCloudLastSyncTime(__int64 value)
+{
+	CString csValue;
+	csValue.Format(_T("%lld"), value);
+	SetProfileString("CloudLastSyncTime", csValue);
+}
+
+BOOL CGetSetOptions::GetCloudInitialPushDone()
+{
+	CString csValue = GetProfileString("CloudInitialPushDone", _T("0"));
+	return _ttoi(csValue) != 0;
+}
+
+void CGetSetOptions::SetCloudInitialPushDone(BOOL bValue)
+{
+	CString csValue;
+	csValue.Format(_T("%d"), bValue ? 1 : 0);
+	SetProfileString("CloudInitialPushDone", csValue);
+}
+
+__int64 CGetSetOptions::GetCloudInitialPushOffset()
+{
+	CString csValue = GetProfileString("CloudInitialPushOffset", _T("0"));
+	return _ttoi64(csValue);
+}
+
+void CGetSetOptions::SetCloudInitialPushOffset(__int64 value)
+{
+	CString csValue;
+	csValue.Format(_T("%lld"), value);
+	SetProfileString("CloudInitialPushOffset", csValue);
+}
+
+__int64 CGetSetOptions::GetCloudLastPushTime()
+{
+	CString csValue = GetProfileString("CloudLastPushTime", _T("0"));
+	return _ttoi64(csValue);
+}
+
+void CGetSetOptions::SetCloudLastPushTime(__int64 value)
+{
+	CString csValue;
+	csValue.Format(_T("%lld"), value);
+	SetProfileString("CloudLastPushTime", csValue);
+}
+
+CString CGetSetOptions::GetCloudKeyFilePath()
+{
+	return GetProfileString("CloudKeyFilePath", _T(""));
+}
+
+void CGetSetOptions::SetCloudKeyFilePath(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudKeyFilePath", lpszValue);
+}
+
+CString CGetSetOptions::GetCloudLastUsername()
+{
+	return GetProfileString("CloudLastUsername", _T(""));
+}
+
+void CGetSetOptions::SetCloudLastUsername(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudLastUsername", lpszValue);
 }
 
 void CGetSetOptions::SetDrawRTF(long bDraw)
@@ -1754,6 +1964,28 @@ void CGetSetOptions::SetEnableDebugLogging(BOOL bEnable)
 {
 	m_bEnableDebugLogging = bEnable;
 	SetProfileLong("EnableDebugLogging", bEnable);
+}
+
+BOOL CGetSetOptions::GetLogClipboardContent()
+{
+	return GetProfileLong("LogClipboardContent", FALSE);
+}
+
+void CGetSetOptions::SetLogClipboardContent(BOOL bEnable)
+{
+	m_bLogClipboardContent = bEnable;
+	SetProfileLong("LogClipboardContent", bEnable);
+}
+
+BOOL CGetSetOptions::GetEnableOCR()
+{
+	return GetProfileLong("Cloud\\EnableOCR", FALSE);
+}
+
+void CGetSetOptions::SetEnableOCR(BOOL bEnable)
+{
+	m_bEnableOCR = bEnable;
+	SetProfileLong("Cloud\\EnableOCR", bEnable);
 }
 
 BOOL CGetSetOptions::GetEnableOutputDebugStringLogging()
@@ -1969,15 +2201,106 @@ bool CGetSetOptions::GetIsChocolateyApp()
 	return m_chocolateyApp;
 }
 
+BOOL CGetSetOptions::GlobMatch(LPCTSTR str, LPCTSTR pattern)
+{
+	while (*str && *pattern)
+	{
+		if (*pattern == '*')
+		{
+			pattern++;
+			if (!*pattern) return TRUE;
+			while (*str)
+			{
+				if (GlobMatch(str, pattern)) return TRUE;
+				str++;
+			}
+			return FALSE;
+		}
+		if (*pattern == '?')
+		{
+			if (!*str) return FALSE;
+			str++;
+			pattern++;
+			continue;
+		}
+		if (_totupper(*str) != _totupper(*pattern)) return FALSE;
+		str++;
+		pattern++;
+	}
+
+	while (*pattern == '*') pattern++;
+	return !*pattern && !*str;
+}
+
+void CGetSetOptions::GetProfileKeyNames(CString csSection, CStringArray &rNames)
+{
+	rNames.RemoveAll();
+
+	if (m_bFromIni && !m_bInConversion)
+	{
+		TCHAR szKeys[32768] = { 0 };
+		GetPrivateProfileString(csSection, NULL, NULL, szKeys, 32768, m_csIniFileName);
+
+		LPCTSTR p = szKeys;
+		while (*p)
+		{
+			rNames.Add(p);
+			p += lstrlen(p) + 1;
+		}
+	}
+	else
+	{
+		CString csPath = CString(REG_PATH) + _T("\\") + csSection;
+		HKEY hkKey;
+		if (RegOpenKeyEx(HKEY_CURRENT_USER, csPath, NULL, KEY_READ, &hkKey) == ERROR_SUCCESS)
+		{
+			DWORD idx = 0;
+			while (true)
+			{
+				TCHAR szName[1024];
+				DWORD dwNameSize = 1024;
+				if (RegEnumValue(hkKey, idx++, szName, &dwNameSize, NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
+					break;
+				rNames.Add(szName);
+			}
+			RegCloseKey(hkKey);
+		}
+	}
+}
+
 CString CGetSetOptions::GetPasteString(CString csAppName)
 {
 	CString csString = GetProfileString(csAppName, _T(""), _T("PasteStrings"));
-	if (csString.IsEmpty())
+	if (!csString.IsEmpty())
 	{
-		return GetDefaultPasteString();
+		return csString;
 	}
 
-	return csString;
+	CStringArray arrKeys;
+	GetProfileKeyNames(_T("PasteStrings"), arrKeys);
+
+	int bestIdx = -1;
+	int bestLen = -1;
+	for (int i = 0; i < arrKeys.GetSize(); i++)
+	{
+		CString key = arrKeys.GetAt(i);
+		if (key.Find(_T('*')) >= 0 || key.Find(_T('?')) >= 0)
+		{
+			if (GlobMatch(csAppName, key) && (int)key.GetLength() > bestLen)
+			{
+				bestLen = (int)key.GetLength();
+				bestIdx = i;
+			}
+		}
+	}
+
+	if (bestIdx >= 0)
+	{
+		CString csKey = arrKeys.GetAt(bestIdx);
+		csString = GetProfileString(csKey, _T(""), _T("PasteStrings"));
+	}
+
+	return csString.IsEmpty() ? GetDefaultPasteString() : csString;
 }
 
 CString CGetSetOptions::GetDefaultPasteString()

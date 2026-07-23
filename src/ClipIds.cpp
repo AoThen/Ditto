@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "CP_Main.h"
 #include "ClipIds.h"
+#include <vector>
 #include "tinyxml\tinyxml.h"
 #include "..\Shared\TextConvert.h"
 #include "Clip_ImportExport.h"
@@ -182,10 +183,6 @@ bool CClipIDs::AggregateData(IClipAggregator &Aggregator, UINT cfType, BOOL bRev
 		}
 	}
 	CATCH_SQLITE_EXCEPTION
-		catch(...)
-	{
-
-	}
 
 	return bRet;
 }
@@ -293,9 +290,14 @@ BOOL CClipIDs::CopyTo(int parentId)
 
 		theApp.m_db.execDML(_T("commit transaction;"));
 	}
-	CATCH_SQLITE_EXCEPTION
+	catch (CppSQLite3Exception& e)
+	{
+		theApp.m_db.execDML(_T("ROLLBACK;"));
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
+		ASSERT(FALSE);
+	}
 		
-	return TRUE;
+	return FALSE;
 }
 
 BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
@@ -307,6 +309,8 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	BOOL bRet = TRUE;
 	INT_PTR count = GetSize();
 	int batchCount = 25;
+
+	std::vector<int> remoteDeleteIds;
 
 	Log(StrF(_T("Begin delete clips, Count: %d from Window: %d"), count, fromClipWindow));
 	
@@ -350,6 +354,16 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 				if(bGroup)
 				{
 					db.execDMLEx(_T("UPDATE Main SET lParentID = -1 WHERE lParentID = %d;"), clipId);
+				}
+
+				if (bGroup)
+				{
+					// Notify cloud sync manager about group deletion
+					theApp.m_CloudSyncManager.OnGroupDeleted(clipId);
+				}
+				else
+				{
+					remoteDeleteIds.push_back(clipId);
 				}
 
 				if(sqlIn.GetLength() > 0)
@@ -398,6 +412,23 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
 	
+	// Notify server about deleted non-group clips for cross-device sync
+	if (!remoteDeleteIds.empty())
+	{
+		try
+		{
+			theApp.m_CloudSyncManager.DeleteRemoteClips(remoteDeleteIds);
+		}
+		catch (std::exception& e)
+		{
+			Log(StrF(_T("DeleteRemoteClips failed (non-fatal): %hs"), e.what()));
+		}
+		catch (...)
+		{
+			Log(_T("DeleteRemoteClips failed (non-fatal): unknown exception"));
+		}
+	}
+
 	Log(StrF(_T("End delete clips, Count: %d"), count));
 
 	return bRet;

@@ -234,7 +234,7 @@ void COptionsQuickPaste::OnButtonDefaultFault()
 	m_LogFont.lfHeight = -10;
 	m_LogFont.lfWeight = 400;
 	m_LogFont.lfCharSet = 1;
-	STRCPY(m_LogFont.lfFaceName, _T("Segoe UI"));
+	STRCPY_S(m_LogFont.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
 
 	m_Font.DeleteObject();
 	m_Font.CreateFontIndirect(&m_LogFont);

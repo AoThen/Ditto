@@ -77,6 +77,8 @@ public:
 
 	void SetDpiInfo(CDPI *dpi);
 
+	void SetDarkMode(BOOL bDark);
+
 	void OnDpiChanged();
 
 	//void SetWindowTextEx(LPCSTR)

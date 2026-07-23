@@ -64,8 +64,7 @@ public:
 
 // Implementation
 protected:
-    void ReportError(int nError);
-    static LONG GetRegKey(HKEY key, LPCTSTR subkey, LPTSTR retdata);
+    static void ReportError(int nError);
     void PositionWindow();
     void SetDefaultCursor();
 

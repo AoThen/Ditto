@@ -10,6 +10,7 @@
 #include "Path.h"
 #include "zlib.h"
 #include "..\Shared\TextConvert.h"
+#include <vector>
 using namespace nsPath;
 
 //////////////////////////////////////////////////////////////////////
@@ -17,55 +18,9 @@ using namespace nsPath;
 //////////////////////////////////////////////////////////////////////
 
 
-BOOL CreateBackup(CString csPath)
-{
-	CString csOriginal;
-	int count = 0;
-	// create a backup of the existing database
-	do
-	{
-		count++;
-		csOriginal = csPath + StrF(_T(".%03d"), count);
-		// in case of some weird infinite loop
-		if (count > 50)
-		{
-			ASSERT(0);
-			return FALSE;
-		}
-	} while (!::CopyFile(csPath, csOriginal, TRUE));
-
-	return TRUE;
-}
-
 CString GetDBName()
 {
 	return CGetSetOptions::GetDBPath();
-}
-
-CString GetOLDDefaultDBName()
-{
-	CString csDefaultPath;
-	LPMALLOC pMalloc;
-
-	if (SUCCEEDED(::SHGetMalloc(&pMalloc)))
-	{
-		LPITEMIDLIST pidlPrograms;
-
-		SHGetSpecialFolderLocation(NULL, CSIDL_APPDATA, &pidlPrograms);
-
-		TCHAR string[MAX_PATH];
-		SHGetPathFromIDList(pidlPrograms, string);
-
-		pMalloc->Free(pidlPrograms);
-		pMalloc->Release();
-
-		csDefaultPath = string;
-		csDefaultPath += "\\Ditto\\";
-
-		csDefaultPath += "DittoDB.mdb";
-	}
-
-	return csDefaultPath;
 }
 
 CString GetDefaultDBName()
@@ -96,6 +51,8 @@ CString GetDefaultDBName()
 
 BOOL CheckDBExists(CString csDBPath)
 {
+	Log(StrF(_T("CheckDBExists - csDBPath = '%s'"), csDBPath));
+	OutputDebugString(StrF(_T("CheckDBExists - csDBPath = '%s'\n"), csDBPath));
 	CPath path(csDBPath);
 
 	//If this is the first time running this version then convert the old database to the new db
@@ -117,16 +74,22 @@ BOOL CheckDBExists(CString csDBPath)
 		if (rootType == ERootType::rtServerShare ||
 			((rootType == ERootType::rtDriveCur || rootType == rtDriveRoot) && driveLetter >= 'A' && driveLetter != 'C'))
 		{
+			Log(_T("CheckDBExists - network share or non-C: drive, returning FALSE"));
+			OutputDebugString(_T("CheckDBExists - network share or non-C: drive, returning FALSE\n"));
 			return FALSE;
 		}
 
 		//first try and create create a db at the same path that was selectd
 		bRet = CreateDB(csDBPath);
+		Log(StrF(_T("CheckDBExists - CreateDB returned, csDBPath='%s'"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - CreateDB returned, csDBPath='%s'\n"), csDBPath));
 
 		//if that didn't work then go back to the default location
 		if (FileExists(csDBPath) == FALSE)
 		{
 			csDBPath = GetDefaultDBName();
+			Log(StrF(_T("CheckDBExists - retry with default path '%s'"), csDBPath));
+			OutputDebugString(StrF(_T("CheckDBExists - retry with default path '%s'\n"), csDBPath));
 
 			nsPath::CPath FullPath(csDBPath);
 			CString csPath = FullPath.GetPath().GetStr();
@@ -138,12 +101,18 @@ BOOL CheckDBExists(CString csDBPath)
 			CGetSetOptions::SetDBPath(csDBPath);
 
 			bRet = CreateDB(csDBPath);
+			Log(StrF(_T("CheckDBExists - retry CreateDB returned, csDBPath='%s'"), csDBPath));
+			OutputDebugString(StrF(_T("CheckDBExists - retry CreateDB returned, csDBPath='%s'\n"), csDBPath));
 		}
 	}
 	else
 	{
+		Log(StrF(_T("CheckDBExists - file exists, calling ValidDB, csDBPath='%s'"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - file exists, calling ValidDB, csDBPath='%s'\n"), csDBPath));
 		if (ValidDB(csDBPath) == FALSE)
 		{
+			Log(_T("CheckDBExists - ValidDB returned FALSE"));
+			OutputDebugString(_T("CheckDBExists - ValidDB returned FALSE\n"));
 			//Db existed but was bad
 			CString csMarkAsBad;
 
@@ -176,15 +145,23 @@ BOOL CheckDBExists(CString csDBPath)
 		}
 		else
 		{
+			Log(_T("CheckDBExists - ValidDB OK, calling OpenDatabase"));
+			OutputDebugString(_T("CheckDBExists - ValidDB OK, calling OpenDatabase\n"));
 			bRet = TRUE;
 		}
 	}
 
 	if (bRet)
 	{
+		Log(StrF(_T("CheckDBExists - calling OpenDatabase('%s')"), csDBPath));
+		OutputDebugString(StrF(_T("CheckDBExists - calling OpenDatabase('%s')\n"), csDBPath));
 		bRet = OpenDatabase(csDBPath);
+		Log(StrF(_T("CheckDBExists - OpenDatabase returned %d"), bRet));
+		OutputDebugString(StrF(_T("CheckDBExists - OpenDatabase returned %d\n"), bRet));
 	}
 
+	Log(StrF(_T("CheckDBExists - returning %d"), bRet));
+	OutputDebugString(StrF(_T("CheckDBExists - returning %d\n"), bRet));
 	return bRet;
 }
 
@@ -195,6 +172,8 @@ BOOL IsDatabaseOpen()
 
 BOOL OpenDatabase(CString dbPath)
 {
+	Log(StrF(_T("OpenDatabase - dbPath='%s'"), dbPath));
+	OutputDebugString(StrF(_T("OpenDatabase - dbPath='%s'\n"), dbPath));
 	try
 	{
 		CPath path(dbPath);
@@ -214,14 +193,43 @@ BOOL OpenDatabase(CString dbPath)
 		theApp.m_db.close();
 		theApp.m_db.open(dbPath);
 
+		Log(_T("OpenDatabase - db.open OK"));
+		OutputDebugString(_T("OpenDatabase - db.open OK\n"));
+
+		MigrateDatabaseSchema();
+
+		Log(_T("OpenDatabase - MigrateDatabaseSchema OK"));
+		OutputDebugString(_T("OpenDatabase - MigrateDatabaseSchema OK\n"));
+
+		if (!theApp.m_databaseOnNetworkShare)
+		{
+			Log(_T("OpenDatabase - setting WAL PRAGMA..."));
+			OutputDebugString(_T("OpenDatabase - setting WAL PRAGMA...\n"));
+			theApp.m_db.execQuery(_T("PRAGMA journal_mode=WAL;"));
+			theApp.m_db.execQuery(_T("PRAGMA synchronous=NORMAL;"));
+		}
+
+		Log(_T("OpenDatabase - WAL/sync PRAGMA OK"));
+		OutputDebugString(_T("OpenDatabase - WAL/sync PRAGMA OK\n"));
+
 		theApp.m_db.setBusyTimeout(CGetSetOptions::GetDbTimeout());
 		theApp.m_db.SetRegexCaseInsensitive(CGetSetOptions::GetRegexCaseInsensitive());
 
+		Log(_T("OpenDatabase - setBusyTimeout OK"));
+		OutputDebugString(_T("OpenDatabase - setBusyTimeout OK\n"));
+		Log(_T("OpenDatabase - returning TRUE"));
+		OutputDebugString(_T("OpenDatabase - returning TRUE\n"));
+
 		return TRUE;
 	}
-	CATCH_SQLITE_EXCEPTION
+	catch (CppSQLite3Exception& e)
+	{
+		CString csErr; csErr.Format(_T("OpenDatabase - CATCH_SQLITE_EXCEPTION, error=%d msg=%s"), e.errorCode(), e.errorMessage()); Log(csErr);
+		OutputDebugString(csErr + _T("\n"));
 
+		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
 		return FALSE;
+	}
 }
 
 void ReOrderStickyClips(int parentID, CppSQLite3DB& db)
@@ -471,6 +479,31 @@ BOOL ValidDB(CString csPath, BOOL bUpgrade)
 			e.errorCode();
 		}
 
+		// Add lModifiedDate column for cloud sync (tracks modification time, not just creation time)
+		try
+		{
+			db.execQuery(_T("SELECT lModifiedDate FROM Main"));
+		}
+		catch (CppSQLite3Exception& e)
+		{
+			db.execDML(_T("ALTER TABLE Main ADD lModifiedDate INTEGER"));
+			// Initialize with lDate for existing clips
+			db.execDML(_T("UPDATE Main SET lModifiedDate = lDate WHERE lModifiedDate IS NULL"));
+
+			e.errorCode();
+		}
+
+		try
+		{
+			db.execQuery(_T("SELECT pinyin FROM Main"));
+		}
+		catch (CppSQLite3Exception& e)
+		{
+			e.errorCode();
+			db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyin TEXT DEFAULT ''"));
+			db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyinAbbr TEXT DEFAULT ''"));
+		}
+
 		db.execDML(_T("DROP INDEX IF EXISTS Main_NoGroup"));
 		db.execDML(_T("DROP INDEX IF EXISTS Main_InGroup"));
 		db.execDML(_T("DROP INDEX IF EXISTS Main_ShortCut"));
@@ -513,34 +546,32 @@ BOOL BackupDB(CString dbPath, CString backupPath)
 			ULONGLONG totalReadSize = 0;
 			int percentageComplete = 0;
 			UINT readBytes = 0;
-			char* pBuffer = new char[65536];
-			if (pBuffer != NULL)
+			std::vector<char> buf(65536);
+			char* pBuffer = buf.data();
+			gzFile f = gzopen(CTextConvert::UnicodeToAnsi(backupPath), "w");
+
+			if (f != NULL)
 			{
-				gzFile f = gzopen(CTextConvert::UnicodeToAnsi(backupPath), "w");
-
-				if (f != NULL)
+				do
 				{
-					do
+					readBytes = file.Read(pBuffer, 65536);
+					gzwrite(f, pBuffer, readBytes);
+					totalReadSize += readBytes;
+
+					int percent = (int)((totalReadSize * 100) / fileSize);
+					if (percent != percentageComplete)
 					{
-						readBytes = file.Read(pBuffer, 65536);
-						gzwrite(f, pBuffer, readBytes);
-						totalReadSize += readBytes;
+						percentageComplete = percent;
+						Log(StrF(_T("backing up db percent done: %d"), percentageComplete));
 
-						int percent = (int)((totalReadSize * 100) / fileSize);
-						if (percent != percentageComplete)
-						{
-							percentageComplete = percent;
-							Log(StrF(_T("backing up db percent done: %d"), percentageComplete));
+						status.Show(StrF(_T("Ditto - %02d%% %s - %s"), percentageComplete, msg, backupPath));
+					}
 
-							status.Show(StrF(_T("Ditto - %02d%% %s - %s"), percentageComplete, msg, backupPath));
-						}
+				} while (readBytes >= 65536);
 
-					} while (readBytes >= 65536);
+				gzclose(f);
 
-					gzclose(f);
-
-					ret = TRUE;
-				}
+				ret = TRUE;
 			}
 
 			file.Close();
@@ -602,7 +633,8 @@ BOOL RestoreDB(CString backupPath)
 			{
 				ULONGLONG totalReadSize = 0;
 				int readBytes = 0;
-				char* pBuffer = new char[65536];
+				std::vector<char> buf(65536);
+				char* pBuffer = buf.data();
 				int percentageComplete = 0;
 
 				do
@@ -705,6 +737,8 @@ BOOL CreateDB(CString csFile)
 			_T("mText TEXT, ")
 			_T("lShortCut INTEGER, ")
 			_T("lDontAutoDelete INTEGER, ")
+			_T("lDontSync INTEGER, ")
+			_T("m_Description TEXT, ")
 			_T("CRC INTEGER, ")
 			_T("bIsGroup INTEGER, ")
 			_T("lParentID INTEGER, ")
@@ -716,7 +750,10 @@ BOOL CreateDB(CString csFile)
 			_T("stickyClipOrder REAL, ")
 			_T("stickyClipGroupOrder REAL, ")
 			_T("MoveToGroupShortCut INTEGER, ")
-			_T("GlobalMoveToGroupShortCut INTEGER);"));
+			_T("GlobalMoveToGroupShortCut INTEGER, ")
+			_T("lModifiedDate INTEGER, ")
+			_T("pinyin TEXT, ")
+			_T("pinyinAbbr TEXT);"));
 
 		db.execDML(_T("CREATE TABLE Data(")
 			_T("lID INTEGER PRIMARY KEY AUTOINCREMENT, ")
@@ -991,153 +1028,39 @@ BOOL DeleteNonUsedClips(bool fromAppWindow)
 	return TRUE;
 }
 
-BOOL EnsureDirectory(CString csPath)
+BOOL MigrateDatabaseSchema()
 {
-	TCHAR drive[_MAX_DRIVE];
-	TCHAR dir[_MAX_DIR];
-	TCHAR fname[_MAX_FNAME];
-	TCHAR ext[_MAX_EXT];
-
-	SPLITPATH(csPath, drive, dir, fname, ext);
-
-	CString csDir(drive);
-	csDir += dir;
-
-	if (FileExists(csDir) == FALSE)
+	try
 	{
-		if (CreateDirectory(csDir, NULL))
-			return TRUE;
-	}
-	else
+		CppSQLite3Query q = theApp.m_db.execQuery(_T("PRAGMA table_info(Main)"));
+		bool hasDontSync = false;
+		bool hasDescription = false;
+		bool hasPinyin = false;
+		while (q.eof() == false)
+		{
+			CString colName = q.getStringField(_T("name"));
+			if (colName == _T("lDontSync"))
+				hasDontSync = true;
+			if (colName == _T("m_Description"))
+				hasDescription = true;
+			if (colName == _T("pinyin"))
+				hasPinyin = true;
+			q.nextRow();
+		}
+
+		if (!hasDontSync)
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN lDontSync INTEGER DEFAULT 0"));
+
+		if (!hasDescription)
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN m_Description TEXT DEFAULT ''"));
+
+		if (!hasPinyin)
+		{
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyin TEXT DEFAULT ''"));
+			theApp.m_db.execDML(_T("ALTER TABLE Main ADD COLUMN pinyinAbbr TEXT DEFAULT ''"));
+		}
+
 		return TRUE;
-
-	return FALSE;
 }
-
-// BOOL RunZippApp(CString csCommandLine)
-// {
-// 	CString csLocalPath = GETENV(_T("U3_HOST_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csLocalPath);
-// 
-// 	CString csZippApp = GETENV(_T("U3_DEVICE_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csZippApp);
-// 	csZippApp += "7za.exe";
-// 
-// 	csZippApp += " ";
-// 	csZippApp += csCommandLine;
-// 
-// 	Log(csZippApp);
-// 
-// 	STARTUPINFO			StartupInfo;
-// 	PROCESS_INFORMATION	ProcessInformation;
-// 
-// 	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
-// 	StartupInfo.cb = sizeof(StartupInfo);
-// 	ZeroMemory(&ProcessInformation, sizeof(ProcessInformation));
-// 
-// 	StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
-// 	StartupInfo.wShowWindow = SW_HIDE;
-// 
-// 	BOOL bRet = CreateProcess(NULL, csZippApp.GetBuffer(csZippApp.GetLength()), NULL, NULL, FALSE,
-// 			CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL, csLocalPath,
-// 			&StartupInfo, &ProcessInformation);
-// 
-// 	if(bRet)
-// 	{
-// 		WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
-// 
-// 		DWORD dwExitCode;
-// 		GetExitCodeProcess(ProcessInformation.hProcess, &dwExitCode);
-// 
-// 		CString cs;
-// 		cs.Format(_T("Exit code from unzip = %d"), dwExitCode);
-// 		Log(cs);
-// 
-// 		if(dwExitCode != 0)
-// 		{
-// 			bRet = FALSE;
-// 		}
-// 	}
-// 	else
-// 	{
-// 		bRet = FALSE;
-// 		Log(_T("Create Process Failed"));
-// 	}
-// 
-// 	csZippApp.ReleaseBuffer();
-// 
-// 	return bRet;
-// }
-
-// BOOL CopyDownDatabase()
-// {
-// 	BOOL bRet = FALSE;
-// 
-// 	CString csZippedPath = GETENV(_T("U3_APP_DATA_PATH"));
-// 	FIX_CSTRING_PATH(csZippedPath);
-// 	
-// 	CString csUnZippedPath = csZippedPath;
-// 	csUnZippedPath += "Ditto.db";
-// 
-// 	csZippedPath += "Ditto.7z";
-// 	
-// 	CString csLocalPath = GETENV(_T("U3_HOST_EXEC_PATH"));
-// 	FIX_CSTRING_PATH(csLocalPath);
-// 
-// 	if(FileExists(csZippedPath))
-// 	{
-// 		CString csCommandLine;
-// 
-// 		//e = extract
-// 		//surround command line arguments with quotes
-// 		//-aoa = overight files with extracted files
-// 
-// 		csCommandLine += "e ";
-// 		csCommandLine += "\"";
-// 		csCommandLine += csZippedPath;
-// 		csCommandLine += "\"";
-// 		csCommandLine += " -o";
-// 		csCommandLine += "\"";
-// 		csCommandLine += csLocalPath;
-// 		csCommandLine += "\"";
-// 		csCommandLine += " -aoa";
-// 
-// 		bRet = RunZippApp(csCommandLine);
-// 
-// 		csLocalPath += "Ditto.db";
-// 	}
-// 	else if(FileExists(csUnZippedPath))
-// 	{
-// 		csLocalPath += "Ditto.db";
-// 		bRet = CopyFile(csUnZippedPath, csLocalPath, FALSE);
-// 	}
-// 
-// 	if(FileExists(csLocalPath) == FALSE)
-// 	{
-// 		Log(_T("Failed to copy files from device zip file"));
-// 	}
-// 
-// 	CGetSetOptions::nLastDbWriteTime = GetLastWriteTime(csLocalPath);
-// 
-// 	return bRet;
-// }
-
-//BOOL CopyUpDatabase()
-//{
-//	CStringA csZippedPath = "C:\\";//getenv("U3_APP_DATA_PATH");
-//	FIX_CSTRING_PATH(csZippedPath);
-//	csZippedPath += "Ditto.zip";
-
-//	CStringA csLocalPath = GetDBName();//getenv("U3_HOST_EXEC_PATH");
-//	//FIX_CSTRING_PATH(csLocalPath);
-//	//csLocalPath += "Ditto.db";
-//
-//	CZipper Zip;
-//
-//	if(Zip.OpenZip(csZippedPath))
-//	{
-//		Zip.AddFileToZip(csLocalPath);
-//	}
-//
-//	return TRUE;
-//}
+	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
+}

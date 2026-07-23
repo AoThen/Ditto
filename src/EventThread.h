@@ -35,7 +35,7 @@ protected:
 
 public:
 	void Start(void *param = NULL);
-	void Stop(int waitTime = 5000); 
+	void Stop(int waitTime = INFINITE); 
 	void AddEvent(int eventId);
 	void AddEvent(int eventId, CString name);
 	void AddEvent(int eventId, HANDLE handle);

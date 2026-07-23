@@ -279,6 +279,44 @@ public:
 	static void		SetNetworkPassword(CString csPassword);
 	static CStringA	GetNetworkPassword();
 
+	// Cloud sync settings
+	static CString  GetCloudServerUrl();
+	static void     SetCloudServerUrl(LPCTSTR lpszValue);
+	static CStringA GetCloudDeviceToken();
+	static void     SetCloudDeviceToken(LPCSTR lpszValue);
+	static CStringA GetCloudDeviceId();
+	static void     SetCloudDeviceId(LPCSTR lpszValue);
+	static BOOL     GetCloudSyncEnabled();
+	static void     SetCloudSyncEnabled(BOOL bValue);
+	static BOOL     GetCloudPushOnCopy();
+	static void     SetCloudPushOnCopy(BOOL bValue);
+	static BOOL     GetCloudPeriodicSync();
+	static void     SetCloudPeriodicSync(BOOL bValue);
+	static int      GetCloudSyncInterval();
+	static void     SetCloudSyncInterval(int nSeconds);
+	static CString  GetCloudDeviceName();
+	static void     SetCloudDeviceName(LPCTSTR lpszValue);
+	static CString  GetCloudEncryptionKey();
+	static void     SetCloudEncryptionKey(LPCTSTR lpszValue);
+	static CString  GetCloudEncryptionSalt();
+	static void     SetCloudEncryptionSalt(LPCTSTR lpszValue);
+	static BOOL     GetCloudSyncEncryptionEnabled();
+	static void     SetCloudSyncEncryptionEnabled(BOOL bValue);
+	static BOOL     GetCloudEncryptionNeedsRecovery();
+	static void     SetCloudEncryptionNeedsRecovery(BOOL bValue);
+	static __int64  GetCloudLastSyncTime();
+	static void     SetCloudLastSyncTime(__int64 value);
+	static BOOL     GetCloudInitialPushDone();
+	static void     SetCloudInitialPushDone(BOOL bValue);
+	static __int64  GetCloudInitialPushOffset();
+	static void     SetCloudInitialPushOffset(__int64 value);
+	static __int64  GetCloudLastPushTime();
+	static void     SetCloudLastPushTime(__int64 value);
+	static CString  GetCloudKeyFilePath();
+	static void     SetCloudKeyFilePath(LPCTSTR lpszValue);
+	static CString  GetCloudLastUsername();
+	static void     SetCloudLastUsername(LPCTSTR lpszValue);
+
 	static BOOL		m_bDrawRTF;
 	static void		SetDrawRTF(long bDraw);
 	static BOOL		GetDrawRTF();
@@ -328,6 +366,10 @@ public:
 	static BOOL		m_bEnableDebugLogging;
 	static BOOL		GetEnableDebugLogging();
 	static void		SetEnableDebugLogging(BOOL bEnable);
+
+	static BOOL		m_bLogClipboardContent;
+	static BOOL		GetLogClipboardContent();
+	static void		SetLogClipboardContent(BOOL bEnable);
 
 	static BOOL		m_bEnsureConnectToClipboard;
 	static BOOL		GetEnsureConnectToClipboard();
@@ -743,6 +785,13 @@ public:
 	static BOOL m_enforceClipboardIgnoreFormats;
 	static void SetEnforceClipboardIgnoreFormats(BOOL val);
 	static BOOL GetEnforceClipboardIgnoreFormats();
+
+	static BOOL		m_bEnableOCR;
+	static BOOL		GetEnableOCR();
+	static void		SetEnableOCR(BOOL bEnable);
+
+	static BOOL GlobMatch(LPCTSTR str, LPCTSTR pattern);
+	static void GetProfileKeyNames(CString csSection, CStringArray &rNames);
 };
 
 // global for easy access and for initialization of fast access variables

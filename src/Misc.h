@@ -8,6 +8,7 @@
 
 #include "..\Shared/ArrayEx.h"
 #include <vector>
+#include <new>
 
 #define VK_MOUSE_CLICK 0x01
 #define VK_MOUSE_DOUBLE_CLICK 0x02
@@ -49,6 +50,16 @@ public:
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));	\
 		ASSERT(FALSE);				\
     }								\
+	catch (std::bad_alloc&)			\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: std::bad_alloc"));	\
+		ASSERT(FALSE);				\
+	}								\
+	catch (...)						\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: unknown exception"));	\
+		ASSERT(FALSE);				\
+	}
 
 #define CATCH_SQLITE_EXCEPTION_AND_RETURN(bRet)		\
 	catch (CppSQLite3Exception& e)	\
@@ -57,11 +68,24 @@ public:
 		ASSERT(FALSE);				\
 		return bRet;				\
     }								\
+	catch (std::bad_alloc&)			\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: std::bad_alloc"));	\
+		ASSERT(FALSE);				\
+		return bRet;				\
+	}								\
+	catch (...)						\
+	{								\
+		Log(_T("CATCH_SQLITE_EXCEPTION: unknown exception"));	\
+		ASSERT(FALSE);				\
+		return bRet;				\
+	}
 	
 #define	FIX_PATH(strPath) \
 { \
-	if (strPath[strlen(strPath)-1] != '\\' && strPath[strlen(strPath)-1] != '/') \
-	strcat(strPath, "\\"); \
+	size_t _len = strlen(strPath); \
+	if (_len > 0 && strPath[_len-1] != '\\' && strPath[_len-1] != '/') \
+		strcat_s(strPath, _len + 2, "\\"); \
 }
 
 #define	FIX_CSTRING_PATH(csPath) \
@@ -79,8 +103,9 @@ CString GetComputerName();
 #define FUNCSIG		__FUNCSIG__
 void AppendToFile(const TCHAR* fn, const TCHAR *msg);
 #define Log(msg) log(msg, false, __FILE__, __LINE__)
+#define LogClip(msg) logclip(msg, false, __FILE__, __LINE__)
+void logclip(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
 void log(const TCHAR* msg, bool bFromSendRecieve = false, CString csFile = _T(""), long lLine = -1);
-CString GetErrorString(int err);
 
 double IdleSeconds();
 
@@ -89,9 +114,6 @@ void logsendrecieveinfo(CString cs, CString csFile = _T(""), long lLine = -1);
 
 // Utility Functions
 CString StrF(const TCHAR * pszFormat, ...);
-// called after determining that the preceding character is a backslash
-BYTE GetEscapeChar( BYTE ch );
-CString RemoveEscapes( const TCHAR* str );
 
 CString GetWndText( HWND hWnd );
 // returns true if the given window is owned by this process
@@ -104,11 +126,6 @@ void CopyToGlobalHH(HGLOBAL hDest, HGLOBAL hSource, SIZE_T ulBufLen);
 HGLOBAL NewGlobalP(LPVOID pBuf, SIZE_T nLen);
 HGLOBAL NewGlobalH(HGLOBAL hSource, SIZE_T nLen);
 HGLOBAL NewGlobal(SIZE_T nLen);
-int CompareGlobalHP(HGLOBAL hLeft, LPVOID pBuf, SIZE_T ulBufLen);
-int CompareGlobalHH(HGLOBAL hLeft, HGLOBAL hRight, SIZE_T ulBufLen);
-
-BOOL EncryptString(CString &csString, UCHAR*& pOutput, int &nLenOutput);
-BOOL DecryptString(UCHAR *pData, int nLenIn, UCHAR*& pOutput, int &nLenOutput);
 
 int GetScreenWidth();
 int GetScreenHeight();
@@ -116,7 +133,6 @@ int GetScreenHeight();
 std::vector<CLIPFORMAT> GetSystemClipFormats();
 CLIPFORMAT GetFormatID(LPCTSTR cbName);
 CString GetFormatName(CLIPFORMAT cbType);
-BOOL PreTranslateGuiDll(MSG *pMsg);
 
 CString GetFilePath(CString csFullPath);
 CString GetFileName(CString csFileName);
@@ -166,13 +182,15 @@ __int64 GetLastWriteTime(const CString &csFile);
 #define WM_REFRESH_FOOTER WM_USER + 232
 #define WM_PASTE_CLIP WM_USER + 233
 #define WM_EDIT_CLIP WM_USER + 234
+#define WM_OCR_COMPLETED WM_USER + 235
+#define WM_OCR_BATCH_DONE WM_USER + 236
 
 
 #if !defined(_BITSET_)
 #	include <bitset>
 #endif // !defined(_BITSET_)
 
-long NewGroupID(int parentID = 0, CString text = "");
+long NewGroupID(int parentID = 0, CString text = "", CString description = _T(""));
 BOOL DeleteAllIDs();
 BOOL DeleteFormats(int parentID, ARRAY& formatIDs);
 
@@ -181,7 +199,6 @@ __inline BOOL FileExists(LPCTSTR pszFile)
 	return (GetFileAttributes(pszFile) != 0xffffffff); 
 }
 
-bool IsRunningLimited();
 BOOL IsVista();
 
 void DeleteDittoTempFiles(BOOL checkFileLastAccess);
@@ -190,6 +207,7 @@ void DeleteFolderFiles(CString csDir, BOOL checkFileLastAccess, CTimeSpan lastAc
 __int64 FileSize(const TCHAR *fileName);
 
 int FindNoCaseAndInsert(CString& mainStr, CString& findStr, CString preInsert, CString postInsert, int linesPerRow);
+void TruncateTextToMatchLine(CString& mainStr, int firstMatchPos, int linesPerRow);
 
 void OnInitMenuPopupEx(CMenu *pPopupMenu, UINT nIndex, BOOL bSysMenu, CWnd *pWnd);
 
@@ -209,7 +227,6 @@ CString TopLevelWindowText(DWORD pid);
 
 BOOL DarkAppWindows10Setting();
 DWORD Windows10AccentColor();
-BOOL Windows10ColorTitleBar();
 
 BOOL BackupDbPrompt(HWND hwnd);
 BOOL RestoreDbPrompt(HWND hwnd);

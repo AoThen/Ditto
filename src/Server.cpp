@@ -7,6 +7,7 @@
 #include "Server.h"
 #include "..\Shared\Tokenizer.h"
 #include "WildCardMatch.h"
+#include "Options.h"
 
 #ifdef _DEBUG
 #undef THIS_FILE
@@ -54,12 +55,12 @@ UINT  MTServerThread(LPVOID pParam)
 		LogSendRecieveInfo("ERROR - theApp.m_sSocket = socket(AF_INET, SOCK_STREAM, 0);");
 		return 0;
 	}
-	if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
+	if(::bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)");
 		return 0;
 	}
-	if(listen(theApp.m_sSocket,10)!=0)
+	if(::listen(theApp.m_sSocket,10)!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(listen(theApp.m_sSocket,10)!=0)");
 		return 0;
@@ -261,7 +262,8 @@ void CServer::OnStart(CSendInfo &info)
 	}
 	
 	info.m_cDesc[20] = 0;
-	LogSendRecieveInfo(StrF(_T("::START %s %s %s"), m_csDesc, m_csComputerName, m_csIP));
+	if (CGetSetOptions::GetLogClipboardContent())
+		LogSendRecieveInfo(StrF(_T("::START %s %s %s"), m_csDesc, m_csComputerName, m_csIP));
 }
 
 void CServer::OnDataStart(CSendInfo &info)
@@ -387,8 +389,6 @@ void CServer::AddRemoteCF_HDROPFormat()
 	CDittoCF_HDROP Drop;
 
 	Drop.respondPort = m_respondPort;
-
-	CTextConvert Convert;
 
 	CStringA dest = CTextConvert::UnicodeToUTF8(m_csIP);
 	strncpy(Drop.m_cIP, dest, sizeof(Drop.m_cIP)-1);

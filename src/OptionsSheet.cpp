@@ -14,6 +14,7 @@
 #include "OptionsCopyBuffers.h"
 #include "Misc.h"
 #include "QuickPasteKeyboard.h"
+#include "OptionCloud.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -71,7 +72,8 @@ COptionsSheet::COptionsSheet(LPCTSTR pszCaption, CWnd* pParentWnd, UINT iSelectP
 	AddPage(m_pStats);
 	AddPage(m_pAbout);
 
-	
+	m_pCloud = new COptionCloud;
+	AddPage(m_pCloud);
 }
 
 COptionsSheet::~COptionsSheet()
@@ -85,7 +87,8 @@ COptionsSheet::~COptionsSheet()
 	delete m_pAbout;	
 	delete m_pFriends;
 	delete m_pUtilites;
-	delete m_pQuickPasteShortCuts;	
+	delete m_pQuickPasteShortCuts;
+	delete m_pCloud;
 }
 
 BEGIN_MESSAGE_MAP(COptionsSheet, CPropertySheet)
@@ -120,7 +123,7 @@ BOOL COptionsSheet::OnInitDialog()
 
 	BOOL bResult = CPropertySheet::OnInitDialog();
 
-	SetWindowText(_T("Options"));
+	SetWindowText(theApp.m_Language.GetString("OptionsWindowTitle", _T("Options")));
 
 	theApp.m_Language.UpdateOptionsSheet(this);
 

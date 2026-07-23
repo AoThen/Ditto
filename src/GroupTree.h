@@ -39,6 +39,7 @@ protected:
 	bool DoActionNewGroup();
 	bool DoActionDeleteSelected();
 	bool DoActionClipProperties();
+	bool DoActionToggleDontSync();
 	void UpdateMenuShortCut(CCmdUI *pCmdUI, DWORD action);
 
 	HWND m_NotificationWnd;
@@ -80,9 +81,11 @@ protected:
 public:
 	afx_msg void OnMenuNewgroup32896();
 	afx_msg void OnMenuDeletegroup();
+	afx_msg void OnMenuDontsync();
 	afx_msg void OnMenuProperties32898();
 	afx_msg void OnUpdateMenuNewgroup32896(CCmdUI *pCmdUI);
 	afx_msg void OnUpdateMenuDeletegroup(CCmdUI *pCmdUI);
+	afx_msg void OnUpdateMenuDontsync(CCmdUI *pCmdUI);
 	afx_msg void OnUpdateMenuProperties32898(CCmdUI *pCmdUI);
 	afx_msg void OnInitMenuPopup(CMenu *pPopupMenu, UINT nIndex,BOOL bSysMenu);
 };

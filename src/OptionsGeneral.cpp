@@ -188,6 +188,11 @@ void COptionsGeneral::FillLanguages()
 
 	CString csLanguage = CGetSetOptions::GetLanguageFile();
 
+	if(csLanguage.IsEmpty())
+	{
+		csLanguage = CMultiLanguage::DetectSystemLanguage();
+	}
+
 	CFileFind find;
 	BOOL bCont = find.FindFile(csFile);
 	int nEnglishIndex = NO_MATCH;
@@ -278,7 +283,7 @@ BOOL COptionsGeneral::OnApply()
 					bOpenNewDatabase = true;
 				}
 				else
-					MessageBox(_T("Error Creating Database"));
+					MessageBox(theApp.m_Language.GetString("MsgErrorCreatingDatabase", "Error Creating Database"));
 			}
 			else
 			{
@@ -289,7 +294,7 @@ BOOL COptionsGeneral::OnApply()
 		{
 			if(ValidDB(resolvedPath) == FALSE)
 			{
-				MessageBox(_T("Invalid Database"), _T("Ditto"), MB_OK);
+				MessageBox(theApp.m_Language.GetString("MsgInvalidDatabase", "Invalid Database"), _T("Ditto"), MB_OK);
 				m_ePath.SetFocus();
 				return FALSE;
 			}
@@ -305,7 +310,7 @@ BOOL COptionsGeneral::OnApply()
 
 			if(OpenDatabase(resolvedPath) == FALSE)
 			{
-				MessageBox(_T("Error Opening new database"), _T("Ditto"), MB_OK);
+				MessageBox(theApp.m_Language.GetString("MsgErrorOpeningDatabase", "Error Opening new database"), _T("Ditto"), MB_OK);
 				m_ePath.SetFocus();
 				return FALSE;
 			}
@@ -356,20 +361,6 @@ BOOL COptionsGeneral::OnSetActive()
 	return CPropertyPage::OnSetActive();
 }
 
-//void COptionsGeneral::OnSetDbPath() 
-//{
-//	if(m_btSetDatabasePath.GetCheck() == BST_CHECKED)
-//	{
-//		m_ePath.EnableWindow(TRUE);
-//		m_btGetPath.EnableWindow(TRUE);
-//	}
-//	else
-//	{
-//		m_ePath.EnableWindow(FALSE);
-//		m_btGetPath.EnableWindow(FALSE);
-//	}	
-//}
-
 void COptionsGeneral::OnGetPath() 
 {
 	OPENFILENAME	FileName;
@@ -397,7 +388,7 @@ void COptionsGeneral::OnGetPath()
 	{
 		if(ValidDB(csPath) == FALSE)
 		{
-			MessageBox(_T("Invalid Database"), _T("Ditto"), MB_OK);
+			MessageBox(theApp.m_Language.GetString("MsgInvalidDatabase", "Invalid Database"), _T("Ditto"), MB_OK);
 			m_ePath.SetFocus();
 		}
 		else
@@ -577,7 +568,7 @@ void COptionsGeneral::OnBnClickedButtonDefaultFault()
 	m_LogFont.lfHeight = -13;
 	m_LogFont.lfWeight = 400;
 	m_LogFont.lfCharSet = 1;
-	STRCPY(m_LogFont.lfFaceName, _T("Segoe UI"));
+	STRCPY_S(m_LogFont.lfFaceName, LF_FACESIZE, _T("Segoe UI"));
 		
 	CString cs;
 	cs.Format(_T("Font - %s (%d)"), m_LogFont.lfFaceName, GetFontSize(m_hWnd, m_LogFont));
@@ -612,27 +603,6 @@ void COptionsGeneral::OnBnClickedButtonFont()
 		m_btFont.SetWindowText(cs);
 	}
 }
-
-
-//void COptionsGeneral::OnNMClickSyslinkEnvVarInfo(NMHDR *pNMHDR, LRESULT *pResult)
-//{
-//	CString url = _T("https:////sourceforge.net//p//ditto-cp//wiki//EnvironmentVariables//");
-//
-//	CHyperLink::GotoURL(url, SW_SHOW);
-//
-//	*pResult = 0;
-//}
-//
-//
-//void COptionsGeneral::OnEnChangePath()
-//{
-//	// TODO:  If this is a RICHEDIT control, the control will not
-//	// send this notification unless you override the CPropertyPage::OnInitDialog()
-//	// function and call CRichEditCtrl().SetEventMask()
-//	// with the ENM_CHANGE flag ORed into the mask.
-//
-//	// TODO:  Add your control notification handler code here
-//}
 
 
 void COptionsGeneral::OnEnChangePath()

@@ -233,6 +233,11 @@ bool CMultiLanguage::UpdateOptionCopyBuffers(CWnd *pParent)
 	return UpdateWindowToLanguage(pParent, m_OptionsCopyBuffers);
 }
 
+bool CMultiLanguage::UpdateOptionCloud(CWnd *pParent)
+{
+	return UpdateWindowToLanguage(pParent, m_OptionsCloud);
+}
+
 bool CMultiLanguage::UpdateGlobalHotKeys(CWnd *pParent)
 {
 	return UpdateWindowToLanguage(pParent, m_GlobalHotKeys);
@@ -396,6 +401,7 @@ bool CMultiLanguage::LoadLanguageFile(CString csFile)
 	bRet = LoadSection(*ItemHeader, m_OptionsSheet, "Ditto_Options_Sheet");
 	bRet = LoadSection(*ItemHeader, m_TrayIconRightClickMenu, "Ditto_Tray_Icon_Menu");
 	bRet = LoadSection(*ItemHeader, m_OptionsCopyBuffers, "Ditto_Options_CopyBuffers");
+	bRet = LoadSection(*ItemHeader, m_OptionsCloud, "Ditto_Options_Cloud");
 	bRet = LoadSection(*ItemHeader, m_GlobalHotKeys, "Ditto_GlobalHotKeys");
 	bRet = LoadSection(*ItemHeader, m_DeleteClipData, "Ditto_DeleteClipData");
 	
@@ -501,4 +507,41 @@ bool CMultiLanguage::LoadStringTableSection(TiXmlNode &doc, LANGUAGE_MAP &Map, C
 	}
 
 	return true;
+}
+
+CString CMultiLanguage::DetectSystemLanguage()
+{
+	LANGID langID = GetUserDefaultUILanguage();
+
+	switch (langID)
+	{
+		case 0x0409: return _T("English");
+		case 0x0804: return _T("Chinese Simplified");
+		case 0x0404: return _T("Chinese Traditional");
+		case 0x041A: return _T("Croatian");
+		case 0x0405: return _T("Czech");
+		case 0x0406: return _T("Danish");
+		case 0x0407: return _T("Deutsch");
+		case 0x0413: return _T("Dutch");
+		case 0x040B: return _T("Finnish");
+		case 0x040C: return _T("French");
+		case 0x0408: return _T("Greek");
+		case 0x040D: return _T("Hebrew");
+		case 0x0410: return _T("Italian");
+		case 0x0411: return _T("Japanese");
+		case 0x0412: return _T("Korean");
+		case 0x0429: return _T("Persian");
+		case 0x0415: return _T("Polski");
+		case 0x0416: return _T("Portuguese");
+		case 0x0816: return _T("Portuguese");
+		case 0x0418: return _T("Romanian");
+		case 0x0419: return _T("Russian");
+		case 0x0424: return _T("Slovenian");
+		case 0x040A: return _T("Spanish");
+		case 0x041D: return _T("Swedish");
+		case 0x041F: return _T("Turkish");
+		case 0x0422: return _T("Ukrainian");
+	}
+
+	return _T("");
 }

@@ -32,7 +32,7 @@ public:
 	long				m_lParameter2;
 	CHAR				m_md5[32];
 	char				m_manualSend;
-	short				m_respondPort;
+	unsigned short		m_respondPort;
 	char				m_cExtra[15];
 };
 
@@ -47,5 +47,5 @@ public:
 	}
 	char m_cIP[25];
 	char m_cComputerName[MAX_COMPUTERNAME_LENGTH + 1];
-	short respondPort;
+	unsigned short respondPort;
 };

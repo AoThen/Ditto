@@ -9,7 +9,7 @@
 
 #define EVENT_FILE_CHANGED 1
 
-#define MAX_TIMEOUT 86400
+#define MAX_TIMEOUT ONE_DAY
 
 CClipEditThread::CClipEditThread()
 {

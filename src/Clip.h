@@ -44,6 +44,8 @@ public:
 	int m_parentId;
 
 	CClipFormat(CLIPFORMAT cfType = 0, HGLOBAL hgData = 0, int parentId = -1);
+	CClipFormat(const CClipFormat& other);
+	CClipFormat& operator=(const CClipFormat& other);
 	~CClipFormat();
 
 	void Clear();
@@ -136,6 +138,8 @@ public:
 	ULONG m_lTotalCopySize;
 	int m_parentId;
 	int m_dontAutoDelete;
+	int m_dontSync;
+	CString m_description;
 	int m_shortCut;
 	BOOL m_bIsGroup;
 	DWORD m_CRC;
@@ -150,6 +154,11 @@ public:
 	int m_moveToGroupShortCut;
 	BOOL m_globalMoveToGroupShortCut;
 	CopyReasonEnum::CopyReason m_copyReason;
+
+	std::vector<BYTE> m_ocrImageData;
+	int m_ocrWidth;
+	int m_ocrHeight;
+	int m_ocrStride;
 
 	virtual CString Description() { return m_Desc; }
 	virtual void Description(CString csValue) { m_Desc = csValue; }
