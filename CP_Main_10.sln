@@ -11,13 +11,13 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CP_Main", "CP_Main.vcxproj"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DittoUtil", "Addins\DittoUtil\DittoUtil.vcxproj", "{CF8F6379-5340-4494-8E59-2807ADF37B95}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "focus", "focusdll\focus.vcxproj", "{E4AB8C80-F35F-451E-853B-07CEDD49E500}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "focus", "tools\focusdll\focus.vcxproj", "{E4AB8C80-F35F-451E-853B-07CEDD49E500}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FocusHighlight", "FocusHighlight\FocusHighlight.vcxproj", "{385F3F81-896E-41EF-AE32-98D8A026588F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FocusHighlight", "tools\FocusHighlight\FocusHighlight.vcxproj", "{385F3F81-896E-41EF-AE32-98D8A026588F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ICU_Loader", "ICU_Loader\ICU_Loader.vcxproj", "{1FA87564-F5EC-42F8-978C-E827AAB54CB1}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ICU_Loader", "tools\ICU_Loader\ICU_Loader.vcxproj", "{1FA87564-F5EC-42F8-978C-E827AAB54CB1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CloudSync_Test", "CloudSync_Test\CloudSync_Test.vcxproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CloudSync_Test", "tools\CloudSync_Test\CloudSync_Test.vcxproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DittoOCR", "Addins\DittoOCR\DittoOCR.vcxproj", "{E7B8A1C2-3D4F-5A6B-7C8D-9E0F1A2B3C4D}"
 EndProject

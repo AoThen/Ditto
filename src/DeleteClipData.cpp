@@ -8,7 +8,7 @@
 #include "Misc.h"
 #include "ProgressWnd.h"
 #include <algorithm>
-#include "../Shared/TextConvert.h"
+#include "shared\TextConvert.h"
 #include "../resource.h"
 #include "CopyProperties.h"
 #include "DimWnd.h"

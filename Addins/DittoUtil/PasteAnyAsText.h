@@ -1,6 +1,6 @@
 #pragma once
-#include "..\..\Shared\DittoDefines.h"
-#include "..\..\Shared\IClip.h"
+#include "..\..\src\shared\DittoDefines.h"
+#include "..\..\src\shared\IClip.h"
 
 
 class PasteAnyAsText

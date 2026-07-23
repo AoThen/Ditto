@@ -1,5 +1,5 @@
 #pragma once
-#include "../Shared/IClip.h"
+#include "../../src/shared/IClip.h"
 #include <vector>
 #include <memory>
 #include <cstring>

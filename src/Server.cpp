@@ -5,7 +5,7 @@
 #include "stdafx.h"
 #include "cp_main.h"
 #include "Server.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include "WildCardMatch.h"
 #include "Options.h"
 

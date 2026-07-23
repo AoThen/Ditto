@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "ConvertRTFToText.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 
 BOOL CConvertRTFToText::Create()

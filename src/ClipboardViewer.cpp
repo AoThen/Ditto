@@ -5,7 +5,7 @@
 #include "cp_main.h"
 #include "ClipboardViewer.h"
 #include "Misc.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include "WildCardMatch.h"
 
 #ifdef _DEBUG

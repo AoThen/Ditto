@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "CP_Main.h"
 #include "OptionsTypes.h"
-#include "..\Shared\ArrayEx.h"
+#include "shared\ArrayEx.h"
 #include "DimWnd.h"
 #include "Misc.h"
 

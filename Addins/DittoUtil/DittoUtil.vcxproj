@@ -354,7 +354,7 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Shared\TextConvert.cpp" />
+    <ClCompile Include="..\..\src\shared\TextConvert.cpp" />
     <ClCompile Include="DialogResizer.cpp" />
     <ClCompile Include="DittoUtil.cpp" />
     <ClCompile Include="Exports.cpp" />
@@ -378,8 +378,8 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Shared\TextConvert.h" />
-    <ClInclude Include="..\..\Shared\Tokenizer.h" />
+    <ClInclude Include="..\..\src\shared\TextConvert.h" />
+    <ClInclude Include="..\..\src\shared\Tokenizer.h" />
     <ClInclude Include="DialogResizer.h" />
     <ClInclude Include="DittoUtil.h" />
     <ClInclude Include="Exports.h" />

@@ -6,7 +6,7 @@
 #include "cp_main.h"
 #include "FileSend.h"
 #include "Server.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "Md5.h"
 
 #include <shlwapi.h>

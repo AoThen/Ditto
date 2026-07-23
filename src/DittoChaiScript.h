@@ -1,6 +1,6 @@
 #pragma once
 
-#include "..\Shared\IClip.h"
+#include "shared\IClip.h"
 #include <string>
 
 

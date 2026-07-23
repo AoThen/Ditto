@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
 #include "stdafx.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include ".\qpastewnd.h"
 #include "ActionEnums.h"
 #include "CF_TextAggregator.h"

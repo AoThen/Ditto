@@ -9,7 +9,7 @@
 #include <io.h>
 #include "Path.h"
 #include "zlib.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include <vector>
 using namespace nsPath;
 

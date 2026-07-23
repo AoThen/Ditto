@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "ChaiScriptOnCopy.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 #include "chaiscript/chaiscript.hpp"
 

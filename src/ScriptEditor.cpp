@@ -6,7 +6,7 @@
 #include "ScriptEditor.h"
 #include "afxdialogex.h"
 #include "ChaiScriptOnCopy.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "DittoChaiScript.h"
 
 

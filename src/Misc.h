@@ -6,7 +6,7 @@
 #pragma once
 #endif // _MSC_VER > 1000
 
-#include "..\Shared/ArrayEx.h"
+#include "shared\ArrayEx.h"
 #include <vector>
 #include <new>
 

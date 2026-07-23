@@ -3,7 +3,7 @@
 #include "ClipIds.h"
 #include <vector>
 #include "tinyxml\tinyxml.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "Clip_ImportExport.h"
 #include "CF_HDropAggregator.h"
 #include "CF_UnicodeTextAggregator.h"

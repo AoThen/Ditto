@@ -2,7 +2,7 @@
 #include "CP_Main.h"
 #include "Misc.h"
 #include "OptionsSheet.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "AlphaBlend.h"
 #include "Tlhelp32.h"
 #include <Wininet.h>

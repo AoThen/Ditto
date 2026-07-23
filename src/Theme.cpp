@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include ".\theme.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "Misc.h"
 #include "Options.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include "CP_Main.h"
 
 CTheme::CTheme(void)

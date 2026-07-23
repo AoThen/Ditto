@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "ChaiScriptXml.h"
 #include "tinyxml\tinyxml.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "Misc.h"
 #include "ActionEnums.h"
 

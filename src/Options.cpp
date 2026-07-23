@@ -2,12 +2,12 @@
 #include "Options.h"
 #include "AlphaBlend.h"
 #include "Misc.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "sqlite\CppSQLite3.h"
 #include "Path.h"
 #include "CP_Main.h"
 #include "ActionEnums.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include <set>
 #include <Wincrypt.h>
 

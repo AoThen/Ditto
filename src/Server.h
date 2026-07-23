@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Winsock2.h"
-#include "..\Shared\Encryption.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\Encryption.h"
+#include "shared\TextConvert.h"
 #include "RecieveSocket.h"
 #include "FileSend.h"
 #include "ServerDefines.h"

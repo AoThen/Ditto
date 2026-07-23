@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CP_Main.h"
 #include "RegExFilterHelper.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include "Options.h"
 #include "WildCardMatch.h"
 

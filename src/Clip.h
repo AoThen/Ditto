@@ -12,7 +12,7 @@
 #include <afxtempl.h>
 #include <memory>
 #include "tinyxml\tinyxml.h"
-#include "..\Shared\IClip.h"
+#include "shared\IClip.h"
 #include "Misc.h"
 
 class CClip;

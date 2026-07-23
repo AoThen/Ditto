@@ -1,7 +1,7 @@
 #include "StdAfx.h"
 #include "ReadOnlyFlag.h"
-#include "../../Shared/Tokenizer.h"
-#include "../../Shared/TextConvert.h"
+#include "../../src/shared/Tokenizer.h"
+#include "../../src/shared/TextConvert.h"
 
 
 CReadOnlyFlag::CReadOnlyFlag(void)

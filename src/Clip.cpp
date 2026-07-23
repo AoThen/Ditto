@@ -8,7 +8,7 @@
 #include "DatabaseUtilities.h"
 #include "Crc32Dynamic.h"
 #include "sqlite\CppSQLite3.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "zlib.h"
 #include "Misc.h"
 #include "Md5.h"

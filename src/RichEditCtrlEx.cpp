@@ -3,7 +3,7 @@
 
 #include "stdafx.h"
 #include "RichEditCtrlEx.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

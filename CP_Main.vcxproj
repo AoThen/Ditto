@@ -182,16 +182,16 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderOutputFile>.\Release\CP_Main.pch</PrecompiledHeaderOutputFile>
-      <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
-      <AssemblerListingLocation>.\Release\</AssemblerListingLocation>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <StringPooling>true</StringPooling>
+    <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    <FunctionLevelLinking>true</FunctionLevelLinking>
+    <PrecompiledHeader>Use</PrecompiledHeader>
+    <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+    <PrecompiledHeaderOutputFile>.\Release\CP_Main.pch</PrecompiledHeaderOutputFile>
+    <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
+    <AssemblerListingLocation>.\Release\</AssemblerListingLocation>
       <ObjectFileName>.\Release\</ObjectFileName>
       <ProgramDataBaseFileName>.\Release\</ProgramDataBaseFileName>
       <WarningLevel>Level3</WarningLevel>
@@ -243,14 +243,14 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderOutputFile>.\Release64\CP_Main.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <StringPooling>true</StringPooling>
+    <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    <FunctionLevelLinking>true</FunctionLevelLinking>
+    <PrecompiledHeader>Use</PrecompiledHeader>
+    <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+    <PrecompiledHeaderOutputFile>.\Release64\CP_Main.pch</PrecompiledHeaderOutputFile>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerListingLocation>.\Release64\</AssemblerListingLocation>
       <ObjectFileName>.\Release64\</ObjectFileName>
@@ -302,14 +302,14 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeaderOutputFile>.\$(Platform)\$(Configuration)\CP_Main.pch</PrecompiledHeaderOutputFile>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <StringPooling>true</StringPooling>
+    <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    <FunctionLevelLinking>true</FunctionLevelLinking>
+    <PrecompiledHeader>Use</PrecompiledHeader>
+    <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
+    <PrecompiledHeaderOutputFile>.\$(Platform)\$(Configuration)\CP_Main.pch</PrecompiledHeaderOutputFile>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <AssemblerListingLocation>.\$(Platform)\$(Configuration)\</AssemblerListingLocation>
       <ObjectFileName>.\$(Platform)\$(Configuration)\</ObjectFileName>
@@ -357,10 +357,10 @@
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -416,10 +416,10 @@
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -474,10 +474,10 @@
       <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
     </Manifest>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>

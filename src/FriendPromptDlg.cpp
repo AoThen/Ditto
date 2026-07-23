@@ -5,7 +5,7 @@
 #include "CP_Main.h"
 #include "FriendPromptDlg.h"
 #include "afxdialogex.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 
 
 // CFriendPromptDlg dialog

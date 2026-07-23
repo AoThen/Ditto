@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include ".\ImageFormatAggregator.h"
 #include "Misc.h"
-#include "..\Shared\Tokenizer.h"
+#include "shared\Tokenizer.h"
 #include "BitmapHelper.h"
 
 CImageFormatAggregator::CImageFormatAggregator(BOOL horizontally)

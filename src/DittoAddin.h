@@ -1,7 +1,7 @@
 #pragma once
 
-#include "..\Shared\DittoDefines.h"
-#include "..\Shared\IClip.h"
+#include "shared\DittoDefines.h"
+#include "shared\IClip.h"
 #include <vector>
 
 class CDittoAddin

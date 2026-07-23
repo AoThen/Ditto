@@ -6,7 +6,7 @@
 #include "CopyProperties.h"
 #include ".\copyproperties.h"
 #include "Md5.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

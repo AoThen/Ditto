@@ -10,7 +10,7 @@
 #include "DittoCopyBuffer.h"
 #include <atlbase.h>
 #include "DrawHTML.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include <cmath>
 #include <vector>
 #include <string>

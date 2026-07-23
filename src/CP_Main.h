@@ -9,7 +9,7 @@
 #include "DatabaseUtilities.h"
 #include "Misc.h"
 #include "Options.h"
-#include "..\Shared\ArrayEx.h"
+#include "shared\ArrayEx.h"
 #include "MainFrm.h"
 #include "ProcessPaste.h"
 #include "MultiLanguage.h"

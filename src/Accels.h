@@ -1,7 +1,7 @@
 #pragma once
 
 #include <map>
-#include "..\Shared\ArrayEx.h"
+#include "shared\ArrayEx.h"
 
 #define ACCEL_VKEY(key)			LOBYTE(key)
 #define ACCEL_MOD(key)			HIBYTE(key)

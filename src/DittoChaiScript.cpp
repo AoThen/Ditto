@@ -1,10 +1,10 @@
 #include "stdafx.h"
 #include "DittoChaiScript.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 #include "Md5.h"
 #include "Misc.h"
 #include "CP_Main.h"
-#include "..\Shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 #include <regex>
 

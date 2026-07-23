@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CreateQRCodeImage.h"
 #include "QRCode/qrencode.h"
-#include "..\shared\TextConvert.h"
+#include "shared\TextConvert.h"
 
 #define QRCODE_TEXT					"http://www.ultramundum.org/index.htm";		// Text to encode into QRCode
 #define OUT_FILE					"C:/temp/test.bmp"								// Output file name

@@ -1,8 +1,8 @@
 #include "StdAfx.h"
 #include "RemoveLineFeeds.h"
 
-#include "../../Shared/Tokenizer.h"
-#include "../../Shared/TextConvert.h"
+#include "../../src/shared/Tokenizer.h"
+#include "../../src/shared/TextConvert.h"
 
 
 CRemoveLineFeeds::CRemoveLineFeeds(void)
