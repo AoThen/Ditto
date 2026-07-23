@@ -68,62 +68,58 @@ echo [BUILD] Step 3/6: Collecting static libs from link tlog...
 set TLOG=%BUILD_DIR%\%CONFIG%\onnxruntime.dir\%CONFIG%\onnxruntime.tlog\link.read.1.tlog
 echo [BUILD] Looking for tlog: %TLOG%
 
-if not exist "%TLOG%" (
-    echo [BUILD] WARNING: link tlog not found at %TLOG%
-    echo [BUILD] Skipping lib merge step - will package install dir directly
-    goto :package_install
-)
-
-echo [BUILD] Tlog found, parsing...
-
 set libs=
-for /f "delims=" %%L in ('type "%TLOG%"') do (
-    set LINE=%%L
-    set LINE=!LINE:^=!
-    if "!LINE:~-4!" == ".LIB" (
-        set LINE=!LINE:"=!
-        set libs=!libs! !LINE!
+if exist "%TLOG%" (
+    echo [BUILD] Tlog found, parsing...
+    for /f "delims=" %%L in ('type "%TLOG%"') do (
+        set LINE=%%L
+        set LINE=!LINE:^=!
+        if "!LINE:~-4!" == ".LIB" (
+            set LINE=!LINE:"=!
+            set libs=!libs! !LINE!
+        )
     )
+    if "!libs!" == "" (
+        echo [BUILD] WARNING: No .lib files found in link tlog
+    ) else (
+        echo [BUILD] Found libs: !libs!
+    )
+) else (
+    echo [BUILD] WARNING: link tlog not found at %TLOG%
 )
-
-if "!libs!" == "" (
-    echo [BUILD] WARNING: No .lib files found in link tlog
-    echo [BUILD] Skipping lib merge step - will package install dir directly
-    goto :package_install
-)
-
-echo [BUILD] Found libs: !libs!
 echo [BUILD] Step 3/6 complete.
 
 REM -------------------------------------------------------------------
-REM 4. Merge static libs with lib.exe
+REM 4. Merge static libs with lib.exe (only if tlog had libs)
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4/6: Merging static libs...
-
 if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
 
-where lib.exe >nul 2>nul
-if errorlevel 1 (
-    echo [BUILD] WARNING: lib.exe not found, copying libs individually
-    for %%L in (!libs!) do (
-        copy "%%L" "%STATIC_INSTALL_DIR%\lib\" >nul
-        if errorlevel 1 (
-            echo [BUILD] WARNING: Failed to copy %%L
-        )
-    )
+if "!libs!" == "" (
+    echo [BUILD] Step 4/6: Skipping lib merge (no libs from tlog)
 ) else (
-    echo [BUILD] Merging with lib.exe...
-    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !libs!
+    echo [BUILD] Step 4/6: Merging static libs...
+    where lib.exe >nul 2>nul
     if errorlevel 1 (
-        echo [BUILD] WARNING: lib.exe failed to merge, copying libs individually
+        echo [BUILD] WARNING: lib.exe not found, copying libs individually
         for %%L in (!libs!) do (
             copy "%%L" "%STATIC_INSTALL_DIR%\lib\" >nul
+            if errorlevel 1 (
+                echo [BUILD] WARNING: Failed to copy %%L
+            )
         )
     ) else (
-        echo [BUILD] onnxruntime.lib created successfully
+        echo [BUILD] Merging with lib.exe...
+        lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !libs!
+        if errorlevel 1 (
+            echo [BUILD] WARNING: lib.exe failed to merge, copying libs individually
+            for %%L in (!libs!) do (
+                copy "%%L" "%STATIC_INSTALL_DIR%\lib\" >nul
+            )
+        ) else (
+            echo [BUILD] onnxruntime.lib created successfully
+        )
     )
 )
-
 echo [BUILD] Step 4/6 complete.
 
 REM -------------------------------------------------------------------
@@ -135,7 +131,7 @@ REM The install directory only contains onnxruntime's own libs.
 REM Third-party deps (protobuf, re2, onnx, absl, etc.) are in the build tree.
 REM Search for all .lib files and copy them to install-static/lib.
 for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\%CONFIG%\*.lib" 2^>nul') do (
-    echo %%f | findstr /i "\install\" >nul
+    echo %%f | findstr /i "\\install\\" >nul
     if errorlevel 1 (
         if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
             copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
