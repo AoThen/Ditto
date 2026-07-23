@@ -25,6 +25,7 @@
 #define DELAYED_SHOW_DITTO_TIMER		16
 #define SET_WINDOWS_THEME_TIMER			17
 #define CLOSE_NO_DB_WINDOW_TIMER        18
+#define EXIT_TIMEOUT_TIMER              19
 
 class CMainFrame: public CFrameWnd
 {

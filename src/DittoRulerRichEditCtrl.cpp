@@ -276,10 +276,13 @@ bool CDittoRulerRichEditCtrl::LoadTextData(CClip &Clip)
 	return true;
 }
 
-bool CDittoRulerRichEditCtrl::CloseEdit(bool bPrompt, BOOL bUpdateDesc)
+bool CDittoRulerRichEditCtrl::CloseEdit(bool bPrompt, BOOL bUpdateDesc, bool bForce)
 {
 	if(m_rtf.GetModify())
-	{		
+	{
+		if(bForce)
+			return true;
+
 		int nRet = IDYES;
 		
 		if(bPrompt)

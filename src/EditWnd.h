@@ -14,7 +14,7 @@ public:
 	virtual ~CEditWnd();
 
 	bool EditIds(CClipIDs &Ids);
-	bool CloseEdits(bool bPrompt);
+	bool CloseEdits(bool bPrompt, bool bForce = false);
 
 	void OnDpiChanged(CWnd* pParent, int dpi);
 

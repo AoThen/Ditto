@@ -215,9 +215,9 @@ BOOL CEditFrameWnd::PreTranslateMessage(MSG* pMsg)
 	return CFrameWnd::PreTranslateMessage(pMsg);
 }
 
-bool CEditFrameWnd::CloseAll()
+bool CEditFrameWnd::CloseAll(bool bForce)
 {
-	return m_EditWnd.CloseEdits(true);
+	return m_EditWnd.CloseEdits(true, bForce);
 }
 void CEditFrameWnd::OnNcLButtonDblClk(UINT nHitTest, CPoint point)
 {

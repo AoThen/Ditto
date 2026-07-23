@@ -880,6 +880,12 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 			theApp.CloseNoDbWindow();
 			break;
 
+		case EXIT_TIMEOUT_TIMER:
+			KillTimer(nIDEvent);
+			Log(_T("Exit timeout reached — forcing process termination"));
+			TerminateProcess(GetCurrentProcess(), 0);
+			break;
+
     }
 
     CFrameWnd::OnTimer(nIDEvent);
@@ -967,74 +973,80 @@ BOOL CMainFrame::PreTranslateMessage(MSG *pMsg)
 
 void CMainFrame::OnClose()
 {
+	SetTimer(EXIT_TIMEOUT_TIMER, 5000, NULL);
+
 	if (m_pEditFrameWnd)
-	{
-		if (m_pEditFrameWnd->CloseAll() == false)
-		{
-			return;
-		}
-	}
+		m_pEditFrameWnd->CloseAll(true);
 
-    CloseAllOpenDialogs();
+	CloseAllOpenDialogs();
 
-    Log(_T("OnClose - before stop MainFrm thread"));
-    m_thread.Stop();
-    Log(_T("OnClose - after stop MainFrm thread"));
+	Log(_T("OnClose - before stop MainFrm thread"));
+	m_thread.Stop(3000);
+	Log(_T("OnClose - after stop MainFrm thread"));
 
-    theApp.BeforeMainClose();
+	theApp.BeforeMainClose();
 
 	m_PowerManager.Close();
 
-    CFrameWnd::OnClose();
-    PostQuitMessage(0);
+	KillTimer(EXIT_TIMEOUT_TIMER);
+	CFrameWnd::OnClose();
+	PostQuitMessage(0);
 }
 
 bool CMainFrame::CloseAllOpenDialogs()
 {
-    bool bRet = false;
-    DWORD dwordProcessId;
-    DWORD dwordChildWindowProcessId;
-    GetWindowThreadProcessId(this->m_hWnd, &dwordProcessId);
-    ASSERT(dwordProcessId);
-
-	CArray<CWnd*, CWnd*> openDialogs;
-
-    CWnd *pTempWnd = GetDesktopWindow()->GetWindow(GW_CHILD);
-    while((pTempWnd = pTempWnd->GetWindow(GW_HWNDNEXT)) != NULL)
-    {
-        if(pTempWnd->GetSafeHwnd() == NULL)
-        {
-            break;
-        }
-
-        GetWindowThreadProcessId(pTempWnd->GetSafeHwnd(), &dwordChildWindowProcessId);
-        if(dwordChildWindowProcessId == dwordProcessId)
-        {
-            TCHAR szTemp[100];
-            GetClassName(pTempWnd->GetSafeHwnd(), szTemp, 100);
-
-            // #32770 is class name for dialogs so don't process the message if it is a dialog
-            if(STRCMP(szTemp, _T("#32770")) == 0)
-            {
-				openDialogs.Add(pTempWnd);                
-                bRet = true;
-            }
-        }
-    }
-
-	for (int i = 0; i < openDialogs.GetCount(); i++)
+	bool bRet = false;
+	for (int attempt = 0; attempt < 2; attempt++)
 	{
-		openDialogs[i]->PostMessage(WM_CLOSE, 0, 0);
+		DWORD dwordProcessId;
+		GetWindowThreadProcessId(this->m_hWnd, &dwordProcessId);
+		ASSERT(dwordProcessId);
+		DWORD dwordChildWindowProcessId;
+
+		CArray<CWnd*, CWnd*> openDialogs;
+
+		CWnd *pTempWnd = GetDesktopWindow()->GetWindow(GW_CHILD);
+		while((pTempWnd = pTempWnd->GetWindow(GW_HWNDNEXT)) != NULL)
+		{
+			if(pTempWnd->GetSafeHwnd() == NULL)
+			{
+				break;
+			}
+
+			GetWindowThreadProcessId(pTempWnd->GetSafeHwnd(), &dwordChildWindowProcessId);
+			if(dwordChildWindowProcessId == dwordProcessId)
+			{
+				TCHAR szTemp[100];
+				GetClassName(pTempWnd->GetSafeHwnd(), szTemp, 100);
+
+				if(STRCMP(szTemp, _T("#32770")) == 0)
+				{
+					openDialogs.Add(pTempWnd);
+					bRet = true;
+				}
+			}
+		}
+
+		if (openDialogs.GetCount() == 0)
+			break;
+
+		for (int i = 0; i < openDialogs.GetCount(); i++)
+		{
+			openDialogs[i]->PostMessage(WM_CLOSE, 0, 0);
+		}
+
+		MSG msg;
+		while(PeekMessage(&msg, NULL, NULL, NULL, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		if (attempt == 0)
+			Sleep(200);
 	}
 
-    MSG msg;
-    while(PeekMessage(&msg, NULL, NULL, NULL, PM_REMOVE))
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    return bRet;
+	return bRet;
 }
 
 LRESULT CMainFrame::OnLoadClipOnClipboard(WPARAM wParam, LPARAM lParam)

@@ -14,7 +14,7 @@ public:
 	bool LoadItem(long lID, CString csDesc);
 	int SaveToDB(BOOL bUpdateDesc);
 	long GetTypeFlags(long lID);
-	bool CloseEdit(bool bPrompt, BOOL bUpdateDesc);
+	bool CloseEdit(bool bPrompt, BOOL bUpdateDesc, bool bForce = false);
 	long GetDBID()		{ return m_lID; }
 	CString GetDesc()	{ return m_csDescription; }
 

@@ -349,7 +349,7 @@ void CEditWnd::OnSetFocus(CWnd* pOldWnd)
 	}
 }
 
-bool CEditWnd::CloseEdits(bool bPrompt)
+bool CEditWnd::CloseEdits(bool bPrompt, bool bForce)
 {
 	BOOL bUpdateDesc = m_updateDescriptionButton.GetCheck();
 
@@ -359,7 +359,7 @@ bool CEditWnd::CloseEdits(bool bPrompt)
 		CDittoRulerRichEditCtrl *pEdit = *it;
 		if(pEdit)
 		{
-			if(pEdit->CloseEdit(bPrompt, bUpdateDesc) == false)
+			if(pEdit->CloseEdit(bPrompt, bUpdateDesc, bForce) == false)
 				return false;
 
 			m_tabControl.DeleteItem(nTab);

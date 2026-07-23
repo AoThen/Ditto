@@ -968,7 +968,7 @@ int CCP_MainApp::ExitInstance()
 	// Quick wait for OCR threads to finish before DLL unload
 	{
 		int ocrWait = 0;
-		while (g_ocrThreadCount > 0 && ocrWait < 200)
+		while (g_ocrThreadCount > 0 && ocrWait < 60)
 		{
 			Sleep(50);
 			ocrWait += 50;

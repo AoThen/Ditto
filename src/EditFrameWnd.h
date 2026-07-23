@@ -12,7 +12,7 @@ class CEditFrameWnd : public CFrameWnd
 
 	bool EditIds(CClipIDs &Ids);
 	void SetNotifyWnd(HWND hWnd)	{ m_hNotifyWnd = hWnd; }
-	bool CloseAll();
+	bool CloseAll(bool bForce = false);
 
 protected:
 	virtual ~CEditFrameWnd();
