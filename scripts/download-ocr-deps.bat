@@ -39,6 +39,31 @@ if not exist "%DEPS_DIR%\onnxruntime-static\windows-x64" (
             copy "%DEPS_DIR%\onnxruntime-static\windows-x64\include\onnxruntime\core\session\*.h" "%DEPS_DIR%\onnxruntime-static\windows-x64\include\"
         )
     )
+
+    REM 合并拆分库为 onnxruntime.lib，兼容 install 回退归档
+    pushd "%DEPS_DIR%\onnxruntime-static\windows-x64\lib"
+    if not exist "onnxruntime.lib" (
+        if exist "onnxruntime_common.lib" (
+            echo Merging ONNX Runtime split libs into onnxruntime.lib...
+            for /f "usebackq delims=" %%i in (`vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2^>nul`) do (
+                call "%%i\VC\Auxiliary\Build\vcvars64.bat" >nul 2>nul
+            )
+            where lib.exe >nul 2>nul
+            if not errorlevel 1 (
+                echo Found lib.exe, merging...
+                lib.exe /OUT:onnxruntime.lib onnxruntime_*.lib
+                if errorlevel 1 (
+                    echo WARNING: lib.exe merge failed
+                ) else (
+                    echo onnxruntime.lib created successfully
+                )
+            ) else (
+                echo WARNING: lib.exe not found, skip merge
+                echo (DittoOCR build will fail with LNK1104 unless onnxruntime.lib exists)
+            )
+        )
+    )
+    popd
 )
 
 REM 2. 下载 OpenCV 静态库（如果不存在）
