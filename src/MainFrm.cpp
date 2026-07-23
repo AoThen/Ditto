@@ -986,6 +986,7 @@ void CMainFrame::OnClose()
 	m_PowerManager.Close();
 
     CFrameWnd::OnClose();
+    PostQuitMessage(0);
 }
 
 bool CMainFrame::CloseAllOpenDialogs()

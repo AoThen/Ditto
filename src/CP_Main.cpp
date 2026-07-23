@@ -204,13 +204,6 @@ BOOL CCP_MainApp::InitInstance()
 	InitCommonControlsEx(&InitCtrls);
 
 	AfxEnableControlContainer();
-	AfxOleInit();
-	AfxInitRichEditEx();	
-
-	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
-
-	LoadLibrary(TEXT("MSFTEDIT.DLL"));
 
 	setlocale(LC_TIME, ".OCP"); // defines the date/time formatting
 
@@ -402,6 +395,14 @@ BOOL CCP_MainApp::InitInstance()
 		}
 		return FALSE;
 	}
+
+	AfxOleInit();
+	AfxInitRichEditEx();	
+
+	Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+	Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
+
+	LoadLibrary(TEXT("MSFTEDIT.DLL"));
 
 	Log(StrF(_T("Starting up ditto with mutex: %s"), csMutex));
 
@@ -967,13 +968,16 @@ int CCP_MainApp::ExitInstance()
 	// Quick wait for OCR threads to finish before DLL unload
 	{
 		int ocrWait = 0;
-		while (g_ocrThreadCount > 0 && ocrWait < 5000)
+		while (g_ocrThreadCount > 0 && ocrWait < 200)
 		{
 			Sleep(50);
 			ocrWait += 50;
 		}
 	}
-	CleanupOCR();
+	if (g_ocrThreadCount == 0)
+	{
+		CleanupOCR();
+	}
 
 	DeleteDittoTempFiles(FALSE);
 
