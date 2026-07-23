@@ -2,6 +2,8 @@
 
 #include "ClipboardViewer.h"
 #include <afxmt.h>
+#include <atomic>
+#include <memory>
 
 struct CCopyConfig
 {
@@ -15,27 +17,44 @@ public:
 	// false to ignore changes in the clipboard
 	bool        m_bCopyOnChange;
 	// the supported types which are copied from the clipboard when it changes.
-	CClipTypes* m_pSupportedTypes; // ONLY accessed from CopyThread
+	std::unique_ptr<CClipTypes> m_pSupportedTypes;
 
 	CCopyConfig( HWND hClipHandler = NULL,
 	             bool bAsyncCopy = false,
 				 bool bCopyOnChange = false,
 				 CClipTypes* pSupportedTypes = NULL )
+		: m_hClipHandler(hClipHandler)
+		, m_bAsyncCopy(bAsyncCopy)
+		, m_bCopyOnChange(bCopyOnChange)
+		, m_pSupportedTypes(pSupportedTypes)
 	{
-		m_hClipHandler = hClipHandler;
-		m_bAsyncCopy = bAsyncCopy;
-		m_bCopyOnChange = bCopyOnChange;
-		m_pSupportedTypes = pSupportedTypes;
 	}
 
-	void DeleteTypes()
+	// Move constructor
+	CCopyConfig(CCopyConfig&& other) noexcept
+		: m_hClipHandler(other.m_hClipHandler)
+		, m_bAsyncCopy(other.m_bAsyncCopy)
+		, m_bCopyOnChange(other.m_bCopyOnChange)
+		, m_pSupportedTypes(std::move(other.m_pSupportedTypes))
 	{
-		if( m_pSupportedTypes )
-		{
-			delete m_pSupportedTypes;
-			m_pSupportedTypes = NULL;
-		}
 	}
+
+	// Move assignment
+	CCopyConfig& operator=(CCopyConfig&& other) noexcept
+	{
+		if (this != &other)
+		{
+			m_hClipHandler = other.m_hClipHandler;
+			m_bAsyncCopy = other.m_bAsyncCopy;
+			m_bCopyOnChange = other.m_bCopyOnChange;
+			m_pSupportedTypes = std::move(other.m_pSupportedTypes);
+		}
+		return *this;
+	}
+
+	// Delete copy constructor and copy assignment to prevent shallow copy of unique_ptr
+	CCopyConfig(const CCopyConfig&) = delete;
+	CCopyConfig& operator=(const CCopyConfig&) = delete;
 };
 
 class CCopyThread : public CWinThread
@@ -66,8 +85,8 @@ public:
 	void SyncConfig(); // safely syncs m_LocalConfig with m_SharedConfig
 
 // Shared (use thread-safe access functions below)
-	CCopyConfig         m_SharedConfig; 
-	bool                m_bConfigChanged; // true if m_SharedConfig was changed.
+	CCopyConfig         m_SharedConfig;
+	std::atomic<bool>   m_bConfigChanged; // true if m_SharedConfig was changed.
 
 	// Called within Main thread:
 	bool IsClipboardViewerConnected();

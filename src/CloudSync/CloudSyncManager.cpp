@@ -97,7 +97,6 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
 	, m_lastSyncSuccessTime(0)
-	, m_bSyncStopped(FALSE)
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
@@ -108,7 +107,6 @@ CCloudSyncManager::CCloudSyncManager()
 CCloudSyncManager::~CCloudSyncManager()
 {
 	Stop();
-	m_bSyncStopped = TRUE;
 	DeleteCriticalSection(&m_csSync);
 	DeleteCriticalSection(&m_csHttpClient);
 	DeleteCriticalSection(&m_csWsClient);
@@ -392,33 +390,34 @@ void CCloudSyncManager::Stop()
 
 	if (m_hSyncThread != NULL)
 	{
-		// Wait up to 30 seconds for thread to exit gracefully
-		// 30s matches the HTTP read timeout, so a single long operation should complete
-		// DO NOT use TerminateThread -- it can corrupt SQLite database and leak resources
-		DWORD dwWait = WaitForSingleObject(m_hSyncThread, 30000);
-		if (dwWait == WAIT_TIMEOUT)
+		// Wait indefinitely for thread to exit gracefully.
+		// SyncThreadProc checks m_hStopEvent between every operation and HTTP calls
+		// have a 30s read timeout, so the thread is guaranteed to exit promptly.
+		// DO NOT use TerminateThread -- it can corrupt SQLite database and leak resources.
+		// Previous 30s timeout caused UAF: after timeout, destructor deleted critical
+		// sections while the detached thread was still accessing them.
+		DWORD dwWait = WaitForSingleObject(m_hSyncThread, INFINITE);
+		if (dwWait == WAIT_OBJECT_0)
 		{
-			// Thread didn't exit in time -- detach and let it self-destruct
-			// CloseHandle releases our reference; OS keeps the kernel object alive
-			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within timeout, detaching.\n"));
-			CloseHandle(m_hSyncThread);
-			m_hSyncThread = NULL;
+			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
 		}
 		else
 		{
-			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
-			CloseHandle(m_hSyncThread);
-			m_hSyncThread = NULL;
+			OutputDebugString(_T("[CloudSync] WARNING: Sync thread wait failed.\n"));
 		}
+		CloseHandle(m_hSyncThread);
+		m_hSyncThread = NULL;
 	}
 
-	// Wait for all active quick-push threads to complete (up to 5 seconds)
-	// This prevents use-after-free if the manager is destroyed while threads are running
+	// Wait for all active quick-push threads to complete (up to 60 seconds).
+	// QuickSyncThreadProc performs up to 2 HTTP operations (PushGroups + PushNewClips),
+	// each with a 30s timeout, so worst case is ~60s.
+	// This prevents use-after-free if the manager is destroyed while threads are running.
 	DWORD waitStart = GetTickCount();
 	while (m_nActiveQuickSyncThreads > 0)
 	{
 		Sleep(50);
-		if (GetTickCount() - waitStart > 5000)
+		if (GetTickCount() - waitStart > 60000)
 		{
 			OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads to complete.\n");
 			break;

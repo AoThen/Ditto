@@ -28,8 +28,7 @@ CCopyThread::CCopyThread():
 
 CCopyThread::~CCopyThread()
 {
-	m_LocalConfig.DeleteTypes();
-	m_SharedConfig.DeleteTypes();
+	// unique_ptr in m_LocalConfig/m_SharedConfig auto-releases CClipTypes
 	delete m_pClipboardViewer;
 }
 
@@ -72,7 +71,7 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 	pClip->m_copyReason = theApp.GetCopyReason();
 
 	COleDataObjectEx oleData;
-	CClipTypes* pSupportedTypes = m_LocalConfig.m_pSupportedTypes;
+	CClipTypes* pSupportedTypes = m_LocalConfig.m_pSupportedTypes.get();
 
 	// If we are copying from a Ditto Buffer or use advanced option
 	// then save all to the database, so when we paste this it will paste 
@@ -154,28 +153,21 @@ void CCopyThread::SyncConfig()
 	// atomic read
 	if(m_bConfigChanged)
 	{
-		CClipTypes* pTypes = NULL;
-		
 		ATL::CCritSecLock csLock(m_cs.m_sect);
-		
-		pTypes = m_LocalConfig.m_pSupportedTypes;
-		
-		m_LocalConfig = m_SharedConfig;
-		
-		// NULL means that it shouldn't have been sync'ed
-		if( m_SharedConfig.m_pSupportedTypes == NULL )
-		{	// let m_LocalConfig keep its types
-			m_LocalConfig.m_pSupportedTypes = pTypes; // undo sync
-			pTypes = NULL; // nothing to delete
-		}
+
+		// Save old local types before overwriting
+		std::unique_ptr<CClipTypes> pOldTypes = std::move(m_LocalConfig.m_pSupportedTypes);
+
+		// Copy simple fields from shared to local
+		m_LocalConfig.m_hClipHandler = m_SharedConfig.m_hClipHandler;
+		m_LocalConfig.m_bAsyncCopy = m_SharedConfig.m_bAsyncCopy;
+		m_LocalConfig.m_bCopyOnChange = m_SharedConfig.m_bCopyOnChange;
+
+		// Transfer types ownership (if shared has types, use them; otherwise keep old local)
+		if (m_SharedConfig.m_pSupportedTypes)
+			m_LocalConfig.m_pSupportedTypes = std::move(m_SharedConfig.m_pSupportedTypes);
 		else
-			m_SharedConfig.m_pSupportedTypes = NULL; // now owned by LocalConfig
-		
-		// delete old types
-		if( pTypes )
-		{
-			delete pTypes;
-		}
+			m_LocalConfig.m_pSupportedTypes = std::move(pOldTypes);
 	}
 }
 
@@ -201,12 +193,8 @@ void CCopyThread::SetSupportedTypes( CClipTypes* pTypes )
 {
 	ATL::CCritSecLock csLock(m_cs.m_sect);
 
-	if(m_SharedConfig.m_pSupportedTypes)
-	{
-		delete m_SharedConfig.m_pSupportedTypes;
-	}
-
-	m_SharedConfig.m_pSupportedTypes = pTypes;
+	// unique_ptr::reset automatically deletes old object
+	m_SharedConfig.m_pSupportedTypes.reset(pTypes);
 	m_bConfigChanged = true;
 }
 
@@ -267,10 +255,13 @@ bool CCopyThread::GetAsyncCopy()
 
 void CCopyThread::Init(CCopyConfig cfg)
 {
-	ASSERT(m_LocalConfig.m_pSupportedTypes == NULL);
-	m_LocalConfig = m_SharedConfig = cfg;
-	// let m_LocalConfig own the m_pSupportedTypes
-	m_SharedConfig.m_pSupportedTypes = NULL;
+	ASSERT(m_LocalConfig.m_pSupportedTypes == nullptr);
+	m_SharedConfig = std::move(cfg);
+	// Copy simple fields to local, transfer types ownership
+	m_LocalConfig.m_hClipHandler = m_SharedConfig.m_hClipHandler;
+	m_LocalConfig.m_bAsyncCopy = m_SharedConfig.m_bAsyncCopy;
+	m_LocalConfig.m_bCopyOnChange = m_SharedConfig.m_bCopyOnChange;
+	m_LocalConfig.m_pSupportedTypes = std::move(m_SharedConfig.m_pSupportedTypes);
 }
 
 bool CCopyThread::Quit()

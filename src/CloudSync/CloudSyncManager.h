@@ -111,7 +111,7 @@ private:
 	void*     m_pWsClient;     // httplib::WebSocketClient* (void* to avoid full header)
 	volatile LONG m_wsReconnectDelay; // Exponential backoff for WS reconnection (InterlockedExchange)
 	CRITICAL_SECTION m_csWsClient; // Protects m_pWsClient access
-	volatile BOOL m_bSyncStopped;   // Set TRUE in destructor before CS deletion; SyncThreadProc relies on m_hStopEvent for timely exit
+
 
 	// Encryption retry state
 	HANDLE m_hEncRetryThread;   // Encryption retry thread (when DEK lost at startup)

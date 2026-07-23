@@ -305,11 +305,16 @@ void CMainFrmThread::OnSaveRemoteClips()
 		//set the clipboard on the main thread, i was having a problem with setting the clipboard on a thread
 		//guess it needs to be set on the main thread
 		//main window will clear this memory
-		PostMessage(theApp.m_MainhWnd, WM_LOAD_ClIP_ON_CLIPBOARD, (LPARAM)pLastClip, 0);
+		// Remove from list first so we can safely delete on PostMessage failure
+		pLocalClips->RemoveTail();
+
+		if (!PostMessage(theApp.m_MainhWnd, WM_LOAD_ClIP_ON_CLIPBOARD, (LPARAM)pLastClip, 0))
+		{
+			Log(StrF(_T("OnSaveRemoteClips: PostMessage(WM_LOAD_ClIP_ON_CLIPBOARD) failed for clip %d"), pLastClip->m_id));
+			delete pLastClip;
+		}
 
 		LogSendRecieveInfo("---------OnSaveRemoteClips - After Posting msg to main thread to set clipboard");
-
-		pLocalClips->RemoveTail();
 	}	
 
 	theApp.RefreshView();

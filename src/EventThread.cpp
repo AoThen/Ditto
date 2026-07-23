@@ -21,9 +21,16 @@ CEventThread::~CEventThread(void)
 {
 	Stop();
 
-	for(EventMapType::iterator it = m_eventMap.begin(); it != m_eventMap.end(); it++)
+	// Only close handles if thread has exited cleanly.
+	// If thread is still running (timeout path), closing handles would cause UAF
+	// because the thread may be blocked in WaitForMultipleObjects on those handles.
+	// Leaked handles are reclaimed by the OS on process exit.
+	if (!m_threadRunning)
 	{
-		CloseHandle(it->first);
+		for(EventMapType::iterator it = m_eventMap.begin(); it != m_eventMap.end(); it++)
+		{
+			CloseHandle(it->first);
+		}
 	}
 }
 
@@ -193,7 +200,8 @@ void CEventThread::Stop(int waitTime)
 
 			Log(StrF(_T("CEventThread::Stop timed out waiting for thread %s, waited %dms"), m_threadName, waitTime));
 			// DO NOT use TerminateThread — it causes abandoned critical sections (mtex.cpp:90 assertion)
-			m_threadRunning = false;
+			// DO NOT set m_threadRunning = false here — the thread is still running.
+			// The destructor checks m_threadRunning and skips handle closure if true.
 		}
 	}
 
