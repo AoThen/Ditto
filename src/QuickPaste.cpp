@@ -100,6 +100,9 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 
 	if(CGetSetOptions::m_bShowPersistent && m_pwndPaste != NULL)
 	{
+		//Ensure theme is loaded before showing window to prevent white flash
+		CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
+
 		m_pwndPaste->ShowWindow(SW_SHOW);
 		m_pwndPaste->MinMaxWindow(FORCE_MAX);
 		m_pwndPaste->SetForegroundWindow();
@@ -281,6 +284,9 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 			m_pwndPaste->MoveWindow(crRect);
 		}
 
+
+		// Ensure theme is loaded before showing window to prevent white flash
+		CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
 
 		// Show the window
 		m_pwndPaste->ShowWindow(SW_SHOW);
