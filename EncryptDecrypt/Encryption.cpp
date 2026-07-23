@@ -1,6 +1,7 @@
 // Encryption.cpp: implementation of the CEncryption class.
 //
 //////////////////////////////////////////////////////////////////////
+#pragma message("DEPRECATED: EncryptDecrypt 使用旧版 AES-CBC/ECB 加密。新功能请使用 CloudCrypto (AES-GCM) 替代。")
 
 #include "stdafx.h"
 #include "Encryption.h"

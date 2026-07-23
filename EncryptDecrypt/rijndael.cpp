@@ -1440,6 +1440,7 @@ void Rijndael::keySched(RD_UINT8 key[_MAX_KEY_COLUMNS][4])
 	}
 }
 
+
 void Rijndael::keyEncToDec()
 {
 	int r;

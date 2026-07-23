@@ -168,6 +168,7 @@
 		<Item English_Text = "View as RTF" ID = "32973"></Item>
 		<Item English_Text = "View as HTML" ID = "32974"></Item>
 		<Item English_Text = "View as Image" ID = "32975"></Item>
+		<Item English_Text = "Dont Sync" ID = "33003"></Item>
 		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
@@ -187,6 +188,8 @@
 		<Item English_Text = "Last Used" ID = "2043"></Item>
 		<Item English_Text = "Quick Paste Text" ID = "2125"></Item>
 		<Item English_Text = "Selected format MD5" ID = "2167"></Item>
+		<Item English_Text = "Dont Sync" ID = "2176"></Item>
+		<Item English_Text = "This will also mark all sub-groups and content under this group as not synced. Are you sure?" ID = "GroupDontSyncConfirm"></Item>
 				
 	</Ditto_Clip_Properties>
 	<Ditto_Options_General>
@@ -363,6 +366,86 @@
 		<Item English_Text = "Quick Paste" ID = "QuickPasteTitle"></Item>
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle"></Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle"></Item>
+		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle"></Item>
+		<Item English_Text = "OK" ID = "CloudBtnOK"></Item>
+		<Item English_Text = "Cancel" ID = "CloudBtnCancel"></Item>
+		<Item English_Text = "Please enter a value." ID = "CloudMsgInputRequired"></Item>
+		<Item English_Text = "Prompt" ID = "CloudTitlePrompt"></Item>
+		<Item English_Text = "Logged in (Device: %hs)" ID = "CloudStatusLoggedInDevice"></Item>
+		<Item English_Text = "Logged in" ID = "CloudStatusLoggedIn"></Item>
+		<Item English_Text = "Not logged in" ID = "CloudStatusNotLoggedIn"></Item>
+		<Item English_Text = "Encryption enabled (Salt: %s...)" ID = "CloudEncryptionEnabledSalt"></Item>
+		<Item English_Text = "Encryption enabled" ID = "CloudEncryptionEnabled"></Item>
+		<Item English_Text = "Encryption not enabled" ID = "CloudEncryptionNotEnabled"></Item>
+		<Item English_Text = "Please enter the server URL before enabling cloud sync." ID = "CloudMsgEnterServerUrl"></Item>
+		<Item English_Text = "Configuration Error" ID = "CloudTitleConfigError"></Item>
+		<Item English_Text = "Please enter the server URL." ID = "CloudMsgEnterServerUrlLogin"></Item>
+		<Item English_Text = "Login" ID = "CloudTitleLogin"></Item>
+		<Item English_Text = "Please enter a username." ID = "CloudMsgEnterUsername"></Item>
+		<Item English_Text = "Please enter a password." ID = "CloudMsgEnterPassword"></Item>
+		<Item English_Text = "Logging in..." ID = "CloudStatusLoggingIn"></Item>
+		<Item English_Text = "Logged in (Device: %s)" ID = "CloudStatusLoggedInDevice2"></Item>
+		<Item English_Text = "Unknown" ID = "CloudUnknown"></Item>
+		<Item English_Text = "Login successful!\nYou can now enable cloud sync." ID = "CloudMsgLoginSuccess"></Item>
+		<Item English_Text = "Login failed: %s" ID = "CloudMsgLoginFailed"></Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusException"></Item>
+		<Item English_Text = "Login error: %hs" ID = "CloudMsgLoginError"></Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudStatusLoginUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudMsgLoginUnknownError"></Item>
+		<Item English_Text = "Registration is closed. Please contact your administrator to create an account." ID = "CloudMsgRegisterDisabled"></Item>
+		<Item English_Text = "Register" ID = "CloudTitleRegister"></Item>
+		<Item English_Text = "Setting up encryption..." ID = "CloudStatusSettingUpEncryption"></Item>
+		<Item English_Text = "Please log in first before enabling encryption." ID = "CloudStatusLoginRequired"></Item>
+		<Item English_Text = "Enable Encryption" ID = "CloudTitleEnableEncryption"></Item>
+		<Item English_Text = "Encryption has been enabled. Your data will be encrypted before syncing." ID = "CloudMsgEncryptionEnabled"></Item>
+		<Item English_Text = "Error enabling encryption: %hs" ID = "CloudMsgEncryptionError"></Item>
+		<Item English_Text = "Unknown error enabling encryption." ID = "CloudStatusEncryptionUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred." ID = "CloudMsgEncryptionUnknownError"></Item>
+		<Item English_Text = "Encryption test failed: encryption failed." ID = "CloudEncTestFailed"></Item>
+		<Item English_Text = "Encryption test failed. Encryption is not working correctly." ID = "CloudMsgEncTestFailed"></Item>
+		<Item English_Text = "Test Encryption" ID = "CloudTitleTestEncryption"></Item>
+		<Item English_Text = "Encryption test succeeded" ID = "CloudEncTestSuccess"></Item>
+		<Item English_Text = "Encryption test succeeded!\nEncryption is working correctly." ID = "CloudMsgEncTestSuccess"></Item>
+		<Item English_Text = "Encryption test failed: decrypted text does not match." ID = "CloudEncTestMismatch"></Item>
+		<Item English_Text = "Encryption test failed. Decrypted text does not match original." ID = "CloudMsgEncTestMismatch"></Item>
+		<Item English_Text = "Encryption test failed: %hs" ID = "CloudEncTestException"></Item>
+		<Item English_Text = "Test encryption error: %hs" ID = "CloudMsgEncTestError"></Item>
+		<Item English_Text = "Encryption test failed: unknown error." ID = "CloudEncTestUnknownError"></Item>
+		<Item English_Text = "An unknown error occurred during encryption test." ID = "CloudMsgEncTestUnknownError"></Item>
+		<Item English_Text = "Please enable encryption (set end-to-end encryption password) first, then export the key file." ID = "CloudMsgEnableEncryptionFirst"></Item>
+		<Item English_Text = "Export Key" ID = "CloudTitleExportKey"></Item>
+		<Item English_Text = "Enter a password to protect the key file:\n(Losing this password means the key cannot be imported)" ID = "CloudPromptExportKeyPassword"></Item>
+		<Item English_Text = "Key file exported successfully!" ID = "CloudMsgKeyExported"></Item>
+		<Item English_Text = "Failed to export key file. Please check the file path and permissions." ID = "CloudMsgExportFailed"></Item>
+		<Item English_Text = "Invalid key file format." ID = "CloudMsgInvalidKeyFile"></Item>
+		<Item English_Text = "Import Key" ID = "CloudTitleImportKey"></Item>
+		<Item English_Text = "Cannot read key file information." ID = "CloudMsgCannotReadKeyFile"></Item>
+		<Item English_Text = "Key File Info: %s\n\nDo you want to import this key?" ID = "CloudMsgKeyFileInfo"></Item>
+		<Item English_Text = "Enter the password that was used when exporting the key file:" ID = "CloudPromptImportKeyPassword"></Item>
+		<Item English_Text = "Key imported successfully.\nEncryption has been enabled." ID = "CloudMsgKeyImported"></Item>
+		<Item English_Text = "Encryption enabled (imported from key: %s)" ID = "CloudEncryptionEnabledImported"></Item>
+		<Item English_Text = "Failed to import key file. The password might be incorrect." ID = "CloudMsgImportFailed"></Item>
+		<Item English_Text = "Cloud authentication token has expired.\n\nYour sync has been paused. Please log in again to continue syncing.\n\nClick OK to open the login dialog." ID = "CloudMsgAuthExpired"></Item>
+		<Item English_Text = "Cloud Sync - Authentication Required" ID = "CloudTitleAuthRequired"></Item>
+		<Item English_Text = "Cloud access denied (HTTP 403).\n\nPossible causes:\n- Your account has been disabled\n- Your device has been removed by an administrator\n\nPlease contact your administrator or log in again." ID = "CloudMsgAccessDenied"></Item>
+		<Item English_Text = "Cloud Sync - Access Denied" ID = "CloudTitleAccessDenied"></Item>
+		<Item English_Text = "Encryption password has changed!\n\nYour encryption password has been modified on another device.\nPlease enter the new encryption password to continue syncing.\n\nClick OK to open encryption settings." ID = "CloudMsgEncryptionChanged"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged"></Item>
+		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed"></Item>
+		<Item English_Text = "Syncing..." ID = "CloudStatusSyncing"></Item>
+		<Item English_Text = "Error: %s" ID = "CloudStatusError"></Item>
+		<Item English_Text = "Last sync: %s \u2713" ID = "CloudStatusLastSync"></Item>
+		<Item English_Text = "Never synced" ID = "CloudStatusNeverSynced"></Item>
+		<Item English_Text = "Force Sync" ID = "CloudTitleForceSync"></Item>
+		<Item English_Text = "Force download has been triggered.\nCloud clips will replace local clips." ID = "CloudForceDownloadMsg"></Item>
+		<Item English_Text = "Force upload has been triggered.\nLocal clips are being pushed to the cloud." ID = "CloudForceUploadMsg"></Item>
+		<Item English_Text = "Please log in first before re-entering encryption password." ID = "CloudMsgLoginRequired"></Item>
+		<Item English_Text = "Cloud Sync - Re-enter Encryption Password" ID = "CloudTitleReEnterPassword"></Item>
+		<Item English_Text = "The encryption password has changed on another device.\n\nPlease enter the new encryption password to continue syncing:" ID = "CloudPromptReEnterPassword"></Item>
+		<Item English_Text = "Password verified successfully!\n\nCloud sync will now resume with the updated encryption key." ID = "CloudMsgPasswordVerified"></Item>
+		<Item English_Text = "Encryption key is missing or corrupted!\n\nYour clipboard encryption key (DEK) could not be loaded.\nCloud sync has been stopped to prevent data loss.\n\nDo you want to re-setup encryption now?\nWARNING: Previously encrypted clips on the server will become unreadable and will be skipped during sync.\n\n- Click Yes to enter a new encryption password and restore sync\n- Click No to keep sync stopped (you can re-enable later in settings)" ID = "CloudMsgEncryptionKeyLost"></Item>
+		<Item English_Text = "Cloud Sync - Encryption Key Lost" ID = "CloudTitleEncryptionKeyLost"></Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database"></Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao"></Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format"></Item>
@@ -439,6 +522,11 @@
 		
 		<Item English_Text = "Backing up database" ID = "BackupDbMsg"></Item>
 		<Item English_Text = "Restoring database" ID = "RestoreDbMsg"></Item>
+		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips"></Item>
+		<Item English_Text = "Delete Group?" ID = "Delete_Clip_Groups"></Item>
+		<Item English_Text = "There are no starred clips" ID = "NoStarredClips"></Item>
+		<Item English_Text = "[Starred clips]" ID = "starred_clips"></Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusEncryptionException"></Item>
 		
 		<Item English_Text = "Ditto was unable to open its database, waiting until it can be opened. Update the path in Options if needed. Path: " ID = "StartupNoDbMsg"></Item>
 				
@@ -446,12 +534,72 @@
 		<Item English_Text = "At Cursor" ID = "AtCursor"></Item>
 		<Item English_Text = "At Previous Position" ID = "AtPreviousPosition"></Item>
 		
+		<Item English_Text = "Error Creating Database" ID = "MsgErrorCreatingDatabase"></Item>
+		<Item English_Text = "Invalid Database" ID = "MsgInvalidDatabase"></Item>
+		<Item English_Text = "Error Opening new database" ID = "MsgErrorOpeningDatabase"></Item>
+		<Item English_Text = "Error registering global hot key\n\nContinue?" ID = "MsgErrorRegisterHotKey"></Item>
+		<Item English_Text = "Error registering global move to group hot key\n\nContinue?" ID = "MsgErrorRegisterMoveToGroupHotKey"></Item>
+		<Item English_Text = "Please enter an encryption password." ID = "CloudMsgEnterEncryptionPassword"></Item>
+		<Item English_Text = "Delete selected items?  This cannot be undone!" ID = "MsgDeleteSelectedItems"></Item>
+		<Item English_Text = "Error Sending data to %s\n\n%s" ID = "MsgErrorSendingData"></Item>
+		<Item English_Text = "-No Group-" ID = "GroupNoGroup"></Item>
+		
+		<Item English_Text = "Error Registering " ID = "HotKeyRegError"></Item>
+		<Item English_Text = "Error Unregistering " ID = "HotKeyUnregError"></Item>
+		<Item English_Text = "Unable to open hyperlink:\n\n" ID = "HyperlinkErrorPrefix"></Item>
+		<Item English_Text = "Unknown Error (%d) occurred." ID = "HyperlinkErrorUnknown"></Item>
+		<Item English_Text = "The operating system is out\nof memory or resources." ID = "HyperlinkErrorOsOom"></Item>
+		<Item English_Text = "The specified path was not found." ID = "HyperlinkErrorPNF"></Item>
+		<Item English_Text = "The specified file was not found." ID = "HyperlinkErrorFNF"></Item>
+		<Item English_Text = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)." ID = "HyperlinkErrorBadFormat"></Item>
+		<Item English_Text = "The operating system denied\naccess to the specified file." ID = "HyperlinkErrorAccessDenied"></Item>
+		<Item English_Text = "The filename association is\nincomplete or invalid." ID = "HyperlinkErrorAssocIncomplete"></Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed." ID = "HyperlinkErrorDdeBusy"></Item>
+		<Item English_Text = "The DDE transaction failed." ID = "HyperlinkErrorDdeFail"></Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because the request timed out." ID = "HyperlinkErrorDdeTimeout"></Item>
+		<Item English_Text = "The specified dynamic-link library was not found." ID = "HyperlinkErrorDllNotFound"></Item>
+		<Item English_Text = "There is no application associated\nwith the given filename extension." ID = "HyperlinkErrorNoAssoc"></Item>
+		<Item English_Text = "There was not enough memory to complete the operation." ID = "HyperlinkErrorOom"></Item>
+		<Item English_Text = "A sharing violation occurred. " ID = "HyperlinkErrorShare"></Item>
+		<Item English_Text = "Progress" ID = "ProgressWindowTitle"></Item>
+		<Item English_Text = " Cancel " ID = "ProgressCancelLabel"></Item>
+		<Item English_Text = "Options" ID = "OptionsWindowTitle"></Item>
+		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle"></Item>
+		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle"></Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1"></Item>
 		<Item English_Text = "Cancel" ID = "2"></Item>
 		<Item English_Text = "Apply" ID = "12321"></Item>
 	</Ditto_Options_Sheet>
+	<Ditto_Options_Cloud>
+		<Item English_Text = "Cloud Sync" ID = "-1" PropertyPage = "true"></Item>
+		<Item English_Text = "Cloud Sync Settings" ID = "2224"></Item>
+		<Item English_Text = "Enable Cloud Sync" ID = "2201"></Item>
+		<Item English_Text = "Server URL" ID = "2216"></Item>
+		<Item English_Text = "Username" ID = "2217"></Item>
+		<Item English_Text = "Password" ID = "2218"></Item>
+		<Item English_Text = "Status:" ID = "2219"></Item>
+		<Item English_Text = "Login" ID = "2207"></Item>
+		<Item English_Text = "Register" ID = "2208"></Item>
+		<Item English_Text = "End-to-End Encryption" ID = "2225"></Item>
+		<Item English_Text = "Encryption Password" ID = "2220"></Item>
+		<Item English_Text = "Enable Encryption" ID = "2209"></Item>
+		<Item English_Text = "Test Encryption" ID = "2210"></Item>
+		<Item English_Text = "Encryption Status:" ID = "2221"></Item>
+		<Item English_Text = "Warning: Lost password means lost data!" ID = "2222"></Item>
+		<Item English_Text = "Key File Management" ID = "2226"></Item>
+		<Item English_Text = "Key File Path" ID = "2223"></Item>
+		<Item English_Text = "Export Key" ID = "2213"></Item>
+		<Item English_Text = "Import Key" ID = "2214"></Item>
+		<Item English_Text = "Force Sync" ID = "2227"></Item>
+		<Item English_Text = "Force Download from Cloud" ID = "2228"></Item>
+		<Item English_Text = "Force Upload to Cloud" ID = "2229"></Item>
+		<Item English_Text = "Sync new clips on copy" ID = "2230"></Item>
+		<Item English_Text = "Periodic sync" ID = "2231"></Item>
+		<Item English_Text = "every" ID = "2233"></Item>
+		<Item English_Text = "Sync Status:" ID = "2235"></Item>
+	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773"></Item>
 		<Item English_Text = "Options" ID = "32771"></Item>
@@ -551,7 +699,35 @@
 		<Item English_Text = "Data Size" ID = "DataSize"></Item>
 		<Item English_Text = "Quick Paste Text" ID = "QuickPasteText"></Item>
 	</Ditto_DeleteClipData>
-	
+
+	<Ditto_Options_Quick_Paste>
+		<Item English_Text="Show text for first ten copy hot keys" ID="1034"></Item>
+		<Item English_Text="Show leading whitespace" ID="2021"></Item>
+		<Item English_Text="Enable Quick Paste Transparency" ID="2006"></Item>
+		<Item English_Text="Show thumbnails (for CF_DIB types) (Could Increase Memory Usage and Display Speed)" ID="2022"></Item>
+		<Item English_Text="Draw RTF Text in List (for RTF types) (Could Increase Memory Usage and Display Speed)" ID="2023"></Item>
+		<Item English_Text="Find As You Type" ID="2036"></Item>
+		<Item English_Text="Ensure Entire Window is Visible" ID="2037"></Item>
+		<Item English_Text="Show Clips That are in Groups in Main List" ID="2038"></Item>
+		<Item English_Text="Prompt when deleting clips" ID="2039"></Item>
+		<Item English_Text="Always Show Scroll Bar" ID="2040"></Item>
+		<Item English_Text="Elevated privileges to paste into elevated apps" ID="2041"></Item>
+		<Item English_Text="Show In Taskbar" ID="2042"></Item>
+		<Item English_Text="Show indicator a clip has been pasted" ID="2043"></Item>
+		<Item English_Text="At Caret" ID="2015"></Item>
+		<Item English_Text="At Cursor" ID="2016"></Item>
+		<Item English_Text="At Previous Position" ID="2017"></Item>
+		<Item English_Text="About Theme" ID="2094"></Item>
+		<Item English_Text="Font" ID="1040"></Item>
+		<Item English_Text="Default Font" ID="2031"></Item>
+		<Item English_Text="..." ID="2124"></Item>
+		<Item English_Text="Text Lines per Clip" ID="2062"></Item>
+		<Item English_Text="Popup Positioning" ID="2063"></Item>
+		<Item English_Text="Theme" ID="2092"></Item>
+		<Item English_Text="Diff Application Path" ID="2122"></Item>
+		<Item English_Text="Quick Paste" ID="-1"></Item>
+	</Ditto_Options_Quick_Paste>
+
 	<Ditto_Options_Quick_Paste_Keyboard>
 		<Item English_Text = "Quick Paste Keyboard" ID = "-1" PropertyPage = "true"></Item>
 		

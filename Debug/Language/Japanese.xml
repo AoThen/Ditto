@@ -433,6 +433,28 @@
 		<Item English_Text = "At Cursor" ID = "AtCursor">カーソル</Item>
 		<Item English_Text = "At Previous Position" ID = "AtPreviousPosition">前回の位置</Item>
 		
+		<Item English_Text = "Error Registering " ID = "HotKeyRegError"></Item>
+		<Item English_Text = "Error Unregistering " ID = "HotKeyUnregError"></Item>
+		<Item English_Text = "Unable to open hyperlink:\n\n" ID = "HyperlinkErrorPrefix"></Item>
+		<Item English_Text = "Unknown Error (%d) occurred." ID = "HyperlinkErrorUnknown"></Item>
+		<Item English_Text = "The operating system is out\nof memory or resources." ID = "HyperlinkErrorOsOom"></Item>
+		<Item English_Text = "The specified path was not found." ID = "HyperlinkErrorPNF"></Item>
+		<Item English_Text = "The specified file was not found." ID = "HyperlinkErrorFNF"></Item>
+		<Item English_Text = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)." ID = "HyperlinkErrorBadFormat"></Item>
+		<Item English_Text = "The operating system denied\naccess to the specified file." ID = "HyperlinkErrorAccessDenied"></Item>
+		<Item English_Text = "The filename association is\nincomplete or invalid." ID = "HyperlinkErrorAssocIncomplete"></Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed." ID = "HyperlinkErrorDdeBusy"></Item>
+		<Item English_Text = "The DDE transaction failed." ID = "HyperlinkErrorDdeFail"></Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because the request timed out." ID = "HyperlinkErrorDdeTimeout"></Item>
+		<Item English_Text = "The specified dynamic-link library was not found." ID = "HyperlinkErrorDllNotFound"></Item>
+		<Item English_Text = "There is no application associated\nwith the given filename extension." ID = "HyperlinkErrorNoAssoc"></Item>
+		<Item English_Text = "There was not enough memory to complete the operation." ID = "HyperlinkErrorOom"></Item>
+		<Item English_Text = "A sharing violation occurred. " ID = "HyperlinkErrorShare"></Item>
+		<Item English_Text = "Progress" ID = "ProgressWindowTitle"></Item>
+		<Item English_Text = " Cancel " ID = "ProgressCancelLabel"></Item>
+		<Item English_Text = "Options" ID = "OptionsWindowTitle"></Item>
+		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle"></Item>
+		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle"></Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">OK</Item>

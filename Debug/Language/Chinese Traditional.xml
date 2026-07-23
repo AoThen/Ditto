@@ -20,8 +20,8 @@
 		<Item English_Text = "20 " ID = "32796">20</Item>
 		<Item English_Text = "25 " ID = "32798">25</Item>
 		<Item English_Text = "30 " ID = "32799">30</Item>
-		<Item English_Text = "35 " ID = "32950"></Item>
-		<Item English_Text = "40 " ID = "32790"></Item>
+		<Item English_Text = "35 " ID = "32950">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "40 " ID = "32790">!!!TRANSLATE!!!</Item>
 		<Item English_Text = "Positioning" ID = "-1">窗口弹出位置</Item>
 		<Item English_Text = "At Caret" ID = "32802">於插入符號處</Item>
 		<Item English_Text = "At Cursor" ID = "32803">於游標處</Item>
@@ -155,7 +155,19 @@
 		<Item English_Text = "Multiple Images Vertically" ID = "32978">竖直显示多图</Item>
 		<Item English_Text = "Ascii Text Only" ID = "32979">仅Ascii字符</Item>
 		<Item English_Text = "Replace Top Sticky Clip" ID = "32938">替换固定到顶部</Item>
-		<Item English_Text = "Set Drag File Name" ID = "32970">设置拖拽文件名</Item>
+		<Item English_Text = "Set Drag File Name" ID = "32970">設定拖曳檔案名稱</Item>
+		
+		//Added 9/4/25 for description window right click menu
+		<Item English_Text = "Remember window position" ID = "32882">記住視窗位置</Item>
+		<Item English_Text = "Size window to content" ID = "32883">視窗大小適應內容</Item>
+		<Item English_Text = "Scale images to fit window" ID = "32884">縮放圖片以適應視窗</Item>
+		<Item English_Text = "Hide description window on mouse clip selection" ID = "32926">滑鼠選擇剪貼項時隱藏描述視窗</Item>
+		<Item English_Text = "Wrap Text" ID = "32928">自動換行</Item>
+		<Item English_Text = "Always on top" ID = "32942">總在最前</Item>
+		<Item English_Text = "View as Text" ID = "32972">以文字檢視</Item>
+		<Item English_Text = "View as RTF" ID = "32973">以RTF檢視</Item>
+		<Item English_Text = "View as HTML" ID = "32974">以HTML檢視</Item>
+		<Item English_Text = "View as Image" ID = "32975">以圖片檢視</Item>
 		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
@@ -269,15 +281,15 @@
 		<Item English_Text = "Move clips to the top of the list on paste" ID = "1043">移動剪貼至貼上清單的頂端</Item>
 		
 		//Added 12/17/16
-		<Item English_Text = "Activate Ditto" ID = "2064"></Item>
-		<Item English_Text = "Activate Ditto" ID = "2066"></Item>
+		<Item English_Text = "Activate Ditto" ID = "2064">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Activate Ditto" ID = "2066">!!!TRANSLATE!!!</Item>
 
-		<Item English_Text = "Win" ID = "2063"></Item>
-		<Item English_Text = "Win" ID = "2065"></Item>
+		<Item English_Text = "Win" ID = "2063">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Win" ID = "2065">!!!TRANSLATE!!!</Item>
 		<Item English_Text = "Save Current Clipboard" ID = "2062">保存当前剪贴板内容</Item>
-		<Item English_Text = "Win" ID = "2047"></Item>
+		<Item English_Text = "Win" ID = "2047">!!!TRANSLATE!!!</Item>
 
-		<Item English_Text = "Use currently selected group in Ditto's UI for last ten copies" ID = "1044"></Item>
+		<Item English_Text = "Use currently selected group in Ditto's UI for last ten copies" ID = "1044">!!!TRANSLATE!!!</Item>
 
 
 
@@ -318,7 +330,7 @@
 		<Item English_Text = "Diff Application Path" ID = "2122">比較應用程式路徑</Item>
 		
 		//Added 1/10/15
-		<Item English_Text = "Show indicator a clip has been pasted" ID = "2043"></Item>
+		<Item English_Text = "Show indicator a clip has been pasted" ID = "2043">!!!TRANSLATE!!!</Item>
 	</Ditto_Options_Quick_Paste>	
 	<Ditto_Options_Friends>
 		<Item English_Text = "When you recieve a sent copy if their ip or computer name is in this list then it will be put on the clipboard.  Otherwise it will be in the saved clips to use at a later time." ID = "2052">當收到一份傳送來的複製內容若他們的IP跟電腦名稱在這份清單上則會被放到剪貼簿上.  否則將會在稍後的時間儲存剪貼.</Item>
@@ -472,6 +484,28 @@
 		<Item English_Text = "At Cursor" ID = "AtCursor">光标处</Item>
 		<Item English_Text = "At Previous Position" ID = "AtPreviousPosition">上次打开的位置</Item>
 		
+		<Item English_Text = "Error Registering " ID = "HotKeyRegError">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Error Unregistering " ID = "HotKeyUnregError">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Unable to open hyperlink:\n\n" ID = "HyperlinkErrorPrefix">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Unknown Error (%d) occurred." ID = "HyperlinkErrorUnknown">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The operating system is out\nof memory or resources." ID = "HyperlinkErrorOsOom">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The specified path was not found." ID = "HyperlinkErrorPNF">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The specified file was not found." ID = "HyperlinkErrorFNF">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)." ID = "HyperlinkErrorBadFormat">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The operating system denied\naccess to the specified file." ID = "HyperlinkErrorAccessDenied">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The filename association is\nincomplete or invalid." ID = "HyperlinkErrorAssocIncomplete">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed." ID = "HyperlinkErrorDdeBusy">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The DDE transaction failed." ID = "HyperlinkErrorDdeFail">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because the request timed out." ID = "HyperlinkErrorDdeTimeout">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "The specified dynamic-link library was not found." ID = "HyperlinkErrorDllNotFound">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "There is no application associated\nwith the given filename extension." ID = "HyperlinkErrorNoAssoc">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "There was not enough memory to complete the operation." ID = "HyperlinkErrorOom">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "A sharing violation occurred. " ID = "HyperlinkErrorShare">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Progress" ID = "ProgressWindowTitle">!!!TRANSLATE!!!</Item>
+		<Item English_Text = " Cancel " ID = "ProgressCancelLabel">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Options" ID = "OptionsWindowTitle">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle">!!!TRANSLATE!!!</Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">確定</Item>
@@ -618,10 +652,10 @@
 		<Item English_Text = "View Groups" ID = "12">查看组</Item>
 		<Item English_Text = "New Clip" ID = "13">新建剪贴项</Item>
 		<Item English_Text = "Edit Clip" ID = "14">编辑剪贴项</Item>
-		<Item English_Text = "MODIFIER_ACTVE_SELECTIONUP" ID = "15"></Item>
-		<Item English_Text = "MODIFIER_ACTVE_SELECTIONDOWN" ID = "16"></Item>
-		<Item English_Text = "MODIFIER_ACTVE_MOVEFIRST" ID = "17"></Item>
-		<Item English_Text = "MODIFIER_ACTVE_MOVELAST" ID = "18"></Item>
+		<Item English_Text = "MODIFIER_ACTVE_SELECTIONUP" ID = "15">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "MODIFIER_ACTVE_SELECTIONDOWN" ID = "16">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "MODIFIER_ACTVE_MOVEFIRST" ID = "17">!!!TRANSLATE!!!</Item>
+		<Item English_Text = "MODIFIER_ACTVE_MOVELAST" ID = "18">!!!TRANSLATE!!!</Item>
 		<Item English_Text = "Cancel Filter" ID = "19">取消过滤器</Item>
 		<Item English_Text = "HOMELIST" ID = "20">主列表</Item>
 		<Item English_Text = "Back Group" ID = "21">返回组</Item>

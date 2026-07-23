@@ -41,7 +41,7 @@
 		<Item English_Text = "Toggles Always on Top" ID = "32814">总在最前端</Item>
 		<Item English_Text = "Rolls-up Window" ID = "32815">收起窗口</Item>
 		<Item English_Text = "Toggles Always Show Description" ID = "32816">总是显示说明</Item>
-		<Item English_Text = "Always on Top	Ctrl-Space" ID = "32784">总在最前端</Item>
+		<Item English_Text = "Always on Top" ID = "32784">总在最前端</Item>
 		<Item English_Text = "Auto Roll-up" ID = "32791">自动收起</Item>
 		<Item English_Text = "Always Show Description" ID = "32813">总是显示说明</Item>
 		<Item English_Text = "Prompt For New Group Names" ID = "32817">提示命名新建组</Item>
@@ -64,10 +64,10 @@
 		<Item English_Text = "Never Auto Delete" ID = "32820">禁止自动删除</Item>
 		<Item English_Text = "Auto Delete" ID = "32821">自动删除</Item>
 		<Item English_Text = "Remove Hot Key" ID = "32822">移除热键</Item>
-		<Item English_Text = "Options..." ID = "32805">&O 选项...</Item>
+		<Item English_Text = "Options..." ID = "32805">选项...</Item>
 		<Item English_Text = "Help" ID = "32842">H 帮助</Item>
 		<Item English_Text = "Disconnect from Clipboard" ID = "32775">断开剪贴板连接</Item>
-		<Item English_Text = "Exit Program" ID = "32806">&X 退出程序</Item>
+		<Item English_Text = "Exit Program" ID = "32806">退出程序</Item>
 		
 		//New strings added in 3.6 6-9-06
 		<Item English_Text = "Prompt to Delete Clip" ID = "32852">删除剪贴项时提示</Item>	
@@ -109,7 +109,7 @@
 		<Item English_Text = "Move To Top" ID = "32908">移至顶部</Item>	
 		<Item English_Text = "Move Up" ID = "32906">上移</Item>	
 		<Item English_Text = "Move Down" ID = "32907">下移</Item>	
-		<Item English_Text = "Export Clip(s) to Image File" ID = "-32902">将剪贴项导出为图像文件</Item>
+		<Item English_Text = "Export Clip(s) to Image File" ID = "32902">将剪贴项导出为图像文件</Item>
 		<Item English_Text = "Export to Google Translate" ID = "32900">导出到谷歌翻译</Item>	
 		
 		<Item English_Text = "Search Options" ID = "-1">搜索选项</Item>	
@@ -121,7 +121,7 @@
 		<Item English_Text = "Wildcard Search" ID = "32903">通配符搜索</Item>	
 		<Item English_Text = "Show text for first ten copy hot keys" ID = "32923">显示前十个复制热键的文本</Item>	
 		<Item English_Text = "Show indicator a clip has been pasted" ID = "32924">显示已粘贴剪贴项标志</Item>	
-		<Item English_Text = "Global Hot Keys" ID = "32933">&G 全局热键</Item>	
+		<Item English_Text = "Global Hot Keys" ID = "32933">全局热键</Item>	
 		<Item English_Text = "Delete Clip Data" ID = "32934">删除剪贴数据</Item>	
 		<Item English_Text = "Import Clip(s)" ID = "32935">导入剪贴项</Item>	
 		<Item English_Text = "New Clip" ID = "32937">新建剪贴项</Item>	
@@ -157,6 +157,19 @@
 		<Item English_Text = "Replace Top Sticky Clip" ID = "32938">替换固定到顶部</Item>
 		<Item English_Text = "Set Drag File Name" ID = "32970">设置拖拽文件名</Item>
 		
+		//Added 9/4/25 for description window right click menu
+		<Item English_Text = "Remember window position" ID = "32882">记住窗口位置</Item>
+		<Item English_Text = "Size window to content" ID = "32883">窗口大小适应内容</Item>
+		<Item English_Text = "Scale images to fit window" ID = "32884">缩放图片以适应窗口</Item>
+		<Item English_Text = "Hide description window on mouse clip selection" ID = "32926">鼠标选择剪贴项时隐藏描述窗口</Item>
+		<Item English_Text = "Wrap Text" ID = "32928">自动换行</Item>
+		<Item English_Text = "Always on top" ID = "32942">总在最前</Item>
+		<Item English_Text = "View as Text" ID = "32972">以文本查看</Item>
+		<Item English_Text = "View as RTF" ID = "32973">以RTF查看</Item>
+		<Item English_Text = "View as HTML" ID = "32974">以HTML查看</Item>
+		<Item English_Text = "View as Image" ID = "32975">以图片查看</Item>
+		<Item English_Text = "Dont Sync" ID = "33003">不同步</Item>
+		
 	</Ditto_Right_Click_Menu>
 	<Ditto_Clip_Properties>
 		<Item English_Text = "Hot Key" ID = "2039">热键</Item>
@@ -175,6 +188,8 @@
 		<Item English_Text = "Last Used" ID = "2043">最后使用</Item>
 		<Item English_Text = "Quick Paste Text" ID = "2125">快速粘贴文本</Item>
 		<Item English_Text = "Selected format MD5" ID = "2167">选择MD5格式</Item>
+		<Item English_Text = "Dont Sync" ID = "2176">不同步</Item>
+		<Item English_Text = "This will also mark all sub-groups and content under this group as not synced. Are you sure?" ID = "GroupDontSyncConfirm">将同时标记该组下所有子分组和内容为不同步，确定？</Item>
 				
 	</Ditto_Clip_Properties>
 	<Ditto_Options_General>
@@ -204,7 +219,7 @@
 		<Item English_Text = "Multi-Paste clip separator ([LF] = line feed)" ID = "2090">多项粘贴剪贴项分隔符（[LF] = 换行）</Item>
 		
 		//New item added 3/1/11
-		<Item English_Text = "Accepted Copy Applications (seperate by ;)" ID = "2098">接受复制的应用程序（以 ; 分隔）</Item>
+		<Item English_Text = "Accepted Copy Applications (separate by ;)" ID = "2098">接受复制的应用程序（以 ; 分隔）</Item>
 		<Item English_Text = "Include" ID = "2095">包括</Item>
 		<Item English_Text = "Exclude" ID = "2096">排除</Item>
 		
@@ -351,6 +366,86 @@
 		<Item English_Text = "Quick Paste" ID = "QuickPasteTitle">快速粘贴</Item>
 		<Item English_Text = "Keyboard Shortcuts" ID = "KeyboardShortcutsTitle">键盘快捷键</Item>
 		<Item English_Text = "About Ditto" ID = "AboutTitle">关于 Ditto</Item>
+		<Item English_Text = "Cloud Sync" ID = "CloudSyncTitle">云端同步</Item>
+		<Item English_Text = "OK" ID = "CloudBtnOK">确定</Item>
+		<Item English_Text = "Cancel" ID = "CloudBtnCancel">取消</Item>
+		<Item English_Text = "Please enter a value." ID = "CloudMsgInputRequired">请输入一个值。</Item>
+		<Item English_Text = "Prompt" ID = "CloudTitlePrompt">提示</Item>
+		<Item English_Text = "Logged in (Device: %hs)" ID = "CloudStatusLoggedInDevice">已登录（设备：%hs）</Item>
+		<Item English_Text = "Logged in" ID = "CloudStatusLoggedIn">已登录</Item>
+		<Item English_Text = "Not logged in" ID = "CloudStatusNotLoggedIn">未登录</Item>
+		<Item English_Text = "Encryption enabled (Salt: %s...)" ID = "CloudEncryptionEnabledSalt">加密已启用（盐值：%s...）</Item>
+		<Item English_Text = "Encryption enabled" ID = "CloudEncryptionEnabled">加密已启用</Item>
+		<Item English_Text = "Encryption not enabled" ID = "CloudEncryptionNotEnabled">加密未启用</Item>
+		<Item English_Text = "Please enter the server URL before enabling cloud sync." ID = "CloudMsgEnterServerUrl">请先输入服务器地址再开启云端同步。</Item>
+		<Item English_Text = "Configuration Error" ID = "CloudTitleConfigError">配置错误</Item>
+		<Item English_Text = "Please enter the server URL." ID = "CloudMsgEnterServerUrlLogin">请输入服务器地址。</Item>
+		<Item English_Text = "Login" ID = "CloudTitleLogin">登录</Item>
+		<Item English_Text = "Please enter a username." ID = "CloudMsgEnterUsername">请输入用户名。</Item>
+		<Item English_Text = "Please enter a password." ID = "CloudMsgEnterPassword">请输入密码。</Item>
+		<Item English_Text = "Logging in..." ID = "CloudStatusLoggingIn">正在登录…</Item>
+		<Item English_Text = "Logged in (Device: %s)" ID = "CloudStatusLoggedInDevice2">已登录（设备：%s）</Item>
+		<Item English_Text = "Unknown" ID = "CloudUnknown">未知</Item>
+		<Item English_Text = "Login successful!\nYou can now enable cloud sync." ID = "CloudMsgLoginSuccess">登录成功！\n现在可以启用云端同步了。</Item>
+		<Item English_Text = "Login failed: %s" ID = "CloudMsgLoginFailed">登录失败：%s</Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusException">异常：%hs</Item>
+		<Item English_Text = "Login error: %hs" ID = "CloudMsgLoginError">登录错误：%hs</Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudStatusLoginUnknownError">登录时发生未知错误。</Item>
+		<Item English_Text = "An unknown error occurred during login." ID = "CloudMsgLoginUnknownError">登录时发生未知错误。</Item>
+		<Item English_Text = "Registration is closed. Please contact your administrator to create an account." ID = "CloudMsgRegisterDisabled">注册已关闭。请联系管理员创建账号。</Item>
+		<Item English_Text = "Register" ID = "CloudTitleRegister">注册</Item>
+		<Item English_Text = "Setting up encryption..." ID = "CloudStatusSettingUpEncryption">正在设置加密…</Item>
+		<Item English_Text = "Please log in first before enabling encryption." ID = "CloudStatusLoginRequired">请在启用加密前先登录。</Item>
+		<Item English_Text = "Enable Encryption" ID = "CloudTitleEnableEncryption">启用加密</Item>
+		<Item English_Text = "Encryption has been enabled. Your data will be encrypted before syncing." ID = "CloudMsgEncryptionEnabled">加密已启用。您的数据将在同步前加密。</Item>
+		<Item English_Text = "Error enabling encryption: %hs" ID = "CloudMsgEncryptionError">启用加密时出错：%hs</Item>
+		<Item English_Text = "Unknown error enabling encryption." ID = "CloudStatusEncryptionUnknownError">启用加密时发生未知错误。</Item>
+		<Item English_Text = "An unknown error occurred." ID = "CloudMsgEncryptionUnknownError">发生未知错误。</Item>
+		<Item English_Text = "Encryption test failed: encryption failed." ID = "CloudEncTestFailed">加密测试失败。</Item>
+		<Item English_Text = "Encryption test failed. Encryption is not working correctly." ID = "CloudMsgEncTestFailed">加密测试失败。加密功能不正常。</Item>
+		<Item English_Text = "Test Encryption" ID = "CloudTitleTestEncryption">测试加密</Item>
+		<Item English_Text = "Encryption test succeeded" ID = "CloudEncTestSuccess">加密测试成功</Item>
+		<Item English_Text = "Encryption test succeeded!\nEncryption is working correctly." ID = "CloudMsgEncTestSuccess">加密测试成功！\n加密功能正常。</Item>
+		<Item English_Text = "Encryption test failed: decrypted text does not match." ID = "CloudEncTestMismatch">加密测试失败：解密文本不匹配。</Item>
+		<Item English_Text = "Encryption test failed. Decrypted text does not match original." ID = "CloudMsgEncTestMismatch">加密测试失败。解密文本与原文不匹配。</Item>
+		<Item English_Text = "Encryption test failed: %hs" ID = "CloudEncTestException">加密测试失败：%hs</Item>
+		<Item English_Text = "Test encryption error: %hs" ID = "CloudMsgEncTestError">测试加密错误：%hs</Item>
+		<Item English_Text = "Encryption test failed: unknown error." ID = "CloudEncTestUnknownError">加密测试失败：未知错误。</Item>
+		<Item English_Text = "An unknown error occurred during encryption test." ID = "CloudMsgEncTestUnknownError">加密测试时发生未知错误。</Item>
+		<Item English_Text = "Please enable encryption (set end-to-end encryption password) first, then export the key file." ID = "CloudMsgEnableEncryptionFirst">请先启用加密（设置端到端加密密码），然后导出密钥文件。</Item>
+		<Item English_Text = "Export Key" ID = "CloudTitleExportKey">导出密钥</Item>
+		<Item English_Text = "Enter a password to protect the key file:\n(Losing this password means the key cannot be imported)" ID = "CloudPromptExportKeyPassword">输入密码以保护密钥文件：\n（丢失此密码将导致密钥无法导入）</Item>
+		<Item English_Text = "Key file exported successfully!" ID = "CloudMsgKeyExported">密钥文件导出成功！</Item>
+		<Item English_Text = "Failed to export key file. Please check the file path and permissions." ID = "CloudMsgExportFailed">导出密钥文件失败。请检查文件路径和权限。</Item>
+		<Item English_Text = "Invalid key file format." ID = "CloudMsgInvalidKeyFile">密钥文件格式无效。</Item>
+		<Item English_Text = "Import Key" ID = "CloudTitleImportKey">导入密钥</Item>
+		<Item English_Text = "Cannot read key file information." ID = "CloudMsgCannotReadKeyFile">无法读取密钥文件信息。</Item>
+		<Item English_Text = "Key File Info: %s\n\nDo you want to import this key?" ID = "CloudMsgKeyFileInfo">密钥文件信息：%s\n\n是否要导入此密钥？</Item>
+		<Item English_Text = "Enter the password that was used when exporting the key file:" ID = "CloudPromptImportKeyPassword">请输入导出密钥文件时使用的密码：</Item>
+		<Item English_Text = "Key imported successfully.\nEncryption has been enabled." ID = "CloudMsgKeyImported">密钥导入成功。\n加密已启用。</Item>
+		<Item English_Text = "Encryption enabled (imported from key: %s)" ID = "CloudEncryptionEnabledImported">加密已启用（从密钥导入：%s）</Item>
+		<Item English_Text = "Failed to import key file. The password might be incorrect." ID = "CloudMsgImportFailed">导入密钥文件失败。密码可能不正确。</Item>
+		<Item English_Text = "Cloud authentication token has expired.\n\nYour sync has been paused. Please log in again to continue syncing.\n\nClick OK to open the login dialog." ID = "CloudMsgAuthExpired">云端认证令牌已过期。\n\n同步已暂停，请重新登录以继续同步。\n\n点击确定打开登录对话框。</Item>
+		<Item English_Text = "Cloud Sync - Authentication Required" ID = "CloudTitleAuthRequired">云端同步 - 需要重新认证</Item>
+		<Item English_Text = "Cloud access denied (HTTP 403).\n\nPossible causes:\n- Your account has been disabled\n- Your device has been removed by an administrator\n\nPlease contact your administrator or log in again." ID = "CloudMsgAccessDenied">云端访问被拒绝（HTTP 403）。\n\n可能原因：\n- 账号已被禁用\n- 设备已被管理员移除\n\n请联系管理员或重新登录。</Item>
+		<Item English_Text = "Cloud Sync - Access Denied" ID = "CloudTitleAccessDenied">云端同步 - 访问被拒绝</Item>
+		<Item English_Text = "Encryption password has changed!\n\nYour encryption password has been modified on another device.\nPlease enter the new encryption password to continue syncing.\n\nClick OK to open encryption settings." ID = "CloudMsgEncryptionChanged">加密密码已变更！\n\n您的加密密码已在其他设备上修改。\n请重新输入新的加密密码以继续同步。\n\n点击确定打开加密设置。</Item>
+		<Item English_Text = "Cloud Sync - Encryption Password Changed" ID = "CloudTitleEncryptionChanged">云端同步 - 加密密码已变更</Item>
+		<Item English_Text = "Encryption initialization failed!\n\nWarning: Your clipboard data will NOT be encrypted.\n\nPossible causes:\n- Encryption password not set\n- Key file not imported\n- Encryption service unavailable\n\nPlease re-enable encryption in the Cloud Sync settings to protect your data." ID = "CloudMsgEncryptionFailed">加密初始化失败！\n\n警告：剪贴板数据将不会被加密。\n\n可能原因：\n- 未设置加密密码\n- 未导入密钥文件\n- 加密服务不可用\n\n请在云端同步设置中重新启用加密以保护数据。</Item>
+		<Item English_Text = "Cloud Sync - Encryption Failed" ID = "CloudTitleEncryptionFailed">云端同步 - 加密失败</Item>
+		<Item English_Text = "Syncing..." ID = "CloudStatusSyncing">正在同步…</Item>
+		<Item English_Text = "Error: %s" ID = "CloudStatusError">错误：%s</Item>
+		<Item English_Text = "Last sync: %s \u2713" ID = "CloudStatusLastSync">上次同步：%s \u2713</Item>
+		<Item English_Text = "Never synced" ID = "CloudStatusNeverSynced">从未同步</Item>
+		<Item English_Text = "Force Sync" ID = "CloudTitleForceSync">强制同步</Item>
+		<Item English_Text = "Force download has been triggered.\nCloud clips will replace local clips." ID = "CloudForceDownloadMsg">已触发强制下载。\n云端剪贴项将替换本地剪贴项。</Item>
+		<Item English_Text = "Force upload has been triggered.\nLocal clips are being pushed to the cloud." ID = "CloudForceUploadMsg">已触发强制上传。\n本地剪贴项正在推送到云端。</Item>
+		<Item English_Text = "Please log in first before re-entering encryption password." ID = "CloudMsgLoginRequired">请先登录后再重新输入加密密码。</Item>
+		<Item English_Text = "Cloud Sync - Re-enter Encryption Password" ID = "CloudTitleReEnterPassword">云端同步 - 重新输入加密密码</Item>
+		<Item English_Text = "The encryption password has changed on another device.\n\nPlease enter the new encryption password to continue syncing:" ID = "CloudPromptReEnterPassword">加密密码已在其他设备上更改。\n\n请输入新的加密密码以继续同步：</Item>
+		<Item English_Text = "Password verified successfully!\n\nCloud sync will now resume with the updated encryption key." ID = "CloudMsgPasswordVerified">密码验证成功！\n\n云端同步将使用更新后的加密密钥恢复。</Item>
+		<Item English_Text = "Encryption key is missing or corrupted!\n\nYour clipboard encryption key (DEK) could not be loaded.\nCloud sync has been stopped to prevent data loss.\n\nDo you want to re-setup encryption now?\nWARNING: Previously encrypted clips on the server will become unreadable and will be skipped during sync.\n\n- Click Yes to enter a new encryption password and restore sync\n- Click No to keep sync stopped (you can re-enable later in settings)" ID = "CloudMsgEncryptionKeyLost">加密密钥丢失或损坏！\n\n无法加载剪贴板加密密钥（DEK）。\n云端同步已停止，以防数据丢失。\n\n是否现在重新设置加密？\n警告：服务器上先前加密的剪贴项将变得不可读，同步时将跳过。\n\n- 点击"是"输入新的加密密码并恢复同步\n- 点击"否"保持同步停止（可在设置中稍后重新启用）</Item>
+		<Item English_Text = "Cloud Sync - Encryption Key Lost" ID = "CloudTitleEncryptionKeyLost">云端同步 - 加密密钥丢失</Item>
 		<Item English_Text = "Error Opening Database." ID = "Error_Opening_Database">打开数据库时出错。</Item>
 		<Item English_Text = "Unable to initialize DAO/Jet db engine.\nSelect YES to download DAO from http://ditto-cp.sourceforge.net/dao_setup.exe\n\nRestart Ditto after installation of DAO." ID = "Error_Init_Dao">无法初始化 DAO/Jet 数据库引擎。\n选择 '是' 将从 http://ditto-cp.sourceforge.net/dao_setup.exe 下载 DAO。\n\n安装 DAO 后请重新启动 Ditto。</Item>
 		<Item English_Text = "Unrecognized Database Format" ID = "Database_Format">无法识别的数据库格式</Item>
@@ -427,6 +522,11 @@
 		
 		<Item English_Text = "Backing up database" ID = "BackupDbMsg">备份数据库信息</Item>
 		<Item English_Text = "Restoring database" ID = "RestoreDbMsg">还原数据库信息</Item>
+		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips">删除所有不在组中、标记为永不自动删除、拥有快捷键或置顶的剪辑。\n\n此操作无法撤销。</Item>
+		<Item English_Text = "Delete Group?" ID = "Delete_Clip_Groups">删除组？</Item>
+		<Item English_Text = "There are no starred clips" ID = "NoStarredClips">没有星标剪辑</Item>
+		<Item English_Text = "[Starred clips]" ID = "starred_clips">[星标剪辑]</Item>
+		<Item English_Text = "Exception: %hs" ID = "CloudStatusEncryptionException">异常：%hs</Item>
 		
 		<Item English_Text = "Ditto was unable to open its database, waiting until it can be opened. Update the path in Options if needed. Path: " ID = "StartupNoDbMsg">Ditto 无法打开数据库，将等待它可以打开的时候。 如果需要，更新选项中的路径。 路径： </Item>
 				
@@ -434,12 +534,73 @@
 		<Item English_Text = "At Cursor" ID = "AtCursor">光标处</Item>
 		<Item English_Text = "At Previous Position" ID = "AtPreviousPosition">上次打开的位置</Item>
 		
+		<Item English_Text = "Error Creating Database" ID = "MsgErrorCreatingDatabase">创建数据库时出错</Item>
+		<Item English_Text = "Invalid Database" ID = "MsgInvalidDatabase">数据库无效</Item>
+		<Item English_Text = "Error Opening new database" ID = "MsgErrorOpeningDatabase">打开新数据库时出错</Item>
+		<Item English_Text = "Error registering global hot key\n\nContinue?" ID = "MsgErrorRegisterHotKey">注册全局热键时出错\n\n继续？</Item>
+		<Item English_Text = "Error registering global move to group hot key\n\nContinue?" ID = "MsgErrorRegisterMoveToGroupHotKey">注册"移动到分组"全局热键时出错\n\n继续？</Item>
+		<Item English_Text = "Please enter an encryption password." ID = "CloudMsgEnterEncryptionPassword">请输入加密密码。</Item>
+		<Item English_Text = "Delete selected items?  This cannot be undone!" ID = "MsgDeleteSelectedItems">删除所选项目？此操作无法撤销！</Item>
+		<Item English_Text = "Error Sending data to %s\n\n%s" ID = "MsgErrorSendingData">向 %s 发送数据时出错\n\n%s</Item>
+		<Item English_Text = "-No Group-" ID = "GroupNoGroup">-无分组-</Item>
+		
+		<Item English_Text = "Error Registering " ID = "HotKeyRegError">注册热键时出错 </Item>
+		<Item English_Text = "Error Unregistering " ID = "HotKeyUnregError">注销热键时出错 </Item>
+		<Item English_Text = "Unable to open hyperlink:\n\n" ID = "HyperlinkErrorPrefix">无法打开超链接：\n\n</Item>
+		<Item English_Text = "Unknown Error (%d) occurred." ID = "HyperlinkErrorUnknown">发生未知错误 (%d)。</Item>
+		<Item English_Text = "The operating system is out\nof memory or resources." ID = "HyperlinkErrorOsOom">操作系统内存或资源不足。</Item>
+		<Item English_Text = "The specified path was not found." ID = "HyperlinkErrorPNF">指定的路径未找到。</Item>
+		<Item English_Text = "The specified file was not found." ID = "HyperlinkErrorFNF">指定的文件未找到。</Item>
+		<Item English_Text = "The .EXE file is invalid\n(non-Win32 .EXE or error in .EXE image)." ID = "HyperlinkErrorBadFormat">.EXE 文件无效（非 Win32 .EXE 或 .EXE 映像错误）。</Item>
+		<Item English_Text = "The operating system denied\naccess to the specified file." ID = "HyperlinkErrorAccessDenied">操作系统拒绝访问指定的文件。</Item>
+		<Item English_Text = "The filename association is\nincomplete or invalid." ID = "HyperlinkErrorAssocIncomplete">文件关联不完整或无效。</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because other DDE transactions\nwere being processed." ID = "HyperlinkErrorDdeBusy">由于其他 DDE 事务正在处理，\nDDE 事务无法完成。</Item>
+		<Item English_Text = "The DDE transaction failed." ID = "HyperlinkErrorDdeFail">DDE 事务失败。</Item>
+		<Item English_Text = "The DDE transaction could not\nbe completed because the request timed out." ID = "HyperlinkErrorDdeTimeout">由于请求超时，DDE 事务无法完成。</Item>
+		<Item English_Text = "The specified dynamic-link library was not found." ID = "HyperlinkErrorDllNotFound">指定的动态链接库未找到。</Item>
+		<Item English_Text = "There is no application associated\nwith the given filename extension." ID = "HyperlinkErrorNoAssoc">没有应用程序与给定的文件扩展名关联。</Item>
+		<Item English_Text = "There was not enough memory to complete the operation." ID = "HyperlinkErrorOom">没有足够的内存完成操作。</Item>
+		<Item English_Text = "A sharing violation occurred. " ID = "HyperlinkErrorShare">发生共享冲突。 </Item>
+		<Item English_Text = "Progress" ID = "ProgressWindowTitle">进度</Item>
+		<Item English_Text = " Cancel " ID = "ProgressCancelLabel"> 取消 </Item>
+		<Item English_Text = "Options" ID = "OptionsWindowTitle">选项</Item>
+		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle">Ditto 编辑器</Item>
+		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle">正在运行 Ditto 更新</Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">确定</Item>
 		<Item English_Text = "Cancel" ID = "2">取消</Item>
 		<Item English_Text = "Apply" ID = "12321">应用</Item>
 	</Ditto_Options_Sheet>
+	<Ditto_Options_Cloud>
+		<Item English_Text = "Cloud Sync" ID = "-1">云端同步</Item>
+		<Item English_Text = "Cloud Sync Settings" ID = "2224">云端同步设置</Item>
+		<Item English_Text = "Enable Cloud Sync" ID = "2201">启用云端同步</Item>
+		
+		<Item English_Text = "Server URL" ID = "2216">服务器地址</Item>
+		<Item English_Text = "Username" ID = "2217">用户名</Item>
+		<Item English_Text = "Password" ID = "2218">密码</Item>
+		<Item English_Text = "Status:" ID = "2219">状态：</Item>
+		<Item English_Text = "Login" ID = "2207">登录</Item>
+		<Item English_Text = "Register" ID = "2208">注册</Item>
+		<Item English_Text = "End-to-End Encryption" ID = "2225">端到端加密</Item>
+		<Item English_Text = "Encryption Password" ID = "2220">加密密码</Item>
+		<Item English_Text = "Enable Encryption" ID = "2209">启用加密</Item>
+		<Item English_Text = "Test Encryption" ID = "2210">测试加密</Item>
+		<Item English_Text = "Encryption Status:" ID = "2221">加密状态：</Item>
+		<Item English_Text = "Warning: Lost password means lost data!" ID = "2222">警告：忘记密码将导致数据不可恢复</Item>
+		<Item English_Text = "Key File Management" ID = "2226">密钥文件管理</Item>
+		<Item English_Text = "Key File Path" ID = "2223">密钥文件路径</Item>
+		<Item English_Text = "Export Key" ID = "2213">导出密钥</Item>
+		<Item English_Text = "Import Key" ID = "2214">导入密钥</Item>
+		<Item English_Text = "Force Sync" ID = "2227">强制同步</Item>
+		<Item English_Text = "Force Download from Cloud" ID = "2228">从云端强制下载</Item>
+		<Item English_Text = "Force Upload to Cloud" ID = "2229">向云端强制上传</Item>
+		<Item English_Text = "Sync new clips on copy" ID = "2230">复制时同步新剪贴项</Item>
+		<Item English_Text = "Periodic sync" ID = "2231">定期同步</Item>
+		<Item English_Text = "every" ID = "2233">每</Item>
+		<Item English_Text = "Sync Status:" ID = "2235">同步状态：</Item>
+	</Ditto_Options_Cloud>
 	<Ditto_Tray_Icon_Menu>
 		<Item English_Text = "Show Quick Paste" ID = "32773">显示快速粘贴</Item>
 		<Item English_Text = "Options" ID = "32771">选项</Item>
@@ -539,7 +700,35 @@
 		<Item English_Text = "Data Size" ID = "DataSize">数据大小</Item>
 		<Item English_Text = "Quick Paste Text" ID = "QuickPasteText">快速粘贴文本</Item>
 	</Ditto_DeleteClipData>
-	
+
+	<Ditto_Options_Quick_Paste>
+		<Item English_Text="Show text for first ten copy hot keys" ID="1034">显示前十个复制热键的文本</Item>
+		<Item English_Text="Show leading whitespace" ID="2021">显示前导空白</Item>
+		<Item English_Text="Enable Quick Paste Transparency" ID="2006">启用快速粘贴透明度</Item>
+		<Item English_Text="Show thumbnails (for CF_DIB types) (Could Increase Memory Usage and Display Speed)" ID="2022">显示缩略图（适用于 CF_DIB 类型，可能增加内存占用和显示耗时）</Item>
+		<Item English_Text="Draw RTF Text in List (for RTF types) (Could Increase Memory Usage and Display Speed)" ID="2023">在列表中绘制 RTF 文本（适用于 RTF 类型，可能增加内存占用和显示耗时）</Item>
+		<Item English_Text="Find As You Type" ID="2036">输入时查找</Item>
+		<Item English_Text="Ensure Entire Window is Visible" ID="2037">确保整个窗口可见</Item>
+		<Item English_Text="Show Clips That are in Groups in Main List" ID="2038">在主列表中显示组内剪贴项</Item>
+		<Item English_Text="Prompt when deleting clips" ID="2039">删除剪贴项时提示</Item>
+		<Item English_Text="Always Show Scroll Bar" ID="2040">始终显示滚动条</Item>
+		<Item English_Text="Elevated privileges to paste into elevated apps" ID="2041">粘贴到高权限应用程序时提升权限</Item>
+		<Item English_Text="Show In Taskbar" ID="2042">在任务栏显示</Item>
+		<Item English_Text="Show indicator a clip has been pasted" ID="2043">显示已粘贴剪贴项标志</Item>
+		<Item English_Text="At Caret" ID="2015">插入符号处</Item>
+		<Item English_Text="At Cursor" ID="2016">光标处</Item>
+		<Item English_Text="At Previous Position" ID="2017">上次打开的位置</Item>
+		<Item English_Text="About Theme" ID="2094">关于主题</Item>
+		<Item English_Text="Font" ID="1040">字体</Item>
+		<Item English_Text="Default Font" ID="2031">默认字体</Item>
+		<Item English_Text="..." ID="2124">浏览</Item>
+		<Item English_Text="Text Lines per Clip" ID="2062">每剪贴项行数</Item>
+		<Item English_Text="Popup Positioning" ID="2063">窗口弹出位置</Item>
+		<Item English_Text="Theme" ID="2092">主题</Item>
+		<Item English_Text="Diff Application Path" ID="2122">差异比较工具路径</Item>
+		<Item English_Text="Quick Paste" ID="-1">快速粘贴</Item>
+	</Ditto_Options_Quick_Paste>
+
 	<Ditto_Options_Quick_Paste_Keyboard>
 		<Item English_Text = "Quick Paste Keyboard" ID = "-1" PropertyPage = "true">快速粘贴按键</Item>
 		

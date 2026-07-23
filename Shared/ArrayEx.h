@@ -13,30 +13,30 @@ template <class TYPE> class CArrayEx : public CArray<TYPE,TYPE>
 public:
 	inline const TYPE&	operator[](int nIndex) const
 	{
-		ASSERT(0 <= nIndex && nIndex < GetSize());
-		return (GetData()[nIndex]);
+		ASSERT(0 <= nIndex && nIndex < this->GetSize());
+		return (this->GetData()[nIndex]);
 	};
 
 	inline const TYPE&	GetAt(int nIndex) const
 	{
-		ASSERT(0 <= nIndex && nIndex < GetSize());
-		return (GetData()[nIndex]);
+		ASSERT(0 <= nIndex && nIndex < this->GetSize());
+		return (this->GetData()[nIndex]);
 	};
 
 	inline TYPE& operator[](int nIndex)
 	{
-		ASSERT(0 <= nIndex && nIndex < GetSize());
-		return (GetData()[nIndex]);
+		ASSERT(0 <= nIndex && nIndex < this->GetSize());
+		return (this->GetData()[nIndex]);
 	};
 
 	void SortAscending()
 	{
-		qsort(GetData(), GetSize(), sizeof(TYPE), CArrayEx::CompareAscending);
+		qsort(this->GetData(), this->GetSize(), sizeof(TYPE), CArrayEx::CompareAscending);
 	}
 
 	void SortDescending()
 	{
-		qsort(GetData(), GetSize(), sizeof(TYPE), CArrayEx::CompareDescending);
+		qsort(this->GetData(), this->GetSize(), sizeof(TYPE), CArrayEx::CompareDescending);
 	}
 	
 	static int CompareAscending(const void * p1, const void * p2)
@@ -52,11 +52,11 @@ public:
 	BOOL Find(TYPE type)
 	{
 		LPVOID lpVoid = NULL;
-		lpVoid = bsearch(&type, GetData(), GetSize(), sizeof(TYPE), CArrayEx::CompareAscending);
+		lpVoid = bsearch(&type, this->GetData(), this->GetSize(), sizeof(TYPE), CArrayEx::CompareAscending);
 
 		if(lpVoid)
 			return TRUE;
-		
+
 		return FALSE;
 	}
 };
