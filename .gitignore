@@ -113,3 +113,6 @@ QWEN.md
 /DittoSetup/appx/Cert2.zip
 /DittoSetup/rcedit-x64.exe
 /DittoSetup/rcedit-x86.exe
+
+# 构建输出
+/Debug/
