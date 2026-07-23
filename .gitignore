@@ -106,3 +106,10 @@ QWEN.md
 *.user
 *.dbm
 *.dbd
+
+# DittoSetup 构建工具二进制文件
+/DittoSetup/ProjectZip.exe
+/DittoSetup/appx/Cert.zip
+/DittoSetup/appx/Cert2.zip
+/DittoSetup/rcedit-x64.exe
+/DittoSetup/rcedit-x86.exe
