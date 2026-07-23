@@ -50,7 +50,6 @@ public:
 	// sets the image type
 	void SetImage(int type);
 
-	void CGdipButton::Test(CString c);
 	BOOL LoadAltImage(UINT id, LPCTSTR pType);
 	BOOL LoadStdImage(UINT id, LPCTSTR pType);
 
@@ -58,6 +57,9 @@ public:
 
 	// if false, disables the press state and uses grayscale image if it exists
 	void EnableButton(BOOL bEnable = TRUE) { m_bIsDisabled = !bEnable; }
+
+	// in dark mode, uses a lightening ColorMatrix to make dark icons visible
+	void SetDarkMode(BOOL bDark = TRUE);
 
 	// in toggle mode each press toggles between std and alt images
 	void EnableToggle(BOOL bEnable = TRUE);
@@ -128,4 +130,16 @@ private:
 
 	CDC*	m_pCurBtn;		// current pointer to one of the above
 
+	CBitmap m_bmpBk;
+	CBitmap m_bmpStd;
+	CBitmap m_bmpStdP;
+	CBitmap m_bmpStdH;
+	CBitmap m_bmpGS;
+	CBitmap m_bmpAlt;
+	CBitmap m_bmpAltP;
+	CBitmap m_bmpAltH;
+
+	BOOL	m_bDarkMode;	// dark mode: lighten icon for visibility
+
+	void ClearBitmaps();
 };
