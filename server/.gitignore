@@ -1,0 +1,15 @@
+# Build output
+bin/
+server
+
+# Runtime data (SQLite DB, auto-generated JWT secret)
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
