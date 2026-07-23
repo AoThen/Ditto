@@ -275,9 +275,7 @@ void CImageViewer::OnLButtonUp(UINT nFlags, CPoint point)
 
 BOOL CImageViewer::OnEraseBkgnd(CDC* pDC)
 {
-	//OutputDebugString(_T("image viewer OnEraseBkgnd\r\n"));
-	//return CWnd::OnEraseBkgnd(pDC);
-	return FALSE;
+	return TRUE;
 }
 
 LRESULT CImageViewer::OnGesture(WPARAM wParam, LPARAM lParam)

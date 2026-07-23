@@ -221,6 +221,7 @@ BEGIN_MESSAGE_MAP(CQPasteWnd, CWndEx)
 	ON_MESSAGE(NM_SET_LIST_COUNT, OnSetListCount)
 	ON_MESSAGE(NM_REFRESH_ROW, OnRefeshRow)
 	ON_MESSAGE(NM_ITEM_DELETED, OnItemDeleted)
+	ON_MESSAGE(NM_FILL_REST_OF_LIST, OnFillRestOfList)
 	ON_WM_TIMER()
 	ON_COMMAND(ID_MENU_EXPORT, OnMenuExport)
 	ON_COMMAND(ID_MENU_IMPORT, OnMenuImport)
@@ -430,7 +431,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	SetWindowText(_T(QPASTE_TITLE));
 
-	m_search.Create(WS_TABSTOP | WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, CRect(0, 0, 0, 0), this, ID_EDIT_SEARCH);
+	m_search.Create(WS_TABSTOP | WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | ES_AUTOHSCROLL, CRect(0, 0, 0, 0), this, ID_EDIT_SEARCH);
 	m_search.SetDpiInfo(&m_DittoWindow.m_dpi);
 	m_search.SetPromptText(theApp.m_Language.GetString(_T("Search"), _T("Search")));
 	::SHAutoComplete(m_search.m_hWnd, SHACF_AUTOSUGGEST_FORCE_OFF);
@@ -471,7 +472,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		CGetSetOptions::m_Theme.ScrollBarThumbHover()
 	);
 
-	((CWnd*)&m_GroupTree)->CreateEx(NULL, _T("SysTreeView32"), NULL, TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS, CRect(0, 0, 100, 100), this, 0);
+	((CWnd*)&m_GroupTree)->CreateEx(NULL, _T("SysTreeView32"), NULL, TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | WS_CLIPSIBLINGS, CRect(0, 0, 100, 100), this, 0);
 	m_GroupTree.ModifyStyle(WS_CAPTION | WS_TABSTOP, 0);
 
 	m_GroupTree.SetNotificationWndEx(m_hWnd);
@@ -500,7 +501,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	m_bPrevDarkMode = IsDarkModeActive();
 
-	m_stGroup.Create(_T(""), WS_CHILD | WS_VISIBLE, CRect(0, 0, 0, 0), this, ID_GROUP_TEXT);
+	m_stGroup.Create(_T(""), WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, CRect(0, 0, 0, 0), this, ID_GROUP_TEXT);
 
 	//Set the z-order
 	m_lstHeader.SetWindowPos(this, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
@@ -508,7 +509,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_ShowGroupsFolderBottom.SetWindowPos(&m_search, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 
 	//LVS_EX_FLATSB
-	m_lstHeader.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_HEADERDRAGDROP);
+	m_lstHeader.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_HEADERDRAGDROP | LVS_EX_DOUBLEBUFFER);
 
 	// Create the columns
 	if (m_lstHeader.InsertColumn(0, _T(""), LVCFMT_LEFT, 2500, 0) != 0)
@@ -734,8 +735,6 @@ void CQPasteWnd::MoveControls()
 		extraSize = m_DittoWindow.m_dpi.Scale(::GetSystemMetrics(SM_CXVSCROLL));
 
 		CRgn rgnRect;
-		CRect r;
-		m_lstHeader.GetWindowRect(&r);
 
 		rgnRect.CreateRectRgn(0, 0, cx, (cy - listBoxBottomOffset - topOfListBox) );
 
@@ -1357,7 +1356,6 @@ LRESULT CQPasteWnd::OnReloadClipInUI(WPARAM wParam, LPARAM lParam)
 					foundClip = TRUE;
 
 					m_lstHeader.RefreshVisibleRows();
-					m_lstHeader.RedrawWindow();
 					SelectFocusID();
 				}
 				else if (updateFlags & UPDATE_CLIP_DESCRIPTION)
@@ -1369,7 +1367,6 @@ LRESULT CQPasteWnd::OnReloadClipInUI(WPARAM wParam, LPARAM lParam)
 					RemoveFromImageRtfCache(-1, clipId);
 
 					m_lstHeader.RefreshVisibleRows();
-					m_lstHeader.RedrawWindow();
 				}
 
 				break;
@@ -4866,7 +4863,6 @@ bool CQPasteWnd::DoMoveClipDown()
 			SelectIds(IDs);
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -4910,7 +4906,6 @@ bool CQPasteWnd::DoMoveClipUp()
 			SelectIds(IDs);
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -4979,7 +4974,6 @@ bool CQPasteWnd::DoMoveClipLast()
 		}
 
 		m_lstHeader.RefreshVisibleRows();
-		m_lstHeader.RedrawWindow();
 	}
 
 	return true;
@@ -5027,7 +5021,6 @@ bool CQPasteWnd::DoMoveClipTOP()
 			SelectIds(IDs);
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -5253,7 +5246,6 @@ bool CQPasteWnd::OnShowFirstTenText()
 	m_lstHeader.SetShowTextForFirstTenHotKeys(CGetSetOptions::GetShowTextForFirstTenHotKeys());
 
 	m_lstHeader.RefreshVisibleRows();
-	m_lstHeader.RedrawWindow();
 	return true;
 }
 
@@ -5263,7 +5255,6 @@ bool CQPasteWnd::OnShowClipWasPasted()
 	m_lstHeader.SetShowIfClipWasPasted(CGetSetOptions::GetShowIfClipWasPasted());
 
 	m_lstHeader.RefreshVisibleRows();
-	m_lstHeader.RedrawWindow();
 	return true;
 }
 
@@ -5323,7 +5314,6 @@ bool CQPasteWnd::OnMakeTopSticky(bool forceSort)
 			SelectIds(IDs);
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -5365,7 +5355,6 @@ bool CQPasteWnd::OnMakeLastSticky()
 			SelectIds(IDs);
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -5401,7 +5390,6 @@ bool CQPasteWnd::OnRemoveStickySetting()
 			//SelectFocusID();
 
 			m_lstHeader.RefreshVisibleRows();
-			m_lstHeader.RedrawWindow();
 		}
 	}
 
@@ -5893,7 +5881,6 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 					bool addToLoadItems = true;
 
 				{
-					ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
 					for (std::list<CPoint>::iterator it = m_loadItems.begin(); it != m_loadItems.end(); it++)
 					{
@@ -6586,7 +6573,8 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 	m_lstHeader.Scroll(CSize(-x, -y));
 
 	m_lstHeader.SetItemCountEx((int)wParam);
-	m_lstHeader.Invalidate();
+	m_lstHeader.ClearRtfCache();
+	m_lstHeader.Invalidate(FALSE);
 
 	if ((int)wParam == 0 &&
 		(m_strSearch != _T("") || m_bShowStarredClips))
@@ -6616,6 +6604,33 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 LRESULT CQPasteWnd::OnItemDeleted(WPARAM wParam, LPARAM lParam)
 {
 	m_lstHeader.OnItemDeleted((int)wParam);
+	return TRUE;
+}
+
+LRESULT CQPasteWnd::OnFillRestOfList(WPARAM wParam, LPARAM lParam)
+{
+	int iFrom = (int)wParam;
+	int iTo = (int)lParam;
+
+	ATL::CCritSecLock csLock(m_CritSection.m_sect);
+
+	bool addToLoadItems = true;
+	for (std::list<CPoint>::iterator it = m_loadItems.begin(); it != m_loadItems.end(); it++)
+	{
+		if (iFrom >= it->x && iTo <= it->y)
+		{
+			addToLoadItems = false;
+			break;
+		}
+	}
+
+	if (addToLoadItems)
+	{
+		m_loadItems.push_back(CPoint(iFrom, iTo));
+	}
+
+	m_thread.FireLoadItems(false);
+
 	return TRUE;
 }
 
@@ -7735,8 +7750,6 @@ LRESULT CQPasteWnd::OnDpiChanged(WPARAM wParam, LPARAM lParam)
 	m_lstHeader.SetListPos(Indexs[0]);
 
 	InvalidateNc();
-	this->Invalidate();
-	m_lstHeader.RefreshVisibleRows();
 	this->RedrawWindow();
 
 	return TRUE;

@@ -1071,6 +1071,15 @@ void CQListCtrl::DrawCopiedColorCode(CString& csText, CRect& rcText, CDC* pDC)
 	}
 
 	// 4. --- Non-W3C Format Parsing ---
+	// Fast reject for non-color text: most non-color text starts with
+	// non-digit, non-'(' and isn't a 6-char hex string
+	int textLen = parseText.GetLength();
+	if (textLen >= 3 && !_istdigit(parseText[0]) && parseText[0] != _T('('))
+	{
+		if (textLen != 6 || !IsHexString(parseText))
+			return;
+	}
+
 	int r, g, b, chars_consumed = 0;
 
 	// Check for parenthesized RGB: "(255, 128, 0)" or "(255 128 0)"
@@ -1159,17 +1168,32 @@ BOOL CQListCtrl::DrawRtfText(int nItem, CRect& crRect, CDC* pDC)
 
 	if (m_pFormatter)
 	{
-		//somehow ms word places crazy rtf text onto the clipboard and our draw routine doesn't handle that
-		//pass the rtf text into a richtext control and get it out and the contorl will clean  the rtf so our routine can draw it
-		m_rtfFormater.SetRTF(pThumbnail->GetAsCStringA());
-		CString betterRTF = m_rtfFormater.GetRTF();
+		// Use cache if available
+		int clipId = pThumbnail->m_parentId;
+		auto cacheIt = m_rtfCache.find(clipId);
+		if (cacheIt != m_rtfCache.end())
+		{
+			CComBSTR bStr(cacheIt->second);
+			m_pFormatter->put_RTFText(bStr);
+			m_pFormatter->Draw(pDC->m_hDC, crRect);
+			bRet = TRUE;
+		}
+		else
+		{
+			//somehow ms word places crazy rtf text onto the clipboard and our draw routine doesn't handle that
+			//pass the rtf text into a richtext control and get it out and the contorl will clean  the rtf so our routine can draw it
+			m_rtfFormater.SetRTF(pThumbnail->GetAsCStringA());
+			CString betterRTF = m_rtfFormater.GetRTF();
 
-		CComBSTR bStr(betterRTF);
-		m_pFormatter->put_RTFText(bStr);
+			m_rtfCache[clipId] = betterRTF;
 
-		m_pFormatter->Draw(pDC->m_hDC, crRect);
+			CComBSTR bStr(betterRTF);
+			m_pFormatter->put_RTFText(bStr);
 
-		bRet = TRUE;
+			m_pFormatter->Draw(pDC->m_hDC, crRect);
+
+			bRet = TRUE;
+		}
 	}
 
 	return bRet;
@@ -1225,29 +1249,10 @@ void CQListCtrl::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 
 BOOL CQListCtrl::OnEraseBkgnd(CDC* pDC)
 {
-
 	CRect rect;
 	GetClientRect(&rect);
-	CBrush myBrush(CGetSetOptions::m_Theme.MainWindowBG());    // dialog background color
-	CBrush* pOld = pDC->SelectObject(&myBrush);
-	BOOL bRes = pDC->PatBlt(0, 0, rect.Width(), rect.Height(), PATCOPY);
-	pDC->SelectObject(pOld);    // restore old brush
-	return bRes;                       // CDialog::OnEraseBkgnd(pDC);
-
-	// Simply returning TRUE seems OK since we do custom item
-	//	painting.  However, there is a pixel buffer around the
-	//	border of this control (not within the item rects)
-	//	which becomes visually corrupt if it is not erased.
-
-	// In most cases, I do not notice the erasure, so I have kept
-	//	the call to CListCtrl::OnEraseBkgnd(pDC);
-
-	// However, for some reason, bulk erasure is very noticeable when
-	//	shift-scrolling the page to select a block of items, so
-	//	I made a special case for that:
-	//if(GetSelectedCount() >= 2)
-	//	return TRUE;
-	//return CListCtrl::OnEraseBkgnd(pDC);
+	pDC->FillSolidRect(rect, CGetSetOptions::m_Theme.MainWindowBG());
+	return TRUE;
 }
 
 BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)

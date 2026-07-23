@@ -228,10 +228,10 @@ BOOL CEditWithButton::OnEraseBkgnd(CDC* pDC)
     pDC->BitBlt(0,0, 50, sizeBitmap.cy, &dcMemory, 
         0, 0, SRCCOPY);
 
-	for(int i = 50; i < size.Width()-50; i++)
+	if(size.Width() > 100)
 	{
-		pDC->BitBlt(i, 0, 1, sizeBitmap.cy, &dcMemory, 
-			50, 0, SRCCOPY);
+		pDC->StretchBlt(50, 0, size.Width()-100, sizeBitmap.cy, &dcMemory, 
+			50, 0, 1, sizeBitmap.cy, SRCCOPY);
 	}
 
 	pDC->BitBlt(size.Width()-50, 0, 50, sizeBitmap.cy, &dcMemory, 

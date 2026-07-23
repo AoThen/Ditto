@@ -146,6 +146,8 @@ public:
 
 	void SetLogFont(LOGFONT &font);
 
+	void ClearRtfCache() { m_rtfCache.clear(); }
+
 	HWND GetToolTipHWnd();
 
 	BOOL HandleKeyDown(WPARAM wParam, LPARAM lParam);
@@ -186,6 +188,7 @@ protected:
 	HFONT m_SmallFont;
 	CAccels	m_Accels;
 	CMapIDtoCF m_RTFData;
+	std::map<int, CString> m_rtfCache;
 	CToolTipEx *m_pToolTip;
 	HWND m_toolTipHwnd;
 	CFont m_Font;
