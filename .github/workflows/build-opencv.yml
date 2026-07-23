@@ -37,7 +37,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: opencvsrc\build-x64-v143-mt
-          key: opencv-build-x64-v143-mt-4.14.0-${{ hashFiles('.github/workflows/build-opencv.yml') }}-${{ hashFiles('scripts/opencv4_cmake_options.txt') }}
+          key: opencv-build-x64-v143-mt-4.14.0-v2-${{ hashFiles('.github/workflows/build-opencv.yml') }}-${{ hashFiles('scripts/opencv4_cmake_options.txt') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
