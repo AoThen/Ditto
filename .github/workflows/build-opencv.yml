@@ -51,7 +51,7 @@ jobs:
           cd opencvsrc\build-x64-v143-mt
           setlocal enabledelayedexpansion
           set "OPTS="
-          for /f "usebackq delims=" %%a in ("opencv4_cmake_options.txt") do set "OPTS=!OPTS! %%a"
+          for /f "usebackq delims=" %%a in ("..\opencv4_cmake_options.txt") do set "OPTS=!OPTS! %%a"
           cmake -G "Visual Studio 17 2022" -A x64 -T v143 !OPTS! ..
 
       - name: Build
