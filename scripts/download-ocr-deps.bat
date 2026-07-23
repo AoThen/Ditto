@@ -25,9 +25,7 @@ if not exist "%DEPS_DIR%\onnxruntime-static\windows-x64" (
         move "%DEPS_DIR%\onnxruntime-static\tmp\windows-x64" "%DEPS_DIR%\onnxruntime-static\"
     ) else (
         mkdir "%DEPS_DIR%\onnxruntime-static\windows-x64"
-        for /d %%i in ("%DEPS_DIR%\onnxruntime-static\tmp\*") do (
-            move "%%i" "%DEPS_DIR%\onnxruntime-static\windows-x64\"
-        )
+        xcopy "%DEPS_DIR%\onnxruntime-static\tmp\*" "%DEPS_DIR%\onnxruntime-static\windows-x64\" /s /e /y /i >nul 2>nul
     )
     rmdir /s /q "%DEPS_DIR%\onnxruntime-static\tmp"
     del "%TEMP%\onnx.7z"
