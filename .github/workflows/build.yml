@@ -6,6 +6,10 @@ on:
 env:
   SOLUTION_FILE_PATH: CP_Main_10.sln
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
