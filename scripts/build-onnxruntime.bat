@@ -127,6 +127,27 @@ if errorlevel 1 (
 echo [BUILD] Step 4/6 complete.
 
 REM -------------------------------------------------------------------
+REM 4b. Collect third-party libs from build tree
+REM -------------------------------------------------------------------
+echo [BUILD] Step 4b/6: Collecting third-party libs from build tree...
+
+REM The install directory only contains onnxruntime's own libs.
+REM Third-party deps (protobuf, re2, onnx, absl, etc.) are in the build tree.
+REM Search for all .lib files and copy them to install-static/lib.
+for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\%CONFIG%\*.lib" 2^>nul') do (
+    echo %%f | findstr /i "\install\" >nul
+    if errorlevel 1 (
+        if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
+            copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
+            if not errorlevel 1 (
+                echo [BUILD]   Copied: %%~nxf
+            )
+        )
+    )
+)
+echo [BUILD] Step 4b/6 complete.
+
+REM -------------------------------------------------------------------
 REM 5. Flatten headers
 REM -------------------------------------------------------------------
 echo [BUILD] Step 5/6: Flattening headers...
