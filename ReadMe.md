@@ -69,12 +69,79 @@ docker-compose -f docker-compose.prod.yml up -d
 - [快速部署指南](DEPLOYMENT_GUIDE.md)
 - [云端部署详解](docs/CLOUD_DEPLOYMENT.md)
 
+### 技术栈
+- **后端:** Go + SQLite3/PostgreSQL + WebSocket
+- **前端:** Vue 3 + Vite + Pinia
+- **加密:** AES-256-GCM 端到端加密
+- **部署:** Docker Compose + Nginx (TLS)
+- **监控:** Prometheus + Grafana + ELK
+
+## 🔍 OCR 文字识别插件
+
+Ditto 内置 OCR（光学字符识别）插件，可从剪贴板图片中提取文字。
+
+### 特性
+- ✅ **图片文字识别** - 自动检测剪贴板中的图片并提取文字
+- ✅ **排版保留** - 按阅读顺序排序识别结果，自动插入换行和空格
+- ✅ **纯文本粘贴** - OCR 结果写入数据表，粘贴纯文本即可获取识别内容
+- ✅ **本地推理** - 基于 ONNX Runtime 1.27.1 + OpenCV 4.14.0，无需联网
+
+### 依赖版本
+- ONNX Runtime: v1.27.1（静态库构建）
+- OpenCV: v4.14.0
+- 模型文件通过 GitHub Releases 自动下载
+
+📖 **构建详情：** 参见 `scripts/build-onnxruntime.bat`、`scripts/download-ocr-deps.bat`
+
+## 📁 项目结构
+
+```
+Ditto/
+├── src/                    # Ditto 主程序 (C++/MFC)
+│   ├── CloudSync/          # 云端同步客户端模块
+│   ├── ClipboardOCR.cpp    # OCR 集成入口
+│   └── ...                 # 核心模块 (Clip, Options, QListCtrl 等)
+├── Addins/
+│   ├── DittoOCR/           # OCR 插件 (ONNX Runtime + OpenCV)
+│   └── DittoUtil/          # 工具插件
+├── server/                 # 云端后端 (Go)
+│   ├── cmd/                # 入口 (server, cli)
+│   ├── internal/           # handler, service, model, hub
+│   ├── pkg/crypto/         # 加密库
+│   └── migrations/         # 数据库迁移
+├── web/                    # Web 管理面板 (Vue 3 + Vite)
+│   └── src/views/          # Clips, Dashboard, Devices, Groups, Settings, Login
+├── docker/                 # Docker Compose 配置
+├── scripts/                # 构建脚本 (ONNX, OCR 依赖, 证书生成, E2E 测试)
+├── docs/                   # 文档 (部署指南、架构设计、测试报告)
+├── CloudSync_Test/         # C++ 云端同步单元测试
+└── monitoring/             # Prometheus + Grafana 监控配置
+```
+
+## 🧪 测试
+
+| 测试项目 | 语言 | 覆盖范围 |
+|----------|------|----------|
+| CloudSync_Test | C++ | 加密、认证、同步、CRC32、MD5、SHA2、正则、拼音转换 |
+| server/tests/ | Go | 认证、剪贴板 CRUD、设备、加密、群组、统计、WebSocket、限流 |
+| web/tests/ | JavaScript | E2E (认证、剪贴板、群组、同步日志、导航) |
+| web/src/ | JavaScript | 单元测试 (组件、Store、API、Composables) |
+
+运行测试：
+```bash
+# Go 服务端测试
+cd server && go test ./...
+
+# Web 单元测试 + E2E
+cd web && npm run test:unit && npm run test:e2e
+```
+
 ## Windows 代码签名策略
 Windows 二进制文件的免费代码签名由 SignPath.io 提供，证书由 SignPath Foundation 提供。
 <br>
 <br>
 
-<img src="ditto.gif">
+<img src="docs/ditto.gif">
 
 ---
 
@@ -163,10 +230,77 @@ docker-compose -f docker-compose.prod.yml up -d
 - [Cloud Server Architecture](docs/PROJECT_PLAN.md)
 - [Quick Deployment Guide](DEPLOYMENT_GUIDE.md)
 
+### Tech Stack
+- **Backend:** Go + SQLite3/PostgreSQL + WebSocket
+- **Frontend:** Vue 3 + Vite + Pinia
+- **Encryption:** AES-256-GCM end-to-end encryption
+- **Deployment:** Docker Compose + Nginx (TLS)
+- **Monitoring:** Prometheus + Grafana + ELK
+
+## 🔍 OCR Addin
+
+Ditto includes an OCR (Optical Character Recognition) plugin to extract text from clipboard images.
+
+### Features
+- ✅ **Image text recognition** - Automatically detect images in clipboard and extract text
+- ✅ **Layout preservation** - Sort results in reading order with automatic line breaks and spaces
+- ✅ **Plain text paste** - OCR results written to data table, paste as plain text to get recognized content
+- ✅ **Local inference** - Based on ONNX Runtime 1.27.1 + OpenCV 4.14.0, no internet required
+
+### Dependencies
+- ONNX Runtime: v1.27.1 (static library build)
+- OpenCV: v4.14.0
+- Models auto-downloaded via GitHub Releases
+
+📖 **Build details:** See `scripts/build-onnxruntime.bat`, `scripts/download-ocr-deps.bat`
+
+## 📁 Project Structure
+
+```
+Ditto/
+├── src/                    # Ditto main app (C++/MFC)
+│   ├── CloudSync/          # Cloud sync client modules
+│   ├── ClipboardOCR.cpp    # OCR integration entry
+│   └── ...                 # Core modules (Clip, Options, QListCtrl, etc.)
+├── Addins/
+│   ├── DittoOCR/           # OCR addin (ONNX Runtime + OpenCV)
+│   └── DittoUtil/          # Utility addin
+├── server/                 # Cloud backend (Go)
+│   ├── cmd/                # Entry points (server, cli)
+│   ├── internal/           # handler, service, model, hub
+│   ├── pkg/crypto/         # Crypto library
+│   └── migrations/         # Database migrations
+├── web/                    # Web management panel (Vue 3 + Vite)
+│   └── src/views/          # Clips, Dashboard, Devices, Groups, Settings, Login
+├── docker/                 # Docker Compose configs
+├── scripts/                # Build scripts (ONNX, OCR deps, cert gen, E2E tests)
+├── docs/                   # Documentation (deployment, architecture, test reports)
+├── CloudSync_Test/         # C++ cloud sync unit tests
+└── monitoring/             # Prometheus + Grafana monitoring configs
+```
+
+## 🧪 Testing
+
+| Test Project | Language | Coverage |
+|--------------|----------|----------|
+| CloudSync_Test | C++ | Encryption, auth, sync, CRC32, MD5, SHA2, regex, pinyin conversion |
+| server/tests/ | Go | Auth, clip CRUD, devices, encryption, groups, stats, WebSocket, rate limiting |
+| web/tests/ | JavaScript | E2E (auth, clips, groups, sync logs, navigation) |
+| web/src/ | JavaScript | Unit tests (components, stores, API, composables) |
+
+Run tests:
+```bash
+# Go server tests
+cd server && go test ./...
+
+# Web unit tests + E2E
+cd web && npm run test:unit && npm run test:e2e
+```
+
 ## Windows Code-Signing Policy
 Free code signing on Windows binaries provided by SignPath.io, certificate by SignPath Foundation.
 <br>
 <br>
 
-<img src="ditto.gif">
+<img src="docs/ditto.gif">
 
