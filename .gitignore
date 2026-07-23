@@ -65,36 +65,22 @@ server/data/*.db-wal
 *.ilk
 *.res
 /enc_temp_folder
-/focusdll/Debug64
 CP_Main.vcxproj.user
 CP_Main_i.c
 CP_Main_i.h
 *.idb
 *.lnk
 CP_Main.aps
-/focusdll/Release64
-/ICU_Loader/x64
 /Release64
 *.db
 *.Settings
-Debug/portable
 *.exp
 *.map
 *.tlh
 /Addins/DittoUtil/Win32/Debug
-/Debug/EditClips
-/EncryptDecrypt/Win32/Debug
-/focusdll/Win32/Debug
-/ICU_Loader/Debug
 /Win32/Debug
-/Debug
-!/Debug/Language/
-!/Debug/Themes/
 /Addins/DittoUtil/x64
 # /EncryptDecrypt - Now using trusted Shared/Encryption.h implementation
-/focusdll/x64
-/FocusHighlight
-/focusdll
 /x64
 QWEN.md
 # docs/PROJECT_PLAN.md 不再忽略，需要跟踪
