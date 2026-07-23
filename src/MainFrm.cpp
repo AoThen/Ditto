@@ -973,6 +973,10 @@ BOOL CMainFrame::PreTranslateMessage(MSG *pMsg)
 
 void CMainFrame::OnClose()
 {
+	// Signal cloud sync threads to stop early, giving them a head start
+	// before ExitInstance waits for them
+	theApp.m_CloudSyncManager.SignalStopEarly();
+
 	SetTimer(EXIT_TIMEOUT_TIMER, 5000, NULL);
 
 	if (m_pEditFrameWnd)

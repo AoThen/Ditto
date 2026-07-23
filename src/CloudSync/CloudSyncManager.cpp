@@ -97,6 +97,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
 	, m_lastSyncSuccessTime(0)
+	, m_bStopCalled(false)
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
@@ -106,11 +107,25 @@ CCloudSyncManager::CCloudSyncManager()
 
 CCloudSyncManager::~CCloudSyncManager()
 {
-	Stop();
-	DeleteCriticalSection(&m_csSync);
-	DeleteCriticalSection(&m_csHttpClient);
-	DeleteCriticalSection(&m_csWsClient);
-	DeleteCriticalSection(&m_csStatus);
+	if (!m_bStopCalled) {
+		Stop();
+	}
+
+	// Only delete critical sections if all threads have exited cleanly.
+	// If Stop() timed out, threads may still be running — skip cleanup
+	// to avoid use-after-free. OS reclaims CRITICAL_SECTION on process exit.
+	BOOL bAllThreadsDead = (m_hSyncThread == NULL && m_hWsThread == NULL);
+	if (bAllThreadsDead)
+	{
+		DeleteCriticalSection(&m_csSync);
+		DeleteCriticalSection(&m_csHttpClient);
+		DeleteCriticalSection(&m_csWsClient);
+		DeleteCriticalSection(&m_csStatus);
+	}
+	else
+	{
+		LogMessage(_T("~CCloudSyncManager: threads still active, skipping CriticalSection cleanup"));
+	}
 }
 
 BOOL CCloudSyncManager::Initialize()
@@ -307,7 +322,7 @@ void CCloudSyncManager::StopEncryptionRetry()
 
 	if (m_hEncRetryThread != NULL)
 	{
-		WaitForSingleObject(m_hEncRetryThread, INFINITE);
+		WaitForSingleObject(m_hEncRetryThread, 1000);
 		CloseHandle(m_hEncRetryThread);
 		m_hEncRetryThread = NULL;
 	}
@@ -390,34 +405,26 @@ void CCloudSyncManager::Stop()
 
 	if (m_hSyncThread != NULL)
 	{
-		// Wait indefinitely for thread to exit gracefully.
-		// SyncThreadProc checks m_hStopEvent between every operation and HTTP calls
-		// have a 30s read timeout, so the thread is guaranteed to exit promptly.
-		// DO NOT use TerminateThread -- it can corrupt SQLite database and leak resources.
-		// Previous 30s timeout caused UAF: after timeout, destructor deleted critical
-		// sections while the detached thread was still accessing them.
-		DWORD dwWait = WaitForSingleObject(m_hSyncThread, INFINITE);
+		DWORD dwWait = WaitForSingleObject(m_hSyncThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
+			CloseHandle(m_hSyncThread);
+			m_hSyncThread = NULL;
 		}
 		else
 		{
-			OutputDebugString(_T("[CloudSync] WARNING: Sync thread wait failed.\n"));
+			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within 1s, detaching.\n"));
+			// Not closing handle — thread still running, OS will reclaim on process exit
 		}
-		CloseHandle(m_hSyncThread);
-		m_hSyncThread = NULL;
 	}
 
-	// Wait for all active quick-push threads to complete (up to 60 seconds).
-	// QuickSyncThreadProc performs up to 2 HTTP operations (PushGroups + PushNewClips),
-	// each with a 30s timeout, so worst case is ~60s.
-	// This prevents use-after-free if the manager is destroyed while threads are running.
+	// Wait for all active quick-push threads to complete (up to 1 second).
 	DWORD waitStart = GetTickCount();
 	while (m_nActiveQuickSyncThreads > 0)
 	{
 		Sleep(50);
-		if (GetTickCount() - waitStart > 60000)
+		if (GetTickCount() - waitStart > 1000)
 		{
 			OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads to complete.\n");
 			break;
@@ -437,8 +444,10 @@ void CCloudSyncManager::Stop()
 		m_hWsTrigger = nullptr;
 	}
 
+	m_bStopCalled = true;
+
 	// NOTE: m_hStopEvent is intentionally NOT closed here.
-	// Threads (SyncThread, WsThread) may still be running after timeout-based detach
+	// Threads may still be running after timeout-based detach
 	// and they read m_hStopEvent in their loops. Closing it would cause WAIT_FAILED
 	// on already-stopped threads, making them unable to detect the stop signal.
 	// The event handle is a kernel object; the OS will clean it up on process exit.
@@ -451,6 +460,23 @@ void CCloudSyncManager::SignalStop()
 		SetEvent(m_hStopEvent);
 	}
 	// Do NOT wait for threads or close handles - process is exiting, OS handles cleanup
+}
+
+void CCloudSyncManager::SignalStopEarly()
+{
+	// Signal encryption retry to stop (no wait)
+	if (m_hEncRetryStop != nullptr)
+	{
+		SetEvent(m_hEncRetryStop);
+	}
+
+	// Signal sync and WS threads to stop (no wait)
+	if (m_hStopEvent != nullptr)
+	{
+		SetEvent(m_hStopEvent);
+	}
+
+	OutputDebugString(_T("[CloudSync] SignalStopEarly: stop events signaled, threads have head start.\n"));
 }
 
 void CCloudSyncManager::OnClipAdded(void* pClip)
@@ -490,6 +516,7 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 	ctx->pManager = this;
 	ctx->pCounter = &m_nActiveQuickSyncThreads;
 	ctx->pCS = &m_csSync;
+	ctx->hStopEvent = m_hStopEvent;
 
 	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, QuickSyncThreadProc, ctx, 0, NULL);
 	if (hThread != NULL)
@@ -524,10 +551,38 @@ unsigned int __stdcall CCloudSyncManager::QuickSyncThreadProc(void* pParam)
 			// Release the lock before doing actual work (long-running)
 			LeaveCriticalSection(ctx->pCS);
 
+			// Check stop event before starting work
+			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
+			{
+				OutputDebugStringA("[CloudSync] Quick-push: stop signaled, exiting.\n");
+				EnterCriticalSection(ctx->pCS);
+				(*ctx->pCounter)--;
+				LeaveCriticalSection(ctx->pCS);
+				delete ctx;
+				return 0;
+			}
+
 			// Check force upload flag (one-shot, auto-reset)
 			BOOL bForce = InterlockedExchange(&pThis->m_forceOverrideRemote, 0) == 1;
 
 			auto newGroupIds = pThis->PushGroups();
+
+			// Check stop event between PushGroups and PushNewClips
+			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
+			{
+				OutputDebugStringA("[CloudSync] Quick-push: stop signaled after PushGroups, exiting.\n");
+				// Rollback newly created groups from partial push
+				for (const auto& gid : newGroupIds)
+				{
+					pThis->DeleteRemoteGroup(gid);
+				}
+				EnterCriticalSection(ctx->pCS);
+				(*ctx->pCounter)--;
+				LeaveCriticalSection(ctx->pCS);
+				delete ctx;
+				return 0;
+			}
+
 			if (!pThis->PushNewClips(bForce))
 			{
 				// PushNewClips failed - rollback newly created groups
@@ -3164,29 +3219,43 @@ void CCloudSyncManager::StopWebSocket()
 	if (m_hWsThread != NULL)
 	{
 		// m_hStopEvent is already set by Stop(), WS thread will see it
-		DWORD dwWait = WaitForSingleObject(m_hWsThread, INFINITE);
+		DWORD dwWait = WaitForSingleObject(m_hWsThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
+
+			// Thread confirmed dead, safely clean up WS client
+			EnterCriticalSection(&m_csWsClient);
+			if (m_pWsClient != nullptr)
+			{
+				auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
+				delete wsClient;
+				m_pWsClient = nullptr;
+			}
+			LeaveCriticalSection(&m_csWsClient);
+
+			CloseHandle(m_hWsThread);
+			m_hWsThread = NULL;
 		}
 		else
 		{
-			LogMessage(_T("StopWebSocket: WS thread wait failed."));
+			LogMessage(_T("StopWebSocket: WS thread did not exit within 1s, detaching."));
+			// Not deleting m_pWsClient — WS thread may still be accessing it
+			// OS will reclaim the memory on process exit
 		}
-
-		CloseHandle(m_hWsThread);
-		m_hWsThread = NULL;
 	}
-
-	// Thread has exited, safely clean up WS client
-	EnterCriticalSection(&m_csWsClient);
-	if (m_pWsClient != nullptr)
+	else
 	{
-		auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
-		delete wsClient;
-		m_pWsClient = nullptr;
+		// No thread, clean up WS client directly
+		EnterCriticalSection(&m_csWsClient);
+		if (m_pWsClient != nullptr)
+		{
+			auto* wsClient = static_cast<httplib::ws::WebSocketClient*>(m_pWsClient);
+			delete wsClient;
+			m_pWsClient = nullptr;
+		}
+		LeaveCriticalSection(&m_csWsClient);
 	}
-	LeaveCriticalSection(&m_csWsClient);
 
 	InterlockedExchange(&m_wsReconnectDelay, 1000);
 }
@@ -3392,6 +3461,7 @@ void CCloudSyncManager::TriggerQuickSync()
 	ctx->pManager = this;
 	ctx->pCounter = &m_nActiveQuickSyncThreads;
 	ctx->pCS = &m_csSync;
+	ctx->hStopEvent = m_hStopEvent;
 
 	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, QuickSyncThreadProc, ctx, 0, NULL);
 	if (hThread != NULL)

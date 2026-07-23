@@ -962,8 +962,8 @@ int CCP_MainApp::ExitInstance()
 {
 	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
 
-	// Signal Cloud Sync to stop without waiting (process exit, OS handles cleanup)
-	m_CloudSyncManager.SignalStop();
+	// Signal Cloud Sync to stop (bounded wait, threads were signaled in OnClose)
+	m_CloudSyncManager.Stop();
 
 	// Quick wait for OCR threads to finish before DLL unload
 	{

@@ -30,6 +30,7 @@ struct QuickSyncContext {
 	void* pManager;            // CCloudSyncManager*
 	LONG* pCounter;            // pointer to active thread counter
 	CRITICAL_SECTION* pCS;     // critical section for thread-safe checks
+	HANDLE hStopEvent;         // stop event for early exit during shutdown
 };
 
 class CCloudSyncManager
@@ -50,6 +51,10 @@ public:
 	// Lightweight stop: signal threads to exit without waiting
 	// Used during process exit; OS handles cleanup
 	void SignalStop();
+
+	// Early stop signal: set events without waiting
+	// Called from OnClose to give threads a head start on exit
+	void SignalStopEarly();
 
 	// Called when a new clip is added locally
 	void OnClipAdded(void* pClip);  // void* to avoid including CClip header yet
@@ -116,6 +121,7 @@ private:
 	// Encryption retry state
 	HANDLE m_hEncRetryThread;   // Encryption retry thread (when DEK lost at startup)
 	HANDLE      m_hEncRetryStop;     // Stop event for retry thread
+	bool m_bStopCalled;         // Guard against double Stop()
 
 	// Atomic flags for one-shot force sync operations
 	LONG      m_forceOverrideLocal;  // Set before ForceDownload, read&reset in MergeRemoteClipToLocal
