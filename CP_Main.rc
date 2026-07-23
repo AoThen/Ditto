@@ -67,13 +67,13 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "src\res\\Ditto2.ico"
+IDR_MAINFRAME           ICON                    "src\\res\\Ditto2.ico"
 
-IDR_CP_MAITYPE          ICON                    "src\res\\CP_MainDoc.ico"
+IDR_CP_MAITYPE          ICON                    "src\\res\\CP_MainDoc.ico"
 
-IDI_DITTO_NOCOPYCB      ICON                    "src\res\\Ditto2_NoCopyCb.ico"
+IDI_DITTO_NOCOPYCB      ICON                    "src\\res\\Ditto2_NoCopyCb.ico"
 
-IDI_MAINFRAME_NO_DB     ICON                    "src\res\\Ditto2_NoDb.ico"
+IDI_MAINFRAME_NO_DB     ICON                    "src\\res\\Ditto2_NoDb.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -81,65 +81,65 @@ IDI_MAINFRAME_NO_DB     ICON                    "src\res\\Ditto2_NoDb.ico"
 // Bitmap
 //
 
-IDR_MAINFRAME           BITMAP                  "src\res\\Toolbar.bmp"
+IDR_MAINFRAME           BITMAP                  "src\\res\\Toolbar.bmp"
 
-IDB_CLOSED_FOLDER       BITMAP                  "src\res\\bitmap1.bmp"
+IDB_CLOSED_FOLDER       BITMAP                  "src\\res\\bitmap1.bmp"
 
-IDB_CLOSED_FOLDER_PRESSED BITMAP                  "src\res\\closed_f.bmp"
+IDB_CLOSED_FOLDER_PRESSED BITMAP                  "src\\res\\closed_f.bmp"
 
-IDB_CLOSED_FOLDER_FOCUSED BITMAP                  "src\res\\bmp00001.bmp"
+IDB_CLOSED_FOLDER_FOCUSED BITMAP                  "src\\res\\bmp00001.bmp"
 
-IDB_OPEN_FOLDER         BITMAP                  "src\res\\bmp00002.bmp"
+IDB_OPEN_FOLDER         BITMAP                  "src\\res\\bmp00002.bmp"
 
-IDB_OPEN_FOLDER_FOCUSED BITMAP                  "src\res\\open_fol.bmp"
+IDB_OPEN_FOLDER_FOCUSED BITMAP                  "src\\res\\open_fol.bmp"
 
-IDB_OPEN_FOLDER_PRESSED BITMAP                  "src\res\\bmp00003.bmp"
+IDB_OPEN_FOLDER_PRESSED BITMAP                  "src\\res\\bmp00003.bmp"
 
-IDB_BACK                BITMAP                  "src\res\\back.bmp"
+IDB_BACK                BITMAP                  "src\\res\\back.bmp"
 
-IDB_BACK_PRESSED        BITMAP                  "src\res\\back1.bmp"
+IDB_BACK_PRESSED        BITMAP                  "src\\res\\back1.bmp"
 
-IDB_BACK_FOCUSED        BITMAP                  "src\res\\back2.bmp"
+IDB_BACK_FOCUSED        BITMAP                  "src\\res\\back2.bmp"
 
-IDR_EDIT_WND            BITMAP                  "src\res\\mainfram.bmp"
+IDR_EDIT_WND            BITMAP                  "src\\res\\mainfram.bmp"
 
-IDB_BITMAP_SEARCH_NORMAL BITMAP                  "src\res\\search_normal.bmp"
+IDB_BITMAP_SEARCH_NORMAL BITMAP                  "src\\res\\search_normal.bmp"
 
-IDB_BITMAP_SEARCH_CLOSE BITMAP                  "src\res\\search_close.bmp"
+IDB_BITMAP_SEARCH_CLOSE BITMAP                  "src\\res\\search_close.bmp"
 
-IDB_BITMAP_SEARCH_NORMAL_125 BITMAP                  "src\res\\search_normal_125.bmp"
+IDB_BITMAP_SEARCH_NORMAL_125 BITMAP                  "src\\res\\search_normal_125.bmp"
 
-IDB_BITMAP_SEARCH_CLOSE_125 BITMAP                  "src\res\\search_close_125.bmp"
+IDB_BITMAP_SEARCH_CLOSE_125 BITMAP                  "src\\res\\search_close_125.bmp"
 
-IDB_BITMAP_SEARCH_CLOSE_150 BITMAP                  "src\res\\search_close_150.bmp"
+IDB_BITMAP_SEARCH_CLOSE_150 BITMAP                  "src\\res\\search_close_150.bmp"
 
-IDB_BITMAP_SEARCH_NORMAL_150 BITMAP                  "src\res\\search_normal_150.bmp"
+IDB_BITMAP_SEARCH_NORMAL_150 BITMAP                  "src\\res\\search_normal_150.bmp"
 
-IDB_BITMAP_SEARCH_CLOSE_200 BITMAP                  "src\res\\search_close_200.bmp"
+IDB_BITMAP_SEARCH_CLOSE_200 BITMAP                  "src\\res\\search_close_200.bmp"
 
-IDB_BITMAP_SEARCH_NORMAL_200 BITMAP                  "src\res\\search_normal_200.bmp"
+IDB_BITMAP_SEARCH_NORMAL_200 BITMAP                  "src\\res\\search_normal_200.bmp"
 
-IDR_EDIT_WND_200        BITMAP                  "src\res\\edit_wnd.bmp"
+IDR_EDIT_WND_200        BITMAP                  "src\\res\\edit_wnd.bmp"
 
-IDR_EDIT_WND_125        BITMAP                  "src\res\\bmp00004.bmp"
+IDR_EDIT_WND_125        BITMAP                  "src\\res\\bmp00004.bmp"
 
-IDR_EDIT_WND_150        BITMAP                  "src\res\\bmp00005.bmp"
+IDR_EDIT_WND_150        BITMAP                  "src\\res\\bmp00005.bmp"
 
-IDR_EDIT_WND_175        BITMAP                  "src\res\\bmp00006.bmp"
+IDR_EDIT_WND_175        BITMAP                  "src\\res\\bmp00006.bmp"
 
-IDR_EDIT_WND_225        BITMAP                  "src\res\\bmp00007.bmp"
+IDR_EDIT_WND_225        BITMAP                  "src\\res\\bmp00007.bmp"
 
-IDR_EDIT_WND_FORMAT     BITMAP                  "src\res\\toolbar1.bmp"
+IDR_EDIT_WND_FORMAT     BITMAP                  "src\\res\\toolbar1.bmp"
 
-IDR_EDIT_WND_FORMAT_200 BITMAP                  "src\res\\bmp00008.bmp"
+IDR_EDIT_WND_FORMAT_200 BITMAP                  "src\\res\\bmp00008.bmp"
 
-IDR_EDIT_WND_FORMAT_125 BITMAP                  "src\res\\bmp00009.bmp"
+IDR_EDIT_WND_FORMAT_125 BITMAP                  "src\\res\\bmp00009.bmp"
 
-IDR_EDIT_WND_FORMAT_150 BITMAP                  "src\res\\bmp00010.bmp"
+IDR_EDIT_WND_FORMAT_150 BITMAP                  "src\\res\\bmp00010.bmp"
 
-IDR_EDIT_WND_FORMAT_175 BITMAP                  "src\res\\bmp00011.bmp"
+IDR_EDIT_WND_FORMAT_175 BITMAP                  "src\\res\\bmp00011.bmp"
 
-IDR_EDIT_WND_FORMAT_225 BITMAP                  "src\res\\bmp00012.bmp"
+IDR_EDIT_WND_FORMAT_225 BITMAP                  "src\\res\\bmp00012.bmp"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1604,7 +1604,7 @@ END
 // AVI
 //
 
-IDR_FILE_COPY           AVI                     "src\res\\FILECOPY.AVI"
+IDR_FILE_COPY           AVI                     "src\\res\\FILECOPY.AVI"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1612,321 +1612,321 @@ IDR_FILE_COPY           AVI                     "src\res\\FILECOPY.AVI"
 // PNG
 //
 
-IDB_OPEN_FOLDER_PNG     PNG                     "src\res\\folder_open.png"
+IDB_OPEN_FOLDER_PNG     PNG                     "src\\res\\folder_open.png"
 
-IDB_COG_16_16           PNG                     "src\res\\cog_16_16.png"
+IDB_COG_16_16           PNG                     "src\\res\\cog_16_16.png"
 
-IDB_OPEN_FOLDER_16_16   PNG                     "src\res\\opened_folder_16_16.png"
+IDB_OPEN_FOLDER_16_16   PNG                     "src\\res\\opened_folder_16_16.png"
 
-IDB_OPEN_FOLDER_20_20   PNG                     "src\res\\opened_folder_20_20.png"
+IDB_OPEN_FOLDER_20_20   PNG                     "src\\res\\opened_folder_20_20.png"
 
-IDB_OPEN_FOLDER_24_24   PNG                     "src\res\\opened_folder_24_24.png"
+IDB_OPEN_FOLDER_24_24   PNG                     "src\\res\\opened_folder_24_24.png"
 
-IDB_OPEN_FOLDER_32_32   PNG                     "src\res\\opened_folder_32_32.png"
+IDB_OPEN_FOLDER_32_32   PNG                     "src\\res\\opened_folder_32_32.png"
 
-IDB_COG_20_20           PNG                     "src\res\\cog_20_20.png"
+IDB_COG_20_20           PNG                     "src\\res\\cog_20_20.png"
 
-IDB_COG_24_24           PNG                     "src\res\\cog_24_24.png"
+IDB_COG_24_24           PNG                     "src\\res\\cog_24_24.png"
 
-IDB_COG_32_32           PNG                     "src\res\\cog_32_32.png"
+IDB_COG_32_32           PNG                     "src\\res\\cog_32_32.png"
 
-IDB_LEFT_ARROW_16_16    PNG                     "src\res\\left_arrow_16_16.png"
+IDB_LEFT_ARROW_16_16    PNG                     "src\\res\\left_arrow_16_16.png"
 
-IDB_LEFT_ARROW_20_20    PNG                     "src\res\\left_arrow_20_20.png"
+IDB_LEFT_ARROW_20_20    PNG                     "src\\res\\left_arrow_20_20.png"
 
-IDB_LEFT_ARROW_24_24    PNG                     "src\res\\left_arrow_24_24.png"
+IDB_LEFT_ARROW_24_24    PNG                     "src\\res\\left_arrow_24_24.png"
 
-IDB_LEFT_ARROW_32_32    PNG                     "src\res\\left_arrow_32_32.png"
+IDB_LEFT_ARROW_32_32    PNG                     "src\\res\\left_arrow_32_32.png"
 
-IDB_CLOSE_8_8           PNG                     "src\res\\close_8_8.png"
+IDB_CLOSE_8_8           PNG                     "src\\res\\close_8_8.png"
 
-IDB_CLOSE_10_10         PNG                     "src\res\\close_10_10.png"
+IDB_CLOSE_10_10         PNG                     "src\\res\\close_10_10.png"
 
-IDB_CLOSE_12_13         PNG                     "src\res\\close_12_12.png"
+IDB_CLOSE_12_13         PNG                     "src\\res\\close_12_12.png"
 
-IDB_CLOSE_16_16         PNG                     "src\res\\close_16_16.png"
+IDB_CLOSE_16_16         PNG                     "src\\res\\close_16_16.png"
 
-IDB_CHEVRON_RIGHT_8_8   PNG                     "src\res\\chevron_right_8_8.png"
+IDB_CHEVRON_RIGHT_8_8   PNG                     "src\\res\\chevron_right_8_8.png"
 
-IDB_CHEVRON_RIGHT_10_10 PNG                     "src\res\\chevron_right_10_10.png"
+IDB_CHEVRON_RIGHT_10_10 PNG                     "src\\res\\chevron_right_10_10.png"
 
-IDB_CHEVRON_RIGHT_12_12 PNG                     "src\res\\chevron_right_12_12.png"
+IDB_CHEVRON_RIGHT_12_12 PNG                     "src\\res\\chevron_right_12_12.png"
 
-IDB_CHEVRON_RIGHT_16_16 PNG                     "src\res\\chevron_right_16_16.png"
+IDB_CHEVRON_RIGHT_16_16 PNG                     "src\\res\\chevron_right_16_16.png"
 
-IDB_CHEVRON_LEFT_8_8    PNG                     "src\res\\chevron_left_8_8.png"
+IDB_CHEVRON_LEFT_8_8    PNG                     "src\\res\\chevron_left_8_8.png"
 
-IDB_CHEVRON_LEFT_10_10  PNG                     "src\res\\chevron_left_10_10.png"
+IDB_CHEVRON_LEFT_10_10  PNG                     "src\\res\\chevron_left_10_10.png"
 
-IDB_CHEVRON_LEFT_12_12  PNG                     "src\res\\chevron_left_12_12.png"
+IDB_CHEVRON_LEFT_12_12  PNG                     "src\\res\\chevron_left_12_12.png"
 
-IDB_CHEVRON_LEFT_16_16  PNG                     "src\res\\chevron_left_16_16.png"
+IDB_CHEVRON_LEFT_16_16  PNG                     "src\\res\\chevron_left_16_16.png"
 
-IDB_CHEVRON_TOP_8_8     PNG                     "src\res\\chevron_top_8_8.png"
+IDB_CHEVRON_TOP_8_8     PNG                     "src\\res\\chevron_top_8_8.png"
 
-IDB_CHEVRON_TOP_10_10   PNG                     "src\res\\chevron_top_10_10.png"
+IDB_CHEVRON_TOP_10_10   PNG                     "src\\res\\chevron_top_10_10.png"
 
-IDB_CHEVRON_TOP_12_12   PNG                     "src\res\\chevron_top_12_12.png"
+IDB_CHEVRON_TOP_12_12   PNG                     "src\\res\\chevron_top_12_12.png"
 
-IDB_CHEVRON_TOP_16_16   PNG                     "src\res\\chevron_top_16_16.png"
+IDB_CHEVRON_TOP_16_16   PNG                     "src\\res\\chevron_top_16_16.png"
 
-IDB_CHEVRON_BOTTOM_8_8  PNG                     "src\res\\chevron_bottom_8_8.png"
+IDB_CHEVRON_BOTTOM_8_8  PNG                     "src\\res\\chevron_bottom_8_8.png"
 
-IDB_CHEVRON_BOTTOM_10_10 PNG                     "src\res\\chevron_bottom_10_10.png"
+IDB_CHEVRON_BOTTOM_10_10 PNG                     "src\\res\\chevron_bottom_10_10.png"
 
-IDB_CHEVRON_BOTTOM_12_12 PNG                     "src\res\\chevron_bottom_12_12.png"
+IDB_CHEVRON_BOTTOM_12_12 PNG                     "src\\res\\chevron_bottom_12_12.png"
 
-IDB_CHEVRON_BOTTOM_16_16 PNG                     "src\res\\chevron_bottom_16_16.png"
+IDB_CHEVRON_BOTTOM_16_16 PNG                     "src\\res\\chevron_bottom_16_16.png"
 
-IDB_MAXIMIZE_8_8        PNG                     "src\res\\maximize_8_8.png"
+IDB_MAXIMIZE_8_8        PNG                     "src\\res\\maximize_8_8.png"
 
-IDB_MAXIMIZE_10_10      PNG                     "src\res\\maximize_10_10.png"
+IDB_MAXIMIZE_10_10      PNG                     "src\\res\\maximize_10_10.png"
 
-IDB_MAXIMIZE_12_12      PNG                     "src\res\\maximize_12_12.png"
+IDB_MAXIMIZE_12_12      PNG                     "src\\res\\maximize_12_12.png"
 
-IDB_MAXIMIZE_16_16      PNG                     "src\res\\maximize_16_16.png"
+IDB_MAXIMIZE_16_16      PNG                     "src\\res\\maximize_16_16.png"
 
-IDB_YELLOW_STAR_32_32   PNG                     "src\res\\yellow_star_32_32.png"
+IDB_YELLOW_STAR_32_32   PNG                     "src\\res\\yellow_star_32_32.png"
 
-IDB_YELLOW_STAR_24_24   PNG                     "src\res\\yellow_star_24_24.png"
+IDB_YELLOW_STAR_24_24   PNG                     "src\\res\\yellow_star_24_24.png"
 
-IDB_YELLOW_STAR_20_20   PNG                     "src\res\\yellow_star_20_20.png"
+IDB_YELLOW_STAR_20_20   PNG                     "src\\res\\yellow_star_20_20.png"
 
-IDB_YELLOW_STAR_16_16   PNG                     "src\res\\yellow_star_16_16.png"
+IDB_YELLOW_STAR_16_16   PNG                     "src\\res\\yellow_star_16_16.png"
 
-IDB_IN_FOLDER_32_32     PNG                     "src\res\\in_folder_32_32.png"
+IDB_IN_FOLDER_32_32     PNG                     "src\\res\\in_folder_32_32.png"
 
-IDB_IN_FOLDER_24_24     PNG                     "src\res\\in_folder_24_24.png"
+IDB_IN_FOLDER_24_24     PNG                     "src\\res\\in_folder_24_24.png"
 
-IDB_IN_FOLDER_20_20     PNG                     "src\res\\in_folder_20_20.png"
+IDB_IN_FOLDER_20_20     PNG                     "src\\res\\in_folder_20_20.png"
 
-IDB_IN_FOLDER_16_16     PNG                     "src\res\\in_folder_16_16.png"
+IDB_IN_FOLDER_16_16     PNG                     "src\\res\\in_folder_16_16.png"
 
-IDB_KEY_32_32           PNG                     "src\res\\key_stroke_32_32.png"
+IDB_KEY_32_32           PNG                     "src\\res\\key_stroke_32_32.png"
 
-IDB_KEY_24_24           PNG                     "src\res\\key_stroke_24_24.png"
+IDB_KEY_24_24           PNG                     "src\\res\\key_stroke_24_24.png"
 
-IDB_KEY_20_20           PNG                     "src\res\\key_stroke_20_20.png"
+IDB_KEY_20_20           PNG                     "src\\res\\key_stroke_20_20.png"
 
-IDB_KEY_16_16           PNG                     "src\res\\key_stroke_16_16.png"
+IDB_KEY_16_16           PNG                     "src\\res\\key_stroke_16_16.png"
 
-IDB_STICKY_32_32        PNG                     "src\res\\Sticky_32_32.png"
+IDB_STICKY_32_32        PNG                     "src\\res\\Sticky_32_32.png"
 
-IDB_STICKY_24_24        PNG                     "src\res\\Sticky_24_24.png"
+IDB_STICKY_24_24        PNG                     "src\\res\\Sticky_24_24.png"
 
-IDB_STICKY_20_20        PNG                     "src\res\\Sticky_20_20.png"
+IDB_STICKY_20_20        PNG                     "src\\res\\Sticky_20_20.png"
 
-IDB_STICKY_16_16        PNG                     "src\res\\Sticky_16_16.png"
+IDB_STICKY_16_16        PNG                     "src\\res\\Sticky_16_16.png"
 
-IDB_SYSTEM_MENU_16_16   PNG                     "src\res\\system_menu_16_16.png"
+IDB_SYSTEM_MENU_16_16   PNG                     "src\\res\\system_menu_16_16.png"
 
-IDB_SYSTEM_MENU_20_20   PNG                     "src\res\\system_menu_20_20.png"
+IDB_SYSTEM_MENU_20_20   PNG                     "src\\res\\system_menu_20_20.png"
 
-IDB_SYSTEM_MENU_24_24   PNG                     "src\res\\system_menu_24_24.png"
+IDB_SYSTEM_MENU_24_24   PNG                     "src\\res\\system_menu_24_24.png"
 
-IDB_SYSTEM_MENU_32_32   PNG                     "src\res\\system_menu_32_32.png"
+IDB_SYSTEM_MENU_32_32   PNG                     "src\\res\\system_menu_32_32.png"
 
-ChevronRight_Black_16_16 PNG                     "src\res\\ChevronRight_Black_16_16.png"
+ChevronRight_Black_16_16 PNG                     "src\\res\\ChevronRight_Black_16_16.png"
 
-ChevronRight_Black_20_20 PNG                     "src\res\\ChevronRight_Black_20_20.png"
+ChevronRight_Black_20_20 PNG                     "src\\res\\ChevronRight_Black_20_20.png"
 
-ChevronRight_Black_24_24 PNG                     "src\res\\ChevronRight_Black_24_24.png"
+ChevronRight_Black_24_24 PNG                     "src\\res\\ChevronRight_Black_24_24.png"
 
-ChevronRight_Black_32_32 PNG                     "src\res\\ChevronRight_Black_32_32.png"
+ChevronRight_Black_32_32 PNG                     "src\\res\\ChevronRight_Black_32_32.png"
 
-Close_Black_16_16       PNG                     "src\res\\Close_Black_16_16.png"
+Close_Black_16_16       PNG                     "src\\res\\Close_Black_16_16.png"
 
-Close_Black_20_20       PNG                     "src\res\\Close_Black_20_20.png"
+Close_Black_20_20       PNG                     "src\\res\\Close_Black_20_20.png"
 
-Close_Black_24_24       PNG                     "src\res\\Close_Black_24_24.png"
+Close_Black_24_24       PNG                     "src\\res\\Close_Black_24_24.png"
 
-Close_Black_32_32       PNG                     "src\res\\Close_Black_32_32.png"
+Close_Black_32_32       PNG                     "src\\res\\Close_Black_32_32.png"
 
-NewWindowIcon_24_14     PNG                     "src\res\\NewWindowIcon_24_14.png"
+NewWindowIcon_24_14     PNG                     "src\\res\\NewWindowIcon_24_14.png"
 
-system_menu_2_48        PNG                     "src\res\\system_menu_2_48.png"
+system_menu_2_48        PNG                     "src\\res\\system_menu_2_48.png"
 
-system_menu_2_36        PNG                     "src\res\\system_menu_2_36.png"
+system_menu_2_36        PNG                     "src\\res\\system_menu_2_36.png"
 
-system_menu_2_30        PNG                     "src\res\\system_menu_2_30.png"
+system_menu_2_30        PNG                     "src\\res\\system_menu_2_30.png"
 
-system_menu_2_24        PNG                     "src\res\\system_menu_2_24.png"
+system_menu_2_24        PNG                     "src\\res\\system_menu_2_24.png"
 
-open_folder_48          PNG                     "src\res\\open_folder_48.png"
+open_folder_48          PNG                     "src\\res\\open_folder_48.png"
 
-open_folder_36          PNG                     "src\res\\open_folder_36.png"
+open_folder_36          PNG                     "src\\res\\open_folder_36.png"
 
-open_folder_30          PNG                     "src\res\\open_folder_30.png"
+open_folder_30          PNG                     "src\\res\\open_folder_30.png"
 
-open_folder_24          PNG                     "src\res\\open_folder_24.png"
+open_folder_24          PNG                     "src\\res\\open_folder_24.png"
 
-ChevronLeft_Black_16_16 PNG                     "src\res\\ChevronLeft_Black_16_16.png"
+ChevronLeft_Black_16_16 PNG                     "src\\res\\ChevronLeft_Black_16_16.png"
 
-ChevronLeft_Black_20_20 PNG                     "src\res\\ChevronLeft_Black_20_20.png"
+ChevronLeft_Black_20_20 PNG                     "src\\res\\ChevronLeft_Black_20_20.png"
 
-ChevronLeft_Black_24_24 PNG                     "src\res\\ChevronLeft_Black_24_24.png"
+ChevronLeft_Black_24_24 PNG                     "src\\res\\ChevronLeft_Black_24_24.png"
 
-ChevronLeft_Black_32_32 PNG                     "src\res\\ChevronLeft_Black_32_32.png"
+ChevronLeft_Black_32_32 PNG                     "src\\res\\ChevronLeft_Black_32_32.png"
 
-NewWindowIcon_48        PNG                     "src\res\\NewWindowIcon_48.png"
+NewWindowIcon_48        PNG                     "src\\res\\NewWindowIcon_48.png"
 
-NewWindowIcon_36        PNG                     "src\res\\NewWindowIcon_36.png"
+NewWindowIcon_36        PNG                     "src\\res\\NewWindowIcon_36.png"
 
-NewWindowIcon_30        PNG                     "src\res\\NewWindowIcon_30.png"
+NewWindowIcon_30        PNG                     "src\\res\\NewWindowIcon_30.png"
 
-return_16               PNG                     "src\res\\return_16.png"
+return_16               PNG                     "src\\res\\return_16.png"
 
-return_20               PNG                     "src\res\\return_20.png"
+return_20               PNG                     "src\\res\\return_20.png"
 
-return_24               PNG                     "src\res\\return_24.png"
+return_24               PNG                     "src\\res\\return_24.png"
 
-return_32               PNG                     "src\res\\return_32.png"
+return_32               PNG                     "src\\res\\return_32.png"
 
-Search_16               PNG                     "src\res\\Search_16.png"
+Search_16               PNG                     "src\\res\\Search_16.png"
 
-Search_20               PNG                     "src\res\\Search_20.png"
+Search_20               PNG                     "src\\res\\Search_20.png"
 
-Search_24               PNG                     "src\res\\Search_24.png"
+Search_24               PNG                     "src\\res\\Search_24.png"
 
-Search_32               PNG                     "src\res\\Search_32.png"
+Search_32               PNG                     "src\\res\\Search_32.png"
 
-search_close_16         PNG                     "src\res\\search_close_16.png"
+search_close_16         PNG                     "src\\res\\search_close_16.png"
 
-minimize_16             PNG                     "src\res\\minimize_16.png"
+minimize_16             PNG                     "src\\res\\minimize_16.png"
 
-minimize_32             PNG                     "src\res\\minimize_32.png"
+minimize_32             PNG                     "src\\res\\minimize_32.png"
 
-minimize_24             PNG                     "src\res\\minimize_24.png"
+minimize_24             PNG                     "src\\res\\minimize_24.png"
 
-minimize_20             PNG                     "src\res\\minimize_20.png"
+minimize_20             PNG                     "src\\res\\minimize_20.png"
 
-maximize_32             PNG                     "src\res\\maximize_32.png"
+maximize_32             PNG                     "src\\res\\maximize_32.png"
 
-maximize_24             PNG                     "src\res\\maximize_24.png"
+maximize_24             PNG                     "src\\res\\maximize_24.png"
 
-maximize_20             PNG                     "src\res\\maximize_20.png"
+maximize_20             PNG                     "src\\res\\maximize_20.png"
 
-return_28               PNG                     "src\res\\return_28.png"
+return_28               PNG                     "src\\res\\return_28.png"
 
-minimize_28             PNG                     "src\res\\minimize_28.png"
+minimize_28             PNG                     "src\\res\\minimize_28.png"
 
-maximize_28             PNG                     "src\res\\maximize_28.png"
+maximize_28             PNG                     "src\\res\\maximize_28.png"
 
-ChevronLeft_Black_28    PNG                     "src\res\\ChevronLeft_Black_28.png"
+ChevronLeft_Black_28    PNG                     "src\\res\\ChevronLeft_Black_28.png"
 
-ChevronRight_Black_28   PNG                     "src\res\\ChevronRight_Black_28.png"
+ChevronRight_Black_28   PNG                     "src\\res\\ChevronRight_Black_28.png"
 
-Close_Black_28          PNG                     "src\res\\Close_Black_28.png"
+Close_Black_28          PNG                     "src\\res\\Close_Black_28.png"
 
-system_menu_2_42        PNG                     "src\res\\system_menu_2_42.png"
+system_menu_2_42        PNG                     "src\\res\\system_menu_2_42.png"
 
-open_folder_42          PNG                     "src\res\\open_folder_42.png"
+open_folder_42          PNG                     "src\\res\\open_folder_42.png"
 
-cog_28                  PNG                     "src\res\\cog_28.png"
+cog_28                  PNG                     "src\\res\\cog_28.png"
 
-Search_28               PNG                     "src\res\\Search_28.png"
+Search_28               PNG                     "src\\res\\Search_28.png"
 
-down_16                 PNG                     "src\res\\down_16.png"
+down_16                 PNG                     "src\\res\\down_16.png"
 
-down_20                 PNG                     "src\res\\down_20.png"
+down_20                 PNG                     "src\\res\\down_20.png"
 
-down_24                 PNG                     "src\res\\down_24.png"
+down_24                 PNG                     "src\\res\\down_24.png"
 
-down_28                 PNG                     "src\res\\down_28.png"
+down_28                 PNG                     "src\\res\\down_28.png"
 
-down_32                 PNG                     "src\res\\down_32.png"
+down_32                 PNG                     "src\\res\\down_32.png"
 
-close_36                PNG                     "src\res\\close_36.png"
+close_36                PNG                     "src\\res\\close_36.png"
 
-close_40                PNG                     "src\res\\close_40.png"
+close_40                PNG                     "src\\res\\close_40.png"
 
-close_44                PNG                     "src\res\\close_44.png"
+close_44                PNG                     "src\\res\\close_44.png"
 
-close_48                PNG                     "src\res\\close_48.png"
+close_48                PNG                     "src\\res\\close_48.png"
 
-close_52                PNG                     "src\res\\close_52.png"
+close_52                PNG                     "src\\res\\close_52.png"
 
-close_56                PNG                     "src\res\\close_56.png"
+close_56                PNG                     "src\\res\\close_56.png"
 
-open_folder_54          PNG                     "src\res\\open_folder_54.png"
+open_folder_54          PNG                     "src\\res\\open_folder_54.png"
 
-open_folder_60          PNG                     "src\res\\open_folder_60.png"
+open_folder_60          PNG                     "src\\res\\open_folder_60.png"
 
-open_folder_66          PNG                     "src\res\\open_folder_66.png"
+open_folder_66          PNG                     "src\\res\\open_folder_66.png"
 
-open_folder_72          PNG                     "src\res\\open_folder_72.png"
+open_folder_72          PNG                     "src\\res\\open_folder_72.png"
 
-open_folder_78          PNG                     "src\res\\open_folder_78.png"
+open_folder_78          PNG                     "src\\res\\open_folder_78.png"
 
-open_folder_84          PNG                     "src\res\\open_folder_84.png"
+open_folder_84          PNG                     "src\\res\\open_folder_84.png"
 
-system_menu_54          PNG                     "src\res\\system_menu_54.png"
+system_menu_54          PNG                     "src\\res\\system_menu_54.png"
 
-system_menu_60          PNG                     "src\res\\system_menu_60.png"
+system_menu_60          PNG                     "src\\res\\system_menu_60.png"
 
-system_menu_66          PNG                     "src\res\\system_menu_66.png"
+system_menu_66          PNG                     "src\\res\\system_menu_66.png"
 
-system_menu_72          PNG                     "src\res\\system_menu_72.png"
+system_menu_72          PNG                     "src\\res\\system_menu_72.png"
 
-system_menu_78          PNG                     "src\res\\system_menu_78.png"
+system_menu_78          PNG                     "src\\res\\system_menu_78.png"
 
-system_menu_84          PNG                     "src\res\\system_menu_84.png"
+system_menu_84          PNG                     "src\\res\\system_menu_84.png"
 
-ChevronLeft_Black_36    PNG                     "src\res\\ChevronLeft_Black_36.png"
+ChevronLeft_Black_36    PNG                     "src\\res\\ChevronLeft_Black_36.png"
 
-ChevronLeft_Black_40    PNG                     "src\res\\ChevronLeft_Black_40.png"
+ChevronLeft_Black_40    PNG                     "src\\res\\ChevronLeft_Black_40.png"
 
-ChevronLeft_Black_44    PNG                     "src\res\\ChevronLeft_Black_44.png"
+ChevronLeft_Black_44    PNG                     "src\\res\\ChevronLeft_Black_44.png"
 
-ChevronLeft_Black_48    PNG                     "src\res\\ChevronLeft_Black_48.png"
+ChevronLeft_Black_48    PNG                     "src\\res\\ChevronLeft_Black_48.png"
 
-ChevronLeft_Black_52    PNG                     "src\res\\ChevronLeft_Black_52.png"
+ChevronLeft_Black_52    PNG                     "src\\res\\ChevronLeft_Black_52.png"
 
-ChevronLeft_Black_56    PNG                     "src\res\\ChevronLeft_Black_56.png"
+ChevronLeft_Black_56    PNG                     "src\\res\\ChevronLeft_Black_56.png"
 
-ChevronRight_Black_36   PNG                     "src\res\\ChevronRight_Black_36.png"
+ChevronRight_Black_36   PNG                     "src\\res\\ChevronRight_Black_36.png"
 
-ChevronRight_Black_40   PNG                     "src\res\\ChevronRight_Black_40.png"
+ChevronRight_Black_40   PNG                     "src\\res\\ChevronRight_Black_40.png"
 
-ChevronRight_Black_44   PNG                     "src\res\\ChevronRight_Black_44.png"
+ChevronRight_Black_44   PNG                     "src\\res\\ChevronRight_Black_44.png"
 
-ChevronRight_Black_48   PNG                     "src\res\\ChevronRight_Black_48.png"
+ChevronRight_Black_48   PNG                     "src\\res\\ChevronRight_Black_48.png"
 
-ChevronRight_Black_52   PNG                     "src\res\\ChevronRight_Black_52.png"
+ChevronRight_Black_52   PNG                     "src\\res\\ChevronRight_Black_52.png"
 
-ChevronRight_Black_56   PNG                     "src\res\\ChevronRight_Black_56.png"
+ChevronRight_Black_56   PNG                     "src\\res\\ChevronRight_Black_56.png"
 
-maximize_36             PNG                     "src\res\\maximize_36.png"
+maximize_36             PNG                     "src\\res\\maximize_36.png"
 
-maximize_40             PNG                     "src\res\\maximize_40.png"
+maximize_40             PNG                     "src\\res\\maximize_40.png"
 
-maximize_44             PNG                     "src\res\\maximize_44.png"
+maximize_44             PNG                     "src\\res\\maximize_44.png"
 
-maximize_48             PNG                     "src\res\\maximize_48.png"
+maximize_48             PNG                     "src\\res\\maximize_48.png"
 
-maximize_52             PNG                     "src\res\\maximize_52.png"
+maximize_52             PNG                     "src\\res\\maximize_52.png"
 
-maximize_56             PNG                     "src\res\\maximize_56.png"
+maximize_56             PNG                     "src\\res\\maximize_56.png"
 
-minimize_36             PNG                     "src\res\\minimize_36.png"
+minimize_36             PNG                     "src\\res\\minimize_36.png"
 
-minimize_40             PNG                     "src\res\\minimize_40.png"
+minimize_40             PNG                     "src\\res\\minimize_40.png"
 
-minimize_44             PNG                     "src\res\\minimize_44.png"
+minimize_44             PNG                     "src\\res\\minimize_44.png"
 
-minimize_48             PNG                     "src\res\\minimize_48.png"
+minimize_48             PNG                     "src\\res\\minimize_48.png"
 
-minimize_52             PNG                     "src\res\\minimize_52.png"
+minimize_52             PNG                     "src\\res\\minimize_52.png"
 
-minimize_56             PNG                     "src\res\\minimize_56.png"
+minimize_56             PNG                     "src\\res\\minimize_56.png"
 
-search_close_20         PNG                     "src\res\\search_close_20.png"
+search_close_20         PNG                     "src\\res\\search_close_20.png"
 
-search_close_24         PNG                     "src\res\\search_close_24.png"
+search_close_24         PNG                     "src\\res\\search_close_24.png"
 
-search_close_28         PNG                     "src\res\\search_close_28.png"
+search_close_28         PNG                     "src\\res\\search_close_28.png"
 
-search_close_32         PNG                     "src\res\\search_close_32.png"
+search_close_32         PNG                     "src\\res\\search_close_32.png"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2131,9 +2131,9 @@ END
 // Cursor
 //
 
-IDC_CURSOR_ZOOM_IN      CURSOR                  "src\res\\cursor_zoom_in.cur"
+IDC_CURSOR_ZOOM_IN      CURSOR                  "src\\res\\cursor_zoom_in.cur"
 
-IDC_CURSOR_ZOOM_OUT     CURSOR                  "src\res\\cursor2.cur"
+IDC_CURSOR_ZOOM_OUT     CURSOR                  "src\\res\\cursor2.cur"
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -2286,7 +2286,7 @@ END
 LANGUAGE 9, 1
 #pragma code_page(1252)
 #endif //_WIN32
-#include "src\res\CP_Main.rc2"  // non-Microsoft Visual C++ edited resources
+#include "src\\res\\CP_Main.rc2"  // non-Microsoft Visual C++ edited resources
 #include "afxres.rc"         // Standard components
 #include "afxprint.rc"       // printing/print preview resources
 #endif
