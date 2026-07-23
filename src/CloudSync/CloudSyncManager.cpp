@@ -3164,14 +3164,14 @@ void CCloudSyncManager::StopWebSocket()
 	if (m_hWsThread != NULL)
 	{
 		// m_hStopEvent is already set by Stop(), WS thread will see it
-		DWORD dwWait = WaitForSingleObject(m_hWsThread, 5000);
-		if (dwWait == WAIT_TIMEOUT)
+		DWORD dwWait = WaitForSingleObject(m_hWsThread, INFINITE);
+		if (dwWait == WAIT_OBJECT_0)
 		{
-			LogMessage(_T("StopWebSocket: WS thread did not exit within timeout."));
+			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
 		}
 		else
 		{
-			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
+			LogMessage(_T("StopWebSocket: WS thread wait failed."));
 		}
 
 		CloseHandle(m_hWsThread);
@@ -3238,7 +3238,8 @@ unsigned int __stdcall CCloudSyncManager::WsThreadProc(void* pParam)
 			if (!bAlreadyCleanedUp)
 				delete wsClient;
 			LONG curDelay1 = pThis->m_wsReconnectDelay;
-			Sleep(curDelay1);
+			if (WaitForSingleObject(pThis->m_hStopEvent, curDelay1) == WAIT_OBJECT_0)
+				return 0;
 			LONG newDelay1 = min(curDelay1 * 2, 30000L);
 			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay1, curDelay1);
 			continue;
@@ -3257,7 +3258,8 @@ unsigned int __stdcall CCloudSyncManager::WsThreadProc(void* pParam)
 			if (!bAlreadyCleanedUp)
 				delete wsClient;
 			LONG curDelay2 = pThis->m_wsReconnectDelay;
-			Sleep(curDelay2);
+			if (WaitForSingleObject(pThis->m_hStopEvent, curDelay2) == WAIT_OBJECT_0)
+				return 0;
 			LONG newDelay2 = min(curDelay2 * 2, 30000L);
 			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay2, curDelay2);
 			continue;
@@ -3312,10 +3314,11 @@ unsigned int __stdcall CCloudSyncManager::WsThreadProc(void* pParam)
 		CString msg;
 		msg.Format(_T("WsThreadProc: reconnecting in %d ms"), pThis->m_wsReconnectDelay);
 		LogMessage(msg);
-LONG curDelay = pThis->m_wsReconnectDelay;
-			Sleep(curDelay);
-			LONG newDelay = min(curDelay * 2, 30000L);
-			InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay, curDelay);
+		LONG curDelay = pThis->m_wsReconnectDelay;
+		if (WaitForSingleObject(pThis->m_hStopEvent, curDelay) == WAIT_OBJECT_0)
+			return 0;
+		LONG newDelay = min(curDelay * 2, 30000L);
+		InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay, curDelay);
 	}
 
 	LogMessage(_T("WsThreadProc: WebSocket listener exiting."));
