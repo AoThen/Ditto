@@ -1,0 +1,89 @@
+name: Build ONNX Runtime static libs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - scripts/download-ocr-deps.bat
+      - .github/workflows/build-onnxruntime.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10.11'
+
+      - name: Checkout onnxruntime source
+        uses: actions/checkout@v5
+        with:
+          repository: microsoft/onnxruntime
+          ref: v1.27.1
+          path: onnxsrc
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Copy build script
+        shell: cmd
+        run: |
+          copy scripts\build-onnxruntime.bat onnxsrc\
+
+      - name: Cache ONNX Runtime build
+        id: cache-onnx
+        uses: actions/cache@v4
+        with:
+          path: onnxsrc\build-x64-v143-mt
+          key: onnxruntime-build-x64-v143-mt-1.27.1-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build
+        if: steps.cache-onnx.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          cd onnxsrc
+          call build-onnxruntime.bat v143 mt
+
+      - name: Package static libs
+        shell: cmd
+        run: |
+          if exist "onnxsrc\build-x64-v143-mt\install-static\lib\*.lib" (
+            echo Packaging install-static...
+            dir onnxsrc\build-x64-v143-mt\install-static /s /b
+            cd onnxsrc\build-x64-v143-mt\install-static
+            7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+          ) else (
+            if exist "onnxsrc\build-x64-v143-mt\Release\install\lib" (
+              echo WARNING: install-static empty, packaging install dir instead
+              dir onnxsrc\build-x64-v143-mt\Release\install /s /b
+              cd onnxsrc\build-x64-v143-mt\Release\install
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+            ) else (
+              echo ERROR: No output artifacts found!
+              dir onnxsrc\build-x64-v143-mt /s /b 2>nul
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z NUL
+            )
+          )
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: onnxruntime-1.27.1
+          name: "ONNX Runtime 1.27.1 static libs (Windows x64, VS2022, mt)"
+          prerelease: true
+          artifacts: onnxruntime-static-windows-x64-1.27.1.7z
+          allowUpdates: true
+          artifactContentType: application/x-7z-compressed
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,89 @@
+name: Build OpenCV static libs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - scripts/download-ocr-deps.bat
+      - .github/workflows/build-opencv.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Checkout opencv source
+        uses: actions/checkout@v5
+        with:
+          repository: opencv/opencv
+          ref: 4.14.0
+          path: opencvsrc
+          fetch-depth: 1
+
+      - name: Copy cmake options file
+        shell: cmd
+        run: |
+          copy scripts\opencv4_cmake_options.txt opencvsrc\
+
+      - name: Cache OpenCV build
+        id: cache-opencv
+        uses: actions/cache@v4
+        with:
+          path: opencvsrc\build-x64-v143-mt
+          key: opencv-build-x64-v143-mt-4.14.0-v2-${{ hashFiles('.github/workflows/build-opencv.yml') }}-${{ hashFiles('scripts/opencv4_cmake_options.txt') }}
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          mkdir opencvsrc\build-x64-v143-mt
+          cd opencvsrc\build-x64-v143-mt
+          setlocal enabledelayedexpansion
+          set "OPTS="
+          for /f "usebackq delims=" %%a in ("opencv4_cmake_options.txt") do set "OPTS=!OPTS! %%a"
+          cmake -G "Visual Studio 17 2022" -A x64 -T v143 !OPTS! ..
+
+      - name: Build
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          cd opencvsrc\build-x64-v143-mt
+          cmake --build . --config Release -j %NUMBER_OF_PROCESSORS%
+
+      - name: Install
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          cd opencvsrc\build-x64-v143-mt
+          cmake --install . --config Release
+
+      - name: Package static libs
+        shell: cmd
+        run: |
+          mkdir windows-x64
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\x64\vc17\staticlib windows-x64\x64\vc17\staticlib\
+          xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
+          7z a opencv-static-windows-x64-4.14.0.7z windows-x64\*
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: opencv-4.14.0
+          name: "OpenCV 4.14.0 static libs (Windows x64, VS2022, mt)"
+          prerelease: true
+          artifacts: opencv-static-windows-x64-4.14.0.7z
+          allowUpdates: true
+          artifactContentType: application/x-7z-compressed
+          token: ${{ secrets.GITHUB_TOKEN }}

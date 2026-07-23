@@ -1,0 +1,432 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  # ── Go Backend ──────────────────────────────────────────────
+  go-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - name: Clean up old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 1
+          delete_workflow_pattern: ${{ github.workflow }}
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: server/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        env:
+          BCRYPT_COST: "4"
+        run: go test -v -race -timeout 300s -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: server/coverage.out
+          fail_ci_if_error: false
+
+  go-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: server/go.sum
+
+      - name: Build
+        run: go build -v -o server ./cmd/server/
+
+  # ── Web Frontend ───────────────────────────────────────────
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npm run build
+
+  # ── Web Frontend Tests ─────────────────────────────────────
+  web-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: cd web && npm ci
+
+      - name: Run unit tests
+        run: cd web && npm run test:unit -- --run
+
+  # ── Windows Client (C++/MFC) ──────────────────────────────
+  client-build-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (Release x64)
+        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
+
+  # ── Windows Client Tests (C++/Google Test) ────────────────
+  client-test-windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build CloudSync_Test (Release x64)
+        run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64
+
+      - name: Run tests
+        run: CloudSync_Test\x64\Release\CloudSync_Test.exe
+
+  # ── Windows Client Portable ZIP ──────────────────────────
+  client-build-portable:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (Release x64) and dependencies
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
+
+      - name: Build OCR dependencies and models
+        shell: cmd
+        run: call scripts\download-ocr-deps.bat
+
+      - name: Build DittoOCR
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
+
+      - name: Diagnostic - verify extracted dependencies
+        if: always()
+        shell: cmd
+        run: |
+          echo === ONNX Runtime ===
+          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          ) else (
+            echo ONNX Runtime directory NOT found
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
+          )
+          echo === OpenCV ===
+          if exist "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          ) else (
+            echo OpenCV directory NOT found
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
+          )
+          echo === Diagnostic complete ===
+          exit /b 0
+
+      - name: Upload diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-diagnostic-${{ github.run_id }}
+          path: |
+            Addins\DittoOCR\*.log
+            Addins\DittoOCR\ocr-deps\**\*.log
+          retention-days: 7
+
+      - name: Package portable zip
+        shell: cmd
+        run: |
+          mkdir DittoPortable
+          mkdir DittoPortable\Help
+          mkdir DittoPortable\Language
+          mkdir DittoPortable\Themes
+          mkdir DittoPortable\Addins
+          copy Release64\Ditto.exe DittoPortable\
+          copy Release64\ICU_Loader.dll DittoPortable\
+          copy Release64\Addins\*.dll DittoPortable\Addins\
+          xcopy /s /e /i Release64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
+          copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
+          copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
+          copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
+          copy DittoSetup\portable DittoPortable\portable
+          copy Debug\Language\*.xml DittoPortable\Language\
+          copy Debug\Themes\*.xml DittoPortable\Themes\
+
+      - name: Verify portable package integrity
+        shell: cmd
+        run: |
+          if not exist DittoPortable\Ditto.exe exit /b 1
+          if not exist DittoPortable\ICU_Loader.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_det_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\inference.yml exit /b 1
+          if not exist DittoPortable\portable exit /b 1
+          if not exist DittoPortable\vcruntime140.dll exit /b 1
+          if not exist DittoPortable\vcruntime140_1.dll exit /b 1
+          if not exist DittoPortable\msvcp140.dll exit /b 1
+          if not exist DittoPortable\mfc140u.dll exit /b 1
+          if not exist DittoPortable\Language\English.xml exit /b 1
+          if not exist DittoPortable\Themes\Classic.xml exit /b 1
+          echo All required files present
+
+      - name: Create portable zip
+        shell: cmd
+        run: 7z a -tzip DittoPortable_Release_x64.zip DittoPortable\*
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-portable-release-x64
+          path: DittoPortable_Release_x64.zip
+          retention-days: 30
+
+  # ── Windows Client Portable ZIP (Debug) ────────────────
+  client-build-debug-portable:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (Debug x64) and dependencies
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
+
+      - name: Build OCR dependencies and models
+        shell: cmd
+        run: call scripts\download-ocr-deps.bat
+
+      - name: Build DittoOCR
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
+
+      - name: Diagnostic - verify extracted dependencies
+        if: always()
+        shell: cmd
+        run: |
+          echo === ONNX Runtime ===
+          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
+          ) else (
+            echo ONNX Runtime directory NOT found
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
+          )
+          echo === OpenCV ===
+          if exist "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          ) else (
+            echo OpenCV directory NOT found
+            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
+          )
+          echo === Diagnostic complete ===
+          exit /b 0
+
+      - name: Upload diagnostic logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-diagnostic-${{ github.run_id }}
+          path: |
+            Addins\DittoOCR\*.log
+            Addins\DittoOCR\ocr-deps\**\*.log
+          retention-days: 7
+
+      - name: Package portable zip
+        shell: cmd
+        run: |
+          mkdir DittoPortable
+          mkdir DittoPortable\Help
+          mkdir DittoPortable\Language
+          mkdir DittoPortable\Themes
+          mkdir DittoPortable\Addins
+          copy Debug64\Ditto.exe DittoPortable\
+          copy Debug64\ICU_Loader.dll DittoPortable\
+          copy Debug64\Addins\*.dll DittoPortable\Addins\
+          xcopy /s /e /i Debug64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
+          copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
+          copy "%WINDIR%\System32\msvcp140d.dll" DittoPortable\
+          copy "%WINDIR%\System32\mfc140ud.dll" DittoPortable\
+          copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
+          copy DittoSetup\portable DittoPortable\portable
+          copy Debug\Language\*.xml DittoPortable\Language\
+          copy Debug\Themes\*.xml DittoPortable\Themes\
+
+      - name: Verify portable package integrity
+        shell: cmd
+        run: |
+          if not exist DittoPortable\Ditto.exe exit /b 1
+          if not exist DittoPortable\ICU_Loader.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_det_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\inference.yml exit /b 1
+          if not exist DittoPortable\portable exit /b 1
+          if not exist DittoPortable\vcruntime140d.dll exit /b 1
+          if not exist DittoPortable\vcruntime140_1d.dll exit /b 1
+          if not exist DittoPortable\msvcp140d.dll exit /b 1
+          if not exist DittoPortable\mfc140ud.dll exit /b 1
+          if not exist DittoPortable\ucrtbased.dll exit /b 1
+          if not exist DittoPortable\Language\English.xml exit /b 1
+          if not exist DittoPortable\Themes\Classic.xml exit /b 1
+          echo All required files present
+
+      - name: Create portable zip
+        shell: cmd
+        run: 7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-portable-debug-x64
+          path: DittoPortable_Debug_x64.zip
+          retention-days: 30
+
+  # ── Playwright E2E ─────────────────────────────────────────
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [ go-build, web-build ]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: server/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      - name: Build web frontend
+        run: cd web && npm run build && cp -r dist ../server/web-dist
+
+      - name: Build Go server
+        run: cd server && go build -o server ./cmd/server/
+
+      - name: Install Playwright browsers
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: cd web && npx playwright test
+        env:
+          CI: 'true'
+          # Enable CORS so cross-origin requests from the web dev server are allowed
+          ALLOWED_ORIGINS: http://localhost:5173
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 30
+
+  # ── Shell E2E ──────────────────────────────────────────────
+  shell-e2e:
+    runs-on: ubuntu-latest
+    needs: [ go-build, web-build ]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build Go server
+        run: cd server && go build -o server ./cmd/server/
+
+      - name: Run shell E2E tests
+        run: ./scripts/test-e2e.sh
