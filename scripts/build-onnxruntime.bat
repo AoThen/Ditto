@@ -28,7 +28,6 @@ python tools\ci_build\build.py ^
     --config %CONFIG% ^
     --parallel ^
     --skip_tests ^
-    --build_shared_lib ^
     --cmake_generator "Visual Studio 17 2022" ^
     --enable_msvc_static_runtime ^
     --cmake_extra_defines "CMAKE_INSTALL_PREFIX=install" "onnxruntime_BUILD_UNIT_TESTS=OFF" "onnxruntime_ENABLE_PYTHON=OFF"
@@ -188,7 +187,7 @@ REM Check for any .lib files in install-static
 dir "%STATIC_INSTALL_DIR%\lib\*.lib" >nul 2>nul
 if not errorlevel 1 (
     echo [BUILD] ===================================================================
-    echo [BUILD] ONNX Runtime static libs built (individual libs, no merge)
+    echo [BUILD] ONNX Runtime static libs built - individual libs, no merge
     echo [BUILD]   Output: %STATIC_INSTALL_DIR%
     echo [BUILD] ===================================================================
     endlocal
@@ -205,7 +204,7 @@ if exist "%INSTALL_DIR%\lib" (
         xcopy "%INSTALL_DIR%\include" "%STATIC_INSTALL_DIR%\include" /s /e /y >nul
     )
     echo [BUILD] ===================================================================
-    echo [BUILD] ONNX Runtime packaged from install dir (fallback)
+    echo [BUILD] ONNX Runtime packaged from install dir - fallback
     echo [BUILD]   Output: %STATIC_INSTALL_DIR%
     echo [BUILD] ===================================================================
     endlocal
