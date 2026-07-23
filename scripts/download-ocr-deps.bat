@@ -90,7 +90,7 @@ if exist "%DEPS_DIR%\opencv-static\windows-x64" (
         echo [WARN] OpenCV header NOT found
         dir "%DEPS_DIR%\opencv-static\windows-x64\include" 2>nul
     )
-    if exist "%DEPS_DIR%\opencv-static\windows-x64\x64\vc17\staticlib\opencv_world414.lib" (
+    if exist "%DEPS_DIR%\opencv-static\windows-x64\x64\vc17\staticlib\opencv_world4140.lib" (
         echo [OK] OpenCV lib found
     ) else (
         echo [WARN] OpenCV lib NOT found

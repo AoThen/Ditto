@@ -201,7 +201,7 @@ if exist "%INSTALL_DIR%\lib" (
     mkdir "%STATIC_INSTALL_DIR%\lib"
     xcopy "%INSTALL_DIR%\lib" "%STATIC_INSTALL_DIR%\lib" /s /e /y >nul
     if exist "%INSTALL_DIR%\include" (
-        xcopy "%INSTALL_DIR%\include" "%STATIC_INSTALL_DIR%\include" /s /e /y >nul
+        xcopy "%INSTALL_DIR%\include" "%STATIC_INSTALL_DIR%\include" /s /e /y /i >nul
     )
     echo [BUILD] ===================================================================
     echo [BUILD] ONNX Runtime packaged from install dir - fallback
