@@ -148,30 +148,24 @@ REM 4c. Merge ALL libs into a single onnxruntime.lib
 REM -------------------------------------------------------------------
 echo [BUILD] Step 4c/6: Merging all libs into onnxruntime.lib...
 
-where lib.exe >nul 2>nul
-if errorlevel 1 (
-    echo [BUILD] WARNING: lib.exe not found, skipping final merge
-) else (
-    REM Remove old onnxruntime.lib if it exists (will be replaced with full merge)
-    if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
-        del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
-    )
+if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
+    del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
+)
 
-    REM Build a list of all .lib files in install-static/lib
-    set all_libs=
-    for %%f in ("%STATIC_INSTALL_DIR%\lib\*.lib") do (
-        set all_libs=!all_libs! "%%f"
-    )
-    if not "!all_libs!" == "" (
-        echo [BUILD] Merging all libs into onnxruntime.lib...
-        lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !all_libs!
-        if errorlevel 1 (
-            echo [BUILD] WARNING: Final merge failed
-        ) else (
-            echo [BUILD] onnxruntime.lib created successfully (all deps included)
-        )
+set all_libs=
+for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
+    set all_libs=!all_libs! "%STATIC_INSTALL_DIR%\lib\%%f"
+)
+
+if "!all_libs!" == "" (
+    echo [BUILD] WARNING: No libs found in install-static/lib
+) else (
+    echo [BUILD] Merging all libs into onnxruntime.lib...
+    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !all_libs!
+    if errorlevel 1 (
+        echo [BUILD] WARNING: Final merge failed
     ) else (
-        echo [BUILD] WARNING: No libs found in install-static/lib
+        echo [BUILD] onnxruntime.lib created successfully - all deps included
     )
 )
 echo [BUILD] Step 4c/6 complete.
