@@ -14,6 +14,7 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include "Pinyin_Convert.h"
 #include <cwchar>   // For swscanf
 #include <algorithm> // For std::round
 #include <gdiplus.h>
@@ -212,6 +213,7 @@ CQListCtrl::CQListCtrl()
 	m_mouseOverScrollAreaStart = 0;
 	m_showIfClipWasPasted = TRUE;
 	m_bShowTextForFirstTenHotKeys = true;
+	m_bPinyinSearch = false;
 	m_pToolTipActions = NULL;
 }
 
@@ -591,11 +593,21 @@ void CQListCtrl::OnCustomdrawList(NMHDR* pNMHDR, LRESULT* pResult)
 		if (DrawRtfText(nItem, rcText, pDC) == FALSE)
 		{
 			auto highlightColor = CGetSetOptions::m_Theme.SearchTextHighlight();
+			CString preTag = StrF(_T("\x01\x04 color='#%02x%02x%02x'\x02"), GetRValue(highlightColor), GetGValue(highlightColor), GetBValue(highlightColor));
 			//use unprintable characters so it doesn't find copied html to convert
 			if (m_searchText.GetLength() > 0 &&
-				FindNoCaseAndInsert(csText, m_searchText, StrF(_T("\x01\x04 color='#%02x%02x%02x'\x02"), GetRValue(highlightColor), GetGValue(highlightColor), GetBValue(highlightColor)), _T("\x01\x03\x04\x02"), m_linesPerRow) > 0)
+				FindNoCaseAndInsert(csText, m_searchText, preTag, _T("\x01\x03\x04\x02"), m_linesPerRow) > 0)
 			{
 				DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
+			}
+			else if (m_bPinyinSearch)
+			{
+				int matchPos = 0;
+				if (HighlightPinyinText(csText, m_searchText, highlightColor, &matchPos) > 0)
+				{
+					TruncateTextToMatchLine(csText, matchPos, m_linesPerRow);
+					DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
+				}
 			}
 			else
 			{
@@ -1273,8 +1285,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
-		lstrcpyn(m_pchTip, strTipText, nLength - 1);
-		m_pchTip[nLength - 1] = 0;
+		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (WCHAR*)m_pchTip;
 	}
 	else
@@ -1284,7 +1295,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 
 		m_pwchTip = new WCHAR[nLength];
 		_mbstowcsz(m_pwchTip, strTipText, nLength - 1);
-		m_pwchTip[nLength - 1] = 0; // end of text
+		m_pwchTip[nLength - 1] = 0;
 		pTTTW->lpszText = (WCHAR*)m_pwchTip;
 	}
 #else
@@ -1294,8 +1305,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
-		STRNCPY(m_pchTip, strTipText, nLength - 1);
-		m_pchTip[nLength - 1] = 0; // end of text
+		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (LPTSTR)m_pchTip;
 	}
 	else
@@ -1304,8 +1314,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 			delete m_pwchTip;
 
 		m_pwchTip = new WCHAR[nLength];
-		lstrcpyn(m_pwchTip, strTipText, nLength - 1);
-		m_pwchTip[nLength - 1] = 0;
+		_tcsncpy_s(m_pwchTip, nLength, strTipText, _TRUNCATE);
 		pTTTW->lpszText = (LPTSTR)m_pwchTip;
 	}
 #endif
@@ -2180,6 +2189,18 @@ void CQListCtrl::StopHideScrollBarTimer()
 void CQListCtrl::SetSearchText(CString text)
 {
 	m_searchText = text;
+	ClearPinyinCache();
+}
+
+void CQListCtrl::SetPinyinSearch(bool bPinyin)
+{
+	m_bPinyinSearch = bPinyin;
+	ClearPinyinCache();
+}
+
+void CQListCtrl::ClearPinyinCache()
+{
+	m_pinyinCache.clear();
 }
 
 void CQListCtrl::HidePopup(bool checkShowPersistant)
@@ -2307,7 +2328,7 @@ void CQListCtrl::CreateSmallFont()
 	lf.lfClipPrecision = CLIP_STROKE_PRECIS;
 	lf.lfQuality = DEFAULT_QUALITY;
 	lf.lfPitchAndFamily = VARIABLE_PITCH | FF_DONTCARE;
-	lstrcpy(lf.lfFaceName, _T("Small Font"));
+	_tcsncpy_s(lf.lfFaceName, LF_FACESIZE, _T("Small Font"), _TRUNCATE);
 
 	m_SmallFont = ::CreateFontIndirect(&lf);
 }
@@ -2331,4 +2352,114 @@ void CQListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 	}
 
 	//CListCtrl::OnMouseHWheel(nFlags, zDelta, pt);
+}
+
+int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, COLORREF color, int* outMatchPos)
+{
+	CString cacheKey = csText;
+
+	std::wstring wText(csText.GetString());
+	size_t nChars = wText.length();
+	if (nChars == 0) return 0;
+
+	std::string pinyin;
+	std::string abbr;
+	auto cacheIt = m_pinyinCache.find(cacheKey);
+	if (cacheIt != m_pinyinCache.end())
+	{
+		pinyin = cacheIt->second.first;
+		abbr = cacheIt->second.second;
+	}
+	else
+	{
+		CPinyinConvert conv;
+		pinyin = conv.ConvertToPinyin(wText);
+		abbr = conv.ConvertToAbbreviation(wText);
+		m_pinyinCache[cacheKey] = std::make_pair(pinyin, abbr);
+	}
+
+	CT2A searchA(searchText, CP_UTF8);
+	std::string searchStr(searchA);
+	std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
+
+	std::string lowPinyin;
+	lowPinyin.resize(pinyin.size());
+	std::transform(pinyin.begin(), pinyin.end(), lowPinyin.begin(), ::tolower);
+
+	bool isAbbr = false;
+	size_t pos = lowPinyin.find(searchStr);
+	size_t matchLen = searchStr.length();
+
+	if (pos == std::string::npos)
+	{
+		std::string lowAbbr;
+		lowAbbr.resize(abbr.size());
+		std::transform(abbr.begin(), abbr.end(), lowAbbr.begin(), ::tolower);
+		pos = lowAbbr.find(searchStr);
+		if (pos != std::string::npos)
+			isAbbr = true;
+	}
+
+	if (pos == std::string::npos)
+		return 0;
+
+	std::vector<int> charOffsets(nChars);
+	std::vector<int> charLengths(nChars);
+	int accum = 0;
+	for (size_t i = 0; i < nChars; i++)
+	{
+		wchar_t ch = wText[i];
+		const char* py = CPinyinConvert::LookupPinyin(ch);
+		int len;
+		if (py != NULL && py[0] != '\0')
+		{
+			len = isAbbr ? 1 : (int)strlen(py);
+		}
+		else if (isAbbr && ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z')))
+		{
+			len = 1;
+		}
+		else if (!isAbbr)
+		{
+			char buf[8] = {0};
+			len = WideCharToMultiByte(CP_UTF8, 0, &ch, 1, buf, 8, NULL, NULL);
+			if (len <= 0) len = 0;
+		}
+		else
+		{
+			len = 0;
+		}
+		charOffsets[i] = accum;
+		charLengths[i] = len;
+		accum += len;
+	}
+
+	int firstChar = -1, lastChar = -1;
+	for (size_t i = 0; i < nChars; i++)
+	{
+		int cStart = charOffsets[i];
+		int cEnd = charOffsets[i] + charLengths[i];
+		if (cStart < (int)(pos + matchLen) && cEnd > (int)pos)
+		{
+			if (firstChar == -1) firstChar = (int)i;
+			lastChar = (int)i;
+		}
+	}
+
+	if (firstChar == -1)
+		return 0;
+
+	CString preTag;
+	preTag.Format(_T("\x01\x04 color='#%02x%02x%02x'\x02"), GetRValue(color), GetGValue(color), GetBValue(color));
+	CString postTag = _T("\x01\x03\x04\x02");
+
+	csText.Insert(lastChar + 1, postTag);
+	csText.Insert(firstChar, preTag);
+
+	if (outMatchPos)
+	{
+		*outMatchPos = firstChar + preTag.GetLength();
+	}
+
+	return 1;
 }

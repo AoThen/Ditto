@@ -24,8 +24,13 @@
 #include "ProcessPaste.h"
 #include "QPasteWnd.h"
 #include "SendMail.h"
+#include "Pinyin_Convert.h"
 #include <algorithm>
-#include <signal.h>
+#include <exception>
+#include <string>
+	#include <vector>
+
+	#include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
 
@@ -84,6 +89,7 @@ CQPasteWnd::CQPasteWnd()
 	m_extraDataCounter = 0;
 	m_noSearchResults = false;
 	m_bShowStarredClips = false;
+	m_bPrevDarkMode = FALSE;
 	m_lastDbWrite = 0;
 	m_pendingRefresh = false;
 	m_lastNonActiveMouseMove = 0;
@@ -139,6 +145,7 @@ BEGIN_MESSAGE_MAP(CQPasteWnd, CWndEx)
 	ON_COMMAND(ID_MENU_VIEWGROUPS, OnMenuViewgroups)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_SETTONEVERAUTODELETE, OnMenuQuickpropertiesSettoneverautodelete)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_AUTODELETE, OnMenuQuickpropertiesAutodelete)
+	ON_COMMAND(ID_MENU_DONTSYNC_CLIP, OnToggleDontSync)
 	ON_COMMAND(ID_MENU_QUICKPROPERTIES_REMOVEHOTKEY, OnMenuQuickpropertiesRemovehotkey)
 	ON_COMMAND(ID_MENU_SENTTO_FRIEND_EIGHT, OnMenuSenttoFriendEight)
 	ON_COMMAND(ID_MENU_SENTTO_FRIEND_ELEVEN, OnMenuSenttoFriendEleven)
@@ -174,6 +181,7 @@ BEGIN_MESSAGE_MAP(CQPasteWnd, CWndEx)
 	ON_UPDATE_COMMAND_UI(ID_MENU_VIEWGROUPS, OnUpdateMenuViewgroups)
 	ON_UPDATE_COMMAND_UI(ID_MENU_PASTEPLAINTEXTONLY, OnUpdateMenuPasteplaintextonly)
 	ON_UPDATE_COMMAND_UI(ID_MENU_DELETE, OnUpdateMenuDelete)
+	ON_UPDATE_COMMAND_UI(ID_MENU_DONTSYNC_CLIP, OnUpdateDontSync)
 	ON_UPDATE_COMMAND_UI(ID_MENU_PROPERTIES, OnUpdateMenuProperties)
 	ON_UPDATE_COMMAND_UI(ID_SPECIALPASTE_POSIXIFY_PATHS, &CQPasteWnd::OnUpdateSpecialPosixifyPaths)
 	ON_COMMAND(ID_QUICKOPTIONS_PROMPTTODELETECLIP, OnPromptToDeleteClip)
@@ -399,12 +407,21 @@ BOOL CQPasteWnd::Create(CRect rect, CWnd* pParentWnd)
 	return CWndEx::Create(rect, pParentWnd);
 }
 
+static BOOL IsDarkModeActive()
+{
+	COLORREF clr = CGetSetOptions::m_Theme.MainWindowBG();
+	return (GetRValue(clr) < 128);
+}
+
 int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 {
 	if (CWndEx::OnCreate(lpCreateStruct) == -1)
 	{
 		return -1;
 	}
+
+	// Ensure theme is loaded before creating controls that depend on it
+	CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
 
 	HICON b = (HICON)LoadImage(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDR_MAINFRAME), IMAGE_ICON, 64, 64, LR_SHARED);
 	SetIcon(b, TRUE);
@@ -417,6 +434,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_search.SetDpiInfo(&m_DittoWindow.m_dpi);
 	m_search.SetPromptText(theApp.m_Language.GetString(_T("Search"), _T("Search")));
 	::SHAutoComplete(m_search.m_hWnd, SHACF_AUTOSUGGEST_FORCE_OFF);
+	m_search.SetDarkMode(IsDarkModeActive());
 	SetSearchImages();
 	m_search.LoadPastSearches(CGetSetOptions::GetPastSearchXml());
 
@@ -463,19 +481,24 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_ShowGroupsFolderBottom.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_SHOW_GROUPS_BOTTOM);
 	//m_ShowGroupsFolderBottom.LoadBitmaps(IDB_CLOSED_FOLDER, IDB_CLOSED_FOLDER_PRESSED, IDB_CLOSED_FOLDER_FOCUSED);
 	m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+	m_ShowGroupsFolderBottom.SetDarkMode(IsDarkModeActive());
 	m_ShowGroupsFolderBottom.ShowWindow(SW_SHOW);
 	m_ShowGroupsFolderBottom.SetToolTipText(theApp.m_Language.GetString(_T("GroupsTooltip"), _T("Groups")));
 	m_ShowGroupsFolderBottom.ModifyStyle(WS_TABSTOP, 0);
 
 	m_BackButton.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_BACK_BUTTON);
 	m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+	m_BackButton.SetDarkMode(IsDarkModeActive());
 	m_BackButton.ModifyStyle(WS_TABSTOP, 0);
 	m_BackButton.ShowWindow(SW_SHOW);
 
 	m_systemMenu.Create(NULL, WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, CRect(0, 0, 0, 0), this, ID_SYSTEM_BUTTON);
 	m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+	m_systemMenu.SetDarkMode(IsDarkModeActive());
 	m_systemMenu.ModifyStyle(WS_TABSTOP, 0);
 	m_systemMenu.ShowWindow(SW_SHOW);
+
+	m_bPrevDarkMode = IsDarkModeActive();
 
 	m_stGroup.Create(_T(""), WS_CHILD | WS_VISIBLE, CRect(0, 0, 0, 0), this, ID_GROUP_TEXT);
 
@@ -835,14 +858,17 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 	}
 	else if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
 	{
+		Log(StrF(_T("DBG_GDIP_OnActivate: ACTIVE bMin=%d m_bShowQP=%d"), bMinimized, theApp.m_bShowingQuickPaste));
+
 		if (bMinimized == FALSE)
 		{
 			if (theApp.m_bShowingQuickPaste == false)
 			{
 				BOOL fillList = FALSE;
-				if (m_listItems.size() == 0)
+				if (m_listItems.size() == 0 || m_pendingRefresh)
 				{
 					fillList = TRUE;
+					m_pendingRefresh = FALSE;
 				}
 				else if (theApp.m_databaseOnNetworkShare)
 				{
@@ -865,7 +891,7 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 
 BOOL CQPasteWnd::HideQPasteWindow(bool releaseFocus, BOOL clearSearchData)
 {
-	if (clearSearchData = -1)
+	if (clearSearchData == -1)
 	{
 		if ((CGetSetOptions::m_maintainSearchView || CGetSetOptions::m_refreshViewAfterPasting == false) &&
 			m_strSearch != _T(""))
@@ -990,6 +1016,30 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 	//Ensure we have the latest theme file, this checks the last write time so it doesn't read the file each time
 	CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
 
+	// detect dark mode change and reload button icons if needed
+	BOOL bDark = IsDarkModeActive();
+	if (bDark != m_bPrevDarkMode)
+	{
+		m_bPrevDarkMode = bDark;
+		m_systemMenu.Reset();
+		m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+		m_systemMenu.SetDarkMode(bDark);
+
+		m_ShowGroupsFolderBottom.Reset();
+		m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+		m_ShowGroupsFolderBottom.SetDarkMode(bDark);
+
+		m_BackButton.Reset();
+		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+		m_BackButton.SetDarkMode(bDark);
+
+		m_search.SetDarkMode(bDark);
+
+		m_systemMenu.Invalidate();
+		m_ShowGroupsFolderBottom.Invalidate();
+		m_BackButton.Invalidate();
+	}
+
 	SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
 	SetCaptionOn(CGetSetOptions::GetCaptionPos(), true, CGetSetOptions::m_Theme.GetCaptionSize(), CGetSetOptions::m_Theme.GetCaptionFontSize());
 
@@ -1005,12 +1055,21 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 
 	if (bFillList)
 	{
+		m_bHandleSearchTextChange = false;
+		m_search.SetWindowText(_T(""));
+		m_bHandleSearchTextChange = true;
 		FillList();
 	}
 	else
 	{
+		Log(StrF(_T("DBG_GDIP_ShowQP: MoveControls bFill=%d"), bFillList));
 		MoveControls();
 	}
+
+	// force button repaint to ensure icons are visible
+	m_systemMenu.Invalidate();
+	m_ShowGroupsFolderBottom.Invalidate();
+	m_BackButton.Invalidate();
 
 	// always on top... for persistent showing (CGetSetOptions::m_bShowPersistent)
 	// SHOWWINDOW was also integrated into this function rather than calling it separately
@@ -1333,6 +1392,12 @@ LRESULT CQPasteWnd::OnRefreshView(WPARAM wParam, LPARAM lParam)
 	// remove all additional refresh view messages from the queue
 	while (::PeekMessage(&msg, m_hWnd, WM_REFRESH_VIEW, WM_REFRESH_VIEW, PM_REMOVE)) {}
 
+	if (!theApp.m_bShowingQuickPaste)
+	{
+		m_pendingRefresh = true;
+		return FALSE;
+	}
+
 	if (theApp.m_bShowingQuickPaste)
 	{
 		CopyReasonEnum::CopyReason copyReason = (CopyReasonEnum::CopyReason)wParam;
@@ -1465,6 +1530,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 	Log(StrF(_T("Start Fill List - %s"), csSQLSearch));
 
 	m_lstHeader.SetSearchText(csSQLSearch);
+	m_lstHeader.SetPinyinSearch(false);
 
 	{
 		ATL::CCritSecLock csLock(m_CritSection.m_sect);
@@ -1537,6 +1603,8 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 	CString sqlSearch = "";
 
+	CString pinyinBaseFilter = strFilter;
+
 	if (csSQLSearch == "")
 	{
 		m_strSQLSearch = m_bShowStarredClips ? strFilter : _T("");
@@ -1607,35 +1675,54 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 			}
 		}
 
-		strFilter = _T("(");
+		std::vector<CString> preds;
 
-		if (descriptionSql != _T(""))
-		{
-			strFilter += descriptionSql;
-		}
+		if (descriptionSql != _T("") && descriptionSql != _T("()"))
+			preds.push_back(descriptionSql);
+		if (quickPasteSql != _T("") && quickPasteSql != _T("()"))
+			preds.push_back(quickPasteSql);
+		if (fullTextSql != _T("") && fullTextSql != _T("()"))
+			preds.push_back(fullTextSql);
 
-		if (quickPasteSql != _T(""))
+		if (csSQLSearch != _T(""))
 		{
-			if (descriptionSql != _T(""))
+			CPinyinConvert pinyinConv;
+			CString alphaOnly = pinyinConv.ExtractAlpha(csSQLSearch);
+			if (alphaOnly.IsEmpty() == FALSE)
 			{
-				strFilter += _T(" OR ");
-			}
+				m_lstHeader.SetPinyinSearch(true);
 
-			strFilter += quickPasteSql;
+				CString lowSearch = alphaOnly;
+				lowSearch.MakeLower();
+				lowSearch.Replace(_T("\\"), _T("\\\\"));
+				lowSearch.Replace(_T("'"), _T("''"));
+				lowSearch.Replace(_T("%"), _T("\\%"));
+				lowSearch.Replace(_T("_"), _T("\\_"));
+
+				CString pinyinLike;
+				pinyinLike.Format(_T("Main.pinyin LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+				CString pinyinAbbrLike;
+				pinyinAbbrLike.Format(_T("Main.pinyinAbbr LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+				preds.push_back(pinyinLike);
+				preds.push_back(pinyinAbbrLike);
+			}
 		}
 
-		if (fullTextSql != _T(""))
+		if (preds.empty() == false)
 		{
-			if (descriptionSql != _T("") ||
-				quickPasteSql != _T(""))
+			strFilter = _T("(");
+			for (size_t i = 0; i < preds.size(); i++)
 			{
-				strFilter += _T(" OR ");
+				if (i > 0)
+					strFilter += _T(" OR ");
+				strFilter += preds[i];
 			}
-
-			strFilter += fullTextSql;
+			strFilter += _T(")");
 		}
-
-		strFilter += _T(")");
+		else
+		{
+			strFilter = pinyinBaseFilter;
+		}
 
 		if (strParentFilter.IsEmpty() == FALSE)
 		{
@@ -1676,7 +1763,10 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 	m_lstHeader.RefreshVisibleRows();
 
 	CPoint loadItem(-1, m_lstHeader.GetCountPerPage() + 2);
-	m_loadItems.push_back(loadItem);
+	{
+		ATL::CCritSecLock csLock(m_CritSection.m_sect);
+		m_loadItems.push_back(loadItem);
+	}
 
 	m_thread.SetSearchSql(sql, countSql);
 	m_thread.FireLoadItems(true);
@@ -2396,6 +2486,66 @@ void CQPasteWnd::OnMenuQuickpropertiesAutodelete()
 	m_lstHeader.RefreshVisibleRows();
 }
 
+void CQPasteWnd::OnToggleDontSync()
+{
+	CWaitCursor wait;
+	ARRAY IDs;
+	ARRAY Indexs;
+	m_lstHeader.GetSelectionItemData(IDs);
+	m_lstHeader.GetSelectionIndexes(Indexs);
+
+	if (IDs.GetSize() <= 0)
+		return;
+
+	bool isDontSync = false;
+	try
+	{
+		CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), IDs[0]);
+		if (!q.eof())
+			isDontSync = q.getIntField(_T("lDontSync")) > 0;
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	int newVal = isDontSync ? 0 : 1;
+
+	try
+	{
+		CString idsStr;
+		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
+		{
+			CString idStr;
+			idStr.Format(_T("%d"), static_cast<int>(IDs[i]));
+			if (i > 0) idsStr += _T(",");
+			idsStr += idStr;
+		}
+		theApp.m_db.execDMLEx(_T("UPDATE Main SET lDontSync = %d WHERE lID IN (%s)"), newVal, idsStr);
+
+		Log(StrF(_T("OnToggleDontSync: %d clips set to lDontSync=%d, ids=[%s]"), IDs.GetSize(), newVal, idsStr));
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	if (newVal == 1)
+	{
+		std::vector<int> localIds;
+		for (INT_PTR i = 0; i < IDs.GetSize(); i++)
+			localIds.push_back(static_cast<int>(IDs[i]));
+		try
+		{
+			theApp.m_CloudSyncManager.MarkClipsDontSync(localIds);
+		}
+		catch (std::exception& e)
+		{
+			Log(StrF(_T("MarkClipsDontSync failed (non-fatal): %hs"), e.what()));
+		}
+		catch (...)
+		{
+			Log(_T("MarkClipsDontSync failed (non-fatal): unknown exception"));
+		}
+	}
+
+	theApp.RefreshView();
+}
+
 void CQPasteWnd::OnMenuQuickpropertiesRemovehotkey()
 {
 	CWaitCursor wait;
@@ -2546,7 +2696,6 @@ void CQPasteWnd::OnMenuSenttoFriendone()
 
 void CQPasteWnd::OnMenuSenttoPromptforip()
 {
-	// TODO: Add your command handler code here
 
 }
 
@@ -2640,7 +2789,7 @@ void CQPasteWnd::OnMenuExport()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -2822,7 +2971,7 @@ BOOL CQPasteWnd::SendToFriendbyPos(int nPos, CString override_IP_Host)
 
 			if (SendToFriend(Info) == FALSE)
 			{
-				MessageBox(StrF(_T("Error Sending data to %s\n\n%s"), Info.m_csIP, Info.m_csErrorText), _T("Ditto"), MB_OK | MB_TOPMOST);
+				MessageBox(StrF(theApp.m_Language.GetString("MsgErrorSendingData", "Error Sending data to %s\n\n%s"), Info.m_csIP, Info.m_csErrorText), _T("Ditto"), MB_OK | MB_TOPMOST);
 			}
 			else
 			{
@@ -2902,8 +3051,6 @@ bool CQPasteWnd::DeleteClips(CClipIDs& IDs, ARRAY& Indexs)
 			}
 		}
 	}
-
-	CClip::m_LastAddedCRC = 0;
 
 	m_extraDataThread.FireLoadAccelerators();
 
@@ -4237,6 +4384,7 @@ bool CQPasteWnd::DoActionPasteSelectedPlainText()
 {
 	CSpecialPasteOptions pasteOptions;
 	pasteOptions.m_pasteAsPlainText = true;
+	pasteOptions.m_trimWhiteSpace = true;
 	OpenSelection(pasteOptions);
 	return true;
 }
@@ -4266,6 +4414,8 @@ bool CQPasteWnd::DoActionMoveClipToGroup()
 				IDs.MoveTo(nGroup);
 			}
 			FillList();
+
+			theApp.m_CloudSyncManager.TriggerQuickSync();
 		}
 
 		m_bHideWnd = true;
@@ -4404,7 +4554,7 @@ bool CQPasteWnd::DoExportToTextFile()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -5477,7 +5627,7 @@ bool CQPasteWnd::DoExportToBitMapFile()
 	memset(&ofn, 0, sizeof(ofn));
 
 	CString csInitialDir = CGetSetOptions::GetLastImportDir();
-	STRCPY(szDir, csInitialDir);
+	STRCPY_S(szDir, 400, csInitialDir);
 
 	ofn.lStructSize = sizeof(OPENFILENAME);
 	ofn.hwndOwner = m_hWnd;
@@ -5733,8 +5883,7 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 					// pipe is the "end of symbols" marker
 					cs += "|" + CMainTableFunctions::GetDisplayText(CGetSetOptions::m_nLinesPerRow, m_listItems[pItem->iItem].m_Desc);
 
-					lstrcpyn(pItem->pszText, cs, pItem->cchTextMax);
-					pItem->pszText[pItem->cchTextMax - 1] = '\0';
+					_tcsncpy_s(pItem->pszText, pItem->cchTextMax, cs, _TRUNCATE);
 
 					//						Log(StrF(_T("DrawItem index %d - "), pItem->iItem));//, pItem->pszText));
 				}
@@ -5742,6 +5891,9 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 				{
 
 					bool addToLoadItems = true;
+
+				{
+					ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
 					for (std::list<CPoint>::iterator it = m_loadItems.begin(); it != m_loadItems.end(); it++)
 					{
@@ -5756,9 +5908,9 @@ void CQPasteWnd::GetDispInfo(NMHDR* pNMHDR, LRESULT* pResult)
 					{
 						CPoint loadItem(pItem->iItem, (m_lstHeader.GetTopIndex() + (m_lstHeader.GetCountPerPage() * 2)));
 
-						//Log(StrF(_T("DrawItem index %d, add: %d"), loadItem.x, loadItem.y));
 						m_loadItems.push_back(loadItem);
 					}
+				}
 
 					m_thread.FireLoadItems(false);
 				}
@@ -5922,11 +6074,7 @@ void CQPasteWnd::OnGetToolTipText(NMHDR* pNMHDR, LRESULT* pResult)
 	{
 		CString cs("no item selected");
 
-		lstrcpyn(pInfo->pszText, cs, pInfo->cchTextMax);
-		if (cs.GetLength() > pInfo->cchTextMax)
-		{
-			pInfo->pszText[pInfo->cchTextMax - 1] = 0;
-		}
+		_tcsncpy_s(pInfo->pszText, pInfo->cchTextMax, cs, _TRUNCATE);
 
 		return;
 	}
@@ -6028,8 +6176,7 @@ void CQPasteWnd::OnGetToolTipText(NMHDR* pNMHDR, LRESULT* pResult)
 		cs += "\r\n\r\n";
 		cs += clipData;
 
-		lstrcpyn(pInfo->pszText, cs, pInfo->cchTextMax);
-		pInfo->pszText[pInfo->cchTextMax - 1] = '\0';
+		_tcsncpy_s(pInfo->pszText, pInfo->cchTextMax, cs, _TRUNCATE);
 	}
 	CATCH_SQLITE_EXCEPTION
 }
@@ -6373,6 +6520,33 @@ void CQPasteWnd::OnUpdateMenuDelete(CCmdUI* pCmdUI)
 	UpdateMenuShortCut(pCmdUI, ActionEnums::DELETE_SELECTED);
 }
 
+void CQPasteWnd::OnUpdateDontSync(CCmdUI* pCmdUI)
+{
+	if (!pCmdUI->m_pMenu)
+	{
+		return;
+	}
+
+	ARRAY IDs;
+	m_lstHeader.GetSelectionItemData(IDs);
+	if (IDs.GetSize() > 0)
+	{
+		try
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lDontSync FROM Main WHERE lID = %d"), IDs[0]);
+			if (!q.eof() && q.getIntField(_T("lDontSync")) > 0)
+			{
+				pCmdUI->SetCheck(1);
+			}
+			else
+			{
+				pCmdUI->SetCheck(0);
+			}
+		}
+		CATCH_SQLITE_EXCEPTION
+	}
+}
+
 void CQPasteWnd::OnUpdateMenuProperties(CCmdUI* pCmdUI)
 {
 	if (!pCmdUI->m_pMenu)
@@ -6412,6 +6586,7 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 	m_lstHeader.Scroll(CSize(-x, -y));
 
 	m_lstHeader.SetItemCountEx((int)wParam);
+	m_lstHeader.Invalidate();
 
 	if ((int)wParam == 0 &&
 		(m_strSearch != _T("") || m_bShowStarredClips))
@@ -6433,6 +6608,7 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 	UpdateStatus(false);
 
 	MoveControls();
+	m_search.Invalidate();
 
 	return TRUE;
 }
@@ -6673,51 +6849,8 @@ LRESULT CQPasteWnd::OnUpdateScrollBar(WPARAM wParam, LPARAM lParam)
 			m_modernScrollBarHorz.UpdateScrollBar();
 		}
 	}
-	return 0;
+return 0;
 }
-
-//HBRUSH CQPasteWnd::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
-//{
-//	// Call the base class implementation first! Otherwise, it may 
-//	// undo what we're trying to accomplish here.
-//	HBRUSH hbr = CWnd::OnCtlColor(pDC, pWnd, nCtlColor);
-//
-//	switch (nCtlColor) 
-//	{
-//	case CTLCOLOR_STATIC:
-//		switch (pWnd->GetDlgCtrlID())
-//		{
-//			case ON_TOP_WARNING:
-//			{
-//				pDC->SetBkMode(TRANSPARENT);
-//				pDC->SetBkColor(RGB(0, 0, 255));
-//
-//				CBrush brush;
-//				brush.CreateSolidBrush(COLORREF(RGB(255, 0, 0)));
-//				return brush;
-//			}
-//			break;
-//		}
-//	}
-//
-//	return hbr;
-//}
-
-//void CQPasteWnd::OnPaint()
-//{
-//	/*CBrush brush;
-//	brush.CreateSolidBrush(COLORREF(RGB(255, 0, 0)));
-//
-//	CRect clientRect;
-//	GetClientRect(clientRect);
-//
-//	CPaintDC dc(this);
-//	dc.FillRect(clientRect, &brush);*/
-//
-//	
-//		CQPasteWnd::OnPaint();
-//	
-//}
 
 BOOL CQPasteWnd::OnEraseBkgnd(CDC* pDC)
 {
@@ -6730,7 +6863,6 @@ BOOL CQPasteWnd::OnEraseBkgnd(CDC* pDC)
 	return bRes;                       // CDialog::OnEraseBkgnd(pDC);
 
 	//return TRUE;
-	// TODO: Add your message handler code here and/or call default
 
 	//return CWndEx::OnEraseBkgnd(pDC);
 }
@@ -7578,14 +7710,20 @@ LRESULT CQPasteWnd::OnDpiChanged(WPARAM wParam, LPARAM lParam)
 
 	m_systemMenu.Reset();
 	m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+	m_systemMenu.SetDarkMode(IsDarkModeActive());
 
 	m_BackButton.Reset();
 	m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+	m_BackButton.SetDarkMode(IsDarkModeActive());
 
 	m_ShowGroupsFolderBottom.Reset();
 	m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+	m_ShowGroupsFolderBottom.SetDarkMode(IsDarkModeActive());
+
+	m_bPrevDarkMode = IsDarkModeActive();
 
 	m_search.OnDpiChanged();
+	m_search.SetDarkMode(IsDarkModeActive());
 	m_lstHeader.OnDpiChanged();
 
 	UpdateFont();
@@ -8120,7 +8258,27 @@ void CQPasteWnd::RefreshThemeColors()
 	
 	// Refresh scrollbar colors
 	RefreshScrollBarColors();
-	
+
+	// Reload button icons if dark mode state changed
+	BOOL bDark = IsDarkModeActive();
+	if (bDark != m_bPrevDarkMode)
+	{
+		m_bPrevDarkMode = bDark;
+		m_systemMenu.Reset();
+		m_systemMenu.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), system_menu_2_24, system_menu_2_30, system_menu_2_36, system_menu_2_42, system_menu_2_48, _T("PNG"), system_menu_54, system_menu_60, system_menu_66, system_menu_72, system_menu_78, system_menu_84);
+		m_systemMenu.SetDarkMode(bDark);
+
+		m_ShowGroupsFolderBottom.Reset();
+		m_ShowGroupsFolderBottom.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), open_folder_24, open_folder_30, open_folder_36, open_folder_42, open_folder_48, _T("PNG"), open_folder_54, open_folder_60, open_folder_66, open_folder_72, open_folder_78, open_folder_84);
+		m_ShowGroupsFolderBottom.SetDarkMode(bDark);
+
+		m_BackButton.Reset();
+		m_BackButton.LoadStdImageDPI(m_DittoWindow.m_dpi.GetDPI(), return_16, return_20, return_24, return_28, return_32, _T("PNG"));
+		m_BackButton.SetDarkMode(bDark);
+
+		m_search.SetDarkMode(bDark);
+	}
+
 	// Force repaint of the entire window including non-client area
 	SetWindowPos(NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 	RedrawWindow(NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME);

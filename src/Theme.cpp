@@ -212,13 +212,6 @@ void CTheme::LoadWindowsAccentColor()
 		m_clipPastedColor = RGB(b, g, r);
 		m_searchTextBoxFocusBorder = m_clipPastedColor;
 		m_searchTextHighlight = m_clipPastedColor;
-
-		//if (Windows10ColorTitleBar())
-		//{
-		//	m_CaptionRight = m_clipPastedColor;
-		//	m_CaptionLeft = m_clipPastedColor;
-		//	m_Border = m_clipPastedColor;
-		//}
 	}
 }
 
@@ -256,21 +249,21 @@ COLORREF HslToRgb(float h, float s, float l)
 	return RGB(r, g, b);
 }
 
-bool CTheme::LoadColor(TiXmlElement *pParent, CStringA csNode, COLORREF &Color)
+bool CTheme::LoadColor(TiXmlElement *pParent, CString csNode, COLORREF &Color)
 {
 	int intValue = 0;
 	return LoadElement(pParent, csNode, Color, intValue);
 }
 
-bool CTheme::LoadInt(TiXmlElement *pParent, CStringA csNode, int &intValue)
+bool CTheme::LoadInt(TiXmlElement *pParent, CString csNode, int &intValue)
 {
 	COLORREF colorValue = 0;
 	return LoadElement(pParent, csNode, colorValue, intValue);
 }
 
-bool CTheme::LoadElement(TiXmlElement *pParent, CStringA csNode, COLORREF &Color, int &intValue)
+bool CTheme::LoadElement(TiXmlElement *pParent, CString csNode, COLORREF &Color, int &intValue)
 {
-	TiXmlElement *pColorNode = pParent->FirstChildElement(csNode);
+	TiXmlElement *pColorNode = pParent->FirstChildElement(CStringA(csNode));
 	if(pColorNode == NULL)
 	{
 		m_csLastError.Format(_T("Theme Load, error loading Node = %s"), csNode);
@@ -286,7 +279,7 @@ bool CTheme::LoadElement(TiXmlElement *pParent, CStringA csNode, COLORREF &Color
 		return false;
 	}
 	
-	CString csColor = pColor->Value();
+	CString csColor = CTextConvert::Utf8ToUnicode(pColor->Value());
 	csColor.Trim();
 
 	if (csColor.IsEmpty())

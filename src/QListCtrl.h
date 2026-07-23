@@ -14,6 +14,9 @@
 #include "Accels.h"
 #include "GdiImageDrawer.h"
 #include "DPI.h"
+#include <map>
+#include <string>
+#include <utility>
 
 #define NM_SEARCH_ENTER_PRESSED		WM_USER+0x100
 #define NM_RIGHT					WM_USER+0x101
@@ -155,6 +158,9 @@ public:
 	int GetRowHeight() { return m_rowHeight; }
 
 	void SetSearchText(CString text);
+	void SetPinyinSearch(bool bPinyin);
+	void ClearPinyinCache();
+	int HighlightPinyinText(CString& csText, const CString& searchText, COLORREF highlightColor, int* outMatchPos = nullptr);
 
 	void SetDpiInfo(CDPI *dpi);
 
@@ -196,6 +202,8 @@ protected:
 	CGdiImageDrawer m_stickyImage;
 	int m_rowHeight;
 	CString m_searchText;
+	bool m_bPinyinSearch;
+	std::map<CString, std::pair<std::string, std::string>> m_pinyinCache;
 	BOOL m_showIfClipWasPasted;
 	CAccels *m_pToolTipActions;
 	CRichEditCtrlEx m_rtfFormater;

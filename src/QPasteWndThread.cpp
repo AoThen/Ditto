@@ -111,7 +111,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 		        loadItemsIndex = max(pasteWnd->m_loadItems.begin()->x, 0);
 		        loadItemsCount = pasteWnd->m_loadItems.begin()->y - pasteWnd->m_loadItems.begin()->x;
 		        pasteWnd->m_bStopQuery = false;
-				listSize = pasteWnd->m_listItems.size();
+				listSize = static_cast<int>(pasteWnd->m_listItems.size());
 		        clearFirstLoadItem = true;
 		    }
 		}
@@ -172,9 +172,9 @@ void CQPasteWndThread::OnLoadItems(void *param)
 						}
 					}
 
-					if(pasteWnd->m_bStopQuery)
+					if(pasteWnd->m_bStopQuery || IsCancelled())
 					{
-						Log(StrF(_T("StopQuery called exiting filling cache count = %d"), loadItemsIndex));
+						Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
 						break;
 					}
 
@@ -195,7 +195,8 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					pos++;
 				}
 
-				DWORD loadCount = GetTickCount() - startTick;
+				DWORD elapsedLoad = GetTickCount() - startTick;
+				int totalLoaded = loadCount;
 				DWORD countCountStart = GetTickCount();
 				DWORD countCount = 0;
 				DWORD acceleratorCount = 0;
@@ -226,7 +227,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					pasteWnd->m_loadItems.erase(pasteWnd->m_loadItems.begin());
 				}
 
-				Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), loadCount, GetTickCount() - startTick, loadCount, countCount, acceleratorCount));
+				Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), totalLoaded, GetTickCount() - startTick, elapsedLoad, countCount, acceleratorCount));
 			}
 			catch (CppSQLite3Exception& e)	\
 			{								\
@@ -302,6 +303,12 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 	
 	for (std::list<CClipFormatQListCtrl>::iterator it = localFormats.begin(); it != localFormats.end(); it++)
     {
+		if (IsCancelled())
+		{
+			Log(_T("OnLoadExtraData cancelled during format processing"));
+			break;
+		}
+
 		bool loadClip = true;
 
 		if (it->m_cfType == CF_DIB)
