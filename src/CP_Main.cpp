@@ -994,19 +994,13 @@ int CCP_MainApp::ExitInstance()
 
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
 
-	// Call AfxOleTerm() to clean up OLE state before module unload.
-	// CWinApp::ExitInstance() is skipped because it asserts on second-instance
-	// partial initialization paths. With AfxOleInit() moved after the mutex check,
-	// calling AfxOleTerm() directly is safe for both first and second instances.
-	AfxOleTerm();
-
 	if(m_hMutex)
 		CloseHandle(m_hMutex);
 
-	// Skip CWinApp::ExitInstance() - it triggers CSingleLock assertion in debug builds
-	// for processes with partial initialization (second instance).
-	// OS handles all cleanup at process exit.
-	return 0;
+	// Let CWinApp::ExitInstance() handle OLE cleanup and MFC internal state cleanup.
+	// Previously skipped due to second-instance AfxOleInit() issues;
+	// now safe because AfxOleInit() is moved after the mutex check.
+	return CWinApp::ExitInstance();
 }
 
 // return TRUE if there is more idle processing to do
