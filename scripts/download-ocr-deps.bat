@@ -72,7 +72,7 @@ if exist "%DEPS_DIR%\onnxruntime-static\windows-x64" (
         echo [WARN] ONNX Runtime header NOT found at include\onnxruntime_cxx_api.h
         dir "%DEPS_DIR%\onnxruntime-static\windows-x64\include" /s 2>nul
     )
-    if exist "%DEPS_DIR%\onnxruntime-static\windows-x64\lib\onnxruntime.lib" (
+    if exist "%DEPS_DIR%\onnxruntime-static\windows-x64\lib\*.lib" (
         echo [OK] ONNX Runtime lib found
     ) else (
         echo [WARN] ONNX Runtime lib NOT found
@@ -94,9 +94,10 @@ if exist "%DEPS_DIR%\opencv-static\windows-x64" (
         echo [OK] OpenCV lib found
     ) else (
         echo [WARN] OpenCV lib NOT found
-        dir "%DEPS_DIR%\opencv-static\windows-x64\x64\vc17\staticlib" 2>nul
+        dir "%DEPS_DIR%\opencv-static\windows-x64" /s /b *.lib 2>nul
     )
 ) else (
     echo [WARN] OpenCV directory NOT found
 )
 echo === Diagnostic end ===
+exit /b 0

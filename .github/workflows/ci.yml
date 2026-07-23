@@ -186,6 +186,7 @@ jobs:
             dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === Diagnostic complete ===
+          exit /b 0
 
       - name: Upload diagnostic logs
         if: failure()
@@ -291,6 +292,7 @@ jobs:
             dir /s "Addins\DittoOCR\ocr-deps" 2>nul
           )
           echo === Diagnostic complete ===
+          exit /b 0
 
       - name: Upload diagnostic logs
         if: failure()
