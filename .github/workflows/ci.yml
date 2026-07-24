@@ -139,7 +139,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Restore NuGet packages
-        run: nuget restore CP_Main_10.sln
+        run: msbuild CP_Main_10.sln -t:Restore
 
       - name: Build CloudSync_Test (Release x64)
         run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64
