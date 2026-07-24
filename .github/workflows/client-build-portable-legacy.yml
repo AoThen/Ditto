@@ -1,0 +1,115 @@
+name: Client Portable (Legacy OCR)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        config: [Release, Debug]
+      fail-fast: false
+    name: Legacy Portable (${{ matrix.config }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      OCR_VERSION: legacy
+      BUILD_DIR: ${{ matrix.config == 'Debug' && 'Debug64' || 'Release64' }}
+      RUNTIME_SUFFIX: ${{ matrix.config == 'Debug' && 'd' || '' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: packages
+          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
+          restore-keys: |
+            nuget-
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore CP_Main_10.sln
+
+      - name: Build (${{ matrix.config }} x64)
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64
+
+      - name: Build OCR dependencies and models
+        shell: cmd
+        run: call scripts\download-ocr-deps.bat legacy
+
+      - name: Build DittoOCR
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" /p:OcrVersion=legacy -v:d
+
+      - name: Diagnostic - verify dependencies
+        if: always()
+        shell: cmd
+        run: |
+          echo === ONNX Runtime (legacy) ===
+          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-1232-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-1232-static\windows-x64\include\*.h" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-1232-static\windows-x64\lib\*.lib" 2>nul
+          ) else (
+            echo ONNX Runtime directory NOT found
+          )
+          echo === OpenCV (legacy) ===
+          if exist "Addins\DittoOCR\ocr-deps\opencv-481-static\windows-x64" (
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-481-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
+            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-481-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
+          ) else (
+            echo OpenCV directory NOT found
+          )
+          exit /b 0
+
+      - name: Package portable zip
+        shell: cmd
+        run: |
+          mkdir DittoPortable
+          mkdir DittoPortable\Help
+          mkdir DittoPortable\Language
+          mkdir DittoPortable\Themes
+          mkdir DittoPortable\Addins
+          copy %BUILD_DIR%\Ditto.exe DittoPortable\
+          copy %BUILD_DIR%\ICU_Loader.dll DittoPortable\
+          copy %BUILD_DIR%\Addins\*.dll DittoPortable\Addins\
+          xcopy /s /e /i %BUILD_DIR%\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
+          copy "%WINDIR%\System32\vcruntime140%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140_1%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\msvcp140%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\mfc140u%RUNTIME_SUFFIX%.dll" DittoPortable\
+          if "%RUNTIME_SUFFIX%"=="d" copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
+          copy DittoSetup\portable DittoPortable\portable
+          copy Debug\Language\*.xml DittoPortable\Language\
+          copy Debug\Themes\*.xml DittoPortable\Themes\
+
+      - name: Verify package integrity
+        shell: cmd
+        run: |
+          if not exist DittoPortable\Ditto.exe exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_det_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
+          if not exist DittoPortable\Addins\DittoOCR\models\inference.yml exit /b 1
+          if not exist DittoPortable\portable exit /b 1
+          echo All required files present
+
+      - name: Create portable zip
+        shell: cmd
+        run: 7z a -tzip DittoPortable_legacy_${{ matrix.config }}_x64.zip DittoPortable\*
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ditto-portable-legacy-${{ matrix.config }}-x64
+          path: DittoPortable_legacy_${{ matrix.config }}_x64.zip
+          retention-days: 30

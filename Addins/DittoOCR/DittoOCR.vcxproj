@@ -39,6 +39,21 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
+    <OcrVersion Condition="'$(OcrVersion)' == ''">new</OcrVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OcrVersion)' == 'legacy'">
+    <OcrOnnxDir>onnxruntime-1232-static</OcrOnnxDir>
+    <OcrOpencvDir>opencv-481-static</OcrOpencvDir>
+    <OcrOpencvLibs>opencv_core481.lib;opencv_imgproc481.lib;opencv_features2d481.lib;opencv_highgui481.lib;opencv_imgcodecs481.lib;opencv_photo481.lib;opencv_video481.lib</OcrOpencvLibs>
+    <OcrExtraLibs>zlib.lib</OcrExtraLibs>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OcrVersion)' != 'legacy'">
+    <OcrOnnxDir>onnxruntime-static</OcrOnnxDir>
+    <OcrOpencvDir>opencv-static</OcrOpencvDir>
+    <OcrOpencvLibs>opencv_world4140.lib</OcrOpencvLibs>
+    <OcrExtraLibs>ittnotify.lib;zlib.lib</OcrExtraLibs>
+  </PropertyGroup>
+  <PropertyGroup>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Configuration)64\Addins\DittoOCR\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Configuration)64\Addins\DittoOCR\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\DittoOCR\</IntDir>
@@ -90,20 +105,20 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\include;$(ProjectDir)ocr-deps\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\$(OcrOnnxDir)\windows-x64\include;$(ProjectDir)ocr-deps\$(OcrOpencvDir)\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\lib;$(ProjectDir)ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>onnxruntime.lib;opencv_world4140.lib;ittnotify.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\$(OcrOnnxDir)\windows-x64\lib;$(ProjectDir)ocr-deps\$(OcrOpencvDir)\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;$(OcrOpencvLibs);$(OcrExtraLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\include;$(ProjectDir)ocr-deps\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\$(OcrOnnxDir)\windows-x64\include;$(ProjectDir)ocr-deps\$(OcrOpencvDir)\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\lib;$(ProjectDir)ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>onnxruntime.lib;opencv_world4140.lib;ittnotify.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)ocr-deps\$(OcrOnnxDir)\windows-x64\lib;$(ProjectDir)ocr-deps\$(OcrOpencvDir)\windows-x64\x64\vc17\staticlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;$(OcrOpencvLibs);$(OcrExtraLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
