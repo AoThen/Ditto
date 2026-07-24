@@ -75,7 +75,7 @@ if not exist "%DEPS_DIR%\%ONNX_DIR%\windows-x64" (
                 )
             ) else (
                 echo WARNING: lib.exe not found, skip merge
-                echo (DittoOCR build will fail with LNK1104 unless onnxruntime.lib exists)
+                echo ^(DittoOCR build will fail with LNK1104 unless onnxruntime.lib exists^)
             )
         )
     )

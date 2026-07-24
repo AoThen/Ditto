@@ -117,7 +117,7 @@ if exist "%TLOG%" (
     for /f "delims=" %%L in ('type "%TLOG%"') do (
         set LINE=%%L
         set LINE=!LINE:^=!
-        if "!LINE:~-4!" == ".LIB" (
+        if /i "!LINE:~-4!" == ".LIB" (
             set LINE=!LINE:"=!
             set libs=!libs! !LINE!
         )
