@@ -864,12 +864,11 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 			{
 				CGetSetOptions::m_Theme.Load(theme);
 
-				auto visible = m_quickPaste.IsWindowVisibleEx();
-				m_quickPaste.CloseQPasteWnd();
-
-				if (visible)
+				// 不再销毁重建窗口，直接刷新主题颜色，避免窗口闪烁和潜在反馈循环
+				if (m_quickPaste.m_pwndPaste != nullptr &&
+					::IsWindow(m_quickPaste.m_pwndPaste->m_hWnd))
 				{
-					m_quickPaste.ShowQPasteWnd(this, true, false, true);
+					m_quickPaste.m_pwndPaste->RefreshThemeColors();
 				}
 			}
 		}
@@ -1531,10 +1530,15 @@ void CMainFrame::OnWinIniChange(LPCTSTR lpszSection)
 {
 	CFrameWnd::OnWinIniChange(lpszSection);
 
+	if (lpszSection != NULL)
+	{
+		Log(StrF(_T("OnWinIniChange - section: %s"), lpszSection));
+	}
+
 	if (lpszSection != NULL &&
 		wcscmp(lpszSection, L"ImmersiveColorSet") == 0)
 	{
-		Log(StrF(_T("OnWinIniChange %s, setting timer to 1000ms to change theme"), lpszSection));
+		Log(_T("OnWinIniChange - ImmersiveColorSet received, setting timer to 1000ms"));
 		KillTimer(SET_WINDOWS_THEME_TIMER);
 		SetTimer(SET_WINDOWS_THEME_TIMER, 1000, NULL);
 	}
