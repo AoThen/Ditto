@@ -99,8 +99,15 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 	Log(StrF(_T("OCR: CopyThread GetEnableOCR=%d"), CGetSetOptions::GetEnableOCR()));
 	if (CGetSetOptions::GetEnableOCR())
 	{
-		ExtractClipImageData(pClip);
-		Log(StrF(_T("OCR: CopyThread after ExtractClipImageData, image data size=%d"), (int)pClip->m_ocrImageData.size()));
+		if (pClip->m_Formats.FindFormat(CF_UNICODETEXT) || pClip->m_Formats.FindFormat(CF_TEXT))
+		{
+			Log(_T("OCR: CopyThread - clip already has text content, skipping OCR"));
+		}
+		else
+		{
+			ExtractClipImageData(pClip);
+			Log(StrF(_T("OCR: CopyThread after ExtractClipImageData, image data size=%d"), (int)pClip->m_ocrImageData.size()));
+		}
 	}
 
 	if(bResult == FALSE)

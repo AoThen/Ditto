@@ -758,9 +758,11 @@ void COptionCloud::OnForceReOcr()
         return;
     }
 
-    CppSQLite3Query q = theApp.m_db.execQuery(
-        _T("SELECT DISTINCT d.lParentID FROM Data d ")
-        _T("WHERE d.strClipBoardFormat = 'CF_DIB' OR d.strClipBoardFormat = 'PNG'"));
+CppSQLite3Query q = theApp.m_db.execQuery(
+		_T("SELECT DISTINCT d.lParentID FROM Data d ")
+		_T("WHERE (d.strClipBoardFormat = 'CF_DIB' OR d.strClipBoardFormat = 'PNG') ")
+		_T("AND d.lParentID NOT IN (SELECT lParentID FROM Data ")
+		_T("WHERE strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"));
 
     std::vector<int> ids;
     while (!q.eof())

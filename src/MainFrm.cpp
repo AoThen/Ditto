@@ -1648,6 +1648,20 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 	{
 		Log(StrF(_T("OCR: OnOcrCompleted start, clipId=%d, textLen=%d"), clipId, pOcrText->GetLength()));
 
+		// 如果 clip 已有文本格式，跳过 mText 追加（避免图文混合场景的重复）
+		{
+			CppSQLite3Query qFormat = theApp.m_db.execQueryEx(
+				_T("SELECT COUNT(*) FROM Data WHERE lParentID = %d ")
+				_T("AND (strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"),
+				clipId);
+			if (!qFormat.eof() && qFormat.getIntField(0) > 0)
+			{
+				Log(StrF(_T("OCR: OnOcrCompleted - clip %d already has text format, skip"), clipId));
+				delete pOcrText;
+				return 0;
+			}
+		}
+
 		CppSQLite3Query q = theApp.m_db.execQueryEx(
 			_T("SELECT mText FROM Main WHERE lID = %d"), clipId);
 		if (!q.eof())
