@@ -53,7 +53,7 @@ set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
     echo [BUILD]   Building re2 target from main build tree...
-    cmake --build "%BUILD_DIR%\%CONFIG%" --target re2 --config %CONFIG%
+    cmake --build "%BUILD_DIR%" --target re2 --config %CONFIG%
     if errorlevel 1 (
         echo [BUILD] WARNING: re2 build failed
     )
