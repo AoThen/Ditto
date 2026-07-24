@@ -234,6 +234,22 @@ jobs:
             Addins\DittoOCR\ocr-deps\**\*.log
           retention-days: 7
 
+      - name: Locate Debug CRT directory
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VS_PATH=%%i
+          if not defined VS_PATH (
+            echo WARNING: VS installation not found
+            exit /b 0
+          )
+          for /d %%d in ("%VS_PATH%\VC\Redist\MSVC\14.*") do set DEBUG_CRT_DIR=%%d\debug_nonredist\x64\Microsoft.VC143.DebugCRT
+          if not exist "%DEBUG_CRT_DIR%" (
+            echo WARNING: Debug CRT directory not found at %DEBUG_CRT_DIR%
+            exit /b 0
+          )
+          echo Found Debug CRT: %DEBUG_CRT_DIR%
+          echo DEBUG_CRT_DIR=%DEBUG_CRT_DIR% >> %GITHUB_ENV%
+
       - name: Package portable zip
         shell: cmd
         env:
@@ -250,11 +266,26 @@ jobs:
           copy %BUILD_DIR%\Addins\*.dll DittoPortable\Addins\
           xcopy /s /e /i %BUILD_DIR%\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
           xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
-          copy "%WINDIR%\System32\vcruntime140%RUNTIME_SUFFIX%.dll" DittoPortable\
-          copy "%WINDIR%\System32\vcruntime140_1%RUNTIME_SUFFIX%.dll" DittoPortable\
-          copy "%WINDIR%\System32\msvcp140%RUNTIME_SUFFIX%.dll" DittoPortable\
-          copy "%WINDIR%\System32\mfc140u%RUNTIME_SUFFIX%.dll" DittoPortable\
-          if "%RUNTIME_SUFFIX%"=="d" copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
+          if "%RUNTIME_SUFFIX%"=="d" (
+            if defined DEBUG_CRT_DIR (
+              copy "%DEBUG_CRT_DIR%\vcruntime140.dll" DittoPortable\vcruntime140d.dll
+              copy "%DEBUG_CRT_DIR%\vcruntime140_1.dll" DittoPortable\vcruntime140_1d.dll
+              copy "%DEBUG_CRT_DIR%\msvcp140.dll" DittoPortable\msvcp140d.dll
+              copy "%DEBUG_CRT_DIR%\mfc140u.dll" DittoPortable\mfc140ud.dll
+              copy "%DEBUG_CRT_DIR%\ucrtbased.dll" DittoPortable\ucrtbased.dll
+            ) else (
+              copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
+              copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
+              copy "%WINDIR%\System32\msvcp140d.dll" DittoPortable\
+              copy "%WINDIR%\System32\mfc140ud.dll" DittoPortable\
+              copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
+            )
+          ) else (
+            copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
+            copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
+            copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
+            copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
+          )
           copy DittoSetup\portable DittoPortable\portable
           copy Debug\Language\*.xml DittoPortable\Language\
           copy Debug\Themes\*.xml DittoPortable\Themes\
