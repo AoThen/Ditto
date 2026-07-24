@@ -40,41 +40,22 @@ if errorlevel 1 (
 echo [BUILD] Step 1/6 complete.
 
 REM -------------------------------------------------------------------
-REM 1b. Build re2 as standalone static library
+REM 1b. Build re2 from the main build tree
 REM -------------------------------------------------------------------
 REM ONNX Runtime fetches re2 via FetchContent with EXCLUDE_FROM_ALL, so the
-REM re2 source is downloaded but NOT compiled by the main build. We build it
-REM explicitly to ensure the static library is available for merging.
+REM re2 source is downloaded but NOT compiled by the main build. We build the
+REM re2 target explicitly from the main build tree (which has absl available).
 
-echo [BUILD] Step 1b/6: Building re2 as standalone static library...
+echo [BUILD] Step 1b/6: Building re2 from main build tree...
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
-set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
 
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
-
-    cmake -S "%RE2_SRC_DIR%" -B "%RE2_BUILD_DIR%" ^
-        -G "Visual Studio 17 2022" ^
-        -DCMAKE_BUILD_TYPE=%CONFIG% ^
-        -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
-        -DBUILD_SHARED_LIBS=OFF ^
-        -DRE2_BUILD_TESTING=OFF
-
+    echo [BUILD]   Building re2 target from main build tree...
+    cmake --build "%BUILD_DIR%\%CONFIG%" --target re2 --config %CONFIG%
     if errorlevel 1 (
-        echo [BUILD] WARNING: re2 cmake configure failed
-    ) else (
-        cmake --build "%RE2_BUILD_DIR%" --config %CONFIG%
-        if errorlevel 1 (
-            echo [BUILD] WARNING: re2 build failed
-        ) else (
-            if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
-                copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\" >nul
-                echo [BUILD]   Copied re2.lib from standalone build
-            ) else (
-                echo [BUILD] WARNING: re2.lib not found in standalone build output
-            )
-        )
+        echo [BUILD] WARNING: re2 build failed
     )
 ) else (
     echo [BUILD] WARNING: re2 source not found at %RE2_SRC_DIR%
@@ -292,13 +273,13 @@ if not exist "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime" mkdir "%STATIC_INSTALL
     echo find_package_handle_standard_args(OnnxRuntime DEFAULT_MSG ONNXRUNTIME_LIBRARIES ONNXRUNTIME_INCLUDE_DIRS)
     echo if(NOT ONNXRUNTIME_FOUND)
     echo   return()
-    echo endif()
+    echo endif(^)
     echo add_library(onnxruntime STATIC IMPORTED)
     echo set_target_properties(onnxruntime PROPERTIES
     echo   IMPORTED_LOCATION "${ONNXRUNTIME_LIBRARIES}"
     echo   INTERFACE_INCLUDE_DIRECTORIES "${ONNXRUNTIME_INCLUDE_DIRS}"
     echo   INTERFACE_COMPILE_DEFINITIONS "ONNXRUNTIME_STATIC_DEFINE"
-    echo )
+    echo ^)
 ) > "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime\OnnxRuntimeConfig.cmake"
 
 echo [BUILD] Step 6/6 complete.
