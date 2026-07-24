@@ -6,6 +6,7 @@ on:
     branches: [main, master, Mod]
     paths:
       - .github/workflows/build-onnxruntime.yml
+      - scripts/build-onnxruntime.bat
 
 permissions:
   contents: write
