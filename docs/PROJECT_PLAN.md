@@ -471,10 +471,10 @@ Response 200:
 ## 七、Go 项目结构
 
 ```
-ditto-cloud-server/
+server/
 ├── cmd/
-│   └── server/
-│       └── main.go                 # 入口，初始化
+│   ├── server/                     # 服务端入口
+│   └── cli/                        # CLI 工具入口
 ├── internal/
 │   ├── handler/                    # HTTP 处理器层
 │   │   ├── auth_handler.go         # 认证接口
@@ -498,28 +498,21 @@ ditto-cloud-server/
 │   │   ├── cors.go
 │   │   ├── rate_limit.go           # 请求限流
 │   │   └── logger.go               # 请求日志
-│   ├── ws/                         # WebSocket
+│   ├── hub/                        # WebSocket 连接管理
 │   │   ├── hub.go                  # 连接管理
 │   │   └── client.go               # 客户端连接
-│   ├── crypto/                     # 加密工具
-│   │   ├── aes.go                  # 端到端加密
-│   │   └── crc32.go                # CRC 校验
-│   └── repository/                 # 数据访问层
-│       ├── clip_repo.go
-│       └── user_repo.go
-├── pkg/
-│   ├── config/                     # 配置管理 (Viper)
 │   ├── database/                   # 数据库初始化
-│   └── response/                   # 统一响应格式
-├── api/
-│   └── swagger.yaml                # API 文档
-├── configs/
-│   ├── config.dev.yaml
-│   ├── config.prod.yaml
-│   └── config.default.yaml
+│   ├── config/                     # 配置管理 (Viper)
+│   ├── response/                   # 统一响应格式
+│   └── utils/                      # 工具函数
+├── pkg/
+│   └── crypto/                     # 加密工具
+│       ├── aes.go                  # 端到端加密
+│       └── crc32.go                # CRC 校验
 ├── migrations/
-│   └── 001_init.sql                # 数据库初始迁移
-├── docker-compose.yml              # 本地开发环境
+│   ├── 000001_init.up.sql          # 数据库初始迁移
+│   └── 000001_init.down.sql        # 回滚迁移
+├── .env.example                    # 环境变量示例
 ├── Dockerfile
 ├── Makefile                        # 常用命令
 ├── go.mod
@@ -531,47 +524,30 @@ ditto-cloud-server/
 ## 八、Web 前端项目结构
 
 ```
-ditto-cloud-web/
+web/
 ├── src/
-│   ├── api/                        # API 请求封装
-│   │   ├── auth.js
-│   │   ├── clips.js
-│   │   ├── groups.js
-│   │   └── stats.js
-│   ├── components/                 # 公共组件
-│   │   ├── ClipCard.vue            # 剪贴板卡片
-│   │   ├── ClipDetailDialog.vue    # 详情弹窗
-│   │   ├── FormatPreview.vue       # 格式预览
-│   │   ├── GroupTree.vue           # 分组树
-│   │   └── SyncStatus.vue          # 同步状态
 │   ├── views/                      # 页面
-│   │   ├── Login.vue               # 登录页
-│   │   ├── Dashboard.vue           # 仪表盘
+│   │   ├── admin/                  # 管理员页面
 │   │   ├── Clips.vue               # 剪贴板管理
-│   │   ├── Groups.vue              # 分组管理
+│   │   ├── Dashboard.vue           # 仪表盘
+│   │   ├── DashboardHome.vue       # 仪表盘首页
 │   │   ├── Devices.vue             # 设备管理
-│   │   └── Settings.vue            # 设置
-│   ├── stores/                     # Pinia 状态
-│   │   ├── user.js
-│   │   ├── clips.js
-│   │   └── sync.js
-│   ├── router/
-│   │   └── index.js
-│   ├── utils/
-│   │   ├── request.js              # Axios 封装（Token 自动刷新）
-│   │   ├── websocket.js            # WS 封装（自动重连）
-│   │   └── format.js               # 格式转换工具
-│   ├── composables/                # 组合式函数
-│   │   ├── useClipSync.js
-│   │   └── useClipboard.js
-│   ├── styles/
-│   │   └── variables.scss
+│   │   ├── Groups.vue              # 分组管理
+│   │   ├── Login.vue               # 登录页
+│   │   ├── NotFound.vue            # 404 页
+│   │   ├── Settings.vue            # 设置
+│   │   └── SyncLogs.vue            # 同步日志
+│   ├── router/                     # 路由配置
+│   ├── api/                        # API 请求封装
+│   ├── components/                 # 公共组件
+│   ├── styles/                     # 样式
 │   ├── App.vue
 │   └── main.js
 ├── public/
 ├── index.html
 ├── package.json
 ├── vite.config.js
+├── vitest.config.js
 └── README.md
 ```
 
@@ -983,7 +959,7 @@ services:
     restart: unless-stopped
 
   web:
-    build: ./ditto-cloud-web
+    build: ./web
     ports:
       - "3000:80"
     depends_on:
@@ -997,7 +973,7 @@ services:
 
 ```bash
 # 下载编译好的二进制
-./ditto-cloud-server --db-path ./ditto.db --port 8080
+./ditto-backend --db-path ./ditto.db --port 8080
 ```
 
 ### 13.3 生产扩展（可选）

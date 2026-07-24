@@ -42,11 +42,19 @@ Ditto 现在支持**云端同步**和基于 Web 的管理面板，实现跨设�
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# 2. 启动开发环境
+# 2. 配置环境
+cp .env.example .env
+JWT_SECRET=$(openssl rand -base64 32)
+sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+
+# 3. 启动后端服务
 docker-compose up -d
 
-# 3. 访问服务
-# 前端: http://localhost
+# 4. 启动前端（开发模式）
+cd web && npm install && npm run dev
+
+# 5. 访问服务
+# 前端: http://localhost:5173（Vite 默认端口）
 # 后端 API: http://localhost:8080
 # 健康检查: http://localhost:8080/health
 ```
@@ -59,8 +67,10 @@ docker-compose up -d
 # 配置 JWT 密钥
 echo "JWT_SECRET=$(openssl rand -base64 32)" > .env
 
-# 启动生产环境
+# 启动后端（生产模式，单容器统一输出 API + 前端静态文件）
 docker-compose -f docker-compose.prod.yml up -d
+
+# 访问服务: https://localhost
 ```
 
 📖 **完整文档：**
@@ -106,16 +116,22 @@ Ditto/
 │   └── DittoUtil/          # 工具插件
 ├── server/                 # 云端后端 (Go)
 │   ├── cmd/                # 入口 (server, cli)
-│   ├── internal/           # handler, service, model, hub
+│   ├── internal/           # handler, service, model, hub, middleware
 │   ├── pkg/crypto/         # 加密库
 │   └── migrations/         # 数据库迁移
 ├── web/                    # Web 管理面板 (Vue 3 + Vite)
-│   └── src/views/          # Clips, Dashboard, Devices, Groups, Settings, Login
+│   └── src/views/          # admin, Clips, Dashboard, DashboardHome, Devices,
+│                           # Groups, Login, NotFound, Settings, SyncLogs
 ├── docker/                 # Docker Compose 配置
 ├── scripts/                # 构建脚本 (ONNX, OCR 依赖, 证书生成, E2E 测试)
 ├── docs/                   # 文档 (部署指南、架构设计、测试报告)
-├── CloudSync_Test/         # C++ 云端同步单元测试
-└── monitoring/             # Prometheus + Grafana 监控配置
+└── tools/                  # 辅助工具
+    ├── CloudSync_Test/     # C++ 云端同步单元测试
+    ├── EncryptDecrypt/     # 加密解密工具
+    ├── FocusHighlight/     # 焦点高亮工具
+    ├── ICU_Loader/         # ICU 加载器
+    ├── U3Stop/             # U3 停止工具
+    └── focusdll/           # 焦点 DLL
 ```
 
 ## 🧪 测试
@@ -204,11 +220,19 @@ Ditto now supports **cloud synchronization** and a **web-based management panel*
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# 2. Start development environment
+# 2. Configure environment
+cp .env.example .env
+JWT_SECRET=$(openssl rand -base64 32)
+sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+
+# 3. Start backend service
 docker-compose up -d
 
-# 3. Access services
-# Frontend: http://localhost
+# 4. Start frontend (development mode)
+cd web && npm install && npm run dev
+
+# 5. Access services
+# Frontend: http://localhost:5173 (Vite default port)
 # Backend API: http://localhost:8080
 # Health check: http://localhost:8080/health
 ```
@@ -221,8 +245,10 @@ For production deployment with HTTPS:
 # Configure JWT secret
 echo "JWT_SECRET=$(openssl rand -base64 32)" > .env
 
-# Start production environment
+# Start backend (production mode, single container serves API + static files)
 docker-compose -f docker-compose.prod.yml up -d
+
+# Access services: https://localhost
 ```
 
 📖 **Full documentation:**
@@ -267,16 +293,22 @@ Ditto/
 │   └── DittoUtil/          # Utility addin
 ├── server/                 # Cloud backend (Go)
 │   ├── cmd/                # Entry points (server, cli)
-│   ├── internal/           # handler, service, model, hub
+│   ├── internal/           # handler, service, model, hub, middleware
 │   ├── pkg/crypto/         # Crypto library
 │   └── migrations/         # Database migrations
 ├── web/                    # Web management panel (Vue 3 + Vite)
-│   └── src/views/          # Clips, Dashboard, Devices, Groups, Settings, Login
+│   └── src/views/          # admin, Clips, Dashboard, DashboardHome, Devices,
+│                           # Groups, Login, NotFound, Settings, SyncLogs
 ├── docker/                 # Docker Compose configs
 ├── scripts/                # Build scripts (ONNX, OCR deps, cert gen, E2E tests)
 ├── docs/                   # Documentation (deployment, architecture, test reports)
-├── CloudSync_Test/         # C++ cloud sync unit tests
-└── monitoring/             # Prometheus + Grafana monitoring configs
+└── tools/                  # Auxiliary tools
+    ├── CloudSync_Test/     # C++ cloud sync unit tests
+    ├── EncryptDecrypt/     # Encryption/decryption tool
+    ├── FocusHighlight/     # Focus highlight tool
+    ├── ICU_Loader/         # ICU loader
+    ├── U3Stop/             # U3 stop tool
+    └── focusdll/           # Focus DLL
 ```
 
 ## 🧪 Testing

@@ -20,8 +20,8 @@ Go 后端服务，为 Ditto 剪贴板管理器提供云端同步功能。
 # 1. 安装依赖
 go mod download
 
-# 2. 复制配置文件
-cp configs/config.default.yaml configs/config.dev.yaml
+# 2. 复制环境配置
+cp .env.example .env
 
 # 3. 启动服务（默认端口 8080）
 go run cmd/server/main.go
@@ -55,6 +55,7 @@ docker-compose -f docker-compose.prod.yml up -d
 ```
 server/
 ├── cmd/server/main.go          # 入口
+├── cmd/cli/                    # CLI 工具入口
 ├── internal/
 │   ├── handler/                # HTTP 处理器
 │   ├── service/                # 业务逻辑
@@ -63,9 +64,9 @@ server/
 │   ├── hub/                    # WebSocket 连接管理
 │   ├── database/               # 数据库初始化
 │   ├── config/                 # Viper 配置
-│   └── response/               # 统一响应格式
+│   ├── response/               # 统一响应格式
+│   └── utils/                  # 工具函数
 ├── pkg/crypto/                 # 加密工具（AES-256-GCM, PBKDF2）
-├── configs/                    # 配置文件
 ├── migrations/                 # 数据库迁移
 └── api/swagger.yaml            # API 文档
 ```
@@ -91,26 +92,20 @@ server/
 
 ## 配置说明
 
-```yaml
-# configs/config.dev.yaml
-server:
-  port: 8080
-  mode: debug  # debug | release
+配置通过 `.env` 文件管理，参考 `.env.example`：
 
-database:
-  type: sqlite3  # sqlite3 | postgres
-  path: ./data/ditto_cloud.db
+```bash
+# .env
+PORT=8080
+DATABASE_PATH=/app/data/ditto_cloud.db
+JWT_SECRET=your-secret-key-change-me
+JWT_ACCESS_TOKEN_EXPIRY=15
+JWT_REFRESH_TOKEN_EXPIRY=10080
 
-jwt:
-  secret: your-secret-key-change-me
-  access_expire: 15m   # Access Token 有效期
-  refresh_expire: 7d   # Refresh Token 有效期
-
-rate_limit:
-  ip_max_fails: 5       # 单 IP 最大失败次数
-  ip_ban_duration: 15m  # IP 封禁时长
-  user_max_fails: 10    # 单用户最大失败次数
-  user_lock_duration: 1h # 用户锁定时长
+# 限流配置
+RATE_LIMIT_LOGIN=5
+RATE_LIMIT_API=60
+RATE_LIMIT_BAN_DURATION=900
 ```
 
 ## 数据库迁移

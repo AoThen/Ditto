@@ -343,10 +343,9 @@ docker-compose -f docker-compose.prod.yml \
 ### 场景 3: 企业（100+ 用户）
 
 ```bash
-# 完整堆栈，包含负载均衡、PostgreSQL、监控
+# 完整堆栈，包含负载均衡、PostgreSQL
 docker-compose -f docker-compose.prod.yml \
   -f docker-compose.postgres.yml \
-  -f docker-compose.monitoring.yml \
   up -d
 ```
 
@@ -832,10 +831,9 @@ docker-compose -f docker-compose.prod.yml \
 ### Scenario 3: Enterprise (100+ Users)
 
 ```bash
-# Full stack with load balancing, PostgreSQL, monitoring
+# Full stack with load balancing, PostgreSQL
 docker-compose -f docker-compose.prod.yml \
   -f docker-compose.postgres.yml \
-  -f docker-compose.monitoring.yml \
   up -d
 ```
 
