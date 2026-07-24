@@ -251,7 +251,7 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
             echo [BUILD] WARNING: re2::RE2 symbols NOT defined in onnxruntime.lib
             echo [BUILD]   This will cause DittoOCR link failures!
         ) else (
-            echo [BUILD] OK: re2::RE2 symbols verified (defined) in onnxruntime.lib
+            echo [BUILD] OK: re2::RE2 symbols verified - defined in onnxruntime.lib
         )
     )
 ) else (
