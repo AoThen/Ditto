@@ -130,7 +130,7 @@ echo [BUILD] Step 4b/6: Collecting third-party libs from build tree...
 REM The install directory only contains onnxruntime's own libs.
 REM Third-party deps (protobuf, re2, onnx, absl, etc.) are in the build tree.
 REM Search for all .lib files and copy them to install-static/lib.
-for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\%CONFIG%\*.lib" 2^>nul') do (
+for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
     echo %%f | findstr /i "\\install\\" >nul
     if errorlevel 1 (
         if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
@@ -144,18 +144,22 @@ for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\%CONFIG%\*.lib" 2^>nul') do (
 
 REM Ensure re2.lib is collected (onnxruntime contrib_ops depend on it)
 if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
-    echo [BUILD] re2.lib not found in build tree search, looking in explicit locations...
+    echo [BUILD] re2.lib not found in install-static/lib, searching build tree...
+    set "RE2_FOUND=0"
     for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\re2.lib" 2^>nul') do (
         copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
         if not errorlevel 1 (
             echo [BUILD]   Copied re2.lib from: %%f
+            set "RE2_FOUND=1"
         )
     )
-)
-if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
-    echo [BUILD] WARNING: re2.lib not found - onnxruntime may fail to link
+    if "!RE2_FOUND!"=="0" (
+        echo [BUILD] WARNING: re2.lib not found in any location - DittoOCR will fail to link
+    ) else (
+        echo [BUILD] re2.lib copied to install-static/lib
+    )
 ) else (
-    echo [BUILD] re2.lib verified in install-static/lib
+    echo [BUILD] re2.lib already present in install-static/lib
 )
 echo [BUILD] Step 4b/6 complete.
 
@@ -185,6 +189,29 @@ if "!all_libs!" == "" (
     )
 )
 echo [BUILD] Step 4c/6 complete.
+
+REM -------------------------------------------------------------------
+REM 4d. Verify re2 symbols in onnxruntime.lib
+REM -------------------------------------------------------------------
+echo [BUILD] Step 4d/6: Verifying re2 symbols in onnxruntime.lib...
+
+if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
+    where dumpbin >nul 2>nul
+    if errorlevel 1 (
+        echo [BUILD] dumpbin not found, skipping re2 verification
+    ) else (
+        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" >nul
+        if errorlevel 1 (
+            echo [BUILD] WARNING: re2::RE2 symbols NOT found in onnxruntime.lib
+            echo [BUILD]   This will cause DittoOCR link failures!
+        ) else (
+            echo [BUILD] OK: re2::RE2 symbols verified in onnxruntime.lib
+        )
+    )
+) else (
+    echo [BUILD] WARNING: onnxruntime.lib not found at %STATIC_INSTALL_DIR%\lib\onnxruntime.lib
+)
+echo [BUILD] Step 4d/6 complete.
 
 REM -------------------------------------------------------------------
 REM 5. Flatten headers
