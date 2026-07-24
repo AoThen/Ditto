@@ -40,19 +40,57 @@ if errorlevel 1 (
 echo [BUILD] Step 1/6 complete.
 
 REM -------------------------------------------------------------------
+REM 1a. Build absl as standalone static library
+REM -------------------------------------------------------------------
+REM absl is fetched via FetchContent with EXCLUDE_FROM_ALL, so it is
+REM downloaded but NOT compiled by the main build. We build it explicitly
+REM so that re2 (which depends on absl) can be built standalone.
+
+echo [BUILD] Step 1a/6: Building absl from source...
+
+set "ABSL_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\abseil_cpp-src"
+set "ABSL_BUILD_DIR=%BUILD_DIR%\absl-external"
+
+if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
+    echo [BUILD]   Found absl source at: %ABSL_SRC_DIR%
+
+    cmake -S "%ABSL_SRC_DIR%" -B "%ABSL_BUILD_DIR%" ^
+        -G "Visual Studio 17 2022" ^
+        -A x64 ^
+        -DCMAKE_BUILD_TYPE=%CONFIG% ^
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DBUILD_SHARED_LIBS=OFF ^
+        -DABSL_BUILD_TESTING=OFF
+
+    if errorlevel 1 (
+        echo [BUILD] WARNING: absl cmake configure failed
+    ) else (
+        cmake --build "%ABSL_BUILD_DIR%" --config %CONFIG%
+        if errorlevel 1 (
+            echo [BUILD] WARNING: absl build failed
+        ) else (
+            echo [BUILD]   absl built successfully
+        )
+    )
+) else (
+    echo [BUILD] WARNING: absl source not found at %ABSL_SRC_DIR%
+)
+
+echo [BUILD] Step 1a/6 complete.
+
+REM -------------------------------------------------------------------
 REM 1b. Build re2 as standalone static library
 REM -------------------------------------------------------------------
 REM ONNX Runtime fetches re2 via FetchContent with EXCLUDE_FROM_ALL, so the
 REM re2 source is downloaded but NOT compiled by the main build. We build it
 REM explicitly to ensure the static library is available for merging.
-REM re2 depends on absl, which is also fetched via FetchContent. We point
-REM cmake to the absl build directory in the main build tree.
+REM re2 depends on absl, which we build standalone in Step 1a.
 
 echo [BUILD] Step 1b/6: Building re2 as standalone static library...
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
 set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
-set "ABSL_BUILD_DIR=%BUILD_DIR%\%CONFIG%\_deps\abseil_cpp-build"
+set "ABSL_BUILD_DIR=%BUILD_DIR%\absl-external"
 
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
