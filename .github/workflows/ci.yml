@@ -31,7 +31,7 @@ jobs:
           keep_minimum_runs: 1
           delete_workflow_pattern: ${{ github.workflow }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -59,7 +59,7 @@ jobs:
       run:
         working-directory: ./server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -77,7 +77,7 @@ jobs:
       run:
         working-directory: ./web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -99,7 +99,7 @@ jobs:
   web-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -117,8 +117,17 @@ jobs:
   # ── Windows Client (C++/MFC) ──────────────────────────────
   client-build-windows:
     runs-on: windows-2022
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: packages
+          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
+          restore-keys: |
+            nuget-
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
@@ -127,13 +136,22 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build (Release x64)
-        run: msbuild CP_Main.vcxproj /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
 
   # ── Windows Client Tests (C++/Google Test) ────────────────
   client-test-windows:
     runs-on: windows-2022
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: packages
+          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
+          restore-keys: |
+            nuget-
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
@@ -147,11 +165,25 @@ jobs:
       - name: Run tests
         run: CloudSync_Test\x64\Release\CloudSync_Test.exe
 
-  # ── Windows Client Portable ZIP ──────────────────────────
+  # ── Windows Client Portable ZIP (Release + Debug) ──
   client-build-portable:
+    strategy:
+      matrix:
+        config: [Release, Debug]
+      fail-fast: false
+    name: Windows Client Portable ZIP (${{ matrix.config }})
     runs-on: windows-2022
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: packages
+          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
+          restore-keys: |
+            nuget-
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
@@ -159,15 +191,15 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
 
-      - name: Build (Release x64) and dependencies
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
+      - name: Build (${{ matrix.config }} x64) and dependencies
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64
 
       - name: Build OCR dependencies and models
         shell: cmd
         run: call scripts\download-ocr-deps.bat
 
       - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Release /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
+        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
 
       - name: Diagnostic - verify extracted dependencies
         if: always()
@@ -196,7 +228,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ditto-diagnostic-${{ github.run_id }}
+          name: ditto-diagnostic-${{ matrix.config }}-${{ github.run_id }}
           path: |
             Addins\DittoOCR\*.log
             Addins\DittoOCR\ocr-deps\**\*.log
@@ -204,27 +236,33 @@ jobs:
 
       - name: Package portable zip
         shell: cmd
+        env:
+          BUILD_DIR: ${{ matrix.config == 'Debug' && 'Debug64' || 'Release64' }}
+          RUNTIME_SUFFIX: ${{ matrix.config == 'Debug' && 'd' || '' }}
         run: |
           mkdir DittoPortable
           mkdir DittoPortable\Help
           mkdir DittoPortable\Language
           mkdir DittoPortable\Themes
           mkdir DittoPortable\Addins
-          copy Release64\Ditto.exe DittoPortable\
-          copy Release64\ICU_Loader.dll DittoPortable\
-          copy Release64\Addins\*.dll DittoPortable\Addins\
-          xcopy /s /e /i Release64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
+          copy %BUILD_DIR%\Ditto.exe DittoPortable\
+          copy %BUILD_DIR%\ICU_Loader.dll DittoPortable\
+          copy %BUILD_DIR%\Addins\*.dll DittoPortable\Addins\
+          xcopy /s /e /i %BUILD_DIR%\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
           xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
-          copy "%WINDIR%\System32\vcruntime140.dll" DittoPortable\
-          copy "%WINDIR%\System32\vcruntime140_1.dll" DittoPortable\
-          copy "%WINDIR%\System32\msvcp140.dll" DittoPortable\
-          copy "%WINDIR%\System32\mfc140u.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\vcruntime140_1%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\msvcp140%RUNTIME_SUFFIX%.dll" DittoPortable\
+          copy "%WINDIR%\System32\mfc140u%RUNTIME_SUFFIX%.dll" DittoPortable\
+          if "%RUNTIME_SUFFIX%"=="d" copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
           copy DittoSetup\portable DittoPortable\portable
           copy Debug\Language\*.xml DittoPortable\Language\
           copy Debug\Themes\*.xml DittoPortable\Themes\
 
       - name: Verify portable package integrity
         shell: cmd
+        env:
+          RUNTIME_SUFFIX: ${{ matrix.config == 'Debug' && 'd' || '' }}
         run: |
           if not exist DittoPortable\Ditto.exe exit /b 1
           if not exist DittoPortable\ICU_Loader.dll exit /b 1
@@ -234,131 +272,24 @@ jobs:
           if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
           if not exist DittoPortable\Addins\DittoOCR\models\inference.yml exit /b 1
           if not exist DittoPortable\portable exit /b 1
-          if not exist DittoPortable\vcruntime140.dll exit /b 1
-          if not exist DittoPortable\vcruntime140_1.dll exit /b 1
-          if not exist DittoPortable\msvcp140.dll exit /b 1
-          if not exist DittoPortable\mfc140u.dll exit /b 1
+          if not exist DittoPortable\vcruntime140%RUNTIME_SUFFIX%.dll exit /b 1
+          if not exist DittoPortable\vcruntime140_1%RUNTIME_SUFFIX%.dll exit /b 1
+          if not exist DittoPortable\msvcp140%RUNTIME_SUFFIX%.dll exit /b 1
+          if not exist DittoPortable\mfc140u%RUNTIME_SUFFIX%.dll exit /b 1
+          if "%RUNTIME_SUFFIX%"=="d" if not exist DittoPortable\ucrtbased.dll exit /b 1
           if not exist DittoPortable\Language\English.xml exit /b 1
           if not exist DittoPortable\Themes\Classic.xml exit /b 1
           echo All required files present
 
       - name: Create portable zip
         shell: cmd
-        run: 7z a -tzip DittoPortable_Release_x64.zip DittoPortable\*
+        run: 7z a -tzip DittoPortable_${{ matrix.config }}_x64.zip DittoPortable\*
 
       - name: Upload portable zip
         uses: actions/upload-artifact@v4
         with:
-          name: ditto-portable-release-x64
-          path: DittoPortable_Release_x64.zip
-          retention-days: 30
-
-  # ── Windows Client Portable ZIP (Debug) ────────────────
-  client-build-debug-portable:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Restore NuGet packages
-        run: nuget restore CP_Main_10.sln
-
-      - name: Build (Debug x64) and dependencies
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Debug /p:Platform=x64
-
-      - name: Build OCR dependencies and models
-        shell: cmd
-        run: call scripts\download-ocr-deps.bat
-
-      - name: Build DittoOCR
-        run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" -v:d
-
-      - name: Diagnostic - verify extracted dependencies
-        if: always()
-        shell: cmd
-        run: |
-          echo === ONNX Runtime ===
-          if exist "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\include\*.h" 2>nul
-            dir /s /b "Addins\DittoOCR\ocr-deps\onnxruntime-static\windows-x64\lib\*.lib" 2>nul
-          ) else (
-            echo ONNX Runtime directory NOT found
-            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
-          )
-          echo === OpenCV ===
-          if exist "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64" (
-            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\include\opencv2\opencv.hpp" 2>nul
-            dir /s /b "Addins\DittoOCR\ocr-deps\opencv-static\windows-x64\x64\vc17\staticlib\*.lib" 2>nul
-          ) else (
-            echo OpenCV directory NOT found
-            dir /s "Addins\DittoOCR\ocr-deps" 2>nul
-          )
-          echo === Diagnostic complete ===
-          exit /b 0
-
-      - name: Upload diagnostic logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ditto-diagnostic-${{ github.run_id }}
-          path: |
-            Addins\DittoOCR\*.log
-            Addins\DittoOCR\ocr-deps\**\*.log
-          retention-days: 7
-
-      - name: Package portable zip
-        shell: cmd
-        run: |
-          mkdir DittoPortable
-          mkdir DittoPortable\Help
-          mkdir DittoPortable\Language
-          mkdir DittoPortable\Themes
-          mkdir DittoPortable\Addins
-          copy Debug64\Ditto.exe DittoPortable\
-          copy Debug64\ICU_Loader.dll DittoPortable\
-          copy Debug64\Addins\*.dll DittoPortable\Addins\
-          xcopy /s /e /i Debug64\Addins\DittoOCR DittoPortable\Addins\DittoOCR\
-          xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
-          copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
-          copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
-          copy "%WINDIR%\System32\msvcp140d.dll" DittoPortable\
-          copy "%WINDIR%\System32\mfc140ud.dll" DittoPortable\
-          copy "%WINDIR%\System32\ucrtbased.dll" DittoPortable\
-          copy DittoSetup\portable DittoPortable\portable
-          copy Debug\Language\*.xml DittoPortable\Language\
-          copy Debug\Themes\*.xml DittoPortable\Themes\
-
-      - name: Verify portable package integrity
-        shell: cmd
-        run: |
-          if not exist DittoPortable\Ditto.exe exit /b 1
-          if not exist DittoPortable\ICU_Loader.dll exit /b 1
-          if not exist DittoPortable\Addins\DittoUtil.dll exit /b 1
-          if not exist DittoPortable\Addins\DittoOCR\OcrDll.dll exit /b 1
-          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_det_infer.onnx exit /b 1
-          if not exist DittoPortable\Addins\DittoOCR\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
-          if not exist DittoPortable\Addins\DittoOCR\models\inference.yml exit /b 1
-          if not exist DittoPortable\portable exit /b 1
-          if not exist DittoPortable\vcruntime140d.dll exit /b 1
-          if not exist DittoPortable\vcruntime140_1d.dll exit /b 1
-          if not exist DittoPortable\msvcp140d.dll exit /b 1
-          if not exist DittoPortable\mfc140ud.dll exit /b 1
-          if not exist DittoPortable\ucrtbased.dll exit /b 1
-          if not exist DittoPortable\Language\English.xml exit /b 1
-          if not exist DittoPortable\Themes\Classic.xml exit /b 1
-          echo All required files present
-
-      - name: Create portable zip
-        shell: cmd
-        run: 7z a -tzip DittoPortable_Debug_x64.zip DittoPortable\*
-
-      - name: Upload portable zip
-        uses: actions/upload-artifact@v4
-        with:
-          name: ditto-portable-debug-x64
-          path: DittoPortable_Debug_x64.zip
+          name: ditto-portable-${{ matrix.config }}-x64
+          path: DittoPortable_${{ matrix.config }}_x64.zip
           retention-days: 30
 
   # ── Playwright E2E ─────────────────────────────────────────
@@ -367,7 +298,7 @@ jobs:
     needs: [ go-build, web-build ]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -415,7 +346,7 @@ jobs:
     needs: [ go-build, web-build ]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5

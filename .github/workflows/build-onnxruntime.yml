@@ -12,6 +12,9 @@ on:
 permissions:
   contents: write
 
+env:
+  ONNX_VERSION: '1.27.1'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,7 +36,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: microsoft/onnxruntime
-          ref: v1.27.1
+          ref: v${{ env.ONNX_VERSION }}
           path: onnxsrc
           submodules: recursive
           fetch-depth: 1
@@ -48,7 +51,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: onnxsrc\build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-1.27.1-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
+          key: onnxruntime-build-x64-v143-mt-${{ env.ONNX_VERSION }}-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -68,27 +71,27 @@ jobs:
             echo Packaging install-static...
             dir onnxsrc\build-x64-v143-mt\install-static /s /b
             cd onnxsrc\build-x64-v143-mt\install-static
-            7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+            7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z *
           ) else (
             if exist "onnxsrc\build-x64-v143-mt\Release\install\lib" (
               echo WARNING: install-static empty, packaging install dir instead
               dir onnxsrc\build-x64-v143-mt\Release\install /s /b
               cd onnxsrc\build-x64-v143-mt\Release\install
-              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z *
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z *
             ) else (
               echo ERROR: No output artifacts found!
               dir onnxsrc\build-x64-v143-mt /s /b 2>nul
-              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-1.27.1.7z NUL
+              7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z NUL
             )
           )
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          tag: onnxruntime-1.27.1
-          name: "ONNX Runtime 1.27.1 static libs (Windows x64, VS2022, mt)"
+          tag: onnxruntime-${{ env.ONNX_VERSION }}
+          name: "ONNX Runtime ${{ env.ONNX_VERSION }} static libs (Windows x64, VS2022, mt)"
           prerelease: true
-          artifacts: onnxruntime-static-windows-x64-1.27.1.7z
+          artifacts: onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z
           allowUpdates: true
           artifactContentType: application/x-7z-compressed
           token: ${{ secrets.GITHUB_TOKEN }}
