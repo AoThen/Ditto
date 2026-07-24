@@ -50,6 +50,10 @@ jobs:
       - name: Build DittoOCR
         run: msbuild Addins\DittoOCR\DittoOCR.vcxproj /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:SolutionDir="${{ github.workspace }}\" /p:OcrVersion=legacy -v:d
 
+      - name: Set short SHA
+        shell: bash
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Diagnostic - verify dependencies
         if: always()
         shell: cmd
@@ -105,11 +109,11 @@ jobs:
 
       - name: Create portable zip
         shell: cmd
-        run: 7z a -tzip DittoPortable_legacy_${{ matrix.config }}_x64.zip DittoPortable\*
+        run: 7z a -tzip DittoPortable_legacy_%SHORT_SHA%_${{ matrix.config }}_x64.zip DittoPortable\*
 
       - name: Upload portable zip
         uses: actions/upload-artifact@v4
         with:
-          name: ditto-portable-legacy-${{ matrix.config }}-x64
-          path: DittoPortable_legacy_${{ matrix.config }}_x64.zip
+          name: ditto-portable-legacy-%SHORT_SHA%-${{ matrix.config }}-x64
+          path: DittoPortable_legacy_%SHORT_SHA%_${{ matrix.config }}_x64.zip
           retention-days: 30
