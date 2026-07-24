@@ -566,6 +566,13 @@
 		<Item English_Text = "Options" ID = "OptionsWindowTitle">选项</Item>
 		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle">Ditto 编辑器</Item>
 		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle">正在运行 Ditto 更新</Item>
+		<Item English_Text = "Unknown error" ID = "CloudErrUnknownError">未知错误</Item>
+		<Item English_Text = "unknown" ID = "CloudErrUnknown">未知</Item>
+		<Item English_Text = "Rebuild pinyin search index for all clips?" ID = "CloudMsgRebuildPinyinConfirm">是否为所有剪贴项重建拼音搜索索引？</Item>
+		<Item English_Text = "Pinyin index rebuilt. %d entries processed." ID = "CloudMsgPinyinRebuilt">拼音索引已重建。已处理 %d 个条目。</Item>
+		<Item English_Text = "OCR re-run is already in progress." ID = "CloudMsgOcrInProgress">OCR 重新运行已在进行中。</Item>
+		<Item English_Text = "Force re-run OCR for all images?" ID = "CloudMsgForceOcrConfirm">是否强制重新运行所有图片的 OCR？</Item>
+		<Item English_Text = "No images found in clipboard history." ID = "CloudMsgNoImagesFound">剪贴板历史中未找到图片。</Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1">确定</Item>

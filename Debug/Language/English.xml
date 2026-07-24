@@ -566,6 +566,13 @@
 		<Item English_Text = "Options" ID = "OptionsWindowTitle"></Item>
 		<Item English_Text = "Ditto Editor" ID = "EditorWindowTitle"></Item>
 		<Item English_Text = "Running Ditto Updates" ID = "UpdatesWindowTitle"></Item>
+		<Item English_Text = "Unknown error" ID = "CloudErrUnknownError"></Item>
+		<Item English_Text = "unknown" ID = "CloudErrUnknown"></Item>
+		<Item English_Text = "Rebuild pinyin search index for all clips?" ID = "CloudMsgRebuildPinyinConfirm"></Item>
+		<Item English_Text = "Pinyin index rebuilt. %d entries processed." ID = "CloudMsgPinyinRebuilt"></Item>
+		<Item English_Text = "OCR re-run is already in progress." ID = "CloudMsgOcrInProgress"></Item>
+		<Item English_Text = "Force re-run OCR for all images?" ID = "CloudMsgForceOcrConfirm"></Item>
+		<Item English_Text = "No images found in clipboard history." ID = "CloudMsgNoImagesFound"></Item>
 	</Ditto_String_Table>
 	<Ditto_Options_Sheet>
 		<Item English_Text = "OK" ID = "1"></Item>

@@ -322,7 +322,7 @@ void COptionCloud::RefreshSyncStatus()
 	{
 		CString err = mgr.GetLastError();
 		if (err.IsEmpty())
-			err = _T("Unknown error");
+			err = theApp.m_Language.GetString("CloudErrUnknownError", _T("Unknown error"));
 		csNew.Format(theApp.m_Language.GetString("CloudStatusError", _T("Error: %s")), err);
 	}
 	else if (mgr.HasSyncedBefore())
@@ -581,7 +581,7 @@ void COptionCloud::OnBtnExportKey()
 		if (GetComputerName(szComputerName, &dwSize))
 			username = szComputerName;
 		else
-			username = _T("unknown");
+			username = theApp.m_Language.GetString("CloudErrUnknown", _T("unknown"));
 	}
 
 	if (CCloudKeyExport::ExportKey(filePath, username, exportPassword))
@@ -706,7 +706,7 @@ void COptionCloud::OnBtnForceUpload()
 // ---------------------------------------------------------------------------
 void COptionCloud::OnRebuildPinyinIndex()
 {
-	if (AfxMessageBox(_T("Rebuild pinyin search index for all clips?"), MB_YESNO) != IDYES)
+	if (AfxMessageBox(theApp.m_Language.GetString("CloudMsgRebuildPinyinConfirm", _T("Rebuild pinyin search index for all clips?")), MB_YESNO) != IDYES)
 		return;
 
 	CWaitCursor wait;
@@ -735,7 +735,7 @@ void COptionCloud::OnRebuildPinyinIndex()
 	theApp.m_db.execDML(_T("COMMIT;"));
 
 	CString msg;
-	msg.Format(_T("Pinyin index rebuilt. %d entries processed."), batch);
+	msg.Format(theApp.m_Language.GetString("CloudMsgPinyinRebuilt", _T("Pinyin index rebuilt. %d entries processed.")), batch);
 	AfxMessageBox(msg);
 }
 
@@ -748,11 +748,11 @@ void COptionCloud::OnForceReOcr()
     bool expected = false;
     if (!running.compare_exchange_strong(expected, true))
     {
-        AfxMessageBox(_T("OCR re-run is already in progress."));
+        AfxMessageBox(theApp.m_Language.GetString("CloudMsgOcrInProgress", _T("OCR re-run is already in progress.")));
         return;
     }
 
-    if (AfxMessageBox(_T("Force re-run OCR for all images?"), MB_YESNO) != IDYES)
+    if (AfxMessageBox(theApp.m_Language.GetString("CloudMsgForceOcrConfirm", _T("Force re-run OCR for all images?")), MB_YESNO) != IDYES)
     {
         running = false;
         return;
@@ -774,7 +774,7 @@ CppSQLite3Query q = theApp.m_db.execQuery(
     if (ids.empty())
     {
         running = false;
-        AfxMessageBox(_T("No images found in clipboard history."));
+        AfxMessageBox(theApp.m_Language.GetString("CloudMsgNoImagesFound", _T("No images found in clipboard history.")));
         return;
     }
 
