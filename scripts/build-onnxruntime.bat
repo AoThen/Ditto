@@ -141,6 +141,22 @@ for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\%CONFIG%\*.lib" 2^>nul') do (
         )
     )
 )
+
+REM Ensure re2.lib is collected (onnxruntime contrib_ops depend on it)
+if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
+    echo [BUILD] re2.lib not found in build tree search, looking in explicit locations...
+    for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\re2.lib" 2^>nul') do (
+        copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
+        if not errorlevel 1 (
+            echo [BUILD]   Copied re2.lib from: %%f
+        )
+    )
+)
+if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
+    echo [BUILD] WARNING: re2.lib not found - onnxruntime may fail to link
+) else (
+    echo [BUILD] re2.lib verified in install-static/lib
+)
 echo [BUILD] Step 4b/6 complete.
 
 REM -------------------------------------------------------------------
