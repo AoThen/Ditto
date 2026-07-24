@@ -245,7 +245,7 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     ) else (
         REM Check that re2::RE2 symbols are DEFINED (sec ^> 0), not just referenced (sec 0)
         REM dumpbin /symbols outputs (sec  0) for undefined, (sec  N) for defined
-        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "(sec  0)" >nul
+        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "^(sec  0^)" >nul
         if errorlevel 1 (
             echo [BUILD] WARNING: re2::RE2 symbols NOT defined in onnxruntime.lib
             echo [BUILD]   This will cause DittoOCR link failures!
