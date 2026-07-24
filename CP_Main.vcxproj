@@ -1139,7 +1139,7 @@
     <None Include="src\res\system_menu_32_32.png" />
     <None Include="src\res\Toolbar.bmp" />
     <None Include="src\res\toolbar1.bmp" />
-    <CustomBuild Include="RulerRichEditCtrl\toolbar.bmp">
+    <CustomBuild Include="src\RulerRichEditCtrl\toolbar.bmp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
