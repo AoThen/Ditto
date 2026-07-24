@@ -3,7 +3,7 @@
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
-#include "../src/CloudSync/CloudCrypto.h"
+#include "../../src/CloudSync/CloudCrypto.h"
 #include <vector>
 #include <string>
 #include <cstring>

@@ -8,8 +8,8 @@
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
-#include "../src/CloudSync/CloudEncryption.h"
-#include "../src/CloudSync/CloudCrypto.h"
+#include "../../src/CloudSync/CloudEncryption.h"
+#include "../../src/CloudSync/CloudCrypto.h"
 #include "GetSetOptionsMock.h"
 #include <vector>
 #include <string>

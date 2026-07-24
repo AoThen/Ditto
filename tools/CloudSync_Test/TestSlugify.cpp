@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/Slugify.h"
+#include "../../src/Slugify.h"
 
 TEST(Slugify, BasicEnglish)
 {

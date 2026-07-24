@@ -49,7 +49,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_MBCS;_UNICODE;UNICODE;CLOUDSYNC_TEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Addins\DittoUtil;$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\Addins\DittoUtil;$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -68,7 +68,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_MBCS;_UNICODE;UNICODE;CLOUDSYNC_TEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Addins\DittoUtil;$(ProjectDir)..\src;$(ProjectDir)..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\Addins\DittoUtil;$(ProjectDir)..\..\src;$(ProjectDir)..\..\src\CloudSync;$(ProjectDir)..\EncryptDecrypt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
@@ -107,25 +107,25 @@
     </ClCompile>
     <ClCompile Include="TestStubs.cpp" />
     <!-- Compile CloudSync source directly -->
-    <ClCompile Include="..\src\ClipCompare.cpp">
+    <ClCompile Include="..\..\src\ClipCompare.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\Crc32Dynamic.cpp">
+    <ClCompile Include="..\..\src\Crc32Dynamic.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\Md5.cpp">
+    <ClCompile Include="..\..\src\Md5.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\CloudSync\CloudAuth.cpp">
+    <ClCompile Include="..\..\src\CloudSync\CloudAuth.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\CloudSync\CloudCrypto.cpp">
+    <ClCompile Include="..\..\src\CloudSync\CloudCrypto.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\CloudSync\CloudEncryption.cpp">
+    <ClCompile Include="..\..\src\CloudSync\CloudEncryption.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\CloudSync\CloudKeyExport.cpp">
+    <ClCompile Include="..\..\src\CloudSync\CloudKeyExport.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\rijndael.cpp">
@@ -140,37 +140,37 @@
     <ClCompile Include="..\EncryptDecrypt\sha2.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\WildCardMatch.cpp">
+    <ClCompile Include="..\..\src\WildCardMatch.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\RegExFilterHelper.cpp">
+    <ClCompile Include="..\..\src\RegExFilterHelper.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\Addins\DittoUtil\RemoveLineFeeds.cpp">
+    <ClCompile Include="..\..\Addins\DittoUtil\RemoveLineFeeds.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\Addins\DittoUtil\TextConvert.cpp">
+    <ClCompile Include="..\..\Addins\DittoUtil\TextConvert.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\ConvertRTFToText.cpp">
+    <ClCompile Include="..\..\src\ConvertRTFToText.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\RichEditCtrlEx.cpp">
+    <ClCompile Include="..\..\src\RichEditCtrlEx.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="..\EncryptDecrypt\MemUtil.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
-    <ClCompile Include="..\src\Pinyin_Convert.cpp">
+    <ClCompile Include="..\..\src\Pinyin_Convert.cpp">
       <ForcedIncludeFiles>stdafx.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\CloudSync\CloudAuth.h" />
-    <ClInclude Include="..\src\CloudSync\CloudCrypto.h" />
-    <ClInclude Include="..\src\CloudSync\CloudEncryption.h" />
-    <ClInclude Include="..\src\CloudSync\CloudKeyExport.h" />
-    <ClInclude Include="..\src\CloudSync\CloudSyncManager.h" />
+    <ClInclude Include="..\..\src\CloudSync\CloudAuth.h" />
+    <ClInclude Include="..\..\src\CloudSync\CloudCrypto.h" />
+    <ClInclude Include="..\..\src\CloudSync\CloudEncryption.h" />
+    <ClInclude Include="..\..\src\CloudSync\CloudKeyExport.h" />
+    <ClInclude Include="..\..\src\CloudSync\CloudSyncManager.h" />
     <ClInclude Include="GetSetOptionsMock.h" />
     <ClInclude Include="IClipMock.h" />
     <ClInclude Include="stdafx.h" />

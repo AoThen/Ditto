@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/RegExFilterHelper.h"
+#include "../../src/RegExFilterHelper.h"
 
 TEST(RegExFilter, ExactMatch)
 {

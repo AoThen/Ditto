@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/ClipCompare.h"
+#include "../../src/ClipCompare.h"
 #include <cstring>
 
 static bool IsClipDataDifferent(const char* data1, size_t len1, const char* data2, size_t len2)

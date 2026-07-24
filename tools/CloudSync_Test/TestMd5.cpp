@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/Md5.h"
+#include "../../src/Md5.h"
 #include <cstring>
 
 TEST(Md5, EmptyString)

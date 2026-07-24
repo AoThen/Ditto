@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/Crc32Dynamic.h"
+#include "../../src/Crc32Dynamic.h"
 
 TEST(Crc32, EmptyData)
 {

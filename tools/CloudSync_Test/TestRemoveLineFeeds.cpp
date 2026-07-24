@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <string>
-#include "../Addins/DittoUtil/RemoveLineFeeds.h"
+#include "../../Addins/DittoUtil/RemoveLineFeeds.h"
 #include "IClipMock.h"
 
 TEST(RemoveLineFeeds, ConstructAndDestroy)

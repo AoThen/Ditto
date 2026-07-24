@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../Addins/DittoUtil/TextConvert.h"
+#include "../../Addins/DittoUtil/TextConvert.h"
 
 TEST(TextConvert, Utf8RoundTrip)
 {

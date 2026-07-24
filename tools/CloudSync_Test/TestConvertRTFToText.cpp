@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "gtest/gtest.h"
-#include "../src/ConvertRTFToText.h"
+#include "../../src/ConvertRTFToText.h"
 #include <string>
 #include <cstdlib>
 #include <cctype>

@@ -6,11 +6,11 @@
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
-#include "../src/CloudSync/CloudCrypto.h"
-#include "../src/CloudSync/CloudKeyExport.h"
+#include "../../src/CloudSync/CloudCrypto.h"
+#include "../../src/CloudSync/CloudKeyExport.h"
 #include "GetSetOptionsMock.h"
-#include "../src/httplib.h"
-#include "../src/json.hpp"
+#include "../../src/httplib.h"
+#include "../../src/json.hpp"
 #include <vector>
 #include <string>
 #include <cstring>

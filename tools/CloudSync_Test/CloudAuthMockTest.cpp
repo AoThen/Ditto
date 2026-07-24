@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include <gtest/gtest.h>
 #include <functional>
-#include "../src/CloudSync/CloudAuth.h"
+#include "../../src/CloudSync/CloudAuth.h"
 #include "GetSetOptionsMock.h"
 
 class MockHttpClient : public IHttpClient {

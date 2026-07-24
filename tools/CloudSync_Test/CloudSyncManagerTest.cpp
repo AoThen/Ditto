@@ -7,8 +7,8 @@
 
 #include "stdafx.h"
 #include <gtest/gtest.h>
-#include "../src/CloudSync/CloudCrypto.h"
-#include "../src/json.hpp"
+#include "../../src/CloudSync/CloudCrypto.h"
+#include "../../src/json.hpp"
 #include "GetSetOptionsMock.h"
 #include <vector>
 #include <string>
