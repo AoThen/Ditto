@@ -79,6 +79,15 @@ jobs:
           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\include windows-x64\include\
           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\x64\vc17\staticlib windows-x64\x64\vc17\staticlib\
           xcopy /s /e /i opencvsrc\build-x64-v143-mt\install\etc windows-x64\etc\
+          REM Collect third-party libs from build tree (re2, ittnotify, etc.)
+          for /f "delims=" %%f in ('dir /s /b opencvsrc\build-x64-v143-mt\*.lib 2^>nul') do (
+              echo %%f | findstr /i "\\install\\" >nul
+              if errorlevel 1 (
+                  if not exist "windows-x64\x64\vc17\staticlib\%%~nxf" (
+                      copy /y "%%f" "windows-x64\x64\vc17\staticlib\" >nul 2>nul
+                  )
+              )
+          )
           7z a opencv-static-windows-x64-4.14.0.7z windows-x64\*
 
       - name: Create Release
