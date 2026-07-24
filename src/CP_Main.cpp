@@ -982,25 +982,38 @@ int CCP_MainApp::ExitInstance()
 	DeleteDittoTempFiles(FALSE);
 
 	m_db.close();
+	Log(_T("m_db.close completed"));
 
 	if(m_pUacPasteThread != NULL)
 	{
-		if(m_pUacPasteThread->ThreadWasStarted() == false)
-		{
-			m_pUacPasteThread->FireExit();
-		}
+		m_pUacPasteThread->FireExit();
 		delete m_pUacPasteThread;
+		Log(_T("UAC cleanup completed"));
+	}
+	else
+	{
+		Log(_T("UAC cleanup skipped (no thread)"));
 	}
 
 	Gdiplus::GdiplusShutdown(m_gdiplusToken);
+	Log(_T("GdiplusShutdown completed"));
 
 	if(m_hMutex)
+	{
 		CloseHandle(m_hMutex);
+		Log(_T("CloseHandle completed"));
+	}
+	else
+	{
+		Log(_T("CloseHandle skipped (no mutex)"));
+	}
 
 	// Let CWinApp::ExitInstance() handle OLE cleanup and MFC internal state cleanup.
 	// Previously skipped due to second-instance AfxOleInit() issues;
 	// now safe because AfxOleInit() is moved after the mutex check.
-	return CWinApp::ExitInstance();
+	int ret = CWinApp::ExitInstance();
+	Log(StrF(_T("CWinApp::ExitInstance returned %d"), ret));
+	return ret;
 }
 
 // return TRUE if there is more idle processing to do

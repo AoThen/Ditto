@@ -305,9 +305,9 @@ void CEventThread::RunThread()
 
 	UndoFireEvent(EXIT_EVENT);
 
-	SetEvent(m_hEvt);
+	m_threadRunning = false;
 
 	Log(StrF(_T("End of CEventThread::RunThread() Name: %s"), m_threadName));
 
-	m_threadRunning = false;
+	SetEvent(m_hEvt);
 }
