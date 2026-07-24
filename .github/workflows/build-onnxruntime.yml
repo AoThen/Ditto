@@ -5,8 +5,6 @@ on:
   push:
     branches: [main, master, Mod]
     paths:
-      - scripts/build-onnxruntime.bat
-      - scripts/download-ocr-deps.bat
       - .github/workflows/build-onnxruntime.yml
 
 permissions:
