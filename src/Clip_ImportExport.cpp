@@ -157,7 +157,8 @@ bool CClip_ImportExport::PlaceCF_TEXT_AND_CF_UNICODETEXT_OnClipboard(CStringA& c
 			long lLen = csCF_TEXT.GetLength();
 			HGLOBAL hGlobal = NewGlobalP(csCF_TEXT.GetBuffer(lLen), lLen + 1);
 			csCF_TEXT.ReleaseBuffer();
-			SetClipboardData(CF_TEXT, hGlobal);
+			if (hGlobal && SetClipboardData(CF_TEXT, hGlobal) == nullptr)
+				GlobalFree(hGlobal);
 
 			bRet = true;
 		}
@@ -166,7 +167,8 @@ bool CClip_ImportExport::PlaceCF_TEXT_AND_CF_UNICODETEXT_OnClipboard(CStringA& c
 			long lLen = csCF_UNICODETEXT.GetLength() * sizeof(wchar_t);
 			HGLOBAL hGlobal = NewGlobalP(csCF_UNICODETEXT.GetBuffer(lLen), lLen + 1);
 			csCF_UNICODETEXT.ReleaseBuffer();
-			SetClipboardData(CF_UNICODETEXT, hGlobal);
+			if (hGlobal && SetClipboardData(CF_UNICODETEXT, hGlobal) == nullptr)
+				GlobalFree(hGlobal);
 
 			bRet = true;
 		}
@@ -200,7 +202,8 @@ bool CClip_ImportExport::PlaceFormatsOnclipboard()
 				HGLOBAL hGlobal = NewGlobalP(Data, GlobalSize(pCF->m_hgData));
 				if (hGlobal)
 				{
-					SetClipboardData(pCF->m_cfType, hGlobal);
+					if (SetClipboardData(pCF->m_cfType, hGlobal) == nullptr)
+						GlobalFree(hGlobal);
 				}
 
 				GlobalUnlock(pCF->m_hgData);

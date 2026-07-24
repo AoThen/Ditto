@@ -66,16 +66,19 @@ bool CClipboardSaveRestore::Restore()
 	{
 		::EmptyClipboard();
 
-		SetClipboardData(theApp.m_cfIgnoreClipboard, NewGlobalP("Ignore", sizeof("Ignore")));
+		HGLOBAL hIgnore = NewGlobalP("Ignore", sizeof("Ignore"));
+		if (::SetClipboardData(theApp.m_cfIgnoreClipboard, hIgnore) == nullptr)
+			::GlobalFree(hIgnore);
 
 		INT_PTR size = m_Clipboard.GetSize();
 		for(int nPos = 0; nPos < size; nPos++)
 		{
 			CClipFormat *pCF = &m_Clipboard.ElementAt(nPos);
-			if(pCF && pCF->m_hgData && ::GlobalSize(pCF->m_hgData) > 0) // Ensure clipboard data is valid
+			if(pCF && pCF->m_hgData && ::GlobalSize(pCF->m_hgData) > 0)
 			{
-				::SetClipboardData(pCF->m_cfType, pCF->m_hgData);
-				pCF->m_hgData = NULL;//clipboard now owns the data
+				if (::SetClipboardData(pCF->m_cfType, pCF->m_hgData) == nullptr)
+					::GlobalFree(pCF->m_hgData);
+				pCF->m_hgData = NULL;
 			}
 		}
 
@@ -101,7 +104,9 @@ bool CClipboardSaveRestore::RestoreTextOnly()
 	{
 		::EmptyClipboard();
 
-		SetClipboardData(theApp.m_cfIgnoreClipboard, NewGlobalP("Ignore", sizeof("Ignore")));
+		HGLOBAL hIgnore = NewGlobalP("Ignore", sizeof("Ignore"));
+		if (::SetClipboardData(theApp.m_cfIgnoreClipboard, hIgnore) == nullptr)
+			::GlobalFree(hIgnore);
 
 		bool foundText = false;
 		int hDropIndex = -1;
@@ -121,8 +126,9 @@ bool CClipboardSaveRestore::RestoreTextOnly()
 						continue;
 					}
 
-					HGLOBAL newData = NewGlobalP(localData, ::GlobalSize(pCF->m_hgData));	
-					::SetClipboardData(pCF->m_cfType, newData);
+				HGLOBAL newData = NewGlobalP(localData, ::GlobalSize(pCF->m_hgData));
+					if (::SetClipboardData(pCF->m_cfType, newData) == nullptr)
+						::GlobalFree(newData);
 
 					::GlobalUnlock(pCF->m_hgData);
 
@@ -168,8 +174,9 @@ bool CClipboardSaveRestore::RestoreTextOnly()
 					GlobalUnlock(pCF->m_hgData);
 				}
 
-				HGLOBAL newData = NewGlobalP(hDropString.GetBuffer(), ((hDropString.GetLength() + 1) * sizeof(TCHAR)));	
-				::SetClipboardData(CF_UNICODETEXT, newData);
+			HGLOBAL newData = NewGlobalP(hDropString.GetBuffer(), ((hDropString.GetLength() + 1) * sizeof(TCHAR)));
+				if (::SetClipboardData(CF_UNICODETEXT, newData) == nullptr)
+					::GlobalFree(newData);
 			}
 		}
 

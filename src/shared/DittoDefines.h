@@ -67,20 +67,20 @@ class DittoAddinHelpers
 public:
 	static void CopyToGlobalHP(HGLOBAL hDest, LPVOID pBuf, ULONG ulBufLen)
 	{
-		ASSERT(hDest && pBuf && ulBufLen);
+		if (!hDest || !pBuf || ulBufLen == 0) return;
 		LPVOID pvData = GlobalLock(hDest);
-		ASSERT(pvData);
+		if (!pvData) return;
 		ULONG size = (ULONG)GlobalSize(hDest);
-		ASSERT(size >= ulBufLen);	// assert if hDest isn't big enough
+		if (size < ulBufLen) { GlobalUnlock(hDest); return; }
 		memcpy(pvData, pBuf, ulBufLen);
 		GlobalUnlock(hDest);
 	}
 
 	static HGLOBAL NewGlobalP(LPVOID pBuf, UINT nLen)
 	{
-		ASSERT(pBuf && nLen);
+		if (!pBuf || nLen == 0) return nullptr;
 		HGLOBAL hDest = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, nLen);
-		ASSERT(hDest);
+		if (!hDest) return nullptr;
 		CopyToGlobalHP(hDest, pBuf, nLen);
 		return hDest;
 	}

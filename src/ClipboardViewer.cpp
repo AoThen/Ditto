@@ -162,8 +162,12 @@ void CClipboardViewer::SendPing()
 		if(OpenClipboard())
 		{
 			m_bPinging = true;
-			SetClipboardData(theApp.m_PingFormat, NewGlobalP("Ditto Ping", sizeof("Ditto Ping")));
-			SetClipboardData(theApp.m_cfIgnoreClipboard , NewGlobalP("Ignore", sizeof("Ignore")));
+			HGLOBAL hPing = NewGlobalP("Ditto Ping", sizeof("Ditto Ping"));
+			if (SetClipboardData(theApp.m_PingFormat, hPing) == nullptr)
+				GlobalFree(hPing);
+			HGLOBAL hIgnore = NewGlobalP("Ignore", sizeof("Ignore"));
+			if (SetClipboardData(theApp.m_cfIgnoreClipboard, hIgnore) == nullptr)
+				GlobalFree(hIgnore);
 
 			SetTimer(TIMER_PING, 2000, NULL);
 			CloseClipboard();

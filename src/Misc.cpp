@@ -258,47 +258,47 @@ BOOL IsValid(HGLOBAL hGlobal)
 
 void CopyToGlobalHP(HGLOBAL hDest, LPVOID pBuf, SIZE_T ulBufLen)
 {
-	ASSERT(hDest && pBuf && ulBufLen);
+	if (!hDest || !pBuf || ulBufLen == 0) return;
 	LPVOID pvData = GlobalLock(hDest);
-	ASSERT(pvData);
+	if (!pvData) return;
 	SIZE_T size = GlobalSize(hDest);
-	ASSERT(size >= ulBufLen);	// assert if hDest isn't big enough
+	if (size < ulBufLen) { GlobalUnlock(hDest); return; }
 	memcpy(pvData, pBuf, ulBufLen);
 	GlobalUnlock(hDest);
 }
 
 void CopyToGlobalHH(HGLOBAL hDest, HGLOBAL hSource, SIZE_T ulBufLen)
 {
-	ASSERT(hDest && hSource && ulBufLen);
+	if (!hDest || !hSource || ulBufLen == 0) return;
 	LPVOID pvData = GlobalLock(hSource);
-	ASSERT(pvData );
+	if (!pvData) return;
 	SIZE_T size = GlobalSize(hSource);
-	ASSERT(size >= ulBufLen);	// assert if hSource isn't big enough
+	if (size < ulBufLen) { GlobalUnlock(hSource); return; }
 	CopyToGlobalHP(hDest, pvData, ulBufLen);
 	GlobalUnlock(hSource);
 }
 
-
 HGLOBAL NewGlobalP(LPVOID pBuf, SIZE_T nLen)
 {
-	ASSERT(pBuf && nLen);
+	if (!pBuf || nLen == 0) return nullptr;
 	HGLOBAL hDest = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, nLen);
-	ASSERT(hDest );
+	if (!hDest) return nullptr;
 	CopyToGlobalHP(hDest, pBuf, nLen);
 	return hDest;
 }
 
 HGLOBAL NewGlobal(SIZE_T nLen)
 {
-	ASSERT(nLen);
+	if (nLen == 0) return nullptr;
 	HGLOBAL hDest = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, nLen);
 	return hDest;
 }
 
 HGLOBAL NewGlobalH(HGLOBAL hSource, SIZE_T nLen)
 {
-	ASSERT(hSource && nLen);
+	if (!hSource || nLen == 0) return nullptr;
 	LPVOID pvData = GlobalLock(hSource);
+	if (!pvData) return nullptr;
 	HGLOBAL hDest = NewGlobalP(pvData, nLen);
 	GlobalUnlock(hSource);
 	return hDest;
