@@ -243,11 +243,10 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     if errorlevel 1 (
         echo [BUILD] dumpbin not found, skipping re2 verification
     ) else (
-        REM Check that re2::RE2 symbols are DEFINED (sec > 0), not just referenced (sec 0)
-        REM dumpbin /symbols outputs (sec  0) for undefined, (sec  N) for defined
-        REM Use a variable to avoid batch parser treating ) in "(sec  0)" as block end
-        set "FILTER=(sec  0)"
-        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "%FILTER%" >nul
+        REM Check that re2::RE2 symbols are DEFINED (sec N), not just referenced (sec  0)
+        REM dumpbin /symbols outputs (sec  0) for undefined (two spaces), (sec  N) for defined (one space)
+        REM Use "sec  0" (two spaces) to match only undefined symbols without using parentheses
+        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "sec  0" >nul
         if errorlevel 1 (
             echo [BUILD] WARNING: re2::RE2 symbols NOT defined in onnxruntime.lib
             echo [BUILD]   This will cause DittoOCR link failures!
