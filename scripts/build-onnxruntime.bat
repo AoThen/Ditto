@@ -40,6 +40,49 @@ if errorlevel 1 (
 echo [BUILD] Step 1/6 complete.
 
 REM -------------------------------------------------------------------
+REM 1b. Build re2 as standalone static library
+REM -------------------------------------------------------------------
+REM ONNX Runtime fetches re2 via FetchContent with EXCLUDE_FROM_ALL, so the
+REM re2 source is downloaded but NOT compiled by the main build. We build it
+REM explicitly to ensure the static library is available for merging.
+
+echo [BUILD] Step 1b/6: Building re2 as standalone static library...
+
+set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
+set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
+
+if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
+    echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
+
+    cmake -S "%RE2_SRC_DIR%" -B "%RE2_BUILD_DIR%" ^
+        -G "Visual Studio 17 2022" ^
+        -DCMAKE_BUILD_TYPE=%CONFIG% ^
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DBUILD_SHARED_LIBS=OFF ^
+        -DRE2_BUILD_TESTING=OFF
+
+    if errorlevel 1 (
+        echo [BUILD] WARNING: re2 cmake configure failed
+    ) else (
+        cmake --build "%RE2_BUILD_DIR%" --config %CONFIG%
+        if errorlevel 1 (
+            echo [BUILD] WARNING: re2 build failed
+        ) else (
+            if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
+                copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\" >nul
+                echo [BUILD]   Copied re2.lib from standalone build
+            ) else (
+                echo [BUILD] WARNING: re2.lib not found in standalone build output
+            )
+        )
+    )
+) else (
+    echo [BUILD] WARNING: re2 source not found at %RE2_SRC_DIR%
+)
+
+echo [BUILD] Step 1b/6 complete.
+
+REM -------------------------------------------------------------------
 REM 2. CMake --install (build.py already built, now install)
 REM -------------------------------------------------------------------
 echo [BUILD] Step 2/6: cmake --install...
@@ -95,7 +138,7 @@ REM -------------------------------------------------------------------
 if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
 
 if "!libs!" == "" (
-    echo [BUILD] Step 4/6: Skipping lib merge (no libs from tlog)
+    echo [BUILD] Step 4/6: Skipping lib merge [no libs from tlog]
 ) else (
     echo [BUILD] Step 4/6: Merging static libs...
     where lib.exe >nul 2>nul
@@ -200,12 +243,14 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     if errorlevel 1 (
         echo [BUILD] dumpbin not found, skipping re2 verification
     ) else (
-        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" >nul
+        REM Check that re2::RE2 symbols are DEFINED (sec ^> 0), not just referenced (sec 0)
+        REM dumpbin /symbols outputs (sec  0) for undefined, (sec  N) for defined
+        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "(sec  0)" >nul
         if errorlevel 1 (
-            echo [BUILD] WARNING: re2::RE2 symbols NOT found in onnxruntime.lib
+            echo [BUILD] WARNING: re2::RE2 symbols NOT defined in onnxruntime.lib
             echo [BUILD]   This will cause DittoOCR link failures!
         ) else (
-            echo [BUILD] OK: re2::RE2 symbols verified in onnxruntime.lib
+            echo [BUILD] OK: re2::RE2 symbols verified (defined) in onnxruntime.lib
         )
     )
 ) else (
