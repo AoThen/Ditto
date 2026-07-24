@@ -88,9 +88,6 @@
     <ClInclude Include="OcrDllInterface.h" />
     <ClInclude Include="clipper.hpp" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="vcpkg.json" />
-  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)ocr-deps\onnxruntime-static\windows-x64\include;$(ProjectDir)ocr-deps\opencv-static\windows-x64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
