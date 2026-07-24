@@ -100,5 +100,9 @@ QWEN.md
 /DittoSetup/rcedit-x64.exe
 /DittoSetup/rcedit-x86.exe
 
-# 构建输出
-/Debug/
+# 构建输出（保留 Language 和 Themes 资源文件）
+/Debug/**
+!/Debug/Language/
+!/Debug/Language/**
+!/Debug/Themes/
+!/Debug/Themes/**
