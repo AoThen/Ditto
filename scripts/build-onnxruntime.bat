@@ -40,22 +40,47 @@ if errorlevel 1 (
 echo [BUILD] Step 1/6 complete.
 
 REM -------------------------------------------------------------------
-REM 1b. Build re2 from the main build tree
+REM 1b. Build re2 as standalone static library
 REM -------------------------------------------------------------------
 REM ONNX Runtime fetches re2 via FetchContent with EXCLUDE_FROM_ALL, so the
-REM re2 source is downloaded but NOT compiled by the main build. We build the
-REM re2 target explicitly from the main build tree (which has absl available).
+REM re2 source is downloaded but NOT compiled by the main build. We build it
+REM explicitly to ensure the static library is available for merging.
+REM re2 depends on absl, which is also fetched via FetchContent. We point
+REM cmake to the absl build directory in the main build tree.
 
-echo [BUILD] Step 1b/6: Building re2 from main build tree...
+echo [BUILD] Step 1b/6: Building re2 as standalone static library...
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
+set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
+set "ABSL_BUILD_DIR=%BUILD_DIR%\%CONFIG%\_deps\abseil_cpp-build"
 
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
-    echo [BUILD]   Building re2 target from main build tree...
-    cmake --build "%BUILD_DIR%" --target re2 --config %CONFIG%
+
+    cmake -S "%RE2_SRC_DIR%" -B "%RE2_BUILD_DIR%" ^
+        -G "Visual Studio 17 2022" ^
+        -A x64 ^
+        -DCMAKE_BUILD_TYPE=%CONFIG% ^
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DBUILD_SHARED_LIBS=OFF ^
+        -DRE2_BUILD_TESTING=OFF ^
+        -Dabsl_DIR="%ABSL_BUILD_DIR%"
+
     if errorlevel 1 (
-        echo [BUILD] WARNING: re2 build failed
+        echo [BUILD] WARNING: re2 cmake configure failed
+    ) else (
+        cmake --build "%RE2_BUILD_DIR%" --config %CONFIG%
+        if errorlevel 1 (
+            echo [BUILD] WARNING: re2 build failed
+        ) else (
+            if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
+                if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
+                copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\" >nul
+                echo [BUILD]   Copied re2.lib from standalone build
+            ) else (
+                echo [BUILD] WARNING: re2.lib not found in standalone build output
+            )
+        )
     )
 ) else (
     echo [BUILD] WARNING: re2 source not found at %RE2_SRC_DIR%
