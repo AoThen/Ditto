@@ -58,6 +58,7 @@ if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
         -G "Visual Studio 17 2022" ^
         -A x64 ^
         -DCMAKE_BUILD_TYPE=%CONFIG% ^
+        -DCMAKE_CXX_STANDARD=17 ^
         -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
         -DBUILD_SHARED_LIBS=OFF ^
         -DABSL_BUILD_TESTING=OFF
