@@ -226,6 +226,13 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 	
 	bool adjustRect = false;
 
+	// Ensure theme is loaded BEFORE creating window so all child controls
+	// are created with correct colors (prevent white background on first open)
+	if (!IsWindow(m_pwndPaste->m_hWnd))
+	{
+		CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
+	}
+
 	if( !IsWindow(m_pwndPaste->m_hWnd) )
 	{
 		CWnd *pLocalParent = pParent;
@@ -239,6 +246,9 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 
 		adjustRect = true;
 	}	
+
+	// Reload theme to ensure latest colors before showing
+	CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
 
 	//If minimized
 	if (m_pwndPaste->IsIconic())
@@ -283,10 +293,6 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 			}
 			m_pwndPaste->MoveWindow(crRect);
 		}
-
-
-		// Ensure theme is loaded before showing window to prevent white flash
-		CGetSetOptions::m_Theme.Load(CGetSetOptions::GetTheme(), false, true);
 
 		// Show the window
 		m_pwndPaste->ShowWindow(SW_SHOW);
