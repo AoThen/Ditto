@@ -6616,6 +6616,19 @@ LRESULT CQPasteWnd::OnFillRestOfList(WPARAM wParam, LPARAM lParam)
 
 	ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
+	if (iFrom >= 0 && iTo < (int)m_listItems.size())
+	{
+		bool allLoaded = true;
+		for (int i = iFrom; i <= iTo && allLoaded; i++)
+		{
+			allLoaded = (m_listItems[i].m_lID > 0);
+		}
+		if (allLoaded)
+		{
+			return TRUE;
+		}
+	}
+
 	bool addToLoadItems = true;
 	for (std::list<CPoint>::iterator it = m_loadItems.begin(); it != m_loadItems.end(); it++)
 	{
