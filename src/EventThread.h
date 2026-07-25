@@ -11,7 +11,10 @@ public:
 	CEventThread(void);
 	~CEventThread(void);
 
-	static unsigned int __stdcall EventThreadFnc(void* thisptr);
+	// Thread function uses __cdecl (default) to match AfxBeginThread signature.
+	// This ensures MFC properly tracks thread lifecycle and cleans up thread state,
+	// preventing mtex.cpp:90 debug assertion during DLL detach.
+	static UINT EventThreadFnc(void* thisptr);
 
 protected:
 	virtual void OnEvent(int eventId, void *param)	{ return; }
@@ -22,7 +25,7 @@ protected:
 	bool RemoveEvent(int eventId);
 
 	UINT m_threadID;
-	HANDLE m_thread;
+	HANDLE m_hThread;
 	HANDLE m_hEvt;
 	EventMapType m_eventMap;
 	bool m_exitThread;

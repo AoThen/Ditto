@@ -155,14 +155,27 @@ bool CEventThread::RemoveEvent(int eventId)
 	return false;
 }
 
-void CEventThread::Start(void *param) 
+void CEventThread::Start(void *param)
 {
 	if(m_threadRunning == false)
 	{
 		ResetEvent(m_hEvt);
 		m_exitThread = false;
 		m_param = param;
-		m_thread = (HANDLE)_beginthreadex(NULL, 0, EventThreadFnc, this, 0, &m_threadID);
+
+		// Use AfxBeginThread so MFC properly tracks thread lifecycle.
+		// This prevents mtex.cpp:90 debug assertion during DLL detach
+		// because MFC cleans up thread state for threads it knows about.
+		CWinThread* pThread = AfxBeginThread(EventThreadFnc, this, THREAD_PRIORITY_NORMAL, 0, 0);
+		if (pThread == NULL)
+		{
+			Log(_T("ERROR: AfxBeginThread failed in CEventThread::Start"));
+			return;
+		}
+
+		m_hThread = pThread->m_hThread;
+		m_threadID = pThread->m_nThreadID;
+		// CWinThread auto-deletes when thread exits (m_bAutoDelete = TRUE)
 
 		// now wait until the thread is up and really running
 		WaitForSingleObject(m_hEvt, 1000);

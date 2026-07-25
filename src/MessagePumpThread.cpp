@@ -22,8 +22,17 @@ void CMessagePumpThread::Start()
 {
 	m_hEvt = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	m_thread = _beginthreadex(NULL, 0, MessagePumpThread, this, 0, &m_threadID);
-	if (0 == m_thread)
+	// Use AfxBeginThread so MFC properly tracks thread lifecycle.
+	// This prevents mtex.cpp:90 debug assertion during DLL detach
+	// because MFC cleans up thread state for threads it knows about.
+	CWinThread* pThread = AfxBeginThread(MessagePumpThread, this, THREAD_PRIORITY_NORMAL, 0, 0);
+	if (pThread != NULL)
+	{
+		m_thread = pThread->m_hThread;
+		m_threadID = pThread->m_nThreadID;
+		// CWinThread auto-deletes when thread exits (m_bAutoDelete = TRUE)
+	}
+	else
 	{
 		throw "Could not create thread";
 	}

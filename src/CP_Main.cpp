@@ -965,6 +965,14 @@ int CCP_MainApp::ExitInstance()
 	// Signal Cloud Sync to stop (bounded wait, threads were signaled in OnClose)
 	m_CloudSyncManager.Stop();
 
+	// Wait for CloudSync threads to fully exit before MFC cleanup.
+	// This ensures MFC thread state is properly cleaned up before DLL detach,
+	// preventing mtex.cpp:90 debug assertion.
+	if (!m_CloudSyncManager.WaitForAllThreads(3000))
+	{
+		Log(_T("WARNING: CloudSync threads did not exit within timeout"));
+	}
+
 	// Quick wait for OCR threads to finish before DLL unload
 	{
 		int ocrWait = 0;

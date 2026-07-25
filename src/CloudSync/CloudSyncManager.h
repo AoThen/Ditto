@@ -93,6 +93,12 @@ public:
 	void ForceDownloadAll();
 	void ForceUploadAll();
 
+	// Wait for all background threads to complete.
+	// Called during ExitInstance before CWinApp::ExitInstance() to ensure
+	// threads have exited and MFC thread state is cleaned up.
+	// Returns TRUE if all threads exited, FALSE if timeout occurred.
+	BOOL WaitForAllThreads(DWORD timeoutMs);
+
 private:
 	// Ensure HTTP client is created/reused for the current server URL
 	void EnsureHttpClient();

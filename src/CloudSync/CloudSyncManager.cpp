@@ -453,6 +453,88 @@ void CCloudSyncManager::Stop()
 	// The event handle is a kernel object; the OS will clean it up on process exit.
 }
 
+BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
+{
+	// Collect all thread handles to wait for
+	HANDLE handles[3] = { NULL, NULL, NULL };
+	int count = 0;
+
+	if (m_hSyncThread != NULL)
+	{
+		handles[count++] = m_hSyncThread;
+	}
+	if (m_hWsThread != NULL)
+	{
+		handles[count++] = m_hWsThread;
+	}
+	if (m_hEncRetryThread != NULL)
+	{
+		handles[count++] = m_hEncRetryThread;
+	}
+
+	if (count == 0 && m_nActiveQuickSyncThreads == 0)
+	{
+		return TRUE; // No threads to wait for
+	}
+
+	// Use deadline-based timeout to ensure total wait doesn't exceed timeoutMs
+	DWORD deadline = GetTickCount() + timeoutMs;
+
+	// Wait for all tracked thread handles
+	if (count > 0)
+	{
+		DWORD remaining = deadline - GetTickCount();
+		if (remaining == 0 || remaining > timeoutMs) // overflow check
+		{
+			remaining = timeoutMs;
+		}
+		DWORD dwWait = WaitForMultipleObjects(count, handles, TRUE, remaining);
+		if (dwWait == WAIT_TIMEOUT)
+		{
+			OutputDebugString(_T("[CloudSync] WARNING: Timeout waiting for CloudSync threads to exit.\n"));
+			return FALSE;
+		}
+		if (dwWait == WAIT_FAILED)
+		{
+			OutputDebugString(_T("[CloudSync] ERROR: WaitForMultipleObjects failed in WaitForAllThreads.\n"));
+			return FALSE;
+		}
+
+		// All threads exited - close handles
+		if (m_hSyncThread != NULL)
+		{
+			CloseHandle(m_hSyncThread);
+			m_hSyncThread = NULL;
+		}
+		if (m_hWsThread != NULL)
+		{
+			CloseHandle(m_hWsThread);
+			m_hWsThread = NULL;
+		}
+		if (m_hEncRetryThread != NULL)
+		{
+			CloseHandle(m_hEncRetryThread);
+			m_hEncRetryThread = NULL;
+		}
+	}
+
+	// Wait for active quick-push threads to complete (use remaining time)
+	if (m_nActiveQuickSyncThreads > 0)
+	{
+		while (m_nActiveQuickSyncThreads > 0)
+		{
+			Sleep(50);
+			if (GetTickCount() > deadline)
+			{
+				OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads in WaitForAllThreads.\n"));
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
 void CCloudSyncManager::SignalStop()
 {
 	if (m_hStopEvent != nullptr)
