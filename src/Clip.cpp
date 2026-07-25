@@ -1090,6 +1090,15 @@ int CClip::FindDuplicate()
 			CGetSetOptions::m_allowBackToBackDuplicates)
 			return -1;
 
+		//0. Quick CRC cache: if the CRC matches the last added clip, return immediately
+		//   This avoids expensive database queries and text fallback when the same
+		//   text is being copied repeatedly (e.g., from delayed rendering or app focus loss).
+		if (!CGetSetOptions::m_bAllowDuplicates && m_CRC == m_LastAddedCRC && m_LastAddedCRC != 0)
+		{
+			Log(StrF(_T("FindDuplicate: CRC cache hit, id=%d"), m_lastAddedID));
+			return m_lastAddedID;
+		}
+
 		//1. CRC match in database
 		int nID = -1;
 		{

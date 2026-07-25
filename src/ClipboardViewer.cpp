@@ -25,6 +25,7 @@ CClipboardViewer::CClipboardViewer(CCopyThread* pHandler) :
 	m_bIsConnected(false),
 	m_bConnect(false),
 	m_dwLastCopy(0),
+	m_bProcessingClipboardChange(false),
 	m_connectOnStartup(true)
 {
 	m_activeWindowTitle = _T("");
@@ -276,9 +277,21 @@ bool CClipboardViewer::GetIgnoreClipboardChange()
 //Message that the clipboard data has changed
 void CClipboardViewer::OnDrawClipboard() 
 {
+	// Reentrancy guard: if we're already processing a clipboard change
+	// (e.g., WM_CLIPBOARDUPDATE sent synchronously during SetClipboardData),
+	// skip setting a new timer to avoid the reset loop.
+	if (m_bProcessingClipboardChange)
+	{
+		Log(_T("OnDrawClipboard:: reentrancy guard active, skipping"));
+		return;
+	}
+
+	m_bProcessingClipboardChange = true;
+
 	if(::IsClipboardFormatAvailable(theApp.m_PingFormat))
 	{
 		m_bPinging = false;
+		m_bProcessingClipboardChange = false;
 		return;
 	}
 
@@ -316,6 +329,8 @@ void CClipboardViewer::OnDrawClipboard()
 			m_hNextClipboardViewer = NULL;
 		}
 	}
+
+	m_bProcessingClipboardChange = false;
 }
 
 bool CClipboardViewer::ValidActiveWnd()

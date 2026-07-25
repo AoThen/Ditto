@@ -1755,6 +1755,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 	m_noSearchResults = false;
 	m_lstHeader.SetItemCount(0);
+	m_lstHeader.Invalidate();
 	m_lstHeader.RefreshVisibleRows();
 
 	CPoint loadItem(-1, m_lstHeader.GetCountPerPage() + 2);

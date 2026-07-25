@@ -52,6 +52,12 @@ public:
 
 	DWORD m_dwLastCopy;
 
+	// Reentrancy guard: prevents OnDrawClipboard from setting a new timer
+	// while a clipboard change is already being processed. This breaks the
+	// loop caused by WM_CLIPBOARDUPDATE being sent synchronously during
+	// SetClipboardData (delayed rendering) while OnClipboardChange is running.
+	bool m_bProcessingClipboardChange;
+
 	// Generated message map functions
 protected:
 	//{{AFX_MSG(CClipboardViewer)
