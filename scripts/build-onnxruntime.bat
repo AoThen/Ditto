@@ -295,7 +295,7 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime_common.lib" (
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime_*.lib" 2>nul
 )
 
-dir /b "%STATIC_INSTALL_DIR%\lib\absl_*.lib" >nul 2>nul && (
+if exist "%STATIC_INSTALL_DIR%\lib\absl_base.lib" (
     echo [BUILD]   Removing absl_*.lib files (merged into onnxruntime.lib)...
     del "%STATIC_INSTALL_DIR%\lib\absl_*.lib" 2>nul
 )
