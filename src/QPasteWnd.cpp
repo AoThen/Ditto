@@ -6614,6 +6614,11 @@ LRESULT CQPasteWnd::OnFillRestOfList(WPARAM wParam, LPARAM lParam)
 	int iFrom = (int)wParam;
 	int iTo = (int)lParam;
 
+	if (iFrom > iTo)
+	{
+		return TRUE;
+	}
+
 	ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
 	if (iFrom >= 0 && iTo < (int)m_listItems.size())
@@ -6642,9 +6647,8 @@ LRESULT CQPasteWnd::OnFillRestOfList(WPARAM wParam, LPARAM lParam)
 	if (addToLoadItems)
 	{
 		m_loadItems.push_back(CPoint(iFrom, iTo));
+		m_thread.FireLoadItems(false);
 	}
-
-	m_thread.FireLoadItems(false);
 
 	return TRUE;
 }

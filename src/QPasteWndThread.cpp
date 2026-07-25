@@ -113,13 +113,10 @@ void CQPasteWndThread::OnLoadItems(void *param)
 	    if(clearFirstLoadItem)
 	    {
 			// Skip empty load items to avoid SQL LIMIT 0 and infinite loop
-			if (loadItemsCount <= 0)
+ 			if (loadItemsCount <= 0)
 			{
-				Log(StrF(_T("OnLoadItems skipping empty load item, index=%d, count=%d"), loadItemsIndex, loadItemsCount));
-				{
-					ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
-					pasteWnd->m_loadItems.erase(pasteWnd->m_loadItems.begin());
-				}
+				ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
+				pasteWnd->m_loadItems.erase(pasteWnd->m_loadItems.begin());
 				continue;
 			}
 
