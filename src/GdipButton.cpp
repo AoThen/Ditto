@@ -484,7 +484,9 @@ void CGdipButton::PaintBtn(CDC *pDC)
 	CRect rect;
 	GetClientRect(rect);
 	BOOL bRes = pDC->BitBlt(0, 0, rect.Width(), rect.Height(), m_pCurBtn, 0, 0, SRCCOPY);
+#ifdef _DEBUG
 	Log(StrF(_T("DBG_GDIP_PaintBtn: res=%d"), bRes));
+#endif
 }
 
 //=============================================================================
@@ -564,9 +566,11 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	CRect rect;
 	GetClientRect(rect);
 
+#ifdef _DEBUG
 	Log(StrF(_T("DBG_GDIP_Enter: hWnd=0x%X r=(%d,%d,%d,%d) pImg=0x%p dcStd=0x%p bHave=%d"),
 		(UINT)(UINT_PTR)m_hWnd, rect.left, rect.top, rect.Width(), rect.Height(),
 		m_pStdImage, m_dcStd.m_hDC, m_bHaveBitmaps));
+#endif
 
 	if (m_pStdImage && rect.Width() > 0 && rect.Height() > 0)
 	{
@@ -577,34 +581,46 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			if (m_bmpStd.GetBitmap(&bm))
 			{
 				BOOL bMatch = (bm.bmWidth == rect.Width() && bm.bmHeight == rect.Height());
+#ifdef _DEBUG
 				Log(StrF(_T("DBG_GDIP_BM: bm=(%d,%d) r=(%d,%d) match=%d"),
 					bm.bmWidth, bm.bmHeight, rect.Width(), rect.Height(), bMatch));
+#endif
 				bNeedCreate = !bMatch;
 			}
 			else
 			{
+#ifdef _DEBUG
 				Log(_T("DBG_GDIP_BM: GetBitmap FAILED"));
+#endif
 			}
 		}
 		else
 		{
+#ifdef _DEBUG
 			Log(_T("DBG_GDIP_BM: dcStd==NULL"));
+#endif
 		}
 		if (bNeedCreate)
 		{
+#ifdef _DEBUG
 			Log(_T("DBG_GDIP_Create: START"));
+#endif
 			ClearBitmaps();
 			CtlColor(pDC, WM_CTLCOLORBTN);
+#ifdef _DEBUG
 			Log(StrF(_T("DBG_GDIP_Create: END dcStd=0x%p pCurBtn=0x%p bHave=%d"),
 				m_dcStd.m_hDC, m_pCurBtn, m_bHaveBitmaps));
+#endif
 		}
 	}
 	else
 	{
+#ifdef _DEBUG
 		if (!m_pStdImage)
 			Log(_T("DBG_GDIP_Skip: pImg==NULL"));
 		if (rect.Width() <= 0 || rect.Height() <= 0)
 			Log(StrF(_T("DBG_GDIP_Skip: r=(%d,%d)"), rect.Width(), rect.Height()));
+#endif
 	}
 
 	// safety: if we have a valid image but pCurBtn is invalid, recreate bitmaps
@@ -612,7 +628,9 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	{
 		if (m_pCurBtn == NULL || m_pCurBtn->m_hDC == NULL)
 		{
+#ifdef _DEBUG
 			Log(_T("DBG_GDIP_Recover: pCurBtn invalid, recreating bitmaps"));
+#endif
 			ClearBitmaps();
 			CtlColor(pDC, WM_CTLCOLORBTN);
 		}
@@ -622,9 +640,13 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 	if(m_bIsDisabled)
 	{
 		m_pCurBtn = &m_dcGS;
+#ifdef _DEBUG
 		Log(StrF(_T("DBG_GDIP_PrePaint: DISABLED pCurBtn=0x%p hDC=0x%p"), m_pCurBtn, (m_pCurBtn ? m_pCurBtn->m_hDC : 0)));
+#endif
 		PaintBtn(pDC);
+#ifdef _DEBUG
 		Log(_T("DBG_GDIP_Exit: DISABLED"));
+#endif
 		return;
 	}
 
@@ -659,14 +681,18 @@ void CGdipButton::DrawItem(LPDRAWITEMSTRUCT lpDIS)
 			m_pCurBtn = &m_dcAlt;
 	}
 
+#ifdef _DEBUG
 	Log(StrF(_T("DBG_GDIP_PrePaint: pCurBtn=0x%p hDC=0x%p dis=%d hov=%d sel=%d"),
 		m_pCurBtn, (m_pCurBtn ? m_pCurBtn->m_hDC : 0),
 		m_bIsDisabled, m_bIsHovering, bIsPressed));
+#endif
 
 	// paint the button
 	PaintBtn(pDC);
 
+#ifdef _DEBUG
 	Log(_T("DBG_GDIP_Exit"));
+#endif
 }
 
 //=============================================================================

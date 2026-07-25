@@ -857,7 +857,9 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 	}
 	else if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
 	{
+#ifdef _DEBUG
 		Log(StrF(_T("DBG_GDIP_OnActivate: ACTIVE bMin=%d m_bShowQP=%d"), bMinimized, theApp.m_bShowingQuickPaste));
+#endif
 
 		if (bMinimized == FALSE)
 		{
@@ -1061,7 +1063,9 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 	}
 	else
 	{
+#ifdef _DEBUG
 		Log(StrF(_T("DBG_GDIP_ShowQP: MoveControls bFill=%d"), bFillList));
+#endif
 		MoveControls();
 	}
 
@@ -3182,7 +3186,10 @@ void CQPasteWnd::SetKeyModiferState(bool bActive)
 {
 	if (CGetSetOptions::m_moveSelectionOnOpenHotkey)
 	{
-		Log(StrF(_T("SetKeyModiferState %d"), bActive));
+		if (m_bModifersMoveActive != bActive)
+		{
+			Log(StrF(_T("SetKeyModiferState %d"), bActive));
+		}
 		m_bModifersMoveActive = bActive;
 	}
 }

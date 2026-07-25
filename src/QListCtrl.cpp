@@ -1251,10 +1251,7 @@ BOOL CQListCtrl::OnEraseBkgnd(CDC* pDC)
 {
 	CRect rect;
 	GetClientRect(&rect);
-	auto bgColor = CGetSetOptions::m_Theme.MainWindowBG();
-	Log(StrF(_T("OnEraseBkgnd - MainWindowBG = RGB(%d,%d,%d)"),
-		GetRValue(bgColor), GetGValue(bgColor), GetBValue(bgColor)));
-	pDC->FillSolidRect(rect, bgColor);
+	pDC->FillSolidRect(rect, CGetSetOptions::m_Theme.MainWindowBG());
 	return TRUE;
 }
 

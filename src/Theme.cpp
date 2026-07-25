@@ -81,7 +81,13 @@ bool CTheme::Load(CString csTheme, bool bHeaderOnly, bool bCheckLastWriteTime)
 		if (DarkAppWindows10Setting())
 		{
 			csTheme = _T("DarkerDitto");
-			Log(_T("Loading theme based on windows setting of dark mode for apps"));			
+			static DWORD lastLog = 0;
+			DWORD now = GetTickCount();
+			if (now - lastLog > 60000)
+			{
+				Log(_T("Loading theme based on windows setting of dark mode for apps"));
+				lastLog = now;
+			}
 		}
 	}
 

@@ -782,7 +782,6 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
                     }
                     else
                     {
-                        Log(StrF(_T("Timer KEY_STATE_MODIFIERS count NOT hit(%d), count (%d) time (%d)"), CGetSetOptions::GetKeyStateWaitTimerCount(), m_keyModifiersTimerCount, waitTime));
                         m_quickPaste.SetKeyModiferState(false);
                     }
 
