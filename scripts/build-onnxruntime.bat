@@ -98,7 +98,7 @@ echo [BUILD] Step 1b/6: Building re2 as standalone static library...
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
 set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
-set "ABSL_CMAKE_DIR=%BUILD_DIR%\absl-install\lib\cmake\absl"
+set "ABSL_CMAKE_DIR=%CD%\%BUILD_DIR%\absl-install\lib\cmake\absl"
 
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
