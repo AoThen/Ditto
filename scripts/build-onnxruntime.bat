@@ -50,6 +50,7 @@ echo [BUILD] Step 1a/6: Building absl from source...
 
 set "ABSL_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\abseil_cpp-src"
 set "ABSL_BUILD_DIR=%BUILD_DIR%\absl-external"
+set "ABSL_INSTALL_DIR=%BUILD_DIR%\absl-install"
 
 if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found absl source at: %ABSL_SRC_DIR%
@@ -71,6 +72,12 @@ if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
             echo [BUILD] WARNING: absl build failed
         ) else (
             echo [BUILD]   absl built successfully
+            cmake --install "%ABSL_BUILD_DIR%" --config %CONFIG% --prefix "%ABSL_INSTALL_DIR%"
+            if errorlevel 1 (
+                echo [BUILD] WARNING: absl install failed
+            ) else (
+                echo [BUILD]   absl installed to %ABSL_INSTALL_DIR%
+            )
         )
     )
 ) else (
@@ -91,7 +98,7 @@ echo [BUILD] Step 1b/6: Building re2 as standalone static library...
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
 set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
-set "ABSL_BUILD_DIR=%BUILD_DIR%\absl-external"
+set "ABSL_CMAKE_DIR=%BUILD_DIR%\absl-install\lib\cmake\absl"
 
 if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
     echo [BUILD]   Found re2 source at: %RE2_SRC_DIR%
@@ -103,7 +110,7 @@ if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
         -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
         -DBUILD_SHARED_LIBS=OFF ^
         -DRE2_BUILD_TESTING=OFF ^
-        -Dabsl_DIR="%ABSL_BUILD_DIR%"
+        -Dabsl_DIR="%ABSL_CMAKE_DIR%"
 
     if errorlevel 1 (
         echo [BUILD] WARNING: re2 cmake configure failed
@@ -277,6 +284,23 @@ if "!all_libs!" == "" (
     )
 )
 echo [BUILD] Step 4c/6 complete.
+
+REM -------------------------------------------------------------------
+REM 4c2. Remove redundant individual libs (merged into onnxruntime.lib)
+REM -------------------------------------------------------------------
+echo [BUILD] Step 4c2/6: Removing redundant individual libs...
+
+if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime_common.lib" (
+    echo [BUILD]   Removing onnxruntime_*.lib (merged into onnxruntime.lib)...
+    del "%STATIC_INSTALL_DIR%\lib\onnxruntime_*.lib" 2>nul
+)
+
+dir /b "%STATIC_INSTALL_DIR%\lib\absl_*.lib" >nul 2>nul && (
+    echo [BUILD]   Removing absl_*.lib files (merged into onnxruntime.lib)...
+    del "%STATIC_INSTALL_DIR%\lib\absl_*.lib" 2>nul
+)
+
+echo [BUILD] Step 4c2/6 complete.
 
 REM -------------------------------------------------------------------
 REM 4d. Verify re2 symbols in onnxruntime.lib
