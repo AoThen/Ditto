@@ -3848,6 +3848,7 @@ public:
   bool send(const char *data, size_t len);
   void close(CloseStatus status = CloseStatus::Normal,
              const std::string &reason = "");
+  void close_socket();
   bool is_open() const;
   const std::string &subprotocol() const;
   void set_read_timeout(time_t sec, time_t usec = 0);
@@ -20368,6 +20369,14 @@ inline bool WebSocketClient::send(const char *data, size_t len) {
 inline void WebSocketClient::close(CloseStatus status,
                                    const std::string &reason) {
   if (ws_) { ws_->close(status, reason); }
+}
+
+inline void WebSocketClient::close_socket() {
+  if (sock_ != INVALID_SOCKET) {
+    detail::shutdown_socket(sock_);
+    detail::close_socket(sock_);
+    sock_ = INVALID_SOCKET;
+  }
 }
 
 inline bool WebSocketClient::is_open() const { return ws_ && ws_->is_open(); }

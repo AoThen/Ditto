@@ -3310,6 +3310,11 @@ void CCloudSyncManager::StopWebSocket()
 		{
 			wsClient->close(httplib::ws::CloseStatus::Normal, "Shutdown");
 		}
+		// Forcibly close the underlying socket to interrupt WS thread's read()
+		// If the server doesn't respond to the close frame, wsClient->read()
+		// would block for up to 300s (default read timeout), preventing the
+		// WS thread from exiting and triggering mtex.cpp:90 assertion on DLL detach.
+		wsClient->close_socket();
 	}
 	LeaveCriticalSection(&m_csWsClient);
 
