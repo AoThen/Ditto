@@ -21,7 +21,7 @@ echo [BUILD] ===================================================================
 REM -------------------------------------------------------------------
 REM 1. Configure via ORT's build.py
 REM -------------------------------------------------------------------
-echo [BUILD] Step 1/6: Running build.py (configure + build)...
+echo [BUILD] Step 1/6: Running build.py (configure + build)
 
 python tools\ci_build\build.py ^
     --build_dir %BUILD_DIR% ^
@@ -46,7 +46,7 @@ REM absl is fetched via FetchContent with EXCLUDE_FROM_ALL, so it is
 REM downloaded but NOT compiled by the main build. We build it explicitly
 REM so that re2 (which depends on absl) can be built standalone.
 
-echo [BUILD] Step 1a/6: Building absl from source...
+echo [BUILD] Step 1a/6: Building absl from source
 
 set "ABSL_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\abseil_cpp-src"
 set "ABSL_BUILD_DIR=%BUILD_DIR%\absl-external"
@@ -94,7 +94,7 @@ REM re2 source is downloaded but NOT compiled by the main build. We build it
 REM explicitly to ensure the static library is available for merging.
 REM re2 depends on absl, which we build standalone in Step 1a.
 
-echo [BUILD] Step 1b/6: Building re2 as standalone static library...
+echo [BUILD] Step 1b/6: Building re2 as standalone static library
 
 set "RE2_SRC_DIR=%BUILD_DIR%\%CONFIG%\_deps\re2-src"
 set "RE2_BUILD_DIR=%BUILD_DIR%\re2-external"
@@ -137,7 +137,7 @@ echo [BUILD] Step 1b/6 complete.
 REM -------------------------------------------------------------------
 REM 2. CMake --install (build.py already built, now install)
 REM -------------------------------------------------------------------
-echo [BUILD] Step 2/6: cmake --install...
+echo [BUILD] Step 2/6: cmake --install
 
 cmake --install "%BUILD_DIR%\%CONFIG%" --config %CONFIG%
 if errorlevel 1 (
@@ -158,14 +158,14 @@ if exist "%INSTALL_DIR%" (
 REM -------------------------------------------------------------------
 REM 3. Collect static libs from the link tlog
 REM -------------------------------------------------------------------
-echo [BUILD] Step 3/6: Collecting static libs from link tlog...
+echo [BUILD] Step 3/6: Collecting static libs from link tlog
 
 set TLOG=%BUILD_DIR%\%CONFIG%\onnxruntime.dir\%CONFIG%\onnxruntime.tlog\link.read.1.tlog
 echo [BUILD] Looking for tlog: %TLOG%
 
 set libs=
 if exist "%TLOG%" (
-    echo [BUILD] Tlog found, parsing...
+    echo [BUILD] Tlog found, parsing
     for /f "delims=" %%L in ('type "%TLOG%"') do (
         set LINE=%%L
         set LINE=!LINE:^=!
@@ -192,7 +192,7 @@ if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
 if "!libs!" == "" (
     echo [BUILD] Step 4/6: Skipping lib merge [no libs from tlog]
 ) else (
-    echo [BUILD] Step 4/6: Merging static libs...
+    echo [BUILD] Step 4/6: Merging static libs
     where lib.exe >nul 2>nul
     if errorlevel 1 (
         echo [BUILD] WARNING: lib.exe not found, copying libs individually
@@ -203,7 +203,7 @@ if "!libs!" == "" (
             )
         )
     ) else (
-        echo [BUILD] Merging with lib.exe...
+        echo [BUILD] Merging with lib.exe
         lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !libs!
         if errorlevel 1 (
             echo [BUILD] WARNING: lib.exe failed to merge, copying libs individually
@@ -220,7 +220,7 @@ echo [BUILD] Step 4/6 complete.
 REM -------------------------------------------------------------------
 REM 4b. Collect third-party libs from build tree
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4b/6: Collecting third-party libs from build tree...
+echo [BUILD] Step 4b/6: Collecting third-party libs from build tree
 
 REM The install directory only contains onnxruntime's own libs.
 REM Third-party deps (protobuf, re2, onnx, absl, etc.) are in the build tree.
@@ -239,7 +239,7 @@ for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
 
 REM Ensure re2.lib is collected (onnxruntime contrib_ops depend on it)
 if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
-    echo [BUILD] re2.lib not found in install-static/lib, searching build tree...
+    echo [BUILD] re2.lib not found in install-static/lib, searching build tree
     set "RE2_FOUND=0"
     for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\re2.lib" 2^>nul') do (
         copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
@@ -261,7 +261,7 @@ echo [BUILD] Step 4b/6 complete.
 REM -------------------------------------------------------------------
 REM 4c. Merge ALL libs into a single onnxruntime.lib
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4c/6: Merging all libs into onnxruntime.lib...
+echo [BUILD] Step 4c/6: Merging all libs into onnxruntime.lib
 
 if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
@@ -275,7 +275,7 @@ for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
 if "!all_libs!" == "" (
     echo [BUILD] WARNING: No libs found in install-static/lib
 ) else (
-    echo [BUILD] Merging all libs into onnxruntime.lib...
+    echo [BUILD] Merging all libs into onnxruntime.lib
     lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !all_libs!
     if errorlevel 1 (
         echo [BUILD] WARNING: Final merge failed
@@ -288,15 +288,15 @@ echo [BUILD] Step 4c/6 complete.
 REM -------------------------------------------------------------------
 REM 4c2. Remove redundant individual libs (merged into onnxruntime.lib)
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4c2/6: Removing redundant individual libs...
+echo [BUILD] Step 4c2/6: Removing redundant individual libs
 
 if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime_common.lib" (
-    echo [BUILD]   Removing onnxruntime_*.lib (merged into onnxruntime.lib)...
+    echo [BUILD]   Removing onnxruntime_*.lib (merged into onnxruntime.lib)
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime_*.lib" 2>nul
 )
 
 if exist "%STATIC_INSTALL_DIR%\lib\absl_base.lib" (
-    echo [BUILD]   Removing absl_*.lib files (merged into onnxruntime.lib)...
+    echo [BUILD]   Removing absl_*.lib files (merged into onnxruntime.lib)
     del "%STATIC_INSTALL_DIR%\lib\absl_*.lib" 2>nul
 )
 
@@ -305,7 +305,7 @@ echo [BUILD] Step 4c2/6 complete.
 REM -------------------------------------------------------------------
 REM 4d. Verify re2 symbols in onnxruntime.lib
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4d/6: Verifying re2 symbols in onnxruntime.lib...
+echo [BUILD] Step 4d/6: Verifying re2 symbols in onnxruntime.lib
 
 if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     where dumpbin >nul 2>nul
@@ -331,12 +331,12 @@ echo [BUILD] Step 4d/6 complete.
 REM -------------------------------------------------------------------
 REM 5. Flatten headers
 REM -------------------------------------------------------------------
-echo [BUILD] Step 5/6: Flattening headers...
+echo [BUILD] Step 5/6: Flattening headers
 
 if not exist "%STATIC_INSTALL_DIR%\include" mkdir "%STATIC_INSTALL_DIR%\include"
 
 if exist "%INSTALL_DIR%\include\onnxruntime" (
-    echo [BUILD] Copying onnxruntime headers...
+    echo [BUILD] Copying onnxruntime headers
     xcopy "%INSTALL_DIR%\include\onnxruntime" "%STATIC_INSTALL_DIR%\include" /s /e /y >nul
 )
 
@@ -352,7 +352,7 @@ echo [BUILD] Step 5/6 complete.
 REM -------------------------------------------------------------------
 REM 6. Create OnnxRuntimeConfig.cmake
 REM -------------------------------------------------------------------
-echo [BUILD] Step 6/6: Creating cmake config...
+echo [BUILD] Step 6/6: Creating cmake config
 
 if not exist "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime" mkdir "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime"
 (
