@@ -322,9 +322,18 @@ void CCloudSyncManager::StopEncryptionRetry()
 
 	if (m_hEncRetryThread != NULL)
 	{
-		WaitForSingleObject(m_hEncRetryThread, 1000);
-		CloseHandle(m_hEncRetryThread);
-		m_hEncRetryThread = NULL;
+		DWORD dwWait = WaitForSingleObject(m_hEncRetryThread, 1000);
+		if (dwWait == WAIT_OBJECT_0)
+		{
+			LogMessage(_T("StopEncryptionRetry: retry thread exited cleanly."));
+			CloseHandle(m_hEncRetryThread);
+			m_hEncRetryThread = NULL;
+		}
+		else
+		{
+			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 1s, detaching."));
+			// Leave handle open — WaitForAllThreads will wait again and close it
+		}
 	}
 
 	if (m_hEncRetryStop != nullptr)
@@ -526,7 +535,7 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 			Sleep(50);
 			if (GetTickCount() > deadline)
 			{
-				OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads in WaitForAllThreads.\n"));
+				OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads in WaitForAllThreads.\n");
 				return FALSE;
 			}
 		}
