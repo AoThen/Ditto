@@ -302,15 +302,9 @@ void CEventThread::RunThread()
 			{
 				GetHandleVector(handles);				
 			}
-			else
+ 		else
 			{
-#ifdef _DEBUG
-				Log(StrF(_T("Start of CEventThread::RunThread() - OnEvent %d - Name %s"), eventId, m_threadName));
-#endif
 				OnEvent(eventId, m_param);
-#ifdef _DEBUG
-				Log(StrF(_T("End of CEventThread::RunThread() - OnEvent %d - Name: %s"), eventId, m_threadName));
-#endif
 			}
 		}
 	}

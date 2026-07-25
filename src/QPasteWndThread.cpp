@@ -30,13 +30,8 @@ void CQPasteWndThread::OnTimeOut(void *param)
 {
 }
 
-void CQPasteWndThread::OnEvent(int eventId, void *param)
+ void CQPasteWndThread::OnEvent(int eventId, void *param)
 {
-	DWORD startTick = GetTickCount();
-#ifdef _DEBUG
-	Log(StrF(_T("Start of OnEvent, eventId: %s"), EnumName((eCQPasteWndThreadEvents)eventId)));
-#endif
-
     switch((eCQPasteWndThreadEvents)eventId)
     {
         case DO_SET_LIST_COUNT:
@@ -55,11 +50,6 @@ void CQPasteWndThread::OnEvent(int eventId, void *param)
             OnLoadExtraData(param);
             break;
     }
-
-	DWORD length = GetTickCount() - startTick;
-#ifdef _DEBUG
-	Log(StrF(_T("End of OnEvent, eventId: %s, Time: %d(ms)"), EnumName((eCQPasteWndThreadEvents)eventId), length));
-#endif
 }
 
 void CQPasteWndThread::OnSetListCount(void *param)
@@ -231,16 +221,10 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					pasteWnd->m_loadItems.erase(pasteWnd->m_loadItems.begin());
 				}
 
-				if(totalLoaded > 0)
+ 			if(totalLoaded > 0)
 				{
 					Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), totalLoaded, GetTickCount() - startTick, elapsedLoad, countCount, acceleratorCount));
 				}
-#ifdef _DEBUG
-				else
-				{
-					Log(StrF(_T("Load items End count = %d, Total Time = %d, LoadItems: %d, Count: %d, Accel: %d"), totalLoaded, GetTickCount() - startTick, elapsedLoad, countCount, acceleratorCount));
-				}
-#endif
 			}
 			catch (CppSQLite3Exception& e)	\
 			{								\

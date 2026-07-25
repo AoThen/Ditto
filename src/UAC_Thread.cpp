@@ -55,11 +55,8 @@ void CUAC_Thread::OnTimeOut(void *param)
 	CloseHandle(hProcess);
 }
 
-void CUAC_Thread::OnEvent(int eventId, void *param)
+ void CUAC_Thread::OnEvent(int eventId, void *param)
 {
-	DWORD startTick = GetTickCount();
-	Log(StrF(_T("Start of OnEvent, eventId: %s"), EnumName((eUacThreadEvents)eventId)));
-
 	switch((eUacThreadEvents)eventId)
 	{
 	case UAC_PASTE:
@@ -75,9 +72,6 @@ void CUAC_Thread::OnEvent(int eventId, void *param)
 		this->CancelThread();
 		break;
 	}
-
-	DWORD length = GetTickCount() - startTick;
-	Log(StrF(_T("End of OnEvent, eventId: %s, Time: %d(ms)"), EnumName((eUacThreadEvents)eventId), length));
 }
 
 CString CUAC_Thread::EnumName(eUacThreadEvents e)

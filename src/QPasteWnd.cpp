@@ -855,11 +855,8 @@ void CQPasteWnd::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
 
 		m_lstHeader.HidePopup(true);
 	}
-	else if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
+ 	else if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
 	{
-#ifdef _DEBUG
-		Log(StrF(_T("DBG_GDIP_OnActivate: ACTIVE bMin=%d m_bShowQP=%d"), bMinimized, theApp.m_bShowingQuickPaste));
-#endif
 
 		if (bMinimized == FALSE)
 		{
@@ -1061,11 +1058,8 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 		m_bHandleSearchTextChange = true;
 		FillList();
 	}
-	else
+ 	else
 	{
-#ifdef _DEBUG
-		Log(StrF(_T("DBG_GDIP_ShowQP: MoveControls bFill=%d"), bFillList));
-#endif
 		MoveControls();
 	}
 
