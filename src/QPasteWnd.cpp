@@ -510,6 +510,7 @@ int CQPasteWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	//LVS_EX_FLATSB
 	m_lstHeader.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_HEADERDRAGDROP | LVS_EX_DOUBLEBUFFER);
+	m_lstHeader.SetBkColor(CGetSetOptions::m_Theme.MainWindowBG());
 
 	// Create the columns
 	if (m_lstHeader.InsertColumn(0, _T(""), LVCFMT_LEFT, 2500, 0) != 0)
@@ -1036,6 +1037,8 @@ BOOL CQPasteWnd::ShowQPasteWindow(BOOL bFillList)
 		m_systemMenu.Invalidate();
 		m_ShowGroupsFolderBottom.Invalidate();
 		m_BackButton.Invalidate();
+
+		m_lstHeader.SetBkColor(CGetSetOptions::m_Theme.MainWindowBG());
 	}
 
 	SetCaptionColorActive(CGetSetOptions::m_bShowPersistent, theApp.GetConnectCV());
@@ -2312,6 +2315,8 @@ void CQPasteWnd::UpdateFont()
 	m_noSearchResultsStatic.SetBkColor(CGetSetOptions::m_Theme.MainWindowBG());
 	m_noSearchResultsStatic.SetTextColor(CGetSetOptions::m_Theme.ListBoxEvenRowsText());
 	m_noSearchResultsStatic.SetFont(&m_SearchFont);
+
+	m_lstHeader.SetBkColor(CGetSetOptions::m_Theme.MainWindowBG());
 
 	m_lstHeader.CreateSmallFont();
 }
