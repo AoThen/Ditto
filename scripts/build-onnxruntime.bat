@@ -30,7 +30,12 @@ python tools\ci_build\build.py ^
     --skip_tests ^
     --cmake_generator "Visual Studio 17 2022" ^
     --enable_msvc_static_runtime ^
-    --cmake_extra_defines "CMAKE_INSTALL_PREFIX=install" "onnxruntime_BUILD_UNIT_TESTS=OFF" "onnxruntime_ENABLE_PYTHON=OFF"
+    --cmake_extra_defines ^
+        "CMAKE_INSTALL_PREFIX=install" ^
+        "onnxruntime_BUILD_UNIT_TESTS=OFF" ^
+        "onnxruntime_ENABLE_PYTHON=OFF" ^
+        "CMAKE_MSVC_RUNTIME_LIBRARY:STRING=MultiThreaded" ^
+        "ABSL_MSVC_STATIC_RUNTIME=ON"
 
 if errorlevel 1 (
     set ERR=!errorlevel!

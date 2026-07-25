@@ -51,7 +51,7 @@
     <OcrOnnxDir>onnxruntime-static</OcrOnnxDir>
     <OcrOpencvDir>opencv-static</OcrOpencvDir>
     <OcrOpencvLibs>opencv_world4140.lib</OcrOpencvLibs>
-    <OcrExtraLibs></OcrExtraLibs>
+    <OcrExtraLibs>ittnotify.lib;zlib.lib</OcrExtraLibs>
   </PropertyGroup>
   <PropertyGroup>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Configuration)64\Addins\DittoOCR\</OutDir>
