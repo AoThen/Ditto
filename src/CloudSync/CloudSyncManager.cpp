@@ -83,8 +83,8 @@ BOOL CCloudSyncManager::IsEncryptionExpected()
 CCloudSyncManager::CCloudSyncManager()
 	: m_hStopEvent(nullptr)
 	, m_hWsTrigger(nullptr)
-	, m_hSyncThread(NULL)
-	, m_hWsThread(NULL)
+	, m_pSyncThread(nullptr)
+	, m_pWsThread(nullptr)
 	, m_cryptoInitialized(FALSE)
 	, m_lastSyncTime(0)
 	, m_nActiveQuickSyncThreads(0)
@@ -92,7 +92,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_pWsClient(nullptr)
 	, m_lastPushTime(0)
 	, m_wsReconnectDelay(1000)
-	, m_hEncRetryThread(NULL)
+	, m_pEncRetryThread(nullptr)
 	, m_hEncRetryStop(nullptr)
 	, m_forceOverrideLocal(0)
 	, m_forceOverrideRemote(0)
@@ -114,7 +114,7 @@ CCloudSyncManager::~CCloudSyncManager()
 	// Only delete critical sections if all threads have exited cleanly.
 	// If Stop() timed out, threads may still be running — skip cleanup
 	// to avoid use-after-free. OS reclaims CRITICAL_SECTION on process exit.
-	BOOL bAllThreadsDead = (m_hSyncThread == NULL && m_hWsThread == NULL);
+	BOOL bAllThreadsDead = (m_pSyncThread == nullptr && m_pWsThread == nullptr);
 	if (bAllThreadsDead)
 	{
 		DeleteCriticalSection(&m_csSync);
@@ -243,8 +243,8 @@ BOOL CCloudSyncManager::Initialize()
 	}
 
 	// Create sync thread (suspended, then resumed)
-	m_hSyncThread = (HANDLE)_beginthreadex(NULL, 0, SyncThreadProc, this, CREATE_SUSPENDED, NULL);
-	if (m_hSyncThread == NULL)
+	m_pSyncThread = AfxBeginThread(SyncThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+	if (m_pSyncThread == nullptr)
 	{
 		OutputDebugString(_T("[CloudSync] Failed to create sync thread.\n"));
 		CloseHandle(m_hWsTrigger);
@@ -254,8 +254,8 @@ BOOL CCloudSyncManager::Initialize()
 		return FALSE;
 	}
 
-	ResumeThread(m_hSyncThread);
-	SetThreadPriority(m_hSyncThread, THREAD_PRIORITY_NORMAL);
+	m_pSyncThread->m_bAutoDelete = FALSE;
+	m_pSyncThread->ResumeThread();
 
 	// Start WebSocket listener thread (H4)
 	StartWebSocket();
@@ -287,7 +287,7 @@ BOOL CCloudSyncManager::ReinitializeSync()
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::StartEncryptionRetry()
 {
-	if (m_hEncRetryThread != NULL)
+	if (m_pEncRetryThread != nullptr)
 	{
 		LogMessage(_T("StartEncryptionRetry: retry thread already running, skipping"));
 		return;
@@ -300,8 +300,8 @@ void CCloudSyncManager::StartEncryptionRetry()
 		return;
 	}
 
-	m_hEncRetryThread = (HANDLE)_beginthreadex(NULL, 0, EncryptionRetryThreadProc, this, 0, NULL);
-	if (m_hEncRetryThread == NULL)
+	m_pEncRetryThread = AfxBeginThread(EncryptionRetryThreadProc, this, THREAD_PRIORITY_BELOW_NORMAL, 0, 0);
+	if (m_pEncRetryThread == nullptr)
 	{
 		LogMessage(_T("StartEncryptionRetry: failed to create thread"));
 		CloseHandle(m_hEncRetryStop);
@@ -309,7 +309,7 @@ void CCloudSyncManager::StartEncryptionRetry()
 		return;
 	}
 
-	SetThreadPriority(m_hEncRetryThread, THREAD_PRIORITY_BELOW_NORMAL);
+	m_pEncRetryThread->m_bAutoDelete = FALSE;
 	LogMessage(_T("StartEncryptionRetry: retry thread started"));
 }
 
@@ -320,19 +320,19 @@ void CCloudSyncManager::StopEncryptionRetry()
 		SetEvent(m_hEncRetryStop);
 	}
 
-	if (m_hEncRetryThread != NULL)
+	if (m_pEncRetryThread != nullptr)
 	{
-		DWORD dwWait = WaitForSingleObject(m_hEncRetryThread, 1000);
+		DWORD dwWait = WaitForSingleObject(m_pEncRetryThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			LogMessage(_T("StopEncryptionRetry: retry thread exited cleanly."));
-			CloseHandle(m_hEncRetryThread);
-			m_hEncRetryThread = NULL;
+			delete m_pEncRetryThread;
+			m_pEncRetryThread = nullptr;
 		}
 		else
 		{
 			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 1s, detaching."));
-			// Leave handle open — WaitForAllThreads will wait again and close it
+			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 		}
 	}
 
@@ -343,7 +343,7 @@ void CCloudSyncManager::StopEncryptionRetry()
 	}
 }
 
-unsigned int __stdcall CCloudSyncManager::EncryptionRetryThreadProc(void* pParam)
+UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 {
 	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
 	if (pThis == nullptr)
@@ -412,19 +412,19 @@ void CCloudSyncManager::Stop()
 		SetEvent(m_hStopEvent);
 	}
 
-	if (m_hSyncThread != NULL)
+	if (m_pSyncThread != nullptr)
 	{
-		DWORD dwWait = WaitForSingleObject(m_hSyncThread, 1000);
+		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
-			CloseHandle(m_hSyncThread);
-			m_hSyncThread = NULL;
+			delete m_pSyncThread;
+			m_pSyncThread = nullptr;
 		}
 		else
 		{
 			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within 1s, detaching.\n"));
-			// Not closing handle — thread still running, OS will reclaim on process exit
+			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 		}
 	}
 
@@ -468,17 +468,17 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 	HANDLE handles[3] = { NULL, NULL, NULL };
 	int count = 0;
 
-	if (m_hSyncThread != NULL)
+	if (m_pSyncThread != nullptr)
 	{
-		handles[count++] = m_hSyncThread;
+		handles[count++] = m_pSyncThread->m_hThread;
 	}
-	if (m_hWsThread != NULL)
+	if (m_pWsThread != nullptr)
 	{
-		handles[count++] = m_hWsThread;
+		handles[count++] = m_pWsThread->m_hThread;
 	}
-	if (m_hEncRetryThread != NULL)
+	if (m_pEncRetryThread != nullptr)
 	{
-		handles[count++] = m_hEncRetryThread;
+		handles[count++] = m_pEncRetryThread->m_hThread;
 	}
 
 	if (count == 0 && m_nActiveQuickSyncThreads == 0)
@@ -509,21 +509,21 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 			return FALSE;
 		}
 
-		// All threads exited - close handles
-		if (m_hSyncThread != NULL)
+		// All threads exited - delete CWinThread objects
+		if (m_pSyncThread != nullptr)
 		{
-			CloseHandle(m_hSyncThread);
-			m_hSyncThread = NULL;
+			delete m_pSyncThread;
+			m_pSyncThread = nullptr;
 		}
-		if (m_hWsThread != NULL)
+		if (m_pWsThread != nullptr)
 		{
-			CloseHandle(m_hWsThread);
-			m_hWsThread = NULL;
+			delete m_pWsThread;
+			m_pWsThread = nullptr;
 		}
-		if (m_hEncRetryThread != NULL)
+		if (m_pEncRetryThread != nullptr)
 		{
-			CloseHandle(m_hEncRetryThread);
-			m_hEncRetryThread = NULL;
+			delete m_pEncRetryThread;
+			m_pEncRetryThread = nullptr;
 		}
 	}
 
@@ -588,7 +588,7 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 	// to prevent use-after-free if the sync manager is destroyed
 	// while the fire-and-forget thread is running.
 	EnterCriticalSection(&m_csSync);
-	BOOL bShouldSync = (m_hSyncThread != NULL && m_hStopEvent != nullptr);
+	BOOL bShouldSync = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
 	if (bShouldSync)
 	{
 		// Increment a reference-like counter to track active quick-push threads
@@ -602,26 +602,28 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 		return;
 	}
 
-	// Use static thread proc with context struct (AfxBeginThread doesn't support lambdas)
+	// Use static thread proc with context struct
 	QuickSyncContext* ctx = new QuickSyncContext;
 	ctx->pManager = this;
 	ctx->pCounter = &m_nActiveQuickSyncThreads;
 	ctx->pCS = &m_csSync;
 	ctx->hStopEvent = m_hStopEvent;
 
-	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, QuickSyncThreadProc, ctx, 0, NULL);
-	if (hThread != NULL)
+	if (AfxBeginThread(QuickSyncThreadProc, ctx) == nullptr)
 	{
-		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
-		CloseHandle(hThread);
+		OutputDebugStringA("[CloudSync] Failed to spawn quick-push thread.\n");
+		EnterCriticalSection(&m_csSync);
+		m_nActiveQuickSyncThreads--;
+		LeaveCriticalSection(&m_csSync);
+		delete ctx;
 	}
 	else
 	{
-		delete ctx;
+		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
 	}
 }
 
-unsigned int __stdcall CCloudSyncManager::QuickSyncThreadProc(void* pParam)
+UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 {
 	QuickSyncContext* ctx = static_cast<QuickSyncContext*>(pParam);
 	if (!ctx || !ctx->pManager)
@@ -636,7 +638,7 @@ unsigned int __stdcall CCloudSyncManager::QuickSyncThreadProc(void* pParam)
 	{
 		// SAFETY: Check again under the lock that the manager is still alive
 		EnterCriticalSection(ctx->pCS);
-		BOOL bAlive = (pThis->m_hSyncThread != NULL && pThis->m_hStopEvent != nullptr);
+		BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
 		if (bAlive)
 		{
 			// Release the lock before doing actual work (long-running)
@@ -732,9 +734,13 @@ void CCloudSyncManager::ForceDownloadAll()
 	LeaveCriticalSection(&m_csSync);
 
 	InterlockedExchange(&m_forceOverrideLocal, 1);
-	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, ForceSyncThreadProc, this, 0, NULL);
-	if (hThread != NULL)
-		CloseHandle(hThread);
+	if (AfxBeginThread(ForceSyncThreadProc, this) == nullptr)
+	{
+		LogMessage(_T("ForceDownloadAll: failed to create thread"));
+		EnterCriticalSection(&m_csSync);
+		m_nActiveQuickSyncThreads--;
+		LeaveCriticalSection(&m_csSync);
+	}
 }
 
 void CCloudSyncManager::ForceUploadAll()
@@ -744,7 +750,7 @@ void CCloudSyncManager::ForceUploadAll()
 	TriggerQuickSync();
 }
 
-unsigned int __stdcall CCloudSyncManager::ForceSyncThreadProc(void* pParam)
+UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 {
 	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
 	if (!pThis)
@@ -1003,7 +1009,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	return FALSE;
 }
 
-unsigned int __stdcall CCloudSyncManager::SyncThreadProc(void* pParam)
+UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 {
 	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(pParam);
 	if (pThis == nullptr || pThis->m_hStopEvent == nullptr)
@@ -3263,7 +3269,7 @@ CString CCloudSyncManager::BuildWsUrl()
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::StartWebSocket()
 {
-	if (m_hWsThread != NULL)
+	if (m_pWsThread != nullptr)
 	{
 		LogMessage(_T("StartWebSocket: WS thread already running."));
 		return;
@@ -3278,15 +3284,15 @@ void CCloudSyncManager::StartWebSocket()
 		return;
 	}
 
-	m_hWsThread = (HANDLE)_beginthreadex(NULL, 0, WsThreadProc, this, CREATE_SUSPENDED, NULL);
-	if (m_hWsThread == NULL)
+	m_pWsThread = AfxBeginThread(WsThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
+	if (m_pWsThread == nullptr)
 	{
 		LogMessage(_T("StartWebSocket: failed to create WS thread."));
 		return;
 	}
 
-	ResumeThread(m_hWsThread);
-	SetThreadPriority(m_hWsThread, THREAD_PRIORITY_NORMAL);
+	m_pWsThread->m_bAutoDelete = FALSE;
+	m_pWsThread->ResumeThread();
 	LogMessage(_T("StartWebSocket: WS listener thread started."));
 }
 
@@ -3307,10 +3313,10 @@ void CCloudSyncManager::StopWebSocket()
 	}
 	LeaveCriticalSection(&m_csWsClient);
 
-	if (m_hWsThread != NULL)
+	if (m_pWsThread != nullptr)
 	{
 		// m_hStopEvent is already set by Stop(), WS thread will see it
-		DWORD dwWait = WaitForSingleObject(m_hWsThread, 1000);
+		DWORD dwWait = WaitForSingleObject(m_pWsThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
@@ -3325,12 +3331,13 @@ void CCloudSyncManager::StopWebSocket()
 			}
 			LeaveCriticalSection(&m_csWsClient);
 
-			CloseHandle(m_hWsThread);
-			m_hWsThread = NULL;
+			delete m_pWsThread;
+			m_pWsThread = nullptr;
 		}
 		else
 		{
 			LogMessage(_T("StopWebSocket: WS thread did not exit within 1s, detaching."));
+			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 			// Not deleting m_pWsClient — WS thread may still be accessing it
 			// OS will reclaim the memory on process exit
 		}
@@ -3356,7 +3363,7 @@ void CCloudSyncManager::StopWebSocket()
 // Connects to the server, listens for real-time events, signals sync on
 // "clip_added" messages. Reconnects with exponential backoff on disconnect.
 // ---------------------------------------------------------------------------
-unsigned int __stdcall CCloudSyncManager::WsThreadProc(void* pParam)
+UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 {
 	auto* pThis = static_cast<CCloudSyncManager*>(pParam);
 	if (pThis == nullptr)
@@ -3535,7 +3542,7 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 void CCloudSyncManager::TriggerQuickSync()
 {
 	EnterCriticalSection(&m_csSync);
-	BOOL bShouldSync = (m_hSyncThread != NULL && m_hStopEvent != nullptr);
+	BOOL bShouldSync = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
 	if (bShouldSync)
 	{
 		m_nActiveQuickSyncThreads++;
@@ -3554,15 +3561,17 @@ void CCloudSyncManager::TriggerQuickSync()
 	ctx->pCS = &m_csSync;
 	ctx->hStopEvent = m_hStopEvent;
 
-	HANDLE hThread = (HANDLE)_beginthreadex(NULL, 0, QuickSyncThreadProc, ctx, 0, NULL);
-	if (hThread != NULL)
+	if (AfxBeginThread(QuickSyncThreadProc, ctx) == nullptr)
 	{
-		OutputDebugStringA("[CloudSync] TriggerQuickSync: spawned quick-push thread.\n");
-		CloseHandle(hThread);
+		OutputDebugStringA("[CloudSync] TriggerQuickSync: failed to spawn quick-push thread.\n");
+		EnterCriticalSection(&m_csSync);
+		m_nActiveQuickSyncThreads--;
+		LeaveCriticalSection(&m_csSync);
+		delete ctx;
 	}
 	else
 	{
-		delete ctx;
+		OutputDebugStringA("[CloudSync] TriggerQuickSync: spawned quick-push thread.\n");
 	}
 }
 

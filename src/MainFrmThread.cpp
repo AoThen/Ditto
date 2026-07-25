@@ -5,7 +5,35 @@
 #include "Misc.h"
 #include "cp_main.h"
 #include "ClipboardOCR.h"
-#include <thread>
+
+// Context for fire-and-forget OCR thread (AfxBeginThread wrapper)
+struct OcrClipContext {
+    int id;
+    std::vector<BYTE> data;
+    int w, h, s;
+
+    static UINT ThreadProc(LPVOID pParam) {
+        auto ctx = static_cast<OcrClipContext*>(pParam);
+        CStringW text = RunOCR(ctx->data, ctx->w, ctx->h, ctx->s);
+        if (!text.IsEmpty()) {
+            HWND hwnd = theApp.m_pMainWnd ? theApp.m_pMainWnd->GetSafeHwnd() : nullptr;
+            if (!hwnd) {
+                Log(StrF(_T("OCR: AfxGetMainWnd returned null, cannot post OCR result for clip %d"), ctx->id));
+            } else if (!::IsWindow(hwnd)) {
+                Log(StrF(_T("OCR: main window handle invalid, cannot post OCR result for clip %d"), ctx->id));
+            } else {
+                CStringW* pText = new CStringW(text);
+                if (!::PostMessage(hwnd, WM_OCR_COMPLETED, ctx->id, (LPARAM)pText)) {
+                    Log(StrF(_T("OCR: PostMessage failed for clip %d"), ctx->id));
+                    delete pText;
+                }
+            }
+        }
+        g_ocrThreadCount--;
+        delete ctx;
+        return 0;
+    }
+};
 
 CMainFrmThread::CMainFrmThread(void)
 {
@@ -171,37 +199,20 @@ Log(_T("SaveCopyClips Before AddToDb"));
 				if (pClip->m_ocrImageData.size() > 0 && pClip->m_id > 0)
 				{
 					Log(StrF(_T("OCR: MainFrmThread launching OCR thread, id=%d, image size=%d"), pClip->m_id, (int)pClip->m_ocrImageData.size()));
+					auto ctx = new OcrClipContext{
+						pClip->m_id,
+						std::move(pClip->m_ocrImageData),
+						pClip->m_ocrWidth,
+						pClip->m_ocrHeight,
+						pClip->m_ocrStride
+					};
 					g_ocrThreadCount++;
-					std::thread([id = pClip->m_id,
-					             data = std::move(pClip->m_ocrImageData),
-					             w = pClip->m_ocrWidth,
-					             h = pClip->m_ocrHeight,
-					             s = pClip->m_ocrStride]()
+					if (AfxBeginThread(OcrClipContext::ThreadProc, ctx) == nullptr)
 					{
-						CStringW text = RunOCR(data, w, h, s);
-						if (!text.IsEmpty())
-						{
-							HWND hwnd = theApp.m_pMainWnd ? theApp.m_pMainWnd->GetSafeHwnd() : nullptr;
-							if (!hwnd)
-							{
-								Log(StrF(_T("OCR: AfxGetMainWnd returned null, cannot post OCR result for clip %d"), id));
-							}
-							else if (!::IsWindow(hwnd))
-							{
-								Log(StrF(_T("OCR: main window handle invalid, cannot post OCR result for clip %d"), id));
-							}
-							else
-							{
-								CStringW* pText = new CStringW(text);
-								if (!::PostMessage(hwnd, WM_OCR_COMPLETED, id, (LPARAM)pText))
-								{
-									Log(StrF(_T("OCR: PostMessage failed for clip %d"), id));
-									delete pText;
-								}
-							}
-						}
+						Log(StrF(_T("ERROR: AfxBeginThread failed for OCR clip %d"), pClip->m_id));
 						g_ocrThreadCount--;
-					}).detach();
+						delete ctx;
+					}
 				}
 			}
 		}

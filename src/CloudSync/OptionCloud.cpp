@@ -9,14 +9,70 @@
 #include "../json.hpp"
 #include "../Options.h"
 #include "../CP_Main.h"
-#include <thread>
-#include <atomic>
 #include "../ClipboardOCR.h"
 #include "../Pinyin_Convert.h"
+#include <atomic>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+// Context for fire-and-forget batch OCR thread (AfxBeginThread wrapper)
+struct OcrBatchContext {
+    std::vector<int> ids;
+    HWND hMainWnd;
+    std::atomic<bool>* pRunning;
+
+    static UINT ThreadProc(LPVOID pParam) {
+        auto ctx = static_cast<OcrBatchContext*>(pParam);
+        std::vector<OcrWorkItem> items;
+        for (int clipId : ctx->ids)
+        {
+            CClip clip;
+            if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
+            {
+                items.push_back({clipId, std::move(clip.m_ocrImageData),
+                                 clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
+            }
+        }
+
+        if (items.empty())
+        {
+            if (::IsWindow(ctx->hMainWnd))
+                ::PostMessage(ctx->hMainWnd, WM_OCR_BATCH_DONE, 0, 0);
+            *ctx->pRunning = false;
+            g_ocrThreadCount--;
+            delete ctx;
+            return 0;
+        }
+
+        int success = 0;
+        for (const auto& item : items)
+        {
+            CStringW text = RunOCR(item.imageData, item.width, item.height, item.stride);
+            if (!text.IsEmpty())
+            {
+                if (::IsWindow(ctx->hMainWnd))
+                {
+                    auto* pText = new CStringW(text);
+                    if (!::PostMessage(ctx->hMainWnd, WM_OCR_COMPLETED,
+                                       item.clipId, (LPARAM)pText))
+                        delete pText;
+                }
+                success++;
+            }
+        }
+
+        if (::IsWindow(ctx->hMainWnd))
+            ::PostMessage(ctx->hMainWnd, WM_OCR_BATCH_DONE,
+                          (WPARAM)items.size(), (LPARAM)success);
+
+        *ctx->pRunning = false;
+        g_ocrThreadCount--;
+        delete ctx;
+        return 0;
+    }
+};
 
 // ---------------------------------------------------------------------------
 // CInputBox - simple input dialog helper (inline)
@@ -780,53 +836,13 @@ CppSQLite3Query q = theApp.m_db.execQuery(
 
     HWND hMainWnd = AfxGetMainWnd()->GetSafeHwnd();
     // Load images and run OCR on background thread to avoid UI freeze
+    auto ctx = new OcrBatchContext{std::move(ids), hMainWnd, &running};
     g_ocrThreadCount++;
-    std::thread([ids = std::move(ids), hMainWnd]()
+    if (AfxBeginThread(OcrBatchContext::ThreadProc, ctx) == nullptr)
     {
-        std::vector<OcrWorkItem> items;
-        for (int clipId : ids)
-        {
-            CClip clip;
-            if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
-            {
-                items.push_back({clipId, std::move(clip.m_ocrImageData),
-                                 clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
-            }
-        }
-
-        if (items.empty())
-        {
-            if (::IsWindow(hMainWnd))
-                ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE, 0, 0);
-            running = false;
-            g_ocrThreadCount--;
-            return;
-        }
-
-        int success = 0;
-        for (const auto& item : items)
-        {
-            CStringW text = RunOCR(item.imageData, item.width, item.height, item.stride);
-            if (!text.IsEmpty())
-            {
-                if (::IsWindow(hMainWnd))
-                {
-                    auto* pText = new CStringW(text);
-                    if (!::PostMessage(hMainWnd, WM_OCR_COMPLETED,
-                                       item.clipId, (LPARAM)pText))
-                        delete pText;
-                }
-                success++;
-            }
-        }
-
-        if (::IsWindow(hMainWnd))
-            ::PostMessage(hMainWnd, WM_OCR_BATCH_DONE,
-                          (WPARAM)items.size(), (LPARAM)success);
-
-        running = false;
         g_ocrThreadCount--;
-    }).detach();
+        delete ctx;
+    }
 }
 
 // ---------------------------------------------------------------------------
