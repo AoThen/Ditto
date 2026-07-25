@@ -638,6 +638,7 @@ void CCP_MainApp::BeforeMainClose()
 	g_HotKeys.UnregisterAll();
 	StopServerThread();
 	StopCopyThread();
+	m_editThread.Close();
 }
 
 void CCP_MainApp::StartCopyThread()

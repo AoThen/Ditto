@@ -26,7 +26,13 @@ CClipEditThread::~CClipEditThread()
 void CClipEditThread::Close()
 {
 	Stop();
-		
+
+	if (m_threadRunning)
+	{
+		Log(StrF(_T("CClipEditThread::Close() - thread still running after Stop(), skipping handle cleanup")));
+		return;
+	}
+
 	if (m_folderHandle != INVALID_HANDLE_VALUE)
 	{
 		CloseHandle(m_folderHandle);
@@ -34,7 +40,7 @@ void CClipEditThread::Close()
 	}
 
 	RemoveEvent(EVENT_FILE_CHANGED);
-	m_overlapped.hEvent = INVALID_HANDLE_VALUE;	
+	m_overlapped.hEvent = INVALID_HANDLE_VALUE;
 
 	CString editClipFolder = CGetSetOptions::GetPath(PATH_EDIT_CLIPS);
 	DeleteFolderFiles(editClipFolder, TRUE, CTimeSpan(7, 0, 0, 0));
