@@ -50,7 +50,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: onnxsrc\build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-${{ env.ONNX_VERSION }}-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
+          key: onnxruntime-build-x64-v143-mt-v2-${{ env.ONNX_VERSION }}-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -92,5 +92,6 @@ jobs:
           prerelease: true
           artifacts: onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z
           allowUpdates: true
+          removeArtifacts: true
           artifactContentType: application/x-7z-compressed
           token: ${{ secrets.GITHUB_TOKEN }}
