@@ -6574,7 +6574,7 @@ LRESULT CQPasteWnd::OnSetListCount(WPARAM wParam, LPARAM lParam)
 
 	m_lstHeader.SetItemCountEx((int)wParam);
 	m_lstHeader.ClearRtfCache();
-	m_lstHeader.Invalidate(FALSE);
+	m_lstHeader.Invalidate();
 
 	if ((int)wParam == 0 &&
 		(m_strSearch != _T("") || m_bShowStarredClips))
