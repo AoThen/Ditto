@@ -14,8 +14,6 @@ CDittoAddins::~CDittoAddins(void)
 
 bool CDittoAddins::UnloadAll()
 {
-	Log(StrF(_T("Ditto Addin - Unloading all addins Count: %d"), m_Addins.size()));
-
 	INT_PTR count = m_Addins.size();
 	for(int i = 0; i < count; i++)
 	{
