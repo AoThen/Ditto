@@ -188,29 +188,31 @@ void CEventThread::WaitForThreadToExit(int waitTime)
 
 void CEventThread::Stop(int waitTime) 
 {
+	if(!m_threadRunning)
+	{
+		return;
+	}
+
 	Log(StrF(_T("Start of CEventThread::Stop(int waitTime) %d - Name: %s"), waitTime, m_threadName));
 
-	if(m_threadRunning)
+	m_exitThread = true;	
+	FireEvent(EXIT_EVENT);
+
+	if(waitTime > 0)
 	{
-		m_exitThread = true;	
-		FireEvent(EXIT_EVENT);
-
-		if(waitTime > 0)
+		DWORD ret = WaitForSingleObject(m_hEvt, waitTime);
+		if (ret == WAIT_OBJECT_0)
 		{
-			DWORD ret = WaitForSingleObject(m_hEvt, waitTime);
-			if (ret == WAIT_OBJECT_0)
-			{
-				m_threadRunning = false;
-				Log(StrF(_T("CEventThread::Stop graceful exit - Name: %s"), m_threadName));
-				Log(StrF(_T("End of CEventThread::Stop(int waitTime) %d - Name: %s"), waitTime, m_threadName));
-				return;
-			}
-
-			Log(StrF(_T("CEventThread::Stop timed out waiting for thread %s, waited %dms"), m_threadName, waitTime));
-			// DO NOT use TerminateThread — it causes abandoned critical sections (mtex.cpp:90 assertion)
-			// DO NOT set m_threadRunning = false here — the thread is still running.
-			// The destructor checks m_threadRunning and skips handle closure if true.
+			m_threadRunning = false;
+			Log(StrF(_T("CEventThread::Stop graceful exit - Name: %s"), m_threadName));
+			Log(StrF(_T("End of CEventThread::Stop(int waitTime) %d - Name: %s"), waitTime, m_threadName));
+			return;
 		}
+
+		Log(StrF(_T("CEventThread::Stop timed out waiting for thread %s, waited %dms"), m_threadName, waitTime));
+		// DO NOT use TerminateThread — it causes abandoned critical sections (mtex.cpp:90 assertion)
+		// DO NOT set m_threadRunning = false here — the thread is still running.
+		// The destructor checks m_threadRunning and skips handle closure if true.
 	}
 
 	Log(StrF(_T("End of CEventThread::Stop(int waitTime) %d - Name: %s"), waitTime, m_threadName));

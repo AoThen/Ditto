@@ -14,6 +14,7 @@
 CClipEditThread::CClipEditThread()
 {
 	m_folderHandle = INVALID_HANDLE_VALUE;
+	m_overlapped.hEvent = INVALID_HANDLE_VALUE;
 	m_threadName = _T("ClipEditTrackingThread");
 	m_waitTimeout = MAX_TIMEOUT;
 }
@@ -39,11 +40,14 @@ void CClipEditThread::Close()
 		m_folderHandle = INVALID_HANDLE_VALUE;
 	}
 
-	RemoveEvent(EVENT_FILE_CHANGED);
-	m_overlapped.hEvent = INVALID_HANDLE_VALUE;
+	if (m_overlapped.hEvent != INVALID_HANDLE_VALUE)
+	{
+		RemoveEvent(EVENT_FILE_CHANGED);
+		m_overlapped.hEvent = INVALID_HANDLE_VALUE;
 
-	CString editClipFolder = CGetSetOptions::GetPath(PATH_EDIT_CLIPS);
-	DeleteFolderFiles(editClipFolder, TRUE, CTimeSpan(7, 0, 0, 0));
+		CString editClipFolder = CGetSetOptions::GetPath(PATH_EDIT_CLIPS);
+		DeleteFolderFiles(editClipFolder, TRUE, CTimeSpan(7, 0, 0, 0));
+	}
 }
 
 void CClipEditThread::StartWatchingFolderForChanges()
