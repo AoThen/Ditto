@@ -71,16 +71,19 @@ if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
         -DABSL_BUILD_TESTING=OFF
 
     if errorlevel 1 (
-        echo [BUILD] WARNING: absl cmake configure failed
+        echo [BUILD] ERROR: absl cmake configure failed - cannot provide /MT absl libs
+        endlocal & exit /b 1
     ) else (
         cmake --build "%ABSL_BUILD_DIR%" --config %CONFIG%
         if errorlevel 1 (
-            echo [BUILD] WARNING: absl build failed
+            echo [BUILD] ERROR: absl build failed - cannot provide /MT absl libs
+            endlocal & exit /b 1
         ) else (
             echo [BUILD]   absl built successfully
             cmake --install "%ABSL_BUILD_DIR%" --config %CONFIG% --prefix "%ABSL_INSTALL_DIR%"
             if errorlevel 1 (
-                echo [BUILD] WARNING: absl install failed
+                echo [BUILD] ERROR: absl install failed - cannot provide /MT absl libs
+                endlocal & exit /b 1
             ) else (
                 echo [BUILD]   absl installed to %ABSL_INSTALL_DIR%
             )
@@ -119,11 +122,13 @@ if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
         -Dabsl_DIR="%ABSL_CMAKE_DIR%"
 
     if errorlevel 1 (
-        echo [BUILD] WARNING: re2 cmake configure failed
+        echo [BUILD] ERROR: re2 cmake configure failed - DittoOCR will fail to link
+        endlocal & exit /b 1
     ) else (
         cmake --build "%RE2_BUILD_DIR%" --config %CONFIG%
         if errorlevel 1 (
-            echo [BUILD] WARNING: re2 build failed
+            echo [BUILD] ERROR: re2 build failed - DittoOCR will fail to link
+            endlocal & exit /b 1
         ) else (
             if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
                 if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
@@ -234,10 +239,13 @@ REM Search for all .lib files and copy them to install-static/lib.
 for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
     echo %%f | findstr /i "\\install\\" >nul
     if errorlevel 1 (
-        if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
-            copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
-            if not errorlevel 1 (
-                echo [BUILD]   Copied: %%~nxf
+        echo %%f | findstr /i "\\_deps\\" >nul
+        if errorlevel 1 (
+            if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
+                copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
+                if not errorlevel 1 (
+                    echo [BUILD]   Copied: %%~nxf
+                )
             )
         )
     )
@@ -299,7 +307,9 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
 
 set all_libs=
 for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
-    set all_libs=!all_libs! "%STATIC_INSTALL_DIR%\lib\%%f"
+    if /i not "%%f"=="onnxruntime.lib" (
+        set all_libs=!all_libs! "%STATIC_INSTALL_DIR%\lib\%%f"
+    )
 )
 
 if "!all_libs!" == "" (
@@ -357,6 +367,34 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     echo [BUILD] WARNING: onnxruntime.lib not found at %STATIC_INSTALL_DIR%\lib\onnxruntime.lib
 )
 echo [BUILD] Step 4d/6 complete.
+
+REM -------------------------------------------------------------------
+REM 4e. Verify CRT: ensure no MSVCRT (MD) references in onnxruntime.lib
+REM -------------------------------------------------------------------
+echo [BUILD] Step 4e/6: Verifying CRT in onnxruntime.lib
+
+if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
+    where dumpbin >nul 2>nul
+    if errorlevel 1 (
+        echo [BUILD] WARNING: dumpbin not found, skipping CRT verification
+    ) else (
+        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "DEFAULTLIB:MSVCRT" >nul
+        if not errorlevel 1 (
+            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references (/MD detected)!
+            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR (expects /MT)
+            endlocal & exit /b 1
+        )
+        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "DEFAULTLIB:LIBCMT" >nul
+        if errorlevel 1 (
+            echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
+        ) else (
+            echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
+        )
+    )
+) else (
+    echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
+)
+echo [BUILD] Step 4e/6 complete.
 
 REM -------------------------------------------------------------------
 REM 5. Flatten headers
