@@ -381,8 +381,10 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     ) else (
         REM Use temp file to avoid batch parser issues in dumpbin output
         dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
-        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
+        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt"
         if not errorlevel 1 (
+            echo [BUILD]   MSVCRT references found in onnxruntime.lib:
+            for /f "tokens=*" %%a in ('findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt"') do echo [BUILD]     %%a
             echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references (/MD detected)
             echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR (expects /MT)
             del "%TEMP%\onnx_crt_directives.txt" 2>nul
