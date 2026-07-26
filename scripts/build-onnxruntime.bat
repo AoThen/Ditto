@@ -343,25 +343,26 @@ if exist "%STATIC_INSTALL_DIR%\lib\absl_base.lib" (
 echo [BUILD] Step 4c2/6 complete.
 
 REM -------------------------------------------------------------------
-REM 4d. Verify re2 symbols in onnxruntime.lib
+REM 4d. Verify re2 member objects in onnxruntime.lib
 REM -------------------------------------------------------------------
-echo [BUILD] Step 4d/6: Verifying re2 symbols in onnxruntime.lib
+echo [BUILD] Step 4d/6: Verifying re2 member objects in onnxruntime.lib
 
 if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     where dumpbin >nul 2>nul
     if errorlevel 1 (
         echo [BUILD] dumpbin not found, skipping re2 verification
     ) else (
-        REM Check that re2::RE2 symbols are DEFINED (sec N), not just referenced (sec  0)
-        REM dumpbin /symbols outputs (sec  0) for undefined (two spaces), (sec  N) for defined (one space)
-        REM Use "sec  0" (two spaces) to match only undefined symbols without using parentheses
-        dumpbin /symbols "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "re2::RE2" | findstr /v "sec  0" >nul
+        REM Use /linkermember:1 to list member objects instead of /symbols
+        REM (avoids FINDSTR: Line X is too long issues with huge symbol tables)
+        dumpbin /linkermember:1 "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_re2_members.txt"
+        findstr /i "re2" "%TEMP%\onnx_re2_members.txt" >nul
         if errorlevel 1 (
-            echo [BUILD] WARNING: re2::RE2 symbols NOT defined in onnxruntime.lib
+            echo [BUILD] WARNING: re2 member objects NOT found in onnxruntime.lib
             echo [BUILD]   This will cause DittoOCR link failures!
         ) else (
-            echo [BUILD] OK: re2::RE2 symbols verified - defined in onnxruntime.lib
+            echo [BUILD] OK: re2 member objects found in onnxruntime.lib
         )
+        del "%TEMP%\onnx_re2_members.txt" 2>nul
     )
 ) else (
     echo [BUILD] WARNING: onnxruntime.lib not found at %STATIC_INSTALL_DIR%\lib\onnxruntime.lib
@@ -378,18 +379,22 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     if errorlevel 1 (
         echo [BUILD] WARNING: dumpbin not found, skipping CRT verification
     ) else (
-        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "DEFAULTLIB:MSVCRT" >nul
+        REM Use temp file to avoid batch parser issues with ! in dumpbin output
+        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
+        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
         if not errorlevel 1 (
             echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references (/MD detected)!
             echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR (expects /MT)
+            del "%TEMP%\onnx_crt_directives.txt" 2>nul
             endlocal & exit /b 1
         )
-        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" | findstr /i "DEFAULTLIB:LIBCMT" >nul
+        findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
         if errorlevel 1 (
             echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
         ) else (
             echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
         )
+        del "%TEMP%\onnx_crt_directives.txt" 2>nul
     )
 ) else (
     echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
