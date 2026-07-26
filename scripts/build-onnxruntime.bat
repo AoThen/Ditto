@@ -66,6 +66,7 @@ if exist "%ABSL_SRC_DIR%\CMakeLists.txt" (
         -DCMAKE_BUILD_TYPE=%CONFIG% ^
         -DCMAKE_CXX_STANDARD=17 ^
         -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DABSL_MSVC_STATIC_RUNTIME=ON ^
         -DBUILD_SHARED_LIBS=OFF ^
         -DABSL_BUILD_TESTING=OFF
 
@@ -262,6 +263,30 @@ if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
     echo [BUILD] re2.lib already present in install-static/lib
 )
 echo [BUILD] Step 4b/6 complete.
+
+REM -------------------------------------------------------------------
+REM 4b2. Override absl libs with standalone build versions
+REM -------------------------------------------------------------------
+REM The generic search in Step 4b may have picked up absl libs from the
+REM FetchContent build tree (compiled with /MD). Override them with the
+REM standalone build versions (compiled with /MT via ABSL_MSVC_STATIC_RUNTIME).
+if exist "%ABSL_BUILD_DIR%" (
+    echo [BUILD] Step 4b2/6: Overriding absl libs with standalone build versions
+    set "ABSL_OVERRIDDEN=0"
+    for /f "delims=" %%f in ('dir /s /b "%ABSL_BUILD_DIR%\absl_*.lib" 2^>nul') do (
+        copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul
+        if not errorlevel 1 (
+            set "ABSL_OVERRIDDEN=1"
+            echo [BUILD]   Overrode: %%~nxf
+        )
+    )
+    if "!ABSL_OVERRIDDEN!"=="0" (
+        echo [BUILD] WARNING: No absl libs found in standalone build tree - CRT mismatch likely
+    )
+    echo [BUILD] Step 4b2/6 complete.
+) else (
+    echo [BUILD] WARNING: ABSL_BUILD_DIR not found, skipping absl lib override
+)
 
 REM -------------------------------------------------------------------
 REM 4c. Merge ALL libs into a single onnxruntime.lib
