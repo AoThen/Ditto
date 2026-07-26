@@ -297,6 +297,33 @@ if exist "%ABSL_BUILD_DIR%" (
 )
 
 REM -------------------------------------------------------------------
+REM 4b3. Diagnostic: check each individual lib for MSVCRT references
+REM -------------------------------------------------------------------
+echo [BUILD] Step 4b3/6: Checking individual libs for MSVCRT references
+
+if exist "%STATIC_INSTALL_DIR%\lib" (
+    where dumpbin >nul 2>nul
+    if errorlevel 1 (
+        echo [BUILD] WARNING: dumpbin not found, skipping individual lib CRT check
+    ) else (
+        echo [BUILD]   Checking each .lib file for MSVCRT references...
+        for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
+            dumpbin /directives "%STATIC_INSTALL_DIR%\lib\%%f" > "%TEMP%\crt_check.txt"
+            findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\crt_check.txt" >nul
+            if not errorlevel 1 (
+                echo [BUILD]   [MSVCRT] %%f
+                for /f "tokens=*" %%a in ('findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\crt_check.txt"') do echo [BUILD]       %%a
+            )
+            del "%TEMP%\crt_check.txt" 2>nul
+        )
+        echo [BUILD]   Individual lib CRT check complete
+    )
+) else (
+    echo [BUILD] WARNING: install-static/lib not found
+)
+echo [BUILD] Step 4b3/6 complete.
+
+REM -------------------------------------------------------------------
 REM 4c. Merge ALL libs into a single onnxruntime.lib
 REM -------------------------------------------------------------------
 echo [BUILD] Step 4c/6: Merging all libs into onnxruntime.lib
