@@ -407,15 +407,23 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     if errorlevel 1 (
         echo [BUILD] WARNING: dumpbin not found, skipping CRT verification
     ) else (
-        REM Use temp file to avoid batch parser issues in dumpbin output
         dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
-        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt"
+        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
+        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
         if not errorlevel 1 (
             echo [BUILD]   MSVCRT references found in onnxruntime.lib:
-            for /f "tokens=*" %%a in ('findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt"') do echo [BUILD]     %%a
-            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references (/MD detected)
-            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR (expects /MT)
-            del "%TEMP%\onnx_crt_directives.txt" 2>nul
+            for /f %%a in ('type "%TEMP%\msvcrt_matches.txt" 2^>nul ^| find /c ""') do set count=%%a
+            echo [BUILD]   Count: !count! MSVCRT references
+            set /a line=0
+            for /f "usebackq delims=" %%a in ("%TEMP%\msvcrt_matches.txt") do (
+                if !line! lss 5 (
+                    echo [BUILD]     %%a
+                    set /a line+=1
+                )
+            )
+            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references ^(/MD detected^)
+            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR ^(expects /MT^)
+            del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
             endlocal & exit /b 1
         )
         findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
@@ -424,7 +432,7 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
         ) else (
             echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
         )
-        del "%TEMP%\onnx_crt_directives.txt" 2>nul
+        del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
     )
 ) else (
     echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
