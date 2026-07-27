@@ -229,10 +229,13 @@ Log(_T("SaveCopyClips Before AddToDb"));
 			CGetSetOptions::GetShowMsgWndOnCopyToGroup())
 		{
 			CString groupName;
-			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT mText FROM Main WHERE lID = %d"), pLocalClips->GetTail()->m_parentId);
-			if (q.eof() == false)
 			{
-				groupName = q.getStringField(0);
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
+				CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT mText FROM Main WHERE lID = %d"), pLocalClips->GetTail()->m_parentId);
+				if (q.eof() == false)
+				{
+					groupName = q.getStringField(0);
+				}
 			}
 
 			CString *pMsg = new CString();

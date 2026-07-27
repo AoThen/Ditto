@@ -1674,7 +1674,7 @@ void CCloudSyncManager::PullChanges()
 					int localId = GetLocalIdByRemoteId(idStr);
 					if (localId > 0)
 					{
-						CSingleLock lockDb(&m_csDb, TRUE);
+						CSingleLock lockDb(&theApp.m_csDb, TRUE);
 						CString csSQL;
 						csSQL.Format(_T("UPDATE Main SET lDontSync = 1 WHERE lID = %d"), localId);
 						theApp.m_db.execDML(csSQL);
@@ -1796,7 +1796,7 @@ void CCloudSyncManager::PullChanges()
 // ---------------------------------------------------------------------------
 time_t CCloudSyncManager::GetMaxLocalClipModifiedDate() const
 {
-	CSingleLock lockDb(&m_csDb, TRUE);
+	CSingleLock lockDb(&theApp.m_csDb, TRUE);
 	CString csSQL = _T("SELECT MAX(lModifiedDate) FROM Main WHERE bIsGroup = 0 AND lDontSync = 0");
 	CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 	if (q.eof() == false)
@@ -1851,7 +1851,7 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 		             _T("ORDER BY lModifiedDate DESC LIMIT %d OFFSET %d"),
 		             (LPCTSTR)where, limit, offset);
 
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
 		int pageCount = 0;
@@ -1999,7 +1999,7 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 		csSQL.Format(_T("SELECT lID, strClipBoardFormat, ooData FROM Data ")
 		             _T("WHERE lParentID = %d ORDER BY lID"), clipId);
 
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
 		while (q.eof() == false)
@@ -2129,7 +2129,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			if (existingId > 0)
 			{
 				// Found existing mapping - load its modification time
-				CSingleLock lockDb(&m_csDb, TRUE);
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
 				CppSQLite3Statement stmt = theApp.m_db.compileStatement(
 					_T("SELECT lModifiedDate FROM Main WHERE lID = ? AND bIsGroup = 0 LIMIT 1"));
 				stmt.bind(1, existingId);
@@ -2171,7 +2171,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 		{
 			// Primary check: CRC match (same content already exists)
 			// Use parameterized query to prevent SQL injection
-			CSingleLock lockDb(&m_csDb, TRUE);
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
 			CString csSQL;
 			csSQL.Format(_T("SELECT lID, lModifiedDate, mText FROM Main WHERE CRC = ? AND bIsGroup = 0 LIMIT 1"));
 			
@@ -2218,7 +2218,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			{
 				// Remote clip is newer - update local clip's modification time
 				// (Content is same per CRC match, so no need to update formats)
-				CSingleLock lockDb(&m_csDb, TRUE);
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
 				CString csUpdateSQL;
 				csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld WHERE lID = %d"),
 				                   (__int64)remoteUpdatedAt, existingId);
@@ -2248,7 +2248,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			try
 			{
 				// Use parameterized query to prevent SQL injection
-				CSingleLock lockDb(&m_csDb, TRUE);
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
 				CString csSQL;
 				csSQL.Format(_T("SELECT lID, lModifiedDate, CRC FROM Main WHERE mText = ? AND bIsGroup = 0 LIMIT 1"));
 				
@@ -2526,7 +2526,7 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 	try
 	{
 		// Check if clip exists
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csCheckSQL;
 		csCheckSQL.Format(_T("SELECT lID FROM Main WHERE lID = %d"), clipId);
 		
@@ -2578,7 +2578,7 @@ void CCloudSyncManager::EnsureMappingTable()
 {
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("CREATE TABLE IF NOT EXISTS CloudClipMap (")
 		             _T("local_id INTEGER PRIMARY KEY,")
@@ -2610,7 +2610,7 @@ void CCloudSyncManager::SaveRemoteIdMapping(int localId, const std::string& remo
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL = _T("INSERT OR REPLACE INTO CloudClipMap (local_id, remote_id) VALUES (?, ?)");
 		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 		stmt.bind(1, localId);
@@ -2640,7 +2640,7 @@ int CCloudSyncManager::GetLocalIdByRemoteId(const std::string& remoteId)
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL = _T("SELECT local_id FROM CloudClipMap WHERE remote_id = ? LIMIT 1");
 		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 		stmt.bind(1, CString(remoteId.c_str()));
@@ -2674,7 +2674,7 @@ std::string CCloudSyncManager::GetRemoteIdByLocalId(int localId)
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("SELECT remote_id FROM CloudClipMap WHERE local_id = %d LIMIT 1"), localId);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
@@ -2704,7 +2704,7 @@ void CCloudSyncManager::EnsureGroupMappingTable()
 {
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("CREATE TABLE IF NOT EXISTS CloudGroupMap (")
 		             _T("local_id INTEGER PRIMARY KEY,")
@@ -2735,7 +2735,7 @@ void CCloudSyncManager::SaveRemoteGroupIdMapping(int localId, const std::string&
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL = _T("INSERT OR REPLACE INTO CloudGroupMap (local_id, remote_id) VALUES (?, ?)");
 		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 		stmt.bind(1, localId);
@@ -2765,7 +2765,7 @@ int CCloudSyncManager::GetLocalGroupIdByRemoteId(const std::string& remoteId)
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL = _T("SELECT local_id FROM CloudGroupMap WHERE remote_id = ? LIMIT 1");
 		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 		stmt.bind(1, CString(remoteId.c_str()));
@@ -2799,7 +2799,7 @@ std::string CCloudSyncManager::GetRemoteGroupIdByLocalId(int localId)
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("SELECT remote_id FROM CloudGroupMap WHERE local_id = %d LIMIT 1"), localId);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
@@ -2832,7 +2832,7 @@ void CCloudSyncManager::DeleteRemoteGroupIdMapping(int localId)
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL;
 		csSQL.Format(_T("DELETE FROM CloudGroupMap WHERE local_id = %d"), localId);
 		theApp.m_db.execDML(csSQL);
@@ -2859,7 +2859,7 @@ void CCloudSyncManager::DeleteRemoteGroupIdMappingByRemote(const std::string& re
 
 	try
 	{
-		CSingleLock lockDb(&m_csDb, TRUE);
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CString csSQL = _T("DELETE FROM CloudGroupMap WHERE remote_id = ?");
 		CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
 		stmt.bind(1, CString(remoteId.c_str()));
@@ -2897,7 +2897,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 		};
 		std::vector<GroupInfo> groups;
 		{
-			CSingleLock lockDb(&m_csDb, TRUE);
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
 			CppSQLite3Query q = theApp.m_db.execQuery(
 				_T("SELECT lID, mText, m_Description, lParentID FROM Main WHERE bIsGroup = 1 AND (lDontSync IS NULL OR lDontSync = 0)"));
 
@@ -2941,7 +2941,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 						auto resp = nlohmann::json::parse(res->body);
 						if (resp.contains("data") && resp["data"].contains("id"))
 						{
-							CSingleLock lockDb(&m_csDb, TRUE);
+							CSingleLock lockDb(&theApp.m_csDb, TRUE);
 							SaveRemoteGroupIdMapping(gi.localId, resp["data"]["id"].get<std::string>());
 							newGroupIds.push_back(resp["data"]["id"].get<std::string>());
 						}
@@ -3019,7 +3019,7 @@ void CCloudSyncManager::PullGroups()
 
 					int localId = GetLocalGroupIdByRemoteId(remoteId);
 
-					CSingleLock lockDb(&m_csDb, TRUE);
+					CSingleLock lockDb(&theApp.m_csDb, TRUE);
 
 					if (localId <= 0)
 					{
@@ -3067,7 +3067,7 @@ void CCloudSyncManager::PullGroups()
 
 					if (localId > 0 && localParentId > 0)
 					{
-						CSingleLock lockDb(&m_csDb, TRUE);
+						CSingleLock lockDb(&theApp.m_csDb, TRUE);
 						CString csSQL;
 						csSQL.Format(_T("UPDATE Main SET lParentID = %d WHERE lID = %d"), localParentId, localId);
 						theApp.m_db.execDML(csSQL);
@@ -3086,7 +3086,7 @@ void CCloudSyncManager::PullGroups()
 
 		// 清理已不在服务端存在的群组映射
 		{
-			CSingleLock lockDb(&m_csDb, TRUE);
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
 			CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT remote_id, local_id FROM CloudGroupMap"));
 			while (!q.eof())
 			{
@@ -3225,7 +3225,7 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 			{
 				try
 				{
-					CSingleLock lockDb(&m_csDb, TRUE);
+					CSingleLock lockDb(&theApp.m_csDb, TRUE);
 					CString csSQL;
 					csSQL.Format(_T("DELETE FROM CloudClipMap WHERE local_id = %d"), localId);
 					theApp.m_db.execDML(csSQL);

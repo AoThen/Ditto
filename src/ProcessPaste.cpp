@@ -197,6 +197,8 @@ UINT CProcessPaste::MarkAsPastedThread(LPVOID pParam)
 					refreshFlags |= UPDATE_AFTER_PASTE_SELECT_CLIP;
 				}
 
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
+
 				for (int i = 0; i < clipCount; i++)
 				{
 					int id = pData->ids.ElementAt(i);
@@ -237,6 +239,7 @@ UINT CProcessPaste::MarkAsPastedThread(LPVOID pParam)
 
 			try
 			{
+				CSingleLock lockDb2(&theApp.m_csDb, TRUE);
 				for (int i = 0; i < clipCount; i++)
 				{
 					int id = pData->ids.ElementAt(i);

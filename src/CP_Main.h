@@ -35,6 +35,7 @@ public:
 	~CCP_MainApp();
 
 	CppSQLite3DB m_db;
+	mutable CCriticalSection m_csDb;
 	bool m_databaseOnNetworkShare;
 
 	HANDLE	m_hMutex; // for singleton app

@@ -139,7 +139,6 @@ private:
 	CStringA  m_lastHttpToken; // Last token used for HTTP client auth headers
 
 	// Critical section for thread-safe access to theApp.m_db from sync thread
-	mutable CCriticalSection m_csDb;
 
 	// Thread-safe sync status (protected by m_csStatus)
 	CString           m_csSyncStatus;

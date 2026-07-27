@@ -69,6 +69,7 @@ void CQPasteWndThread::OnSetListCount(void *param)
 
     try
     {
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
         lRecordCount = theApp.m_db.execScalar(countSQL);
         ::PostMessage(pasteWnd->m_hWnd, NM_SET_LIST_COUNT, lRecordCount, 0);
     }
@@ -131,70 +132,74 @@ void CQPasteWndThread::OnLoadItems(void *param)
 
 				CMainTable table;
 
-				CppSQLite3Query q = theApp.m_db.execQuery(localSql);
-				while(!q.eof())
 				{
-					CQPasteWnd::FillMainTable(table, q);
+					CSingleLock lockDb(&theApp.m_csDb, TRUE);
 
-					int updateIndex = -1;
-
+					CppSQLite3Query q = theApp.m_db.execQuery(localSql);
+					while(!q.eof())
 					{
-						ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
+						CQPasteWnd::FillMainTable(table, q);
 
-						if (pos < pasteWnd->m_listItems.size())
-						{
-							pasteWnd->m_listItems[pos] = table;
+						int updateIndex = -1;
 
-							updateIndex = pos;
+						{
+							ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
 
-							//Log(StrF(_T("updating list pos = %d, id: %d, size: %d"), pos, table.m_lID, pasteWnd->m_listItems.size() - 1));
-						}
-						else if (pos == pasteWnd->m_listItems.size())
-						{
-							pasteWnd->m_listItems.push_back(table);
-							updateIndex = (int)pasteWnd->m_listItems.size() - 1;
-							//Log(StrF(_T("adding (same size) list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
-						}
-						else if (pos > pasteWnd->m_listItems.size())
-						{
-							for (int toAdd = (int)pasteWnd->m_listItems.size()-1; toAdd < pos - 1; toAdd++)
+							if (pos < pasteWnd->m_listItems.size())
 							{
-								CMainTable empty;
-								empty.m_lID = -1;
-								pasteWnd->m_listItems.push_back(empty);
+								pasteWnd->m_listItems[pos] = table;
 
-								//Log(StrF(_T("adding dummy row size: %d"), pasteWnd->m_listItems.size()-1));
+								updateIndex = pos;
+
+								//Log(StrF(_T("updating list pos = %d, id: %d, size: %d"), pos, table.m_lID, pasteWnd->m_listItems.size() - 1));
 							}
+							else if (pos == pasteWnd->m_listItems.size())
+							{
+								pasteWnd->m_listItems.push_back(table);
+								updateIndex = (int)pasteWnd->m_listItems.size() - 1;
+								//Log(StrF(_T("adding (same size) list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
+							}
+							else if (pos > pasteWnd->m_listItems.size())
+							{
+								for (int toAdd = (int)pasteWnd->m_listItems.size()-1; toAdd < pos - 1; toAdd++)
+								{
+									CMainTable empty;
+									empty.m_lID = -1;
+									pasteWnd->m_listItems.push_back(empty);
 
-							pasteWnd->m_listItems.push_back(table);
+									//Log(StrF(_T("adding dummy row size: %d"), pasteWnd->m_listItems.size()-1));
+								}
 
-							updateIndex = (int)pasteWnd->m_listItems.size() - 1;
+								pasteWnd->m_listItems.push_back(table);
 
-							//Log(StrF(_T("adding list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
+								updateIndex = (int)pasteWnd->m_listItems.size() - 1;
+
+								//Log(StrF(_T("adding list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
+							}
 						}
-					}
 
-					if(pasteWnd->m_bStopQuery || IsCancelled())
-					{
-						Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
-						break;
-					}
-
-					q.nextRow();
-
-					if(firstLoad == false)
-					{
-						/*if (updateIndex != loadItemsIndex)
+						if(pasteWnd->m_bStopQuery || IsCancelled())
 						{
-							Log(StrF(_T("index difference old: %d, new: %d"), loadItemsIndex, updateIndex));
-						}*/
+							Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
+							break;
+						}
 
-	            		::PostMessage(pasteWnd->m_hWnd, NM_REFRESH_ROW, table.m_lID, updateIndex);
+						q.nextRow();
+
+						if(firstLoad == false)
+						{
+							/*if (updateIndex != loadItemsIndex)
+							{
+								Log(StrF(_T("index difference old: %d, new: %d"), loadItemsIndex, updateIndex));
+							}*/
+
+							::PostMessage(pasteWnd->m_hWnd, NM_REFRESH_ROW, table.m_lID, updateIndex);
+						}
+
+						loadItemsIndex++;
+						loadCount++;
+						pos++;
 					}
-
-					loadItemsIndex++;
-					loadCount++;
-					pos++;
 				}
 
 				DWORD elapsedLoad = GetTickCount() - startTick;

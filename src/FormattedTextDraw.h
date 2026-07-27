@@ -96,6 +96,10 @@ public:
 		m_dwMaxLength = INFINITE;
 	}
 
+	// Copy prevention
+	CFormattedTextDraw(const CFormattedTextDraw&) = delete;
+	CFormattedTextDraw& operator=(const CFormattedTextDraw&) = delete;
+
 	~CFormattedTextDraw()
 	{
 		if (m_RTFText != NULL)

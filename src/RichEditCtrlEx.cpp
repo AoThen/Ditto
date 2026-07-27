@@ -485,10 +485,12 @@ void CRichEditCtrlEx::SetFontSize(int nPointSize)
 
 void CRichEditCtrlEx::GetSystemFonts(CStringArray &saFontList)
 {
-	CDC *pDC = GetDC ();
-
-	EnumFonts (pDC->GetSafeHdc(),NULL,(FONTENUMPROC) CBEnumFonts,(LPARAM)&saFontList);//Enumerate
-
+	CDC *pDC = GetDC();
+	if (pDC)
+	{
+		EnumFonts(pDC->GetSafeHdc(), NULL, (FONTENUMPROC)CBEnumFonts, (LPARAM)&saFontList);
+		ReleaseDC(pDC);
+	}
 }
 
 BOOL CALLBACK CRichEditCtrlEx::CBEnumFonts(LPLOGFONT lplf, LPTEXTMETRIC lptm, DWORD dwType, LPARAM lpData)

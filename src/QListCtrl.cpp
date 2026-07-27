@@ -220,10 +220,10 @@ CQListCtrl::CQListCtrl()
 CQListCtrl::~CQListCtrl()
 {
 	if (m_pchTip != NULL)
-		delete m_pchTip;
+		delete[] m_pchTip;
 
 	if (m_pwchTip != NULL)
-		delete m_pwchTip;
+		delete[] m_pwchTip;
 
 	if (m_SmallFont)
 		::DeleteObject(m_SmallFont);

@@ -22,6 +22,10 @@ public:
         Cleanup();
     }
 
+    // Copy prevention
+    CEncryption(const CEncryption&) = delete;
+    CEncryption& operator=(const CEncryption&) = delete;
+
     // Encrypt data with password
     // Returns encrypted data in pOutput, caller must call FreeBuffer() when done
     BOOL Encrypt(UCHAR* pData, int nLenIn, CStringA csPassword,
