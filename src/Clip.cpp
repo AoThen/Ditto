@@ -569,6 +569,8 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 			Sleep(10);
 		}
 		bIsDescSet = SetDescFromText(cfDesc.m_hgData, true);
+		if (bIsDescSet && activeApp == _T("excel.exe"))
+			StripExcelOuterQuotes(m_Desc);
 
 		LogClip(StrF(_T("Tried to set description from cf_unicode text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
 	}
@@ -593,6 +595,8 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 			}
 
 			bIsDescSet = SetDescFromText(cfDesc.m_hgData, false);
+			if (bIsDescSet && activeApp == _T("excel.exe"))
+				StripExcelOuterQuotes(m_Desc);
 
 			LogClip(StrF(_T("Tried to set description from cf_text text, Set: %d, Desc: [%s]"), bIsDescSet, m_Desc.Left(30)));
 		}
@@ -745,7 +749,13 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 				}
 
 				ASSERT(::IsValid(cf.m_hgData));
-				
+
+				if ((cf.m_cfType == CF_UNICODETEXT || cf.m_cfType == CF_TEXT) &&
+				activeApp == _T("excel.exe"))
+				{
+					StripExcelOuterQuotesFromGlobal(cf.m_hgData, cf.m_cfType);
+				}
+
 				m_Formats.Add(cf);
 				bSuccess = true;
 			}
@@ -923,6 +933,65 @@ bool CClip::SetDescFromText(HGLOBAL hgData, bool unicode)
 	GlobalUnlock(hgData);
 	
 	return bRet;
+}
+
+void CClip::StripExcelOuterQuotes(CString &str)
+{
+	if (str.GetLength() >= 2 && str[0] == _T('"') && str[str.GetLength() - 1] == _T('"'))
+	{
+		str = str.Mid(1, str.GetLength() - 2);
+		str.Replace(_T("\"\""), _T("\""));
+	}
+}
+
+void CClip::StripExcelOuterQuotesFromGlobal(HGLOBAL &hGlobal, CLIPFORMAT cfType)
+{
+	if (cfType == CF_UNICODETEXT)
+	{
+		wchar_t *pData = (wchar_t *)GlobalLock(hGlobal);
+		if (!pData) return;
+		CStringW str(pData);
+		GlobalUnlock(hGlobal);
+
+		if (str.GetLength() < 2 || str[0] != L'"' || str[str.GetLength() - 1] != L'"')
+			return;
+
+		str = str.Mid(1, str.GetLength() - 2);
+		str.Replace(L"\"\"", L"\"");
+
+		SIZE_T newSize = (str.GetLength() + 1) * sizeof(wchar_t);
+		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE, newSize);
+		if (!hNew) return;
+		void *pNew = GlobalLock(hNew);
+		if (!pNew) { GlobalFree(hNew); return; }
+		memcpy(pNew, (LPCWSTR)str, newSize);
+		GlobalUnlock(hNew);
+		GlobalFree(hGlobal);
+		hGlobal = hNew;
+	}
+	else if (cfType == CF_TEXT)
+	{
+		char *pData = (char *)GlobalLock(hGlobal);
+		if (!pData) return;
+		CStringA str(pData);
+		GlobalUnlock(hGlobal);
+
+		if (str.GetLength() < 2 || str[0] != '"' || str[str.GetLength() - 1] != '"')
+			return;
+
+		str = str.Mid(1, str.GetLength() - 2);
+		str.Replace("\"\"", "\"");
+
+		SIZE_T newSize = str.GetLength() + 1;
+		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE, newSize);
+		if (!hNew) return;
+		void *pNew = GlobalLock(hNew);
+		if (!pNew) { GlobalFree(hNew); return; }
+		memcpy(pNew, (LPCSTR)str, newSize);
+		GlobalUnlock(hNew);
+		GlobalFree(hGlobal);
+		hGlobal = hNew;
+	}
 }
 
 bool CClip::SetDescFromType()

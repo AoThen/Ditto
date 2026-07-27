@@ -181,6 +181,8 @@ public:
 	int LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore = true, CString activeApp = _T(""), CString activeAppTitle = _T(""));
 	bool SetDescFromText(HGLOBAL hgData, bool unicode);
 	bool SetDescFromType();
+	void StripExcelOuterQuotes(CString &str);
+	void StripExcelOuterQuotesFromGlobal(HGLOBAL &hGlobal, CLIPFORMAT cfType);
 	bool AddToDB(bool bCheckForDuplicates = true);
 	bool ModifyMainTable();
 	bool ModifyDescription();	
