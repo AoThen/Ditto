@@ -433,8 +433,8 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
                 )
             )
             echo [BUILD]   Count: !count! MSVCRT references
-            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references ^(/MD detected^)
-            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR ^(expects /MT^)
+            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references - /MD detected
+            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR - expects /MT
             del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
             endlocal & exit /b 1
         )
