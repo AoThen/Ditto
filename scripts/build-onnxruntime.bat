@@ -271,6 +271,17 @@ if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
 ) else (
     echo [BUILD] re2.lib already present in install-static/lib
 )
+REM Force re2.lib from standalone build (overrides any ONNX Runtime internal build copy)
+if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
+    copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\re2.lib" >nul
+    if not errorlevel 1 (
+        echo [BUILD]   Forced re2.lib from standalone build
+    ) else (
+        echo [BUILD] WARNING: Failed to copy re2.lib from standalone build
+    )
+) else (
+    echo [BUILD] WARNING: Standalone re2.lib not found at %RE2_BUILD_DIR%\%CONFIG%\re2.lib
+)
 echo [BUILD] Step 4b/6 complete.
 
 REM -------------------------------------------------------------------
@@ -412,15 +423,16 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
         findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
         if not errorlevel 1 (
             echo [BUILD]   MSVCRT references found in onnxruntime.lib:
-            for /f %%a in ('type "%TEMP%\msvcrt_matches.txt" 2^>nul ^| find /c ""') do set count=%%a
-            echo [BUILD]   Count: !count! MSVCRT references
-            set /a line=0
+            set count=0
+            set line=0
             for /f "usebackq delims=" %%a in ("%TEMP%\msvcrt_matches.txt") do (
+                set /a count+=1
                 if !line! lss 5 (
                     echo [BUILD]     %%a
                     set /a line+=1
                 )
             )
+            echo [BUILD]   Count: !count! MSVCRT references
             echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references ^(/MD detected^)
             echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR ^(expects /MT^)
             del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
