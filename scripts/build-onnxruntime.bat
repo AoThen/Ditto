@@ -421,7 +421,7 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
         dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
         findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
         findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
-        if not errorlevel 1 (
+        if !errorlevel! equ 0 (
             echo [BUILD]   MSVCRT references found in onnxruntime.lib:
             set count=0
             set line=0
