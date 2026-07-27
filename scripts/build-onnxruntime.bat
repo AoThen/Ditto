@@ -117,6 +117,8 @@ if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
         -A x64 ^
         -DCMAKE_BUILD_TYPE=%CONFIG% ^
         -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ^
+        -DCMAKE_CXX_FLAGS="/MT" ^
+        -DCMAKE_C_FLAGS="/MT" ^
         -DBUILD_SHARED_LIBS=OFF ^
         -DRE2_BUILD_TESTING=OFF ^
         -Dabsl_DIR="%ABSL_CMAKE_DIR%"
