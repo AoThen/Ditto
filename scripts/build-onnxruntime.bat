@@ -420,23 +420,8 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     ) else (
         dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
         findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
-        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul && (
-            echo [BUILD]   MSVCRT references found in onnxruntime.lib:
-            set count=0
-            set line=0
-            for /f "usebackq delims=" %%a in ("%TEMP%\msvcrt_matches.txt") do (
-                set /a count+=1
-                if !line! lss 5 (
-                    echo [BUILD]     %%a
-                    set /a line+=1
-                )
-            )
-            echo [BUILD]   Count: !count! MSVCRT references
-            echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references - /MD detected
-            echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR - expects /MT
-            del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
-            endlocal & exit /b 1
-        )
+        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
+        if not errorlevel 1 (call :report_msvcrt_found & endlocal & exit /b 1)
         findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
         if errorlevel 1 (
             echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
@@ -545,3 +530,24 @@ if exist "%BUILD_DIR%" (
 )
 endlocal
 exit /b 1
+
+REM -------------------------------------------------------------------
+REM Subroutine: report MSVCRT found in onnxruntime.lib and exit with error
+REM -------------------------------------------------------------------
+:report_msvcrt_found
+setlocal EnableDelayedExpansion
+echo [BUILD]   MSVCRT references found in onnxruntime.lib:
+set count=0
+set line=0
+for /f "usebackq delims=" %%a in ("%TEMP%\msvcrt_matches.txt") do (
+    set /a count+=1
+    if !line! lss 5 (
+        echo [BUILD]     %%a
+        set /a line+=1
+    )
+)
+echo [BUILD]   Count: !count! MSVCRT references
+echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references - /MD detected
+echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR - expects /MT
+del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
+endlocal & exit /b 1
