@@ -420,15 +420,17 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     ) else (
         dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
         findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
-        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" >nul
-        if not errorlevel 1 (call :report_msvcrt_found & endlocal & exit /b 1)
-        findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
         if errorlevel 1 (
-            echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
+            findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
+            if errorlevel 1 (
+                echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
+            ) else (
+                echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
+            )
+            del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
         ) else (
-            echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
+            call :report_msvcrt_found & endlocal & exit /b 1
         )
-        del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
     )
 ) else (
     echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
