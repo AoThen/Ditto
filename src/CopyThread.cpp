@@ -118,6 +118,11 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 			int maxRetries = 3;
 			for (int retry = 1; retry <= maxRetries && bResult == FALSE; retry++)
 			{
+				if (::CountClipboardFormats() == 0)
+				{
+					Log(_T("Clipboard has no formats, skipping retry"));
+					break;
+				}
 				Log(StrF(_T("LoadFromClipboard didn't find any clips to save, sleeping %dms, then trying again (retry %d/%d)"), delay, retry, maxRetries));
 				Sleep(delay);
 				delay *= 2;
