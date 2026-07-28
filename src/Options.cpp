@@ -746,7 +746,7 @@ BOOL CGetSetOptions::SetProfileString(CString csName, CString csValue)
 		return FALSE;
 
 	::RegSetValueEx(hkKey, csName, NULL, REG_SZ,
-		(BYTE*)(LPCTSTR)csValue, csValue.GetLength()*sizeof(TCHAR));
+		(BYTE*)(LPCTSTR)csValue, (csValue.GetLength() + 1) * sizeof(TCHAR));
 
 	RegCloseKey(hkKey);
 
@@ -928,10 +928,12 @@ void CGetSetOptions::SetRunOnStartUp(BOOL bRun)
 	if(bRun)
 	{
 		CString sExeName = GetExeFileName();
+		CString sQuotedExeName = _T("\"") + sExeName + _T("\"");
 		::RegSetValueEx(hkRun, GetAppName(), NULL, REG_SZ,
-			(BYTE*)(LPCTSTR)sExeName, sExeName.GetLength()*sizeof(TCHAR));
-	} 
-	else 
+			(BYTE*)(LPCTSTR)sQuotedExeName,
+			(sQuotedExeName.GetLength() + 1) * sizeof(TCHAR));
+	}
+	else
 	{
 		::RegDeleteValue(hkRun, GetAppName());
 	}
