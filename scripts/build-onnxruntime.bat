@@ -242,9 +242,13 @@ for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
     if errorlevel 1 (
         echo %%f | findstr /i "\\_deps\\" >nul
         if errorlevel 1 (
-            if not exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
+            if exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
+                rem file already exists, skip
+            ) else (
                 copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
-                if not errorlevel 1 (
+                if errorlevel 1 (
+                    rem copy failed, continue
+                ) else (
                     echo [BUILD]   Copied: %%~nxf
                 )
             )
@@ -258,7 +262,9 @@ if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
     set "RE2_FOUND=0"
     for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\re2.lib" 2^>nul') do (
         copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
-        if not errorlevel 1 (
+        if errorlevel 1 (
+            rem copy failed, continue
+        ) else (
             echo [BUILD]   Copied re2.lib from: %%f
             set "RE2_FOUND=1"
         )
@@ -274,10 +280,10 @@ if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
 REM Force re2.lib from standalone build (overrides any ONNX Runtime internal build copy)
 if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
     copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\re2.lib" >nul
-    if not errorlevel 1 (
-        echo [BUILD]   Forced re2.lib from standalone build
-    ) else (
+    if errorlevel 1 (
         echo [BUILD] WARNING: Failed to copy re2.lib from standalone build
+    ) else (
+        echo [BUILD]   Forced re2.lib from standalone build
     )
 ) else (
     echo [BUILD] WARNING: Standalone re2.lib not found at %RE2_BUILD_DIR%\%CONFIG%\re2.lib
@@ -295,7 +301,9 @@ if exist "%ABSL_BUILD_DIR%" (
     set "ABSL_OVERRIDDEN=0"
     for /f "delims=" %%f in ('dir /s /b "%ABSL_BUILD_DIR%\absl_*.lib" 2^>nul') do (
         copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul
-        if not errorlevel 1 (
+        if errorlevel 1 (
+            rem copy failed, continue
+        ) else (
             set "ABSL_OVERRIDDEN=1"
             echo [BUILD]   Overrode: %%~nxf
         )
@@ -322,7 +330,9 @@ if exist "%STATIC_INSTALL_DIR%\lib" (
         for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
             dumpbin /directives "%STATIC_INSTALL_DIR%\lib\%%f" > "%TEMP%\crt_check.txt"
             findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\crt_check.txt" >nul
-            if not errorlevel 1 (
+            if errorlevel 1 (
+                rem no MSVCRT in this lib
+            ) else (
                 echo [BUILD]   [MSVCRT] %%f
                 for /f "tokens=*" %%a in ('findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\crt_check.txt"') do echo [BUILD]       %%a
             )
