@@ -892,6 +892,7 @@
 		<Item English_Text = "Paste CamelCase" ID = "122">驼峰式粘贴</Item>
 		<Item English_Text = "Paste Multiple Images Horizontally" ID = "123">水平粘贴多幅图像</Item>
 		<Item English_Text = "Paste Multiple Images Vertically" ID = "124">竖直粘贴多幅图像</Item>
+		<Item English_Text = "Paste as Image" ID = "152">粘贴为图像</Item>
 	
 	</Ditto_Options_Quick_Paste_Keyboard>
 	

@@ -1581,6 +1581,22 @@ void COleClipSource::PasteAsImage(CClip& clip)
 {
 	Log(_T("Start of PasteAsImage"));
 
+	// If clip already has image data, keep only image formats
+	if (clip.m_Formats.FindFormatEx(CF_DIB) != NULL ||
+		clip.m_Formats.FindFormatEx(theApp.m_PNG_Format) != NULL)
+	{
+		for (int i = clip.m_Formats.Size() - 1; i >= 0; i--)
+		{
+			IClipFormat* pFmt = clip.m_Formats.GetAt(i);
+			CLIPFORMAT type = pFmt->Type();
+			if (type != CF_DIB && type != theApp.m_PNG_Format)
+			{
+				clip.m_Formats.DeleteAt(i);
+			}
+		}
+		return;
+	}
+
 	IClipFormat* pUnicodeText = clip.m_Formats.FindFormatEx(CF_UNICODETEXT);
 	if (pUnicodeText == NULL)
 	{

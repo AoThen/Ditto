@@ -521,6 +521,8 @@ int ActionEnums::GetDefaultShortCutKeyA(ActionEnumValues value, int pos)
 			return VK_F5;
 		case SET_DRAG_FILE_NAME:
 			return VK_F4;
+		case ActionEnums::PASTE_AS_IMAGE:
+			return ACCEL_MAKEKEY(VK_OEM_5, HOTKEYF_SHIFT);
 		}
 		break;
 	case 1:
