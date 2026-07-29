@@ -203,7 +203,7 @@ echo [BUILD] Step 3/6 complete.
 REM -------------------------------------------------------------------
 REM 4. Merge static libs with lib.exe (only if tlog had libs)
 REM -------------------------------------------------------------------
-if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
+if exist "%STATIC_INSTALL_DIR%\lib" (rem) else mkdir "%STATIC_INSTALL_DIR%\lib"
 
 if "!libs!" == "" (
     echo [BUILD] Step 4/6: Skipping lib merge [no libs from tlog]
@@ -261,7 +261,9 @@ for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
 )
 
 REM Ensure re2.lib is collected (onnxruntime contrib_ops depend on it)
-if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
+if exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
+    echo [BUILD] re2.lib already present in install-static/lib
+) else (
     echo [BUILD] re2.lib not found in install-static/lib, searching build tree
     set "RE2_FOUND=0"
     for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\re2.lib" 2^>nul') do (
@@ -278,8 +280,6 @@ if not exist "%STATIC_INSTALL_DIR%\lib\re2.lib" (
     ) else (
         echo [BUILD] re2.lib copied to install-static/lib
     )
-) else (
-    echo [BUILD] re2.lib already present in install-static/lib
 )
 REM Force re2.lib from standalone build (overrides any ONNX Runtime internal build copy)
 if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
@@ -433,7 +433,7 @@ REM 5. Flatten headers
 REM -------------------------------------------------------------------
 echo [BUILD] Step 5/6: Flattening headers
 
-if not exist "%STATIC_INSTALL_DIR%\include" mkdir "%STATIC_INSTALL_DIR%\include"
+if exist "%STATIC_INSTALL_DIR%\include" (rem) else mkdir "%STATIC_INSTALL_DIR%\include"
 
 if exist "%INSTALL_DIR%\include\onnxruntime" (
     echo [BUILD] Copying onnxruntime headers
@@ -454,7 +454,7 @@ REM 6. Create OnnxRuntimeConfig.cmake
 REM -------------------------------------------------------------------
 echo [BUILD] Step 6/6: Creating cmake config
 
-if not exist "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime" mkdir "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime"
+if exist "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime" (rem) else mkdir "%STATIC_INSTALL_DIR%\lib\cmake\OnnxRuntime"
 (
     echo set(ONNXRUNTIME_INCLUDE_DIRS "%STATIC_INSTALL_DIR%\include")
     echo set(ONNXRUNTIME_LIBRARIES "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib")
@@ -487,7 +487,9 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
 
 REM Check for any .lib files in install-static
 dir "%STATIC_INSTALL_DIR%\lib\*.lib" >nul 2>nul
-if not errorlevel 1 (
+if errorlevel 1 (
+    rem dir command failed, no libs found
+) else (
     echo [BUILD] ===================================================================
     echo [BUILD] ONNX Runtime static libs built - individual libs, no merge
     echo [BUILD]   Output: %STATIC_INSTALL_DIR%
