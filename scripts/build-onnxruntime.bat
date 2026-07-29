@@ -360,7 +360,9 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
 
 set all_libs=
 for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
-    if /i not "%%f"=="onnxruntime.lib" (
+    if /i "%%f"=="onnxruntime.lib" (
+        rem skip onnxruntime.lib itself
+    ) else (
         set all_libs=!all_libs! "%STATIC_INSTALL_DIR%\lib\%%f"
     )
 )
