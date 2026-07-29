@@ -132,7 +132,11 @@ if exist "%RE2_SRC_DIR%\CMakeLists.txt" (
             endlocal & exit /b 1
         ) else (
             if exist "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" (
-                if not exist "%STATIC_INSTALL_DIR%\lib" mkdir "%STATIC_INSTALL_DIR%\lib"
+                if exist "%STATIC_INSTALL_DIR%\lib" (
+                    rem dir exists, skip
+                ) else (
+                    mkdir "%STATIC_INSTALL_DIR%\lib"
+                )
                 copy /y "%RE2_BUILD_DIR%\%CONFIG%\re2.lib" "%STATIC_INSTALL_DIR%\lib\" >nul
                 echo [BUILD]   Copied re2.lib from standalone build
             ) else (
