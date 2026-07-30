@@ -72,6 +72,7 @@
     
 #include "stdafx.h"
 #include "SystemTray.h"
+#include "Misc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -334,7 +335,10 @@ BOOL CSystemTray::AddIcon()
     {
         m_tnd.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         if (!Shell_NotifyIcon(NIM_ADD, &m_tnd))
+        {
+            Log(_T("SystemTray::AddIcon - Shell_NotifyIcon(NIM_ADD) failed, pending"));
             m_bShowIconPending = TRUE;
+        }
         else
             m_bRemoved = m_bHidden = FALSE;
     }
@@ -351,6 +355,8 @@ BOOL CSystemTray::RemoveIcon()
     m_tnd.uFlags = 0;
     if (Shell_NotifyIcon(NIM_DELETE, &m_tnd))
         m_bRemoved = m_bHidden = TRUE;
+    else
+        Log(_T("SystemTray::RemoveIcon - Shell_NotifyIcon(NIM_DELETE) failed"));
 
     return (m_bRemoved == TRUE);
 }

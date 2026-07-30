@@ -100,6 +100,8 @@ CClient::~CClient()
 
 BOOL CClient::CloseConnection()
 {
+	LogSendRecieveInfo(_T("CClient::CloseConnection"));
+
 	if(m_Connection != NULL && m_Connection != 0)
 	{
 		CSendInfo Info;
@@ -197,6 +199,8 @@ BOOL CClient::OpenConnection(const TCHAR* servername)
 
 BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 {
+	LogSendRecieveInfo(_T("CClient::SendItem - start"));
+
 	CSendInfo Info;
 
 	Info.m_manualSend = manualSend;
@@ -243,6 +247,8 @@ BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 		return FALSE;
 
 	theApp.m_lClipsSent++;
+	
+	LogSendRecieveInfo(_T("CClient::SendItem - end"));
 	
 	return TRUE;
 }

@@ -34,6 +34,10 @@ static CString GetCurrentTimeStamp()
 
 static void LogMessage(const CString& msg)
 {
+#ifndef _DEBUG
+	if (!CGetSetOptions::m_bEnableDebugLogging)
+		return;
+#endif
 	CString logMsg;
 	logMsg.Format(_T("[CloudSync] %s %s\n"), GetCurrentTimeStamp(), msg.GetString());
 	OutputDebugString(logMsg);

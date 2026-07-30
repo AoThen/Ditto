@@ -581,6 +581,8 @@ void CDeleteClipData::ApplyDelete()
 	if (m_applyingDelete)
 		return;
 
+	Log(_T("ApplyDelete: starting"));
+
 	if (MessageBox(theApp.m_Language.GetString("MsgDeleteSelectedItems", "Delete selected items?  This cannot be undone!"), _T(""), MB_OKCANCEL | MB_ICONWARNING) == IDOK)
 	{
 		m_clipList.EnableWindow(FALSE);
@@ -603,18 +605,22 @@ void CDeleteClipData::ApplyDelete()
 				}
 			}
 
+			Log(StrF(_T("ApplyDelete: selected %d items to delete"), rowsToDelete.size()));
+
 			CProgressWnd progress;
 			progress.Create(this, _T("Deleting clip items"), TRUE);
 			progress.SetRange(0, (int)rowsToDelete.size() + 2);
 			progress.SetText(_T("Deleting selected items"));
 			progress.SetStep(1);
 
-			INT_PTR count = rowsToDelete.size();
-			for (INT_PTR i = count - 1; i >= 0; i--)
+			INT_PTR deletedCount = 0;
+			INT_PTR totalCount = rowsToDelete.size();
+			for (INT_PTR i = totalCount - 1; i >= 0; i--)
 			{
 				progress.PeekAndPump();
 				if (m_cancelDelete || progress.Cancelled())
 				{
+					Log(StrF(_T("ApplyDelete: cancelled after deleting %d of %d items"), deletedCount, totalCount));
 					break;
 				}
 				progress.StepIt();
@@ -639,10 +645,13 @@ void CDeleteClipData::ApplyDelete()
 						_T(")"), data.m_lID);
 
 					m_data.erase(m_data.begin() + row);
+					deletedCount++;
 				}
 				CATCH_SQLITE_EXCEPTION
 			}
 			
+			Log(StrF(_T("ApplyDelete: deleted %d items"), deletedCount));
+
 			progress.StepIt();
 			progress.SetText(_T("Refreshing database size"));
 			SetDbSize();			
@@ -665,6 +674,8 @@ void CDeleteClipData::ApplyDelete()
 		m_applyingDelete = false;
 		m_clipList.EnableWindow();
 		m_clipList.SetFocus();
+
+		Log(_T("ApplyDelete: completed"));
 	}
 }
 

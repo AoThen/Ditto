@@ -182,6 +182,8 @@ CGetSetOptions::~CGetSetOptions()
 
 void CGetSetOptions::LoadSettings()
 {
+	Log(_T("LoadSettings: enter"));
+
 	CString exeDir = CGetSetOptions::GetExeFileName();
 	exeDir = GetFilePath(exeDir);
 	FIX_CSTRING_PATH(exeDir);
@@ -229,6 +231,8 @@ void CGetSetOptions::LoadSettings()
 		}
 	}
 
+	Log(StrF(_T("LoadSettings: using INI=%s, portable=%d, fromIni=%d"), m_csIniFileName, m_portable, m_bFromIni));
+
 	if(m_bFromIni)
 	{
 		CString csPath = GetFilePath(m_csIniFileName);
@@ -237,6 +241,7 @@ void CGetSetOptions::LoadSettings()
 
 		//create the ini file as unicode, this way we can save unicode string to the ini file
 		//http://www.codeproject.com/Articles/9071/Using-Unicode-in-INI-files
+		Log(StrF(_T("LoadSettings: creating INI file: %s"), m_csIniFileName));
 		CreateIniFile(m_csIniFileName);
 	}
 
@@ -338,6 +343,8 @@ void CGetSetOptions::LoadSettings()
 	}
 
 	m_tooltipTimeout = GetToolTipTimeout();
+
+	Log(_T("LoadSettings: complete"));
 }
 
 void CGetSetOptions::CreateIniFile(CString path)

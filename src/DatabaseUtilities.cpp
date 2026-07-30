@@ -644,9 +644,9 @@ BOOL RestoreDB(CString backupPath)
 
 					totalReadSize += readBytes;
 
-					Log(StrF(_T("restoring db uncompressed bytes read: %d"), readBytes));
-
 				} while (readBytes >= 65536);
+
+				Log(StrF(_T("restoring db complete, total uncompressed bytes: %llu"), totalReadSize));
 
 				file.Close();
 			}
@@ -914,11 +914,12 @@ BOOL RemoveOldEntries(bool checkIdleTime)
 					{
 						clipId = q.getIntField(_T("lID"));
 						IDs.Add(clipId);
-						Log(StrF(_T("From MaxEntries - Deleting Id: %d"), clipId));
 					}
 
 					q.nextRow();
 				}
+
+				Log(StrF(_T("From MaxEntries - clips to delete: %d"), IDs.GetCount()));
 
 				if (IDs.GetCount() > 0)
 				{
@@ -946,10 +947,10 @@ BOOL RemoveOldEntries(bool checkIdleTime)
 				{
 					IDs.Add(q.getIntField(_T("lID")));
 
-					Log(StrF(_T("From Clips Expire - Deleting Id: %d"), q.getIntField(_T("lID"))));
-
 					q.nextRow();
 				}
+
+				Log(StrF(_T("From Clips Expire - clips to delete: %d"), IDs.GetCount()));
 
 				if (IDs.GetCount() > 0)
 				{
@@ -1007,8 +1008,6 @@ BOOL DeleteNonUsedClips(bool fromAppWindow)
 	while (q.eof() == false)
 	{
 		IDs.Add(q.getIntField(_T("lID")));
-
-		Log(StrF(_T("From Clips DeleteNonUsedClips - Deleting Id: %d"), q.getIntField(_T("lID"))));
 
 		q.nextRow();
 	}

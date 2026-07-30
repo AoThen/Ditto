@@ -4018,6 +4018,8 @@ bool CQPasteWnd::DoActionForceCloseWindow()
 
 bool CQPasteWnd::DoActionCloseWindow()
 {
+	Log(_T("DoActionCloseWindow: enter"));
+
 	bool ret = false;
 	if (m_bModifersMoveActive)
 	{
@@ -4027,19 +4029,15 @@ bool CQPasteWnd::DoActionCloseWindow()
 	}
 	else
 	{
-		Log(_T("close 1"));
-
 		if (m_lstHeader.IsToolTipShowPersistant() == false &&
 			m_lstHeader.IsToolTipWindowVisible())
 		{
 			m_lstHeader.HidePopup(true);
-			Log(_T("close 2"));
 			ret = true;
 		}
 		else if (m_strSQLSearch.IsEmpty() == FALSE)
 		{
 			OnCancelFilter(0, 0);
-			Log(_T("close 3"));
 			ret = true;
 		}
 		else
@@ -4049,8 +4047,6 @@ bool CQPasteWnd::DoActionCloseWindow()
 				MinMaxWindow(FORCE_MIN);
 				theApp.m_activeWnd.ReleaseFocus();
 
-				Log(_T("close 4"));
-
 				ret = true;
 			}
 			else
@@ -4059,13 +4055,10 @@ bool CQPasteWnd::DoActionCloseWindow()
 				{
 					HideQPasteWindow(true);
 					ret = true;
-					Log(_T("close 5"));
 				}
 			}
 		}
 	}
-
-	Log(_T("close 6"));
 
 	return ret;
 }

@@ -375,11 +375,15 @@ void CServer::OnExit(CSendInfo &info)
 
 void CServer::OnRequestFiles(CSendInfo &info)
 {
+	LogSendRecieveInfo(_T("CServer::OnRequestFiles - start"));
+
 	CFileSend Send;
 	Send.SendClientFiles(m_Sock.GetSocket(), m_pClipList);
 
 	delete m_pClipList;
 	m_pClipList = NULL;
+
+	LogSendRecieveInfo(_T("CServer::OnRequestFiles - end"));
 }
 
 void CServer::AddRemoteCF_HDROPFormat()

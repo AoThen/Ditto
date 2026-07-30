@@ -285,6 +285,8 @@ void CMainFrame::OnFirstExit()
 
 LRESULT CMainFrame::OnHotKey(WPARAM wParam, LPARAM lParam)
 {
+	Log(StrF(_T("OnHotKey: wParam=%d"), wParam));
+
     if(theApp.m_pDittoHotKey && wParam == theApp.m_pDittoHotKey->m_Atom ||
 		theApp.m_pDittoHotKey2 && wParam == theApp.m_pDittoHotKey2->m_Atom ||
 		theApp.m_pDittoHotKey3 && wParam == theApp.m_pDittoHotKey3->m_Atom)
@@ -321,127 +323,102 @@ LRESULT CMainFrame::OnHotKey(WPARAM wParam, LPARAM lParam)
     }
     else if(theApp.m_pPosOne && wParam == theApp.m_pPosOne->m_Atom)
     {
-        Log(_T("Pos 1 hot key"));
         DoFirstTenPositionsPaste(0);
     }
     else if(theApp.m_pPosTwo && wParam == theApp.m_pPosTwo->m_Atom)
     {
-        Log(_T("Pos 2 hot key"));
         DoFirstTenPositionsPaste(1);
     }
     else if(theApp.m_pPosThree && wParam == theApp.m_pPosThree->m_Atom)
     {
-        Log(_T("Pos 3 hot key"));
         DoFirstTenPositionsPaste(2);
     }
     else if(theApp.m_pPosFour && wParam == theApp.m_pPosFour->m_Atom)
     {
-        Log(_T("Pos 4 hot key"));
         DoFirstTenPositionsPaste(3);
     }
     else if(theApp.m_pPosFive && wParam == theApp.m_pPosFive->m_Atom)
     {
-        Log(_T("Pos 5 hot key"));
         DoFirstTenPositionsPaste(4);
     }
     else if(theApp.m_pPosSix && wParam == theApp.m_pPosSix->m_Atom)
     {
-        Log(_T("Pos 6 hot key"));
         DoFirstTenPositionsPaste(5);
     }
     else if(theApp.m_pPosSeven && wParam == theApp.m_pPosSeven->m_Atom)
     {
-        Log(_T("Pos 7 hot key"));
         DoFirstTenPositionsPaste(6);
     }
     else if(theApp.m_pPosEight && wParam == theApp.m_pPosEight->m_Atom)
     {
-        Log(_T("Pos 8 hot key"));
         DoFirstTenPositionsPaste(7);
     }
     else if(theApp.m_pPosNine && wParam == theApp.m_pPosNine->m_Atom)
     {
-        Log(_T("Pos 9 hot key"));
         DoFirstTenPositionsPaste(8);
     }
     else if(theApp.m_pPosTen && wParam == theApp.m_pPosTen->m_Atom)
     {
-        Log(_T("Pos 10 hot key"));
         DoFirstTenPositionsPaste(9);
     }
     else if(theApp.m_pCopyBuffer1 && wParam == theApp.m_pCopyBuffer1->m_Atom)
     {
-        Log(_T("Copy buffer 1 hot key"));
         theApp.m_CopyBuffer.StartCopy(0);
     }
     else if(theApp.m_pPasteBuffer1 && wParam == theApp.m_pPasteBuffer1->m_Atom)
     {
-        Log(_T("Paste buffer 1 hot key"));
         theApp.m_CopyBuffer.PastCopyBuffer(0);
     }
     else if(theApp.m_pCutBuffer1 && wParam == theApp.m_pCutBuffer1->m_Atom)
     {
-        Log(_T("Cut buffer 1 hot key"));
         theApp.m_CopyBuffer.StartCopy(0, true);
     }
     else if(theApp.m_pCopyBuffer2 && wParam == theApp.m_pCopyBuffer2->m_Atom)
     {
-        Log(_T("Copy buffer 2 hot key"));
         theApp.m_CopyBuffer.StartCopy(1);
     }
     else if(theApp.m_pPasteBuffer2 && wParam == theApp.m_pPasteBuffer2->m_Atom)
     {
-        Log(_T("Paste buffer 2 hot key"));
         theApp.m_CopyBuffer.PastCopyBuffer(1);
     }
     else if(theApp.m_pCutBuffer2 && wParam == theApp.m_pCutBuffer2->m_Atom)
     {
-        Log(_T("Cut buffer 2 hot key"));
         theApp.m_CopyBuffer.StartCopy(1, true);
     }
     else if(theApp.m_pCopyBuffer3 && wParam == theApp.m_pCopyBuffer3->m_Atom)
     {
-        Log(_T("Copy buffer 3 hot key"));
         theApp.m_CopyBuffer.StartCopy(2);
     }
     else if(theApp.m_pPasteBuffer3 && wParam == theApp.m_pPasteBuffer3->m_Atom)
     {
-        Log(_T("Paste buffer 3 hot key"));
         theApp.m_CopyBuffer.PastCopyBuffer(2);
     }
     else if(theApp.m_pCutBuffer3 && wParam == theApp.m_pCutBuffer3->m_Atom)
     {
-        Log(_T("Cut buffer 3 hot key"));
         theApp.m_CopyBuffer.StartCopy(2, true);
     }
 	else if (theApp.m_pCopyBuffer4 && wParam == theApp.m_pCopyBuffer4->m_Atom)
 	{
-		Log(_T("Copy buffer 4 hot key"));
 		theApp.m_CopyBuffer.StartCopy(3);
 	}
 	else if (theApp.m_pPasteBuffer4 && wParam == theApp.m_pPasteBuffer4->m_Atom)
 	{
-		Log(_T("Paste buffer 4 hot key"));
 		theApp.m_CopyBuffer.PastCopyBuffer(3);
 	}
 	else if (theApp.m_pCutBuffer4 && wParam == theApp.m_pCutBuffer4->m_Atom)
 	{
-		Log(_T("Cut buffer 4 hot key"));
 		theApp.m_CopyBuffer.StartCopy(3, true);
 	}
 	else if (theApp.m_pCopyBuffer5 && wParam == theApp.m_pCopyBuffer5->m_Atom)
 	{
-		Log(_T("Copy buffer 5 hot key"));
 		theApp.m_CopyBuffer.StartCopy(4);
 		}
 	else if (theApp.m_pPasteBuffer5 && wParam == theApp.m_pPasteBuffer5->m_Atom)
 	{
-		Log(_T("Paste buffer 5 hot key"));
 		theApp.m_CopyBuffer.PastCopyBuffer(4);
 	}
 	else if (theApp.m_pCutBuffer5 && wParam == theApp.m_pCutBuffer5->m_Atom)
 	{
-		Log(_T("Cut buffer 5 hot key"));
 		theApp.m_CopyBuffer.StartCopy(4, true);
 	}
 	else if(theApp.m_pTextOnlyPaste && wParam == theApp.m_pTextOnlyPaste->m_Atom)
@@ -1518,6 +1495,8 @@ LRESULT CMainFrame::OnResolutionChange(WPARAM wParam, LPARAM lParam)
 	{
 		m_startupScreenWidth = GetScreenWidth();
 		m_startupScreenHeight = GetScreenHeight();
+
+		Log(StrF(_T("OnResolutionChange: resolution changed to %dx%d"), m_startupScreenWidth, m_startupScreenHeight));
 
 		SetTimer(SCREEN_RESOLUTION_CHANGED, 1000, NULL);
 	}
