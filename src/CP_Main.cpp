@@ -396,6 +396,12 @@ BOOL CCP_MainApp::InitInstance()
 		return FALSE;
 	}
 
+	// Refresh startup path for portable mode to handle drive letter changes between boots
+	if(CGetSetOptions::GetIsPortableDitto() && CGetSetOptions::GetRunOnStartUp())
+	{
+		CGetSetOptions::SetRunOnStartUp(TRUE);
+	}
+
 	AfxOleInit();
 	AfxInitRichEditEx();	
 
