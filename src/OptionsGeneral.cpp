@@ -96,8 +96,6 @@ BOOL COptionsGeneral::OnInitDialog()
 	
 	m_pParent = (COptionsSheet *)GetParent();
 
-#ifndef _DEBUG
-
 	if (CGetSetOptions::GetIsWindowsApp())
 	{
 		m_btRunOnStartup.SetCheck(BST_CHECKED);
@@ -107,7 +105,6 @@ BOOL COptionsGeneral::OnInitDialog()
 	{
 		m_btRunOnStartup.SetCheck(CGetSetOptions::GetRunOnStartUp());
 	}
-#endif
 
 	m_btMaximumCheck.SetCheck(CGetSetOptions::GetCheckForMaxEntries());
 	if (CGetSetOptions::GetCheckForMaxEntries() == FALSE)
@@ -224,13 +221,10 @@ BOOL COptionsGeneral::OnApply()
 {
 	UpdateData();
 
-#ifndef _DEBUG
-
 	if (CGetSetOptions::GetIsWindowsApp() == FALSE)
 	{
 		CGetSetOptions::SetRunOnStartUp(m_btRunOnStartup.GetCheck());
 	}
-#endif
 
 	CGetSetOptions::SetCheckForMaxEntries(m_btMaximumCheck.GetCheck());
 	CGetSetOptions::SetCheckForExpiredEntries(m_btExpire.GetCheck());
