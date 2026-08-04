@@ -1,0 +1,95 @@
+name: Build OCR CLI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: OcrCli (Legacy)
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      OCR_VERSION: legacy
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache OCR dependencies
+        uses: actions/cache@v4
+        with:
+          path: Addins\DittoOCR\ocr-deps
+          key: ocr-deps-legacy-${{ hashFiles('scripts/download-ocr-deps.bat') }}
+          restore-keys: |
+            ocr-deps-legacy-
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build OCR dependencies and models
+        shell: cmd
+        run: call scripts\download-ocr-deps.bat legacy
+
+      - name: Build DittoOCR (OcrDll.dll)
+        run: >
+          msbuild Addins\DittoOCR\DittoOCR.vcxproj
+          /p:Configuration=Release /p:Platform=x64
+          /p:SolutionDir="${{ github.workspace }}\"
+          /p:OcrVersion=legacy -v:d
+
+      - name: Build OcrCli (OcrCli.exe)
+        run: >
+          msbuild tools\OcrCli\OcrCli.vcxproj
+          /p:Configuration=Release /p:Platform=x64
+          /p:SolutionDir="${{ github.workspace }}\" -v:d
+
+      - name: Diagnostic - verify outputs
+        if: always()
+        shell: cmd
+        run: |
+          echo === OcrDll.dll ===
+          dir Release64\Addins\DittoOCR\OcrDll.dll 2>nul || echo NOT FOUND
+          echo === OcrCli.exe ===
+          dir Release64\Addins\DittoOCR\OcrCli.exe 2>nul || echo NOT FOUND
+          echo === Models ===
+          dir Addins\DittoOCR\models\*.onnx 2>nul || echo NOT FOUND
+          exit /b 0
+
+      - name: Set short SHA
+        shell: bash
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Package portable zip
+        shell: cmd
+        run: |
+          mkdir OcrCliPortable
+          mkdir OcrCliPortable\models
+          copy Release64\Addins\DittoOCR\OcrDll.dll OcrCliPortable\
+          copy Release64\Addins\DittoOCR\OcrCli.exe OcrCliPortable\
+          xcopy /s /e /i Addins\DittoOCR\models OcrCliPortable\models\
+
+      - name: Verify package integrity
+        shell: cmd
+        run: |
+          if not exist OcrCliPortable\OcrCli.exe exit /b 1
+          if not exist OcrCliPortable\OcrDll.dll exit /b 1
+          if not exist OcrCliPortable\models\PP-OCRv6_small_det_infer.onnx exit /b 1
+          if not exist OcrCliPortable\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
+          if not exist OcrCliPortable\models\inference.yml exit /b 1
+          echo All required files present
+
+      - name: Create portable zip
+        shell: cmd
+        run: 7z a -tzip OcrCli_legacy_%SHORT_SHA%_x64.zip OcrCliPortable\*
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-cli-legacy-${{ env.SHORT_SHA }}-x64
+          path: OcrCli_legacy_${{ env.SHORT_SHA }}_x64.zip
+          retention-days: 30
