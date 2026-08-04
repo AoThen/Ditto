@@ -71,6 +71,7 @@ jobs:
           mkdir OcrCliPortable\models
           copy Release64\Addins\DittoOCR\OcrDll.dll OcrCliPortable\
           copy Release64\Addins\DittoOCR\OcrCli.exe OcrCliPortable\
+          copy tools\OcrCli\README.txt OcrCliPortable\
           xcopy /s /e /i Addins\DittoOCR\models OcrCliPortable\models\
 
       - name: Verify package integrity
@@ -81,6 +82,7 @@ jobs:
           if not exist OcrCliPortable\models\PP-OCRv6_small_det_infer.onnx exit /b 1
           if not exist OcrCliPortable\models\PP-OCRv6_small_rec_infer.onnx exit /b 1
           if not exist OcrCliPortable\models\inference.yml exit /b 1
+          if not exist OcrCliPortable\README.txt exit /b 1
           echo All required files present
 
       - name: Create portable zip
