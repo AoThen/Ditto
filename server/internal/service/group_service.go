@@ -112,6 +112,7 @@ func (s *GroupService) ListGroups(userID uint, page, perPage int) (*response.Pag
 		Total:   total,
 		Page:    page,
 		PerPage: perPage,
+		HasMore: int64(page)*int64(perPage) < total,
 	}, nil
 }
 
@@ -282,12 +283,12 @@ func (s *GroupService) UpdateGroup(userID uint, groupID string, req *UpdateGroup
 	var group model.Group
 	if err := database.DB.Where("id = ? AND user_id = ?", groupID, userID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, ErrGroupNotFound
-			}
-			return nil, err
+			return nil, ErrGroupNotFound
 		}
+		return nil, err
+	}
 
-		// Validate parent exists and isn't self
+	// Validate parent exists and isn't self
 	if req.ParentID != nil && *req.ParentID != "" {
 		if *req.ParentID == groupID {
 			return nil, errors.New("不能将分组设为自身")

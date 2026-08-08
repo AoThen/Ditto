@@ -40,4 +40,5 @@ type PaginatedResponse struct {
 	Total   int64       `json:"total"`
 	Page    int         `json:"page"`
 	PerPage int         `json:"per_page"`
+	HasMore bool        `json:"has_more"`
 }
