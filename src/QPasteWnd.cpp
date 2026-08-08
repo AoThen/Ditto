@@ -2695,6 +2695,9 @@ void CQPasteWnd::OnMenuSenttoFriendone()
 	SendToFriendbyPos(0, _T(""));
 }
 
+// NOT IMPLEMENTED: this legacy menu command has no UI entry in the resource files.
+// The prompt-for-friend functionality is provided by "Send To -> Prompt for Name"
+// (OnSendtoPromptforname / ActionEnums::PROMPT_SEND_TO_FRIEND).
 void CQPasteWnd::OnMenuSenttoPromptforip()
 {
 
@@ -6723,9 +6726,13 @@ void CQPasteWnd::OnDestroy()
 {
 	CGetSetOptions::SetPastSearchXml(m_search.SavePastSearches());
 
-	CWndEx::OnDestroy();
+	// Stop worker threads BEFORE destroying the base window: event handlers
+	// receive "this" (m_param), so they must not run against a half-destroyed
+	// window. Stop() waits up to 1s for the threads to converge.
 	m_thread.Stop();
 	m_extraDataThread.Stop();
+
+	CWndEx::OnDestroy();
 }
 
 void CQPasteWnd::OnTimer(UINT_PTR nIDEvent)

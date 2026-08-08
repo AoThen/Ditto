@@ -185,11 +185,15 @@ void CCopyThread::SyncConfig()
 
 bool CCopyThread::IsClipboardViewerConnected()
 {
+	if (m_pClipboardViewer == NULL)
+		return false;
 	return m_pClipboardViewer->m_bIsConnected;
 }
 
 bool CCopyThread::GetConnectCV()
 {
+	if (m_pClipboardViewer == NULL)
+		return false;
 	return m_pClipboardViewer->GetConnect();
 }
 
@@ -279,6 +283,9 @@ void CCopyThread::Init(CCopyConfig cfg)
 bool CCopyThread::Quit()
 {
 	m_bQuit = true;
-	m_pClipboardViewer->PostMessage( WM_QUIT );
+	if (m_pClipboardViewer != NULL)
+	{
+		m_pClipboardViewer->PostMessage( WM_QUIT );
+	}
 	return CWinThread::PostThreadMessage( WM_QUIT, NULL, NULL ) != FALSE;
 }

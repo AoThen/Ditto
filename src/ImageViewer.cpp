@@ -171,8 +171,6 @@ void CImageViewer::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 
 BOOL CImageViewer::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	OutputDebugString(_T("OnMouseWheel\r\n"));
-
 	if (nFlags == MK_CONTROL)
 	{
 		this->LockWindowUpdate();
@@ -214,10 +212,37 @@ BOOL CImageViewer::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 	return TRUE;
 }
 
+void CImageViewer::ProcessZoom(double k, int x, int y)
+{
+	if (k <= 0 || k >= 100)
+	{
+		// Reject invalid or extreme zoom factors
+		return;
+	}
+
+	this->LockWindowUpdate();
+	CPoint delta;
+	double oldScale = m_scale;
+
+	m_scale *= k;
+	m_scale = max(m_scale, 0.01);
+
+	UpdateBitmapSize(false);
+
+	if (oldScale > 0 && m_scale > 0)
+	{
+		delta.x = static_cast<LONG>(round((double)(x * (1 / oldScale)) - (x * (1 / m_scale))));
+		delta.y = static_cast<LONG>(round((double)(y * (1 / oldScale)) - (y * (1 / m_scale))));
+
+		m_scrollHelper.Update(delta);
+	}
+
+	this->Invalidate();
+	this->UnlockWindowUpdate();
+}
+
 void CImageViewer::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	OutputDebugString(_T("OnMouseHWheel\r\n"));
-
 	BOOL wasScrolled = m_scrollHelper.OnMouseHWheel(nFlags, -zDelta, pt);
 
 	CWnd::OnMouseHWheel(nFlags, zDelta, pt);
@@ -306,11 +331,9 @@ LRESULT CImageViewer::OnGesture(WPARAM wParam, LPARAM lParam)
 				m_ptFirst.x = gi.ptsLocation.x;
 				m_ptFirst.y = gi.ptsLocation.y;
 				::ScreenToClient(m_hWnd, &m_ptFirst);
-				OutputDebugString(_T("zoom start\r\n"));
 				break;
 
 			case GF_END:
-				OutputDebugString(_T("zoom end\r\n"));
 				break;
 
 			default:
@@ -326,24 +349,23 @@ LRESULT CImageViewer::OnGesture(WPARAM wParam, LPARAM lParam)
 
 				// The zoom factor is the ratio between the new and the old distance. 
 				// The new distance between two fingers is stored in gi.ullArguments 
-				// (lower DWORD) and the old distance is stored in _dwArguments.
-				k = (double)(LODWORD(gi.ullArguments)) / (double)(m_dwArguments);
+				// (lower DWORD) and the old distance is stored in m_dwArguments.
+				if (m_dwArguments > 0)
+				{
+					k = (double)(LODWORD(gi.ullArguments)) / (double)(m_dwArguments);
+				}
+				else
+				{
+					k = 1;
+				}
 
 				// Now we process zooming in/out of the object
-				//ProcessZoom(k, ptZoomCenter.x, ptZoomCenter.y);
-
-				//m_scrollHelper.Update(ptZoomCenter);
-
-				CString cs;
-				cs.Format(_T("ZOOM k: %f, x: %d, y: %d\r\n"), k, ptZoomCenter.x, ptZoomCenter.y);
-				OutputDebugString(cs);
-
-				//InvalidateRect(hWnd, NULL, TRUE);
+				ProcessZoom(k, ptZoomCenter.x, ptZoomCenter.y);
 
 				// Now we have to store new information as a starting information 
 				// for the next step in this gesture.
 				m_ptFirst = m_ptSecond;
-				//m_dwArguments = LODWORD(gi.ullArguments);
+				m_dwArguments = LODWORD(gi.ullArguments);
 				break;
 			}
 			break;
@@ -388,24 +410,19 @@ LRESULT CImageViewer::OnGesture(WPARAM wParam, LPARAM lParam)
 			}
 
 			break;
-			break;
 		case GID_ROTATE:
-			OutputDebugString(_T("rotate\r\n"));
 			// Code for rotation goes here
 			bHandled = TRUE;
 			break;
 		case GID_TWOFINGERTAP:
-			OutputDebugString(_T("two finger\r\n"));
 			// Code for two-finger tap goes here
 			bHandled = TRUE;
 			break;
 		case GID_PRESSANDTAP:
-			OutputDebugString(_T("press and tap\r\n"));
 			// Code for roll over goes here
 			bHandled = TRUE;
 			break;
 		default:
-			OutputDebugString(_T("default\r\n"));
 			// A gesture was not recognized
 			break;
 		}
@@ -413,7 +430,6 @@ LRESULT CImageViewer::OnGesture(WPARAM wParam, LPARAM lParam)
 	else {
 		DWORD dwErr = GetLastError();
 		if (dwErr > 0) {
-			OutputDebugString(_T("error\r\n"));
 			//MessageBoxW(hWnd, L"Error!", L"Could not retrieve a GESTUREINFO structure.", MB_OK);
 		}
 	}

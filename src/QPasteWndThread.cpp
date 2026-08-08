@@ -454,12 +454,14 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 void CQPasteWndThread::OnLoadAccelerators(void *param)
 {
     CQPasteWnd *pasteWnd = (CQPasteWnd*)param;
+    ATL::CCritSecLock csLock(theApp.m_csDb.m_sect);
     pasteWnd->m_lstHeader.DestroyAndCreateAccelerator(TRUE, theApp.m_db);
 }
 
 void CQPasteWndThread::OnUnloadAccelerators(void *param)
 {
     CQPasteWnd *pasteWnd = (CQPasteWnd*)param;
+    ATL::CCritSecLock csLock(theApp.m_csDb.m_sect);
     pasteWnd->m_lstHeader.DestroyAndCreateAccelerator(FALSE, theApp.m_db);
 }
 

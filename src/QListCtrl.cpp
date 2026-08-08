@@ -1287,7 +1287,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 	if (pNMHDR->code == TTN_NEEDTEXTA)
 	{
 		if (m_pchTip != NULL)
-			delete m_pchTip;
+			delete[] m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
 		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
@@ -1296,7 +1296,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 	else
 	{
 		if (m_pwchTip != NULL)
-			delete m_pwchTip;
+			delete[] m_pwchTip;
 
 		m_pwchTip = new WCHAR[nLength];
 		_mbstowcsz(m_pwchTip, strTipText, nLength - 1);
@@ -1307,7 +1307,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 	if (pNMHDR->code == TTN_NEEDTEXTA)
 	{
 		if (m_pchTip != NULL)
-			delete m_pchTip;
+			delete[] m_pchTip;
 
 		m_pchTip = new TCHAR[nLength];
 		_tcsncpy_s(m_pchTip, nLength, strTipText, _TRUNCATE);
@@ -1316,7 +1316,7 @@ BOOL CQListCtrl::OnToolTipText(UINT id, NMHDR* pNMHDR, LRESULT* pResult)
 	else
 	{
 		if (m_pwchTip != NULL)
-			delete m_pwchTip;
+			delete[] m_pwchTip;
 
 		m_pwchTip = new WCHAR[nLength];
 		_tcsncpy_s(m_pwchTip, nLength, strTipText, _TRUNCATE);

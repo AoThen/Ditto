@@ -295,7 +295,19 @@ void CEventThread::RunThread()
 			}
 
 			HANDLE firedHandle = handles[handleIndex];
-			const int eventId = m_eventMap[firedHandle];
+			int eventId = EXIT_EVENT;
+			{
+				ATL::CCritSecLock csLock(m_lock.m_sect);
+				EventMapType::iterator it = m_eventMap.find(firedHandle);
+				if (it == m_eventMap.end())
+				{
+					// Handle was removed concurrently (RemoveEvent) — rebuild and continue
+					Log(StrF(_T("CEventThread::RunThread() Fired handle no longer in event map, rebuilding - Name %s"), m_threadName));
+					GetHandleVector(handles);
+					continue;
+				}
+				eventId = it->second;
+			}
 			if(eventId == EXIT_EVENT)
 			{				
 				break;

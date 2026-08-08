@@ -811,71 +811,59 @@ BOOL CreateDB(CString csFile)
 
 BOOL CompactDatabase()
 {
-	//	if(!theApp.CloseDB())
-	//		return FALSE;
-	//
-	//	CString csDBName = GetDBName();
-	//	CString csTempDBName = csDBName;
-	//	csTempDBName.Replace(".mdb", "TempDBName.mdb");
-	//	
-	//	//Compact the database			
-	//	try
-	//	{
-	//		CDaoWorkspace::CompactDatabase(csDBName, csTempDBName);//, dbLangGeneral, 0, "andrew");//DATABASE_PASSWORD);
-	//	}
-	//	catch(CDaoException* e)
-	//	{
-	//		AfxMessageBox(e->m_pErrorInfo->m_strDescription);
-	//		DeleteFile(csTempDBName);
-	//		e->Delete();
-	//		return FALSE;
-	//	}
-	//	catch(CMemoryException* e) 
-	//	{
-	//		AfxMessageBox("Memory Exception");
-	//		DeleteFile(csTempDBName);
-	//		e->Delete();
-	//		return FALSE;
-	//	}
-	//	
-	//	//Since compacting the database creates a new db delete the old one and replace it
-	//	//with the compacted db
-	//	if(DeleteFile(csDBName))
-	//	{
-	//		try
-	//		{
-	//			CFile::Rename(csTempDBName, csDBName);
-	//		}
-	//		catch(CFileException *e)
-	//		{
-	//			e->ReportError();
-	//			e->Delete();
-	//			return FALSE;
-	//		}
-	//	}
-	//	else
-	//		AfxMessageBox("Error Compacting Database");
+	BOOL bRet = FALSE;
+	try
+	{
+		// VACUUM rebuilds the database file, reclaiming space occupied by
+		// deleted rows. Run it on a dedicated connection with a busy timeout
+		// so concurrent queries on the main handle are not blocked forever.
+		CppSQLite3DB db;
+		CString csDbPath = GetDBName();
+		db.open(csDbPath);
+		db.execQuery(_T("PRAGMA busy_timeout=5000;"));
+		db.execDML(_T("VACUUM;"));
+		db.close();
 
-	return TRUE;
+		Log(_T("CompactDatabase: VACUUM completed"));
+		bRet = TRUE;
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("CompactDatabase SQLite error: %hs"), e.errorMessage()));
+		bRet = FALSE;
+	}
+	return bRet;
 }
 
 BOOL RepairDatabase()
 {
-	//	if(!theApp.CloseDB())
-	//		return FALSE;
+	BOOL bRet = FALSE;
+	try
+	{
+		// SQLite has no dedicated repair command; rebuilding the file with
+		// VACUUM and verifying the result with integrity_check is the
+		// supported way to sanitize a database.
+		CppSQLite3DB db;
+		CString csDbPath = GetDBName();
+		db.open(csDbPath);
+		db.execQuery(_T("PRAGMA busy_timeout=5000;"));
+		db.execDML(_T("VACUUM;"));
 
-	//	try
-	//	{
-	//		CDaoWorkspace::RepairDatabase(GetDBName());
-	//	}
-	//	catch(CDaoException *e)
-	//	{
-	//		AfxMessageBox(e->m_pErrorInfo->m_strDescription);
-	//		e->Delete();
-	//		return FALSE;
-	//	}
+		CppSQLite3Query q = db.execQuery(_T("PRAGMA integrity_check;"));
+		CString result;
+		if (q.eof() == false)
+			result = q.getStringField(0);
+		db.close();
 
-	return TRUE;
+		Log(StrF(_T("RepairDatabase: integrity check result: %s"), result));
+		bRet = (result == _T("ok"));
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("RepairDatabase SQLite error: %hs"), e.errorMessage()));
+		bRet = FALSE;
+	}
+	return bRet;
 }
 
 BOOL RemoveOldEntries(bool checkIdleTime)

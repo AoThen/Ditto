@@ -1425,6 +1425,8 @@ void CMainFrame::OnFirstSavecurrentclipboard()
 		else
 		{
 			Log(_T("Failed to load supported types from the db, not saving to the db"));
+			delete pClip;
+			pClip = NULL;
 		}
 	}
 	Log(_T("Start Saving the current clipboard to the database"));
@@ -1628,6 +1630,10 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 
 	try
 	{
+		// Hold the DB lock for the whole write sequence so concurrent
+		// queries (CloudSync, list refresh) never race with this writer.
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
+
 		Log(StrF(_T("OCR: OnOcrCompleted start, clipId=%d, textLen=%d"), clipId, pOcrText->GetLength()));
 
 		// 如果 clip 已有文本格式，跳过 mText 追加（避免图文混合场景的重复）

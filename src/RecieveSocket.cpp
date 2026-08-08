@@ -92,7 +92,7 @@ LPVOID CRecieveSocket::ReceiveEncryptedData(long lInSize, long &lOutSize)
 
 				if(m_pEncryptor->Decrypt((UCHAR*)pInput, lInSize, csPassword, pOutput, nOut) == FALSE)
 				{
-					LogSendRecieveInfo(StrF(_T("ReceiveEncryptedData:: Failed to Decrypt data password = %s"), CGetSetOptions::m_csPassword));
+					LogSendRecieveInfo(_T("ReceiveEncryptedData:: Failed to Decrypt data"));
 				}
 				else
 				{

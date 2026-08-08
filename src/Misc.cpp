@@ -964,7 +964,20 @@ CString GetProcessName(HWND hWnd, DWORD processId)
 
 BOOL IsVista()
 {
-	return TRUE;
+	OSVERSIONINFOW osvi;
+	ZeroMemory(&osvi, sizeof(osvi));
+	osvi.dwOSVersionInfoSize = sizeof(osvi);
+
+#pragma warning(push)
+#pragma warning(disable: 4996) // GetVersionEx is deprecated but adequate for this feature check
+	if (!GetVersionExW(&osvi))
+	{
+		// Query failed - assume a modern OS (Vista+)
+		return TRUE;
+	}
+#pragma warning(pop)
+
+	return osvi.dwMajorVersion >= 6;
 }
 
 void DeleteDittoTempFiles(BOOL checkFileLastAccess)
@@ -1238,7 +1251,7 @@ CString InternetEncode(CString text)
 	DWORD dwError = ::GetLastError();
 	if (!fRes && dwError == ERROR_INSUFFICIENT_BUFFER)
 	{
-		delete lpOutputBuffer;
+		delete[] lpOutputBuffer;
 		lpOutputBuffer = new TCHAR[dwSize];
 		fRes = ::InternetCanonicalizeUrl(text, lpOutputBuffer, &dwSize, ICU_BROWSER_MODE);
 		if (fRes)
@@ -1250,15 +1263,21 @@ CString InternetEncode(CString text)
 		{
 			//failed to decode
 		}
-		if (lpOutputBuffer != NULL)
-		{
-			delete [] lpOutputBuffer;
-			lpOutputBuffer = NULL;
-		}
+		delete[] lpOutputBuffer;
+		lpOutputBuffer = NULL;
+	}
+	else if (fRes)
+	{
+		//input was short enough for the initial buffer and was successfully decoded
+		ret = lpOutputBuffer;
+		delete[] lpOutputBuffer;
+		lpOutputBuffer = NULL;
 	}
 	else
 	{
-		//some other error OR the input string url is just 1 char and was successfully decoded
+		//some other error
+		delete[] lpOutputBuffer;
+		lpOutputBuffer = NULL;
 	}
 
 	return ret;

@@ -257,6 +257,11 @@ BOOL CClient::SendClipFormat(CClipFormat* pCF)
 {
 	CSendInfo Info;
 	LPVOID pvData = GlobalLock(pCF->m_hgData);
+	if (pvData == NULL)
+	{
+		LogSendRecieveInfo(StrF(_T("CClient::SendClipFormat - GlobalLock failed, hGlobal: %p"), pCF->m_hgData));
+		return FALSE;
+	}
 	INT_PTR length = GlobalSize(pCF->m_hgData);
 	UCHAR* pOutput = NULL;
 	int nLenOutput = 0;

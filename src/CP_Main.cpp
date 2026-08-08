@@ -787,6 +787,8 @@ void CCP_MainApp::RefreshClipInUI(int clipId, int updateFlags)
 	}
 }
 
+// Paste completed hook - intentionally empty (extension point).
+// Paste behavior itself (activate target, auto-hide) is handled by callers.
 void CCP_MainApp::OnPasteCompleted()
 {
 }

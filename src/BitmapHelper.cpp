@@ -113,6 +113,8 @@ BOOL CBitmapHelper::GetCBitmap(CClipFormats& clips, CDC* pDC, CBitmap* pBitMap, 
 		CClipFormat clip = clips[i];
 
 		Gdiplus::Bitmap* gdipBitmap = clip.CreateGdiplusBitmap();
+		if (gdipBitmap == NULL)
+			continue;
 
 		if (horizontal)
 		{

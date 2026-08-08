@@ -49,8 +49,18 @@ void CCloudSyncManager::EnsureHttpClient()
 	// Normalize URL: ensure https:// prefix
 	CStringA serverUrlA(m_serverUrl);
 	std::string url = serverUrlA.GetString();
-	if (url.find("https://") != 0 && url.find("http://") != 0)
+	if (url.find("https://") != 0)
 	{
+		// Enforce HTTPS: reject plain http for security (consistent with CloudAuth)
+		if (url.find("http://") == 0)
+		{
+			OutputDebugStringA("[CloudSync] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			m_httpClient.reset();
+			m_httpClientUrl.Empty();
+			LeaveCriticalSection(&m_csHttpClient);
+			return;
+		}
+		// No scheme - default to https
 		url = "https://" + url;
 	}
 	// Detect token change: if token differs from last used, force client rebuild
@@ -105,6 +115,7 @@ CCloudSyncManager::CCloudSyncManager()
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
+	InitializeCriticalSection(&m_csGroupsPush);
 	InitializeCriticalSection(&m_csWsClient);
 	InitializeCriticalSection(&m_csStatus);
 }
@@ -123,6 +134,7 @@ CCloudSyncManager::~CCloudSyncManager()
 	{
 		DeleteCriticalSection(&m_csSync);
 		DeleteCriticalSection(&m_csHttpClient);
+		DeleteCriticalSection(&m_csGroupsPush);
 		DeleteCriticalSection(&m_csWsClient);
 		DeleteCriticalSection(&m_csStatus);
 	}
@@ -983,7 +995,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 		EnsureHttpClient();
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient->Get("/api/v1/encryption/salt");
+		auto res = m_httpClient ? m_httpClient->Get("/api/v1/encryption/salt") : nullptr;
 		LeaveCriticalSection(&m_csHttpClient);
 		if (!res || res->status != 200)
 			return FALSE;
@@ -1067,7 +1079,16 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 			pThis->PushGroups();
 
 			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
-			pThis->PushNewClips();
+			if (!pThis->PushNewClips())
+			{
+				// Push failed (e.g. auth expired / network error).
+				// Skip pull this cycle: pulling with a stale/invalid credential is
+				// pointless and would spam an error dialog every cycle.
+				LogMessage(_T("Sync: push failed, skipping pull this cycle"));
+				pThis->m_csSyncStatus = _T("Error");
+				pThis->m_csLastError = _T("Push failed - skipping pull this cycle");
+				continue;
+			}
 
 			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0) break;
 
@@ -1220,7 +1241,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 
 			std::string bodyStr = syncReq.dump();
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json");
+			auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json") : nullptr;
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res)
 			{
@@ -1358,53 +1379,82 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 	try
 	{
 		std::string dataStr = hdropFormat["data"].get<std::string>();
-		// CF_HDROP data is typically base64-encoded binary DROPFILES structure + file paths
-		// For cloud sync, we only care about the file path strings
-		// In the simplest case, the data might already be a text representation of paths
 
-		// Parse the file paths (assuming newline or null separated)
-		CStringA data(dataStr.c_str());
-		CStringA remaining = data;
-		CStringA path;
-
-		while (!remaining.IsEmpty())
+		// CF_HDROP data is stored base64-encoded by LoadClipFormats.
+		// Decode it first, then parse the embedded DROPFILES structure.
+		std::vector<BYTE> raw;
+		const bool bIsBase64 = hdropFormat.value("encoding", "") == "base64";
+		if (bIsBase64)
 		{
-			// Find null or newline separator
-			int pos = -1;
-			for (int i = 0; i < remaining.GetLength(); i++)
+			raw = CCloudCrypto::Base64Decode(CStringA(dataStr.c_str()));
+		}
+		else
+		{
+			raw.assign(dataStr.begin(), dataStr.end());
+		}
+
+		// DROPFILES structure is 20 bytes:
+		//   DWORD pFiles (offset->first file path), POINT pt, BOOL fNC, BOOL fWide
+		if (raw.size() < 20)
+		{
+			LogMessage(_T("ExtractFilePathsFromHDROP: data too small to be a DROPFILES structure"));
+			return paths;
+		}
+
+		DWORD offset = 0;
+		BOOL fWide = FALSE;
+		memcpy(&offset, raw.data(), sizeof(offset));
+		memcpy(&fWide, raw.data() + 16, sizeof(fWide));
+
+		if (offset < 20 || offset >= raw.size())
+		{
+			LogMessage(_T("ExtractFilePathsFromHDROP: invalid file list offset"));
+			return paths;
+		}
+
+		if (fWide)
+		{
+			// Paths are UTF-16LE, NUL-separated, double-NUL terminated
+			const wchar_t* pPaths = reinterpret_cast<const wchar_t*>(raw.data() + offset);
+			const size_t maxChars = (raw.size() - offset) / sizeof(wchar_t);
+			size_t i = 0;
+			while (i < maxChars)
 			{
-				char ch = remaining[i];
-				if (ch == '\0' || ch == '\n' || ch == '\r')
+				while (i < maxChars && pPaths[i] == L'\0')
+					i++;
+				if (i >= maxChars)
+					break;
+				size_t start = i;
+				while (i < maxChars && pPaths[i] != L'\0')
+					i++;
+				if (i > start)
 				{
-					if (i > 0) // skip leading whitespace chars
-					{
-						pos = i;
-						break;
-					}
-					remaining = remaining.Mid(i + 1);
-					continue;
+					CStringW widePath(pPaths + start, (int)(i - start));
+					CT2A utf8Path(widePath, CP_UTF8);
+					paths.push_back(std::string(utf8Path.m_psz));
 				}
 			}
-
-			if (pos > 0)
+		}
+		else
+		{
+			// Paths are ANSI, NUL-separated, double-NUL terminated
+			const char* pPaths = reinterpret_cast<const char*>(raw.data() + offset);
+			const size_t maxBytes = raw.size() - offset;
+			size_t i = 0;
+			while (i < maxBytes)
 			{
-				path = remaining.Left(pos);
-				remaining = remaining.Mid(pos + 1);
-
-				// Skip empty paths
-				if (!path.IsEmpty() && path.GetLength() > 1)
+				while (i < maxBytes && pPaths[i] == '\0')
+					i++;
+				if (i >= maxBytes)
+					break;
+				size_t start = i;
+				while (i < maxBytes && pPaths[i] != '\0')
+					i++;
+				if (i > start)
 				{
-					paths.push_back(path.GetString());
+					CStringA ansiPath(pPaths + start, (int)(i - start));
+					paths.push_back(std::string(ansiPath.GetString()));
 				}
-			}
-			else
-			{
-				// Last path
-				if (!remaining.IsEmpty() && remaining.GetLength() > 1)
-				{
-					paths.push_back(remaining.GetString());
-				}
-				break;
 			}
 		}
 	}
@@ -1502,7 +1552,7 @@ void CCloudSyncManager::PullChanges()
 			CStringA path;
 		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient->Get(path.GetString());
+		auto res = m_httpClient ? m_httpClient->Get(path.GetString()) : nullptr;
 		LeaveCriticalSection(&m_csHttpClient);
 		if (!res)
 		{
@@ -2888,6 +2938,9 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 {
 	std::vector<std::string> newGroupIds;
 	EnsureHttpClient();
+	// Serialize with any concurrent sync/quick-sync push to avoid duplicate
+	// group creation from parallel threads (m_csGroupsPush)
+	EnterCriticalSection(&m_csGroupsPush);
 	try
 	{
 		// Collect all groups first (under DB lock), then release lock before HTTP calls
@@ -2936,7 +2989,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			{
 				// Create new group
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient->Post("/api/v1/groups", body.dump(), "application/json");
+				auto res = m_httpClient ? m_httpClient->Post("/api/v1/groups", body.dump(), "application/json") : nullptr;
 				LeaveCriticalSection(&m_csHttpClient);
 				if (res && res->status == 200)
 				{
@@ -2960,7 +3013,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			{
 				// Update existing group
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json");
+				auto res = m_httpClient ? m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json") : nullptr;
 				LeaveCriticalSection(&m_csHttpClient);
 				if (!res || res->status != 200)
 				{
@@ -2977,6 +3030,13 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 		err.Format(_T("PushGroups error: %hs"), e.what());
 		LogMessage(err);
 	}
+	catch (...)
+	{
+		// CppSQLite3Exception does not derive from std::exception; a guard is
+		// required here so m_csGroupsPush is always released (no deadlock).
+		LogMessage(_T("PushGroups error: unknown exception"));
+	}
+	LeaveCriticalSection(&m_csGroupsPush);
 	return newGroupIds;
 }
 
@@ -2997,7 +3057,7 @@ void CCloudSyncManager::PullGroups()
 		{
 			std::string url = "/api/v1/groups?page=" + std::to_string(page) + "&per_page=200";
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient->Get(url.c_str());
+			auto res = m_httpClient ? m_httpClient->Get(url.c_str()) : nullptr;
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res || res->status != 200)
 				break;
@@ -3127,7 +3187,7 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 	{
 		EnsureHttpClient();
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str());
+		auto res = m_httpClient ? m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str()) : nullptr;
 		LeaveCriticalSection(&m_csHttpClient);
 		if (res && (res->status == 200 || res->status == 404))
 		{
@@ -3176,7 +3236,7 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 		body["ids"] = remoteIds;
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json");
+		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : nullptr;
 		LeaveCriticalSection(&m_csHttpClient);
 
 		{
@@ -3221,7 +3281,7 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 		body["ids"] = remoteIds;
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json");
+		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : nullptr;
 		LeaveCriticalSection(&m_csHttpClient);
 		if (res && (res->status == 200 || res->status == 404))
 		{

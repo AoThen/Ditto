@@ -26,11 +26,6 @@ BEGIN_MESSAGE_MAP(CEditFrameWnd, CFrameWnd)
 	ON_WM_CREATE()
 	ON_WM_DESTROY()
 	ON_WM_SIZE()
-	ON_COMMAND(ID_BUTTON_SAVE, OnDummy)
-	ON_COMMAND(ID_BUTTON_SAVE_ALL, OnDummy)
-	ON_COMMAND(ID_BUTTON_CLOSE, OnDummy)
-	ON_COMMAND(ID_BUTTON_NEW, OnDummy)
-	ON_COMMAND(ID_BUTTON_SAVE_CLOSE_CLIPBOARD, OnDummy)
 	ON_WM_SETFOCUS()
 	ON_WM_CLOSE()
 	ON_WM_NCCALCSIZE()
@@ -136,11 +131,6 @@ BOOL CEditFrameWnd::PreCreateWindow(CREATESTRUCT& cs)
 	cs.lpszClass = wc.lpszClassName;
 
 	return CFrameWnd::PreCreateWindow(cs);
-}
-
-void CEditFrameWnd::OnDummy()
-{
-
 }
 
 

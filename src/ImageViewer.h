@@ -18,6 +18,9 @@ public:
 
 	void UpdateBitmapSize(bool setScale);
 
+	// Zoom the image by the given factor, keeping the point (x, y) fixed
+	void ProcessZoom(double k, int x, int y);
+
 	BOOL Create(CWnd* pParent);
 
 	bool m_hoveringOverImage;

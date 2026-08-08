@@ -15,7 +15,7 @@ CMd5::~CMd5()
 void CMd5::FreeBuffer()
 {
 	if(mp_s8ReadBuffer) 
-		delete mp_s8ReadBuffer;
+		delete[] mp_s8ReadBuffer;
 }
 
 /*********************************************************************
