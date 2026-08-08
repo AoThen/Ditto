@@ -995,7 +995,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 		EnsureHttpClient();
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Get("/api/v1/encryption/salt") : nullptr;
+		auto res = m_httpClient ? m_httpClient->Get("/api/v1/encryption/salt") : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
 		if (!res || res->status != 200)
 			return FALSE;
@@ -1241,7 +1241,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 
 			std::string bodyStr = syncReq.dump();
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json") : nullptr;
+			auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json") : httplib::Result();
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res)
 			{
@@ -1552,7 +1552,7 @@ void CCloudSyncManager::PullChanges()
 			CStringA path;
 		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Get(path.GetString()) : nullptr;
+		auto res = m_httpClient ? m_httpClient->Get(path.GetString()) : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
 		if (!res)
 		{
@@ -2989,7 +2989,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			{
 				// Create new group
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient ? m_httpClient->Post("/api/v1/groups", body.dump(), "application/json") : nullptr;
+				auto res = m_httpClient ? m_httpClient->Post("/api/v1/groups", body.dump(), "application/json") : httplib::Result();
 				LeaveCriticalSection(&m_csHttpClient);
 				if (res && res->status == 200)
 				{
@@ -3013,7 +3013,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			{
 				// Update existing group
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient ? m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json") : nullptr;
+				auto res = m_httpClient ? m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json") : httplib::Result();
 				LeaveCriticalSection(&m_csHttpClient);
 				if (!res || res->status != 200)
 				{
@@ -3057,7 +3057,7 @@ void CCloudSyncManager::PullGroups()
 		{
 			std::string url = "/api/v1/groups?page=" + std::to_string(page) + "&per_page=200";
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient ? m_httpClient->Get(url.c_str()) : nullptr;
+			auto res = m_httpClient ? m_httpClient->Get(url.c_str()) : httplib::Result();
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res || res->status != 200)
 				break;
@@ -3187,7 +3187,7 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 	{
 		EnsureHttpClient();
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str()) : nullptr;
+		auto res = m_httpClient ? m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str()) : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
 		if (res && (res->status == 200 || res->status == 404))
 		{
@@ -3236,7 +3236,7 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 		body["ids"] = remoteIds;
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : nullptr;
+		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
 
 		{
@@ -3281,7 +3281,7 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 		body["ids"] = remoteIds;
 
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : nullptr;
+		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
 		if (res && (res->status == 200 || res->status == 404))
 		{
