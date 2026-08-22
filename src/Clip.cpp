@@ -674,7 +674,12 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 
 					if(!plainText.IsEmpty())
 					{
-						m_Desc = CString(plainText);
+						int wideLen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+							plainText.GetString(), (int)plainText.GetLength(), NULL, 0);
+						if(wideLen > 0)
+							m_Desc = CTextConvert::Utf8ToUnicode(plainText);
+						else
+							m_Desc = CString(plainText);
 						if(m_Desc.GetLength() > CGetSetOptions::m_bDescTextSize)
 						{
 							m_Desc = m_Desc.Left(CGetSetOptions::m_bDescTextSize);
