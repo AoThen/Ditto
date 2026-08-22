@@ -168,6 +168,7 @@ BOOL COleClipSource::DoImmediateRender()
 	if (m_pasteOptions.LimitFormatsToText())
 	{
 		PlainTextFilter(clip);
+		AddTextFromHtmlIfMissing(clip);
 	}
 
 	if(m_pasteOptions.m_pasteUpperCase ||
@@ -767,8 +768,52 @@ void COleClipSource::PlainTextFilter(CClip &clip)
 
 			CClipFormat format(CF_UNICODETEXT, HDrop.GetHGlobalAsString());
 			clip.m_Formats.Add(format);
-			format.m_autoDeleteData = false; //owned by m_DelayRenderedFormats			
+			format.m_autoDeleteData = false; //owned by m_DelayRenderedFormats
 		}
+	}
+}
+
+void COleClipSource::AddTextFromHtmlIfMissing(CClip &clip)
+{
+	if(clip.m_Formats.FindFormat(CF_UNICODETEXT) != NULL ||
+		clip.m_Formats.FindFormat(CF_TEXT) != NULL)
+	{
+		return;
+	}
+
+	INT_PTR count = m_ClipIDs.GetSize();
+	if(count <= 0)
+	{
+		return;
+	}
+
+	HGLOBAL hHtml = CClip::LoadFormat(m_ClipIDs[0], theApp.m_HTML_Format);
+	if(hHtml == NULL)
+	{
+		return;
+	}
+
+	CStringA html;
+	char* htmlData = (char*)GlobalLock(hHtml);
+	if(htmlData)
+	{
+		html = CStringA(htmlData, (int)GlobalSize(hHtml));
+		GlobalUnlock(hHtml);
+	}
+	GlobalFree(hHtml);
+
+	CString text = HtmlFragmentToPlainText(html);
+	if(text.IsEmpty())
+	{
+		return;
+	}
+
+	HGLOBAL hText = NewGlobalP(text.GetBuffer(), ((text.GetLength() + 1) * sizeof(wchar_t)));
+	if(hText)
+	{
+		CClipFormat format(CF_UNICODETEXT, hText);
+		clip.m_Formats.Add(format);
+		Log(StrF(_T("Added CF_UNICODETEXT from HTML Format for clip: %d"), m_ClipIDs[0]));
 	}
 }
 

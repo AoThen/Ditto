@@ -22,6 +22,7 @@ public:
 	BOOL DoImmediateRender();
 
 	void PlainTextFilter(CClip &clip);
+	void AddTextFromHtmlIfMissing(CClip &clip);
 
 	INT_PTR PutFormatOnClipboard(CClipFormats *pFormats);
 
