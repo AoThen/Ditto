@@ -462,6 +462,67 @@ bool CClip::AddFormat(CLIPFORMAT cfType, void* pData, UINT nLen, bool setDesc)
 	return true;
 }
 
+CString HtmlFragmentToPlainText(const CStringA& htmlBytes)
+{
+	int len = (int)htmlBytes.GetLength();
+	while(len > 0 && htmlBytes[len - 1] == '\0')
+		len--;
+	CStringA html = htmlBytes.Left(len);
+
+	int startHtml = 0, endHtml = 0;
+	int pos = html.Find("StartHTML:");
+	if(pos >= 0)
+	{
+		CStringA numStr = html.Mid(pos + 10, 10);
+		numStr.Trim();
+		startHtml = atoi(numStr);
+	}
+	pos = html.Find("EndHTML:");
+	if(pos >= 0)
+	{
+		CStringA numStr = html.Mid(pos + 8, 10);
+		numStr.Trim();
+		endHtml = atoi(numStr);
+	}
+
+	CStringA htmlContent;
+	if(startHtml > 0 && endHtml > startHtml && endHtml <= html.GetLength())
+		htmlContent = html.Mid(startHtml, endHtml - startHtml);
+	else
+		htmlContent = html;
+
+	CStringA plainText;
+	bool inTag = false;
+	INT_PTR contentLen = htmlContent.GetLength();
+	for(int i = 0; i < contentLen; i++)
+	{
+		char c = htmlContent[i];
+		if(c == '<')
+			inTag = true;
+		else if(c == '>')
+			inTag = false;
+		else if(!inTag)
+			plainText += c;
+	}
+
+	plainText.Replace("&nbsp;", " ");
+	plainText.Replace("&amp;", "&");
+	plainText.Replace("&lt;", "<");
+	plainText.Replace("&gt;", ">");
+	plainText.Replace("&quot;", "\"");
+	plainText.Trim();
+
+	if(plainText.IsEmpty())
+		return _T("");
+
+	int wideLen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+		plainText.GetString(), (int)plainText.GetLength(), NULL, 0);
+	if(wideLen > 0)
+		return CTextConvert::Utf8ToUnicode(plainText);
+
+	return CString(plainText);
+}
+
 // Fills this CClip with the contents of the clipboard.
 int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, CString activeApp, CString activeAppTitle)
 {
@@ -614,72 +675,9 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 				char* htmlData = (char*)GlobalLock(hgHtml);
 				if(htmlData)
 				{
-					INT_PTR htmlSize = GlobalSize(hgHtml);
-					CStringA html(htmlData, (int)htmlSize);
-
-					// Parse CF_HTML header to find content boundaries
-					int startHtml = 0, endHtml = 0;
-					int pos = html.Find("StartHTML:");
-					if(pos >= 0)
+					m_Desc = HtmlFragmentToPlainText(CStringA(htmlData, (int)GlobalSize(hgHtml)));
+					if(!m_Desc.IsEmpty())
 					{
-						CStringA numStr = html.Mid(pos + 10, 10);
-						numStr.Trim();
-						startHtml = atoi(numStr);
-					}
-					pos = html.Find("EndHTML:");
-					if(pos >= 0)
-					{
-						CStringA numStr = html.Mid(pos + 8, 10);
-						numStr.Trim();
-						endHtml = atoi(numStr);
-					}
-
-					CStringA htmlContent;
-					if(startHtml > 0 && endHtml > startHtml && endHtml <= html.GetLength())
-					{
-						htmlContent = html.Mid(startHtml, endHtml - startHtml);
-					}
-					else
-					{
-						htmlContent = html;
-					}
-
-					// Strip HTML tags
-					CStringA plainText;
-					bool inTag = false;
-					INT_PTR len = htmlContent.GetLength();
-					for(int i = 0; i < len; i++)
-					{
-						char c = htmlContent[i];
-						if(c == '<')
-						{
-							inTag = true;
-						}
-						else if(c == '>')
-						{
-							inTag = false;
-						}
-						else if(!inTag)
-						{
-							plainText += c;
-						}
-					}
-
-					plainText.Replace("&nbsp;", " ");
-					plainText.Replace("&amp;", "&");
-					plainText.Replace("&lt;", "<");
-					plainText.Replace("&gt;", ">");
-					plainText.Replace("&quot;", "\"");
-					plainText.Trim();
-
-					if(!plainText.IsEmpty())
-					{
-						int wideLen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-							plainText.GetString(), (int)plainText.GetLength(), NULL, 0);
-						if(wideLen > 0)
-							m_Desc = CTextConvert::Utf8ToUnicode(plainText);
-						else
-							m_Desc = CString(plainText);
 						if(m_Desc.GetLength() > CGetSetOptions::m_bDescTextSize)
 						{
 							m_Desc = m_Desc.Left(CGetSetOptions::m_bDescTextSize);
@@ -689,6 +687,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 					}
 				}
 				GlobalUnlock(hgHtml);
+				GlobalFree(hgHtml);
 			}
 		}
 	}
