@@ -120,6 +120,7 @@ private:
 	static UINT DeleteSyncThreadProc(LPVOID pParam);
 	void DeleteRemoteClipsInternal(const std::vector<int>& localClipIds);
 	void MarkClipsDontSyncInternal(const std::vector<int>& localClipIds);
+	void OnGroupDeletedInternal(int localGroupId);
 	std::unique_ptr<httplib::Client> CreateShortTimeoutHttpClient();
 
 	// Check if user expects encryption (via registry setting)
