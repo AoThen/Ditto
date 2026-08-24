@@ -1,7 +1,7 @@
 name: Client Portable (Legacy OCR)
 
 on:
-  workflow_dispatch:
+  push:
 
 permissions:
   actions: write
