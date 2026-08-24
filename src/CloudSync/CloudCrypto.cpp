@@ -171,9 +171,10 @@ std::vector<BYTE> CCloudCrypto::DeriveKey(
 // ---------------------------------------------------------------------------
 std::vector<BYTE> CCloudCrypto::RandomBytes(int count)
 {
-	std::vector<BYTE> buf(count);
 	if (count <= 0)
-		return buf;
+		return std::vector<BYTE>();
+
+	std::vector<BYTE> buf(count);
 
 	BCRYPT_ALG_HANDLE hAlg = nullptr;
 	NTSTATUS status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_RNG_ALGORITHM, nullptr, 0);
@@ -448,46 +449,31 @@ std::vector<BYTE> CCloudCrypto::PBKDF2(
 	int iterations,
 	int dkLen)
 {
-	if (salt.empty() || iterations <= 0 || dkLen <= 0)
+	if (password.empty() || salt.empty() || iterations <= 0 || dkLen <= 0)
 		return std::vector<BYTE>();
 
-	// hLen = 32 (SHA-256 output size)
-	const int hLen = 32;
-	int l = (dkLen + hLen - 1) / hLen; // ceil(dkLen / hLen)
+	// Use the built-in CNG PBKDF2 implementation (PBKDF2-HMAC-SHA256).
+	// This is far faster than the previous hand-rolled loop that repeatedly
+	// opened and closed BCrypt handles on every SHA256 invocation.
+	BCRYPT_ALG_HANDLE hPrf = nullptr;
+	NTSTATUS status = BCryptOpenAlgorithmProvider(
+		&hPrf, BCRYPT_SHA256_ALGORITHM, nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
+	if (!BCRYPT_SUCCESS(status) || hPrf == nullptr)
+		return std::vector<BYTE>();
 
-	std::vector<BYTE> dk;
-	dk.reserve(dkLen);
+	std::vector<BYTE> dk(dkLen);
+	status = BCryptDeriveKeyPBKDF2(
+		hPrf,
+		const_cast<PUCHAR>(password.data()), static_cast<ULONG>(password.size()),
+		const_cast<PUCHAR>(salt.data()), static_cast<ULONG>(salt.size()),
+		static_cast<ULONGLONG>(iterations),
+		dk.data(), static_cast<ULONG>(dkLen), 0);
 
-	for (int i = 1; i <= l; i++)
-	{
-		// Build salt || INT_32_BE(i)
-		std::vector<BYTE> saltBlock = salt;
-		saltBlock.push_back(static_cast<BYTE>((i >> 24) & 0xFF));
-		saltBlock.push_back(static_cast<BYTE>((i >> 16) & 0xFF));
-		saltBlock.push_back(static_cast<BYTE>((i >> 8) & 0xFF));
-		saltBlock.push_back(static_cast<BYTE>(i & 0xFF));
+	BCryptCloseAlgorithmProvider(hPrf, 0);
 
-		// U_1 = HMAC-SHA256(password, salt || INT_32_BE(i))
-		std::vector<BYTE> u = HmacSha256(password, saltBlock);
-		std::vector<BYTE> t = u; // T = U_1
+	if (!BCRYPT_SUCCESS(status))
+		return std::vector<BYTE>();
 
-		for (int c = 1; c < iterations; c++)
-		{
-			// U_c = HMAC-SHA256(password, U_{c-1})
-			u = HmacSha256(password, u);
-
-			// T = T XOR U_c
-			for (int j = 0; j < hLen; j++)
-			{
-				t[j] ^= u[j];
-			}
-		}
-
-		dk.insert(dk.end(), t.begin(), t.end());
-	}
-
-	// Truncate to dkLen
-	dk.resize(dkLen);
 	return dk;
 }
 

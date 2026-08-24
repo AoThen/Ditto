@@ -29,7 +29,10 @@ struct OcrBatchContext {
         for (int clipId : ctx->ids)
         {
             CClip clip;
-            if (clip.LoadFormats(clipId, false, false, -1) && ExtractClipImageData(&clip))
+            CSingleLock lockDb(&theApp.m_csDb, TRUE);
+            bool loaded = clip.LoadFormats(clipId, false, false, -1);
+            lockDb.Unlock();
+            if (loaded && ExtractClipImageData(&clip))
             {
                 items.push_back({clipId, std::move(clip.m_ocrImageData),
                                  clip.m_ocrWidth, clip.m_ocrHeight, clip.m_ocrStride});
@@ -395,9 +398,9 @@ void COptionCloud::RefreshSyncStatus()
 	if (csNew != m_csSyncStatus)
 	{
 		m_csSyncStatus = csNew;
-m_bEnableDebugLogging = CGetSetOptions::GetEnableDebugLogging();
-
-	UpdateData(FALSE);
+		// 仅更新同步状态控件，避免 UpdateData(FALSE) 把成员旧值回写到
+		// 用户正在编辑的服务器地址/密码等输入框
+		SetDlgItemText(IDC_CLOUD_SYNC_STATUS, m_csSyncStatus);
 	}
 }
 
@@ -767,31 +770,62 @@ void COptionCloud::OnRebuildPinyinIndex()
 
 	CWaitCursor wait;
 
-	CppSQLite3Query q = theApp.m_db.execQuery(
-		_T("SELECT lID, mText FROM Main"));
-
-	int batch = 0;
-	theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
-	while (!q.eof())
+	// 第一遍：先取回全部 lID/mText 并关闭游标，避免在游标打开时提交事务
+	std::vector<std::pair<long, CString>> items;
+	try
 	{
-		long id = q.getIntField(0);
-		CString mText = q.getStringField(1);
-		auto py = CPinyinConvert::TextToPinyin(mText);
-		CString pinyinW = py.first;
-		CString abbrW = py.second;
-		theApp.m_db.execDMLEx(
-			_T("UPDATE Main SET pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
-			pinyinW, abbrW, id);
-
-		if (++batch % 100 == 0) {
-			theApp.m_db.execDML(_T("COMMIT; BEGIN TRANSACTION;"));
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
+		CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT lID, mText FROM Main"));
+		while (!q.eof())
+		{
+			items.emplace_back(q.getIntField(_T("lID")), q.getStringField(_T("mText")));
+			q.nextRow();
 		}
-		q.nextRow();
 	}
-	theApp.m_db.execDML(_T("COMMIT;"));
+	catch (const CppSQLite3Exception& e)
+	{
+		CString errMsg;
+		errMsg.Format(_T("OnRebuildPinyinIndex: read failed (%d) %s"), e.errorCode(), e.errorMessage());
+		TRACE(_T("%s\n"), (LPCTSTR)errMsg);
+		AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to read clips while rebuilding pinyin index.")), MB_ICONERROR);
+		return;
+	}
+
+	// 第二遍：逐条转换并参数化更新，避免 SQL 注入/语法破坏
+	int processed = 0;
+	try
+	{
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
+		theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
+		for (const auto& item : items)
+		{
+			auto py = CPinyinConvert::TextToPinyin(item.second);
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+				_T("UPDATE Main SET pinyin = ?, pinyinAbbr = ? WHERE lID = ?"));
+			stmt.bind(1, py.first);
+			stmt.bind(2, py.second);
+			stmt.bind(3, (int)item.first);
+			stmt.execDML();
+
+			if (++processed % 500 == 0)
+			{
+				theApp.m_db.execDML(_T("COMMIT; BEGIN TRANSACTION;"));
+			}
+		}
+		theApp.m_db.execDML(_T("COMMIT;"));
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		CString errMsg;
+		errMsg.Format(_T("OnRebuildPinyinIndex: update failed (%d) %s"), e.errorCode(), e.errorMessage());
+		TRACE(_T("%s\n"), (LPCTSTR)errMsg);
+		theApp.m_db.execDML(_T("ROLLBACK;"));
+		AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to rebuild pinyin index.")), MB_ICONERROR);
+		return;
+	}
 
 	CString msg;
-	msg.Format(theApp.m_Language.GetString("CloudMsgPinyinRebuilt", _T("Pinyin index rebuilt. %d entries processed.")), batch);
+	msg.Format(theApp.m_Language.GetString("CloudMsgPinyinRebuilt", _T("Pinyin index rebuilt. %d entries processed.")), processed);
 	AfxMessageBox(msg);
 }
 
