@@ -2,6 +2,7 @@
 #include "CP_Main.h"
 #include "ClipIds.h"
 #include <vector>
+#include <map>
 #include "tinyxml\tinyxml.h"
 #include "shared\TextConvert.h"
 #include "Clip_ImportExport.h"
@@ -314,6 +315,8 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	// Invalidate the last-added CRC cache so a deleted clip can be re-copied
 	CClip::m_LastAddedCRC = 0;
 
+	bool bCloudSyncActive = theApp.m_CloudSyncManager.IsLoggedIn();
+
 	std::vector<int> remoteDeleteIds;
 
 	Log(StrF(_T("Begin delete clips, Count: %d from Window: %d"), count, fromClipWindow));
@@ -334,40 +337,66 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 			status.Show(workingString);
 		}
 
+		std::map<int,bool> groupInfo;
+		const int lookupChunk = 500;
+		for(INT_PTR chunkStart = 0; chunkStart < count; chunkStart += lookupChunk)
+		{
+			CString inList = _T("");
+			bool anyValidId = false;
+			INT_PTR chunkEnd = min(chunkStart + lookupChunk, count);
+			for(INT_PTR i = chunkStart; i < chunkEnd; i++)
+			{
+				int clipId = ElementAt(i);
+				if(clipId <= 0)
+					continue;
+
+				if(inList.GetLength() > 0)
+					inList += _T(", ");
+				inList += StrF(_T("%d"), clipId);
+				anyValidId = true;
+			}
+
+			if(!anyValidId)
+				continue;
+
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
+			CppSQLite3Query q = db.execQueryEx(_T("SELECT lId, bIsGroup FROM Main WHERE lId IN (%s)"), (LPCTSTR)inList);
+			while(q.eof() == false)
+			{
+				groupInfo[q.getIntField(_T("lId"))] = q.getIntField(_T("bIsGroup")) > 0;
+				q.nextRow();
+			}
+		}
+
 		for(index = 0; index < count; index++)
 		{
 			int clipId = ElementAt(index);
 			if(clipId <= 0)
 				continue;
 
-			Log(StrF(_T("Delete clip Id: %d"), clipId));
-
-			bool cont = false;
-			bool bGroup = false;
-			{
-				CppSQLite3Query q = db.execQueryEx(_T("SELECT bIsGroup FROM Main WHERE lId = %d"), clipId);
-				cont = !q.eof();
-				if(cont)
-				{
-					bGroup = q.getIntField(_T("bIsGroup")) > 0;
-				}
-			}
+			std::map<int,bool>::iterator itInfo = groupInfo.find(clipId);
+			bool cont = (itInfo != groupInfo.end());
+			bool bGroup = cont ? itInfo->second : false;
 
 			if(cont)
 			{			
 				if(bGroup)
 				{
-					db.execDMLEx(_T("UPDATE Main SET lParentID = -1 WHERE lParentID = %d;"), clipId);
-				}
+					{
+						CSingleLock lockDb(&theApp.m_csDb, TRUE);
+						db.execDMLEx(_T("UPDATE Main SET lParentID = -1 WHERE lParentID = %d;"), clipId);
+					}
 
-				if (bGroup)
-				{
-					// Notify cloud sync manager about group deletion
-					theApp.m_CloudSyncManager.OnGroupDeleted(clipId);
+					if(bCloudSyncActive)
+					{
+						// Notify cloud sync manager about group deletion
+						theApp.m_CloudSyncManager.OnGroupDeleted(clipId);
+					}
 				}
 				else
 				{
-					remoteDeleteIds.push_back(clipId);
+					if(bCloudSyncActive)
+						remoteDeleteIds.push_back(clipId);
 				}
 
 				if(sqlIn.GetLength() > 0)
@@ -386,7 +415,10 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 				}
 				startIndex = index;
 
-				db.execDMLEx(sql + sqlIn + _T(")"));
+				{
+					CSingleLock lockDb(&theApp.m_csDb, TRUE);
+					db.execDMLEx(sql + sqlIn + _T(")"));
+				}
 				sqlIn = "";
 				bRet = TRUE;
 
@@ -410,14 +442,17 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 				status.Show(StrF(_T("Deleting %d - %d of %d..."), startIndex+1, index, count));
 			}
 
-			db.execDMLEx(sql + sqlIn + _T(")"));
+			{
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
+				db.execDMLEx(sql + sqlIn + _T(")"));
+			}
 			bRet = TRUE;
 		}
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(FALSE)
 	
 	// Notify server about deleted non-group clips for cross-device sync
-	if (!remoteDeleteIds.empty())
+	if (bCloudSyncActive && !remoteDeleteIds.empty())
 	{
 		try
 		{

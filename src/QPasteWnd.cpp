@@ -3033,7 +3033,7 @@ bool CQPasteWnd::DeleteClips(CClipIDs& IDs, ARRAY& Indexs)
 	POSITION pos = m_lstHeader.GetFirstSelectedItemPosition();
 	int nFirstSel = m_lstHeader.GetNextSelectedItem(pos);
 
-	IDs.DeleteIDs(true, theApp.m_db);
+	BOOL bDeletedOk = IDs.DeleteIDs(true, theApp.m_db);
 
 	Indexs.SortDescending();
 	INT_PTR count = Indexs.GetSize();
@@ -3067,6 +3067,12 @@ bool CQPasteWnd::DeleteClips(CClipIDs& IDs, ARRAY& Indexs)
 	}
 
 	m_lstHeader.SetListPos(nFirstSel);
+
+	if (bDeletedOk == FALSE)
+	{
+		m_thread.FireLoadItems(true);
+	}
+
 	UpdateStatus();
 
 	if (m_lstHeader.IsToolTipWindowVisible())
@@ -4330,6 +4336,19 @@ bool CQPasteWnd::ShowProperties(int id, int row)
 
 	if (doModalRet == IDOK)
 	{
+		bool bFoundInDb = false;
+		CMainTable table;
+		try
+		{
+			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT * FROM Main WHERE lID = %d"), id);
+			if (!q.eof())
+			{
+				FillMainTable(table, q);
+				bFoundInDb = true;
+			}
+		}
+		CATCH_SQLITE_EXCEPTION
+
 		{
 			ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
@@ -4353,10 +4372,9 @@ bool CQPasteWnd::ShowProperties(int id, int row)
 			if (row >= 0 &&
 				row < (int)m_listItems.size())
 			{
-				CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT * FROM Main WHERE lID = %d"), id);
-				if (!q.eof())
+				if (bFoundInDb)
 				{
-					FillMainTable(m_listItems[row], q);
+					m_listItems[row] = table;
 				}
 
 				RemoveFromImageRtfCache(row);

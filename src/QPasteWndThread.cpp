@@ -130,7 +130,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 				limit.Format(_T(" LIMIT %d OFFSET %d"), loadItemsCount, loadItemsIndex);
 				localSql += limit;
 
-				CMainTable table;
+				std::vector<CMainTable> loadedTables;
 
 				{
 					CSingleLock lockDb(&theApp.m_csDb, TRUE);
@@ -138,68 +138,69 @@ void CQPasteWndThread::OnLoadItems(void *param)
 					CppSQLite3Query q = theApp.m_db.execQuery(localSql);
 					while(!q.eof())
 					{
-						CQPasteWnd::FillMainTable(table, q);
-
-						int updateIndex = -1;
-
-						{
-							ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
-
-							if (pos < pasteWnd->m_listItems.size())
-							{
-								pasteWnd->m_listItems[pos] = table;
-
-								updateIndex = pos;
-
-								//Log(StrF(_T("updating list pos = %d, id: %d, size: %d"), pos, table.m_lID, pasteWnd->m_listItems.size() - 1));
-							}
-							else if (pos == pasteWnd->m_listItems.size())
-							{
-								pasteWnd->m_listItems.push_back(table);
-								updateIndex = (int)pasteWnd->m_listItems.size() - 1;
-								//Log(StrF(_T("adding (same size) list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
-							}
-							else if (pos > pasteWnd->m_listItems.size())
-							{
-								for (int toAdd = (int)pasteWnd->m_listItems.size()-1; toAdd < pos - 1; toAdd++)
-								{
-									CMainTable empty;
-									empty.m_lID = -1;
-									pasteWnd->m_listItems.push_back(empty);
-
-									//Log(StrF(_T("adding dummy row size: %d"), pasteWnd->m_listItems.size()-1));
-								}
-
-								pasteWnd->m_listItems.push_back(table);
-
-								updateIndex = (int)pasteWnd->m_listItems.size() - 1;
-
-								//Log(StrF(_T("adding list pos = %d, id: %d, size: %d"), pasteWnd->m_listItems.size()-1, table.m_lID, pasteWnd->m_listItems.size() - 1));
-							}
-						}
-
 						if(pasteWnd->m_bStopQuery || IsCancelled())
 						{
 							Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
 							break;
 						}
 
+						CMainTable table;
+						CQPasteWnd::FillMainTable(table, q);
+						loadedTables.push_back(table);
+
 						q.nextRow();
-
-						if(firstLoad == false)
-						{
-							/*if (updateIndex != loadItemsIndex)
-							{
-								Log(StrF(_T("index difference old: %d, new: %d"), loadItemsIndex, updateIndex));
-							}*/
-
-							::PostMessage(pasteWnd->m_hWnd, NM_REFRESH_ROW, table.m_lID, updateIndex);
-						}
-
-						loadItemsIndex++;
-						loadCount++;
-						pos++;
 					}
+				}
+
+				for (size_t rowIndex = 0; rowIndex < loadedTables.size(); rowIndex++)
+				{
+					if(pasteWnd->m_bStopQuery || IsCancelled())
+					{
+						Log(StrF(_T("StopQuery or cancelled, exiting filling cache count = %d"), loadItemsIndex));
+						break;
+					}
+
+					CMainTable& table = loadedTables[rowIndex];
+
+					int updateIndex = -1;
+
+					{
+						ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
+
+						if (pos < pasteWnd->m_listItems.size())
+						{
+							pasteWnd->m_listItems[pos] = table;
+
+							updateIndex = pos;
+						}
+						else if (pos == pasteWnd->m_listItems.size())
+						{
+							pasteWnd->m_listItems.push_back(table);
+							updateIndex = (int)pasteWnd->m_listItems.size() - 1;
+						}
+						else if (pos > pasteWnd->m_listItems.size())
+						{
+							for (int toAdd = (int)pasteWnd->m_listItems.size()-1; toAdd < pos - 1; toAdd++)
+							{
+								CMainTable empty;
+								empty.m_lID = -1;
+								pasteWnd->m_listItems.push_back(empty);
+							}
+
+							pasteWnd->m_listItems.push_back(table);
+
+							updateIndex = (int)pasteWnd->m_listItems.size() - 1;
+						}
+					}
+
+					if(firstLoad == false)
+					{
+						::PostMessage(pasteWnd->m_hWnd, NM_REFRESH_ROW, table.m_lID, updateIndex);
+					}
+
+					loadItemsIndex++;
+					loadCount++;
+					pos++;
 				}
 
 				DWORD elapsedLoad = GetTickCount() - startTick;
