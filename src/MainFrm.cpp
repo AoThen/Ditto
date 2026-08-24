@@ -1633,8 +1633,8 @@ LRESULT CMainFrame::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 	UINT statusCode = static_cast<UINT>(wParam);
 
 	CString csLog;
-	csLog.Format(_T("CloudSync: auth required (status=%u)"), statusCode);
-	LogMessage(csLog);
+	csLog.Format(_T("[CloudSync] auth required (status=%u)\n"), statusCode);
+	OutputDebugString(csLog);
 
 	// 401/999 类错误意味着凭据或加密状态已失效，同步已停摆；
 	// 尝试让同步管理器重启以恢复（若仍失败，用户可在设置页处理）。
@@ -1646,7 +1646,7 @@ LRESULT CMainFrame::OnCloudReinitSync(WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(wParam);
 	UNREFERENCED_PARAMETER(lParam);
-	LogMessage(_T("CloudSync: reinit sync requested (main window)"));
+	OutputDebugString(_T("[CloudSync] reinit sync requested (main window)\n"));
 	theApp.m_CloudSyncManager.ReinitializeSync();
 	return 0;
 }
