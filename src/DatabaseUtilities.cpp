@@ -207,6 +207,8 @@ BOOL OpenDatabase(CString dbPath)
 			OutputDebugString(_T("OpenDatabase - setting WAL PRAGMA...\n"));
 			theApp.m_db.execQuery(_T("PRAGMA journal_mode=WAL;"));
 			theApp.m_db.execQuery(_T("PRAGMA synchronous=NORMAL;"));
+			theApp.m_db.execQuery(_T("PRAGMA cache_size=-32000;"));
+			theApp.m_db.execQuery(_T("PRAGMA temp_store=MEMORY;"));
 		}
 
 		Log(_T("OpenDatabase - WAL/sync PRAGMA OK"));
