@@ -205,6 +205,8 @@ public:
 
     bool IsDatabaseOpen() { return mpDB != NULL; }
 
+    bool InAutoCommit() { return mpDB == NULL || sqlite3_get_autocommit(mpDB) != 0; }
+
     bool DBEncrypted();
 
 private:

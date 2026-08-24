@@ -1125,9 +1125,38 @@ bool CClip::AddToDB(bool bCheckForDuplicates)
 	}
 	
 	bResult = false;
-	if(AddToMainTable())
-	{		
-		bResult = AddToDataTable();
+	bool bOwnTransaction = false;
+
+	try
+	{
+		if (theApp.m_db.InAutoCommit())
+		{
+			theApp.m_db.execDML(_T("BEGIN IMMEDIATE;"));
+			bOwnTransaction = true;
+		}
+
+		if(AddToMainTable())
+		{		
+			bResult = AddToDataTable();
+		}
+
+		if (bOwnTransaction)
+		{
+			theApp.m_db.execDML(bResult ? _T("COMMIT;") : _T("ROLLBACK;"));
+			bOwnTransaction = false;
+		}
+	}
+	CATCH_SQLITE_EXCEPTION
+
+	if (bOwnTransaction)
+	{
+		try
+		{
+			theApp.m_db.execDML(_T("ROLLBACK;"));
+		}
+		catch (...)
+		{
+		}
 	}
 
 	if(bResult)
