@@ -1527,7 +1527,6 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 	Log(StrF(_T("Start Fill List - %s"), csSQLSearch));
 
-	m_lstHeader.SetSearchText(csSQLSearch);
 	m_lstHeader.SetPinyinSearch(false);
 
 	{
@@ -1607,6 +1606,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 	{
 		m_strSQLSearch = m_bShowStarredClips ? strFilter : _T("");
 		m_strSearch = "";
+		m_lstHeader.SetSearchText(_T(""));
 	}
 	else
 	{
@@ -1737,6 +1737,7 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 		m_strSQLSearch = strFilter;
 		m_strSearch = csSQLSearch;
+		m_lstHeader.SetSearchText(csSQLSearch);
 	}
 
 	CString sql;
