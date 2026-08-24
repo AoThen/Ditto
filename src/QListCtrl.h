@@ -205,6 +205,7 @@ protected:
 	CGdiImageDrawer m_stickyImage;
 	int m_rowHeight;
 	CString m_searchText;
+	CString m_pinyinQuery;
 	bool m_bPinyinSearch;
 	std::map<CString, std::pair<std::string, std::string>> m_pinyinCache;
 	BOOL m_showIfClipWasPasted;

@@ -214,6 +214,7 @@ CQListCtrl::CQListCtrl()
 	m_showIfClipWasPasted = TRUE;
 	m_bShowTextForFirstTenHotKeys = true;
 	m_bPinyinSearch = false;
+	m_pinyinQuery = _T("");
 	m_pToolTipActions = NULL;
 }
 
@@ -603,10 +604,14 @@ void CQListCtrl::OnCustomdrawList(NMHDR* pNMHDR, LRESULT* pResult)
 			else if (m_bPinyinSearch)
 			{
 				int matchPos = 0;
-				if (HighlightPinyinText(csText, m_searchText, highlightColor, &matchPos) > 0)
+				if (HighlightPinyinText(csText, m_pinyinQuery, highlightColor, &matchPos) > 0)
 				{
 					TruncateTextToMatchLine(csText, matchPos, m_linesPerRow);
 					DrawHTML(pDC->m_hDC, csText, csText.GetLength(), rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
+				}
+				else
+				{
+					pDC->DrawText(csText, rcText, DT_VCENTER | DT_EXPANDTABS | DT_NOPREFIX);
 				}
 			}
 			else
@@ -2194,6 +2199,8 @@ void CQListCtrl::StopHideScrollBarTimer()
 void CQListCtrl::SetSearchText(CString text)
 {
 	m_searchText = text;
+	CPinyinConvert conv;
+	m_pinyinQuery = conv.ExtractAlpha(text);
 	ClearPinyinCache();
 }
 
@@ -2361,6 +2368,9 @@ void CQListCtrl::OnMouseHWheel(UINT nFlags, short zDelta, CPoint pt)
 
 int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, COLORREF color, int* outMatchPos)
 {
+	if (searchText.IsEmpty())
+		return 0;
+
 	CString cacheKey = csText;
 
 	std::wstring wText(csText.GetString());
