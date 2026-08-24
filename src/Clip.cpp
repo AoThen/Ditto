@@ -1214,9 +1214,10 @@ int CClip::FindDuplicate()
 		{
 			CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Main WHERE CRC = %d"), m_CRC);
 			if(q.eof() == false)
+			{
 				nID = q.getIntField(_T("lID"));
-
-		Log(StrF(_T("FindDuplicate: CRC hit, id=%d"), nID));
+				Log(StrF(_T("FindDuplicate: CRC hit, id=%d"), nID));
+			}
 		}
 
 		//2. CRC miss, fallback to text content comparison on recent 50 entries
@@ -1374,7 +1375,7 @@ bool CClip::AddToMainTable()
 
 		m_id = (long)theApp.m_db.lastRowId();
 
-		LogClip(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc, m_clipOrder, m_clipGroupOrder));
+		LogClip(StrF(_T("Added clip to main table, Id: %d, ParentId: %d Desc: %s, Order: %f, GroupOrder: %f"), m_id, m_parentId, m_Desc.Left(30), m_clipOrder, m_clipGroupOrder));
 
 		Log(StrF(_T("AddToMainTable: id=%d, CRC=%d, lDontSync=%d, lModifiedDate=%lld"), m_id, m_CRC, m_dontSync, m_Time.GetTime()));
 
@@ -2494,7 +2495,7 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 		newDesc += filePath;
 		newDesc += _T("\n");
 
-		Log(StrF(_T("Saving file contents to Ditto Database, file: %s, size: %d, md5: %s"), filePath, fileSize, md5String));
+		Log(StrF(_T("Saving file contents to Ditto Database, file: %s, size: %d, md5: %s"), GetFileName(filePath), fileSize, md5String));
 	}
 
 	if (!addedFileData)
@@ -2585,20 +2586,17 @@ CClipList::~CClipList()
 // while this does empty the Format Data, it does not delete the Clips.
 int CClipList::AddToDB(bool bLatestOrder)
 {
-	Log(_T("AddToDB - Start"));
-
 	int savedCount = 0;
 	CClip* pClip;
 	POSITION pos;
 	bool bResult;
-	
+
 	INT_PTR remaining = GetCount();
 	pos = GetHeadPosition();
 	while(pos)
 	{
-		Log(StrF(_T("AddToDB - while(pos), Start Remaining %d"), remaining));
 		remaining--;
-		
+
 		pClip = GetNext(pos);
 		ASSERT(pClip);
 		
@@ -2613,12 +2611,10 @@ int CClipList::AddToDB(bool bLatestOrder)
 		{
 			savedCount++;
 		}
-
-		Log(StrF(_T("AddToDB - while(pos), End Remaining %d, save count: %d"), remaining, savedCount));
 	}
 
-	Log(StrF(_T("AddToDB - Start, count: %d"), savedCount));
-	
+	Log(StrF(_T("AddToDB - Done, count: %d"), savedCount));
+
 	return savedCount;
 }
 

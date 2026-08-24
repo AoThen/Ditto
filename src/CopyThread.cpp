@@ -53,8 +53,6 @@ int CCopyThread::ExitInstance()
 // Called within Copy Thread:
 void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTitle)
 {
-	Log(_T("OnClipboardChange - Start"));
-
 	SyncConfig(); // synchronize with the main thread's copy configuration
 	
 	// if we are told not to copy on change, then we have nothing to do.
@@ -83,8 +81,6 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 		pSupportedTypes = availableTypes.get();
 	}
 
-	Log(_T("LoadFromClipboard - Before"));
-
 	// XYplorer/XYcopy 使用延迟渲染，提前等待避免首次读取冲突
 	if(activeWindow.Find(_T("xyplorer")) != -1 || activeWindow.Find(_T("xycopy")) != -1)
 	{
@@ -93,12 +89,11 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 	}
 
 	int bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
-	Log(_T("LoadFromClipboard - After"));
 
 	// [OCR] Extract image pixel data for later OCR processing
-	Log(StrF(_T("OCR: CopyThread GetEnableOCR=%d"), CGetSetOptions::GetEnableOCR()));
 	if (CGetSetOptions::GetEnableOCR())
 	{
+		Log(StrF(_T("OCR: CopyThread GetEnableOCR=%d"), CGetSetOptions::GetEnableOCR()));
 		if (pClip->m_Formats.FindFormat(CF_UNICODETEXT) || pClip->m_Formats.FindFormat(CF_TEXT))
 		{
 			Log(_T("OCR: CopyThread - clip already has text content, skipping OCR"));
@@ -123,14 +118,12 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 					Log(_T("Clipboard has no formats, skipping retry"));
 					break;
 				}
-				Log(StrF(_T("LoadFromClipboard didn't find any clips to save, sleeping %dms, then trying again (retry %d/%d)"), delay, retry, maxRetries));
-				Sleep(delay);
-				delay *= 2;
+			Log(StrF(_T("LoadFromClipboard didn't find any clips to save, sleeping %dms, then trying again (retry %d/%d)"), delay, retry, maxRetries));
+			Sleep(delay);
+			delay *= 2;
 
-				Log(StrF(_T("LoadFromClipboard #%d - Before"), retry + 1));
-				bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
-				Log(StrF(_T("LoadFromClipboard #%d - After"), retry + 1));
-			}
+			bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
+		}
 		}
 		else
 		{
@@ -156,8 +149,6 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 		::PostMessage(m_LocalConfig.m_hClipHandler, WM_CLIPBOARD_COPIED, (WPARAM)pClip, 0);
 	else
 		::SendMessage(m_LocalConfig.m_hClipHandler, WM_CLIPBOARD_COPIED, (WPARAM)pClip, 0);
-
-	Log(_T("OnClipboardChange - End"));
 }
 
 void CCopyThread::SyncConfig()

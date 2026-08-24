@@ -57,7 +57,6 @@ BOOL CProcessPaste::DoPaste()
 
 		if (m_bSendPaste)
 		{
-			Log(_T("Sending Paste to active window"));
 			theApp.m_activeWnd.SendPaste(m_bActivateTarget);
 		}
 		else if (m_bActivateTarget)
@@ -147,8 +146,6 @@ BOOL CProcessPaste::DoDrag()
 
 void CProcessPaste::MarkAsPasted(bool updateClipOrder)
 {
-	Log(_T("start of MarkAsPasted"));
-
 	CClipIDs& clips = GetClipIDs();
 	
 	CGetSetOptions::SetTripPasteCount(-1);
@@ -164,8 +161,6 @@ void CProcessPaste::MarkAsPasted(bool updateClipOrder)
 
 	//Moved to a thread because when running from from U3 devices the write is time consuming
 	AfxBeginThread(CProcessPaste::MarkAsPastedThread, (LPVOID)pData, THREAD_PRIORITY_LOWEST);
-
-	Log(_T("End of MarkAsPasted"));
 }
 
 UINT CProcessPaste::MarkAsPastedThread(LPVOID pParam)
@@ -174,8 +169,6 @@ UINT CProcessPaste::MarkAsPastedThread(LPVOID pParam)
 
 	static CEvent UpdateTimeEvent(TRUE, TRUE, _T("Ditto_Update_Clip_Time"), NULL);
 	UpdateTimeEvent.ResetEvent();
-
-	Log(_T("Start of MarkAsPastedThread"));
 
 	BOOL bRet = FALSE;
 	int clipId = 0;
@@ -259,8 +252,6 @@ UINT CProcessPaste::MarkAsPastedThread(LPVOID pParam)
 		}
 	}
 	CATCH_SQLITE_EXCEPTION
-
-	Log(_T("End of MarkAsPastedThread"));
 
 	DWORD endTick = GetTickCount();
 	if((endTick-startTick) > 350)

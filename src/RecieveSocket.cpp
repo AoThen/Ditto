@@ -61,6 +61,7 @@ LPVOID CRecieveSocket::ReceiveEncryptedData(long lInSize, long &lOutSize)
 			CStringA csPassword;
 			INT_PTR count = CGetSetOptions::m_csNetworkPasswordArray.GetSize();
 			INT_PTR nIndex;
+			bool bDecrypted = false;
 			for(int i = -2; i < count; i++)
 			{
 				csPassword.Empty();
@@ -90,20 +91,22 @@ LPVOID CRecieveSocket::ReceiveEncryptedData(long lInSize, long &lOutSize)
 					}
 				}
 
-				if(m_pEncryptor->Decrypt((UCHAR*)pInput, lInSize, csPassword, pOutput, nOut) == FALSE)
-				{
-					LogSendRecieveInfo(_T("ReceiveEncryptedData:: Failed to Decrypt data"));
-				}
-				else
+				if(m_pEncryptor->Decrypt((UCHAR*)pInput, lInSize, csPassword, pOutput, nOut) != FALSE)
 				{
 					theApp.m_lLastGoodIndexForNextworkPassword = (long)nIndex;
+					bDecrypted = true;
 					break;
 				}
+			}
+
+			if (!bDecrypted)
+			{
+				LogSendRecieveInfo(StrF(_T("ReceiveEncryptedData:: Failed to decrypt with %d password(s)"), count + 2));
 			}
 		}
 		else
 		{
-			LogSendRecieveInfo(StrF(_T("ReceiveEncryptedData:: FAILED"), lInSize));
+			LogSendRecieveInfo(StrF(_T("ReceiveEncryptedData:: Recv failed, size: %d"), lInSize));
 		}
 
 		lOutSize = nOut;
@@ -158,8 +161,6 @@ int recv_to(int fd, char *buffer, int len, int flags, int to)
 
 BOOL CRecieveSocket::RecieveExactSize(char *pData, long lSize)
 {
-	LogSendRecieveInfo(StrF(_T("RecieveExactSize:: ------ Start wanted size %d"), lSize));
-
 	long lReceiveCount = 0;
 
 	long lWanted = lSize;
@@ -227,11 +228,9 @@ BOOL CRecieveSocket::RecieveExactSize(char *pData, long lSize)
 
 		lWanted -= lReceiveCount;
 		lOffset += lReceiveCount;
-
-		LogSendRecieveInfo(StrF(_T("RecieveExactSize:: ------Bytes Read %d Total Recieved %d"), lReceiveCount, lOffset));
 	}
 
-//	LogSendRecieveInfo(StrF(_T("RecieveExactSize:: ------END RecieveExactSize Recieved %d"), lOffset));
+	LogSendRecieveInfo(StrF(_T("RecieveExactSize:: ------END RecieveExactSize Recieved %d"), lOffset));
 
 	return TRUE;
 }

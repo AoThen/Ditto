@@ -36,6 +36,7 @@ UINT  MTServerThread(LPVOID pParam)
 	if(wsaret!=0)
 	{
 		LogSendRecieveInfo("ERROR - int wsaret = WSAStartup(0x101,&wsaData);");
+		bRunning = false;
 		return 0;
 	}
 	local.sin_family = AF_INET;
@@ -53,16 +54,19 @@ UINT  MTServerThread(LPVOID pParam)
 	if(theApp.m_sSocket == INVALID_SOCKET)
 	{
 		LogSendRecieveInfo("ERROR - theApp.m_sSocket = socket(AF_INET, SOCK_STREAM, 0);");
+		bRunning = false;
 		return 0;
 	}
 	if(::bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)");
+		bRunning = false;
 		return 0;
 	}
 	if(::listen(theApp.m_sSocket,10)!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(listen(theApp.m_sSocket,10)!=0)");
+		bRunning = false;
 		return 0;
 	}
 		
@@ -86,7 +90,9 @@ UINT  MTServerThread(LPVOID pParam)
 		}
 		else
 		{
+			LogSendRecieveInfo(StrF(_T("MTServerThread: accept failed, error: %d"), WSAGetLastError()));
 			delete pParams;
+			Sleep(500);
 		}
 	}	
 

@@ -557,14 +557,18 @@ BOOL BackupDB(CString dbPath, CString backupPath)
 				do
 				{
 					readBytes = file.Read(pBuffer, 65536);
-					gzwrite(f, pBuffer, readBytes);
+					if (gzwrite(f, pBuffer, readBytes) < (int)readBytes)
+					{
+						errorMessage = _T("Error writing to backup file, disk may be full");
+						Log(StrF(_T("BackupDB: gzwrite failed, read=%u"), readBytes));
+						break;
+					}
 					totalReadSize += readBytes;
 
 					int percent = (int)((totalReadSize * 100) / fileSize);
 					if (percent != percentageComplete)
 					{
 						percentageComplete = percent;
-						Log(StrF(_T("backing up db percent done: %d"), percentageComplete));
 
 						status.Show(StrF(_T("Ditto - %02d%% %s - %s"), percentageComplete, msg, backupPath));
 					}
@@ -573,7 +577,13 @@ BOOL BackupDB(CString dbPath, CString backupPath)
 
 				gzclose(f);
 
-				ret = TRUE;
+				if (errorMessage.IsEmpty())
+					ret = TRUE;
+			}
+			else
+			{
+				errorMessage.Format(_T("Failed to open backup file %s"), backupPath);
+				Log(StrF(_T("BackupDB: gzopen failed for %s"), backupPath));
 			}
 
 			file.Close();
@@ -587,18 +597,19 @@ BOOL BackupDB(CString dbPath, CString backupPath)
 	}
 	catch (...)
 	{
-
+		errorMessage = _T("Unexpected exception during backup");
+		Log(_T("BackupDB: unexpected exception caught"));
 	}
 
 	if (errorMessage != _T(""))
 	{
 		CString cs;
-		cs.Format(_T("Restore ERROR: %s"), errorMessage);
+		cs.Format(_T("Backup ERROR: %s"), errorMessage);
 		::SendMessage(theApp.m_MainhWnd, WM_SHOW_ERROR_MSG, (WPARAM)cs.GetBuffer(cs.GetLength()), 0);
 		cs.ReleaseBuffer();
 	}
 
-	Log(StrF(_T("Done restoring db, from: %s, errors: %s"), backupPath, errorMessage));
+	Log(StrF(_T("Done backing up db, from: %s, errors: %s"), backupPath, errorMessage));
 
 	return ret;
 }
@@ -654,7 +665,7 @@ BOOL RestoreDB(CString backupPath)
 			}
 			else
 			{
-				//errorMessage.Format(_T("Failed to open temp file %s, exception: %s"), tempPath, ex.GetErrorMessage());
+				errorMessage.Format(_T("Failed to open temp file %s"), tempPath);
 			}
 
 			gzclose(f);
@@ -679,9 +690,14 @@ BOOL RestoreDB(CString backupPath)
 				if (MoveFile(tempPath, newFullPath))
 				{
 					CGetSetOptions::SetDBPath(newFullPath);
-					OpenDatabase(newFullPath);
-
-					ret = TRUE;
+					if (OpenDatabase(newFullPath))
+					{
+						ret = TRUE;
+					}
+					else
+					{
+						errorMessage.Format(_T("Failed to open restored database %s"), newFullPath);
+					}
 				}
 				else
 				{
@@ -695,7 +711,7 @@ BOOL RestoreDB(CString backupPath)
 		}
 		else
 		{
-			errorMessage.Format(_T("Failed to open file %s"), tempPath);
+			errorMessage.Format(_T("Failed to open backup file %s"), backupPath);
 		}
 	}
 	catch (CFileException* pEx)

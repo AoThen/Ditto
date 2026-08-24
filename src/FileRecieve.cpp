@@ -135,10 +135,15 @@ long CFileRecieve::RecieveFiles(SOCKET sock, CString csIP, CFileTransferProgress
 					lastWriteTime.dwLowDateTime = Info.m_lParameter1;
 					lastWriteTime.dwHighDateTime = Info.m_lParameter2;
 
-					HANDLE filename = CreateFile(fileName, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-					if (filename != NULL)
+HANDLE filename = CreateFile(fileName, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+					if (filename != INVALID_HANDLE_VALUE)
 					{
-						SetFileTime(filename, NULL, NULL, &lastWriteTime);
+						if (SetFileTime(filename, NULL, NULL, &lastWriteTime) == FALSE)
+						{
+							LogSendRecieveInfo(StrF(_T("Failed to set file time for: %s"), fileName));
+						}
+						CloseHandle(filename);
+					}
 					}
 				}
 			}
@@ -212,8 +217,19 @@ long CFileRecieve::RecieveFileData(ULONG lFileSize, CString csFileName, CString 
 		{
 			break;
 		}
-		
-		File.Write(pBuffer, lBytesNeeded);
+
+		try
+		{
+			File.Write(pBuffer, lBytesNeeded);
+		}
+		catch (CFileException* e)
+		{
+			TCHAR szError[200];
+			e->GetErrorMessage(szError, 200);
+			LogSendRecieveInfo(StrF(_T("Error writing file %s: %s"), csFileName, szError));
+			e->Delete();
+			break;
+		}
 
 		if (calcMd5)
 		{

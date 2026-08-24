@@ -98,7 +98,13 @@ bool ExternalWindowTracker::TrackActiveWnd(bool force)
 
 	if(NotifyTrayhWnd(newActive) || NotifyTrayhWnd(newFocus))
 	{
-		Log(_T("TargetActiveWindow shell tray icon has active"));
+		static DWORD lastTrayLog = 0;
+		DWORD now = GetTickCount();
+		if (now - lastTrayLog > 5000)
+		{
+			Log(_T("TargetActiveWindow shell tray icon has active"));
+			lastTrayLog = now;
+		}
 		return false;
 	}
 
@@ -128,7 +134,13 @@ bool ExternalWindowTracker::TrackActiveWnd(bool force)
 	if(theApp.QPasteWnd())
 		theApp.QPasteWnd()->UpdateStatus(true);
 
-	Log(StrF(_T("TargetActiveWindow Active: %s (%d), Focus: %s (%d), FromHook %d, IdleTime: %f"), WndName(m_activeWnd), m_activeWnd, WndName(m_focusWnd), m_focusWnd, fromHook, IdleSeconds()));
+	static DWORD lastActiveLog = 0;
+	DWORD now = GetTickCount();
+	if (now - lastActiveLog > 5000)
+	{
+		Log(StrF(_T("TargetActiveWindow Active: %s (%d), Focus: %s (%d), FromHook %d, IdleTime: %f"), WndName(m_activeWnd), m_activeWnd, WndName(m_focusWnd), m_focusWnd, fromHook, IdleSeconds()));
+		lastActiveLog = now;
+	}
 
 	return true;
 }
@@ -203,8 +215,6 @@ bool ExternalWindowTracker::NotifyTrayhWnd(HWND hWnd)
 
 bool ExternalWindowTracker::ActivateTarget()
 {
-	Log(StrF(_T("Activate Target - Active: %d, Focus: %d"), m_activeWnd, m_focusWnd));
-
 	if (IsIconic(m_activeWnd))
 	{
 		ShowWindow(m_activeWnd, SW_RESTORE);
@@ -313,8 +323,6 @@ void ExternalWindowTracker::SendPaste(bool activateTarget)
 		send.SetKeyDownDelay(sendKeysDelay);
 		send.SendKeys(csPasteString, true);
 	}
-
-	Log(_T("Post sending paste"));
 }
 
 void ExternalWindowTracker::SendCopy(CopyReasonEnum::CopyReason copyReason)
@@ -363,9 +371,7 @@ void ExternalWindowTracker::SendCopy(CopyReasonEnum::CopyReason copyReason)
 		theApp.SetCopyReason(copyReason);
 
 		send.SendKeys(csString, true);
-	}	
-
-	Log(_T("Post sending copy"));
+	}
 }
 
 // sends Ctrl-X to the TargetWnd
@@ -398,7 +404,7 @@ void ExternalWindowTracker::SendCut()
 		pasteAsAdmin &&
 		theApp.UACThreadRunning() == false)
 	{
-		Log(StrF(_T("Passing copy off to uac aware app")));
+		Log(StrF(_T("Passing cut off to uac aware app")));
 		if (theApp.UACCut() == false)
 		{
 			pasteAsAdmin = false;
@@ -412,9 +418,7 @@ void ExternalWindowTracker::SendCut()
 		send.SetKeyDownDelay(sendKeysDelay);
 
 		send.SendKeys(csString, true);
-	}		
-
-	Log(_T("Post sending cut"));
+	}
 }
 
 CString ExternalWindowTracker::ActiveWndName() 

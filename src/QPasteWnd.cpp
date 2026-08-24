@@ -7256,8 +7256,9 @@ void CQPasteWnd::OnMenuGoToEntry()
 			gotKey = true;
 		}
 	}
-	catch (CppSQLite3Exception&)
+	catch (CppSQLite3Exception& e)
 	{
+		Log(StrF(_T("QPasteWnd GoToEntry: failed to query targetID=%d, error=%s"), targetID, e.errorMessage()));
 	}
 
 	if (!gotKey)
@@ -7294,8 +7295,9 @@ void CQPasteWnd::OnMenuGoToEntry()
 
 		targetIndex = theApp.m_db.execScalar(rankSql);
 	}
-	catch (CppSQLite3Exception&)
+	catch (CppSQLite3Exception& e)
 	{
+		Log(StrF(_T("QPasteWnd GoToEntry: rank query failed, targetID=%d, error=%s"), targetID, e.errorMessage()));
 		targetIndex = -1;
 	}
 

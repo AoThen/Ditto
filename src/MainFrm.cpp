@@ -908,15 +908,12 @@ void CMainFrame::OnUpdateFirstToggleConnectCV(CCmdUI *pCmdUI)
 
 LRESULT CMainFrame::OnClipboardCopied(WPARAM wParam, LPARAM lParam)
 {
-	Log(_T("Start of function OnClipboardCopied, adding clip to thread for processing"));
-
 	CClip *pClip = (CClip*)wParam;
 	if(pClip != NULL)
 	{
 		m_thread.AddClipToSave(pClip);
-	} 
-    
-    Log(_T("End of function OnClipboardCopied"));	
+	}
+
     return TRUE;
 }
 
@@ -1431,7 +1428,6 @@ void CMainFrame::OnFirstSavecurrentclipboard()
 			pClip = NULL;
 		}
 	}
-	Log(_T("Start Saving the current clipboard to the database"));
 }
 
 LRESULT CMainFrame::OnReAddTaskBarIcon(WPARAM wParam, LPARAM lParam)

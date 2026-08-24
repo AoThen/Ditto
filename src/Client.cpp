@@ -229,7 +229,10 @@ BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 	m_SendSocket.SetSocket(m_Connection);
 
 	if(m_SendSocket.SendCSendData(Info, MyEnums::START) == FALSE)
+	{
+		LogSendRecieveInfo(_T("CClient::SendItem - Send START failed"));
 		return FALSE;
+	}
 	
 	CClipFormat* pCF;
 	
@@ -244,7 +247,10 @@ BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 	}
 	
 	if(m_SendSocket.SendCSendData(Info, MyEnums::END) == FALSE)
+	{
+		LogSendRecieveInfo(_T("CClient::SendItem - Send END failed"));
 		return FALSE;
+	}
 
 	theApp.m_lClipsSent++;
 	
@@ -283,9 +289,18 @@ BOOL CClient::SendClipFormat(CClipFormat* pCF)
 			Info.m_cDesc[sizeof(Info.m_cDesc)-1] = 0;
 			
 			if(m_SendSocket.SendCSendData(Info, MyEnums::DATA_START) == FALSE)
+			{
+				GlobalUnlock(pCF->m_hgData);
 				return FALSE;
+			}
 
-			m_SendSocket.SendExactSize((char*)pOutput, nLenOutput, false);
+			if (m_SendSocket.SendExactSize((char*)pOutput, nLenOutput, false) == FALSE)
+			{
+				LogSendRecieveInfo(StrF(_T("CClient::SendClipFormat - SendExactSize failed for format %s"), GetFormatName(pCF->m_cfType)));
+				m_SendSocket.m_pEncryptor->FreeBuffer(pOutput);
+				GlobalUnlock(pCF->m_hgData);
+				return FALSE;
+			}
 
 			m_SendSocket.m_pEncryptor->FreeBuffer(pOutput);
 
@@ -294,6 +309,7 @@ BOOL CClient::SendClipFormat(CClipFormat* pCF)
 		else
 		{
 			LogSendRecieveInfo("Failed to encrypt data");
+			GlobalUnlock(pCF->m_hgData);
 			return FALSE;
 		}
 	}
@@ -351,21 +367,34 @@ HGLOBAL CClient::RequestCopiedFiles(CClipFormat &HDropFormat, CString csIP, CStr
 		m_SendSocket.SetProgressBar(pProgress);
 
 		if(m_SendSocket.SendCSendData(Info, MyEnums::START) == FALSE)
+		{
+			csErrorString = _T("Error sending request START.");
+			LogSendRecieveInfo(StrF(_T("RequestCopiedFiles: Send START failed to %s"), csIP));
 			break;
+		}
 
 		if(SendClipFormat(&HDropFormat) == FALSE)
 		{
 			csErrorString = _T("Error sending data request.");
+			LogSendRecieveInfo(StrF(_T("RequestCopiedFiles: SendClipFormat failed to %s"), csIP));
 			break;
 		}
 
 		if(m_SendSocket.SendCSendData(Info, MyEnums::END) == FALSE)
+		{
+			csErrorString = _T("Error sending request END.");
+			LogSendRecieveInfo(StrF(_T("RequestCopiedFiles: Send END failed to %s"), csIP));
 			break;
+		}
 			
 		pProgress->SetMessage(StrF(_T("Requesting Files from %s (%s)"), csComputerName, csIP));
 
 		if(m_SendSocket.SendCSendData(Info, MyEnums::REQUEST_FILES) == FALSE)
+		{
+			csErrorString = _T("Error sending REQUEST_FILES.");
+			LogSendRecieveInfo(StrF(_T("RequestCopiedFiles: Send REQUEST_FILES failed to %s"), csIP));
 			break;
+		}
 
 		CFileRecieve Recieve;
 		long lRet = Recieve.RecieveFiles(m_Connection, csIP, pProgress);

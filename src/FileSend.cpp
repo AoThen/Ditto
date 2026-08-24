@@ -50,38 +50,57 @@ BOOL CFileSend::SendClientFiles(SOCKET sock, CClipList *pClipList)
 	if(pFormat)
 	{
 		HDROP drop = (HDROP)GlobalLock(pFormat->m_hgData);
- 		int nNumFiles = DragQueryFile(drop, -1, NULL, 0);
- 		TCHAR file[MAX_PATH];
+		if (drop != NULL)
+		{
+			int nNumFiles = DragQueryFile(drop, -1, NULL, 0);
+			TCHAR file[MAX_PATH];
 
- 		for(int nFile = 0; nFile < nNumFiles; nFile++)
- 		{
- 			if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
- 			{
-				if(PathIsDirectory(file) == FALSE)
+			for(int nFile = 0; nFile < nNumFiles; nFile++)
+			{
+				if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
 				{
-					CopyFiles.Add(file);
+					if(PathIsDirectory(file) == FALSE)
+					{
+						CopyFiles.Add(file);
+					}
 				}
- 			}
- 		}
+			}
 
-		GlobalUnlock(pFormat->m_hgData);
+			GlobalUnlock(pFormat->m_hgData);
+		}
+		else
+		{
+			LogSendRecieveInfo("CFileSend::SendClientFiles - GlobalLock returned NULL");
+		}
 	}
 
 	Info.m_lParameter1 = (long)CopyFiles.GetSize();
 	if(Info.m_lParameter1 > 0)
 	{
-		if(m_Send.SendCSendData(Info, MyEnums::START))
+		if(m_Send.SendCSendData(Info, MyEnums::START) == FALSE)
 		{
-			for(int nFile = 0; nFile < Info.m_lParameter1; nFile++)
+			LogSendRecieveInfo("CFileSend::SendClientFiles - Send START failed");
+			return FALSE;
+		}
+
+		for(int nFile = 0; nFile < Info.m_lParameter1; nFile++)
+		{
+			if (SendFile(CopyFiles[nFile]) == FALSE)
 			{
-				SendFile(CopyFiles[nFile]);
+				LogSendRecieveInfo(StrF(_T("CFileSend::SendClientFiles - SendFile failed for %s"), CopyFiles[nFile]));
+				break;
 			}
 		}
 	}
-	
-	if(m_Send.SendCSendData(Info, MyEnums::END))
-			bRet = TRUE;
-	
+
+	if(m_Send.SendCSendData(Info, MyEnums::END) == FALSE)
+	{
+		LogSendRecieveInfo("CFileSend::SendClientFiles - Send END failed");
+		return FALSE;
+	}
+
+	bRet = TRUE;
+
 	return bRet;
 }
 
@@ -129,7 +148,7 @@ BOOL CFileSend::SendFile(CString csFile)
 			Info.m_cDesc[sizeof(Info.m_cDesc)-1] = 0;			
 
 			Info.m_lParameter1 = (long)file.GetLength();
-			if(m_Send.SendCSendData(Info, MyEnums::DATA_START))
+if(m_Send.SendCSendData(Info, MyEnums::DATA_START))
 			{
 				long lReadBytes = 0;
 				BOOL bError = FALSE;
@@ -139,11 +158,11 @@ BOOL CFileSend::SendFile(CString csFile)
 				BOOL calcMd5 = CGetSetOptions::GetCheckMd5OnFileTransfers();
 
 				DWORD d = GetTickCount();
-				
+
 				do
 				{
 					lReadBytes = file.Read(pBuffer, CHUNK_WRITE_SIZE);
-					
+
 					if(m_Send.SendExactSize(pBuffer, lReadBytes, false) == FALSE)
 					{
 						LogSendRecieveInfo("Error sending SendExactSize in SendFile");
@@ -155,9 +174,9 @@ BOOL CFileSend::SendFile(CString csFile)
 					{
 						md5.MD5Update((unsigned char *)pBuffer, lReadBytes);
 					}
-					
+
 				}while(lReadBytes >= CHUNK_WRITE_SIZE);
-				
+
 				DWORD end = GetTickCount() - d;
 
 				if(bError == FALSE)
@@ -174,7 +193,7 @@ BOOL CFileSend::SendFile(CString csFile)
 						Info.m_lParameter1 = lastWriteTime.dwLowDateTime;
 						Info.m_lParameter2 = lastWriteTime.dwHighDateTime;
 					}
-										
+
 					CStringA csMd5 = md5.MD5FinalToString();
 					strncpy(Info.m_md5, csMd5, sizeof(Info.m_md5));
 
@@ -182,7 +201,13 @@ BOOL CFileSend::SendFile(CString csFile)
 
 					if(m_Send.SendCSendData(Info, MyEnums::DATA_END))
 						bRet = TRUE;
+					else
+						LogSendRecieveInfo(StrF(_T("Error sending DATA_END for file: %s"), csFile));
 				}
+			}
+			else
+			{
+				LogSendRecieveInfo(StrF(_T("Error sending DATA_START for file: %s"), csFile));
 			}
 		}
 		else

@@ -235,8 +235,6 @@ BOOL COleClipSource::DoImmediateRender()
 			{
 				try
 				{
-					Log(StrF(_T("Start of paste script name: %s, script: %s"), element.m_name, element.m_script));
-
 					ChaiScriptOnCopy onPaste;
 					CDittoChaiScript clipData(&clip, "", "");
 					if (onPaste.ProcessScript(clipData, (LPCSTR)CTextConvert::UnicodeToAnsi(element.m_script)) == false)
@@ -1290,8 +1288,6 @@ void COleClipSource::Typoglycemia(CClip &clip)
 
 INT_PTR COleClipSource::PutFormatOnClipboard(CClipFormats *pFormats)
 {
-	Log(_T("Start of put format on clipboard"));
-
 	CClipFormat* pCF;
 	INT_PTR	count = pFormats->GetSize();
 	bool bDelayedRenderCF_HDROP = false;
@@ -1333,8 +1329,6 @@ INT_PTR COleClipSource::PutFormatOnClipboard(CClipFormats *pFormats)
 			continue;
 		}
 
-		Log(StrF(_T("Setting clipboard type: %s to the clipboard"), GetFormatName(pCF->m_cfType)));
-
 		CacheGlobalData(pCF->m_cfType, pCF->m_hgData);
 		pCF->m_hgData = 0; // OLE owns it now
 	}
@@ -1343,7 +1337,7 @@ INT_PTR COleClipSource::PutFormatOnClipboard(CClipFormats *pFormats)
 
 	m_bLoadedFormats = true;
 
-	Log(_T("End of put format on clipboard"));
+	Log(StrF(_T("Put %d format(s) on clipboard"), count));
 
 	return count;
 }
@@ -1587,8 +1581,6 @@ void COleClipSource::Slugify(CClip &clip)
 
 void COleClipSource::PutGuidOntoClipboard(CClip& clip)
 {
-	Log(_T("Start of put Guid on clipboard"));
-
 	clip.m_Formats.RemoveAll();
 
 	CString guid = NewGuidString();
@@ -1598,14 +1590,10 @@ void COleClipSource::PutGuidOntoClipboard(CClip& clip)
 
 	CClipFormat cf(CF_UNICODETEXT, hGlobal);
 	clip.m_Formats.Add(cf);
-
-	Log(_T("End of put Guid on clipboard"));
 }
 
 void COleClipSource::PasteAsImage(CClip& clip)
 {
-	Log(_T("Start of PasteAsImage"));
-
 	// If clip already has image data, keep only image formats
 	if (clip.m_Formats.FindFormatEx(CF_DIB) != NULL ||
 		clip.m_Formats.FindFormatEx(theApp.m_PNG_Format) != NULL)
@@ -1683,6 +1671,4 @@ void COleClipSource::PasteAsImage(CClip& clip)
 		}
 		pStream->Release();
 	}
-
-	Log(_T("End of PasteAsImage"));
 }

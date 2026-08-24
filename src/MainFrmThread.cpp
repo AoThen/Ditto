@@ -53,7 +53,6 @@ void CMainFrmThread::AddClipToSave(CClip *pClip)
 {
 	ATL::CCritSecLock csLock(m_cs.m_sect);
 
-	Log(_T("Adding clip to thread for save to db"));
 	m_saveClips.AddTail(pClip);
 	FireEvent(SAVE_CLIPS);
 }
@@ -62,8 +61,6 @@ void CMainFrmThread::AddRemoteClipToSave(CClipList *pClipList)
 {
 	ATL::CCritSecLock csLock(m_cs.m_sect);
 
-	Log(_T("Adding REMOTE clip to thread for save to db"));
-	
 	POSITION pos = pClipList->GetHeadPosition();
 	while(pos)
 	{
@@ -161,8 +158,6 @@ void CMainFrmThread::OnSaveClips()
 		m_saveClips.RemoveAll();
 	}
 
-Log(_T("SaveCopyClips Before AddToDb")); 
-
 	if (IsCancelled())
 	{
 		Log(_T("SaveCopyClips cancelled before AddToDb"));
@@ -172,7 +167,7 @@ Log(_T("SaveCopyClips Before AddToDb"));
 
 	int count = pLocalClips->AddToDB(true);
 
-	Log(StrF(_T("SaveCopyclips After AddToDb, Count: %d"), count));
+	Log(StrF(_T("SaveCopyclips saved to db, count: %d"), count));
 
 	if (IsCancelled())
 	{
@@ -219,11 +214,7 @@ Log(_T("SaveCopyClips Before AddToDb"));
 
 		int Id = pLocalClips->GetTail()->m_id;
 
-		Log(StrF(_T("SaveCopyclips After AddToDb, Id: %d Before OnCopyCopyCompleted"), Id));
-
 		theApp.OnCopyCompleted(Id, count, copyReason);
-
-		Log(StrF(_T("SaveCopyclips After AddToDb, Id: %d After OnCopyCopyCompleted"), Id));
 
 		if (pLocalClips->GetTail()->m_copyReason == CopyReasonEnum::COPY_TO_GROUP &&
 			CGetSetOptions::GetShowMsgWndOnCopyToGroup())
@@ -255,8 +246,6 @@ Log(_T("SaveCopyClips Before AddToDb"));
 
 void CMainFrmThread::OnSaveRemoteClips()
 {
-	LogSendRecieveInfo("---------Start of OnSaveRemoteClips");
-
 	CClipList *pLocalClips = new CClipList();
 
 	//Save the clips locally
@@ -277,8 +266,6 @@ void CMainFrmThread::OnSaveRemoteClips()
 		m_saveRemoteClips.RemoveAll();
 	}
 
-	LogSendRecieveInfo("---------OnSaveRemoteClips - Before AddToDB");
-
 	if (IsCancelled())
 	{
 		Log(_T("OnSaveRemoteClips cancelled before AddToDB"));
@@ -288,7 +275,7 @@ void CMainFrmThread::OnSaveRemoteClips()
 
 	int count = pLocalClips->AddToDB(true);
 
-	LogSendRecieveInfo("---------OnSaveRemoteClips - After AddToDB");
+	LogSendRecieveInfo(StrF(_T("OnSaveRemoteClips saved to db, count: %d"), count));
 
 	if (IsCancelled())
 	{
@@ -314,8 +301,6 @@ void CMainFrmThread::OnSaveRemoteClips()
 
 	if(pLastClip && (pLastClip->m_param1 & REMOTE_CLIP_ADD_TO_CLIPBOARD))
 	{
-		LogSendRecieveInfo("---------OnSaveRemoteClips - Before Posting msg to main thread to set clipboard");
-
 		//set the clipboard on the main thread, i was having a problem with setting the clipboard on a thread
 		//guess it needs to be set on the main thread
 		//main window will clear this memory
@@ -327,13 +312,9 @@ void CMainFrmThread::OnSaveRemoteClips()
 			Log(StrF(_T("OnSaveRemoteClips: PostMessage(WM_LOAD_ClIP_ON_CLIPBOARD) failed for clip %d"), pLastClip->m_id));
 			delete pLastClip;
 		}
-
-		LogSendRecieveInfo("---------OnSaveRemoteClips - After Posting msg to main thread to set clipboard");
-	}	
+	}
 
 	theApp.RefreshView();
 
 	delete pLocalClips;
-
-	LogSendRecieveInfo("---------End of OnSaveRemoteClips");
 }

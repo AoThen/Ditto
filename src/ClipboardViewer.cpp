@@ -66,8 +66,6 @@ void CClipboardViewer::Create()
 // connects as a clipboard viewer
 void CClipboardViewer::Connect()
 {
-	Log(_T("Connect to Clipboard"));
-	
 	m_bCalling_SetClipboardViewer = true;
 
 	bool useSetClipboardWnd = true;
@@ -82,17 +80,17 @@ void CClipboardViewer::Connect()
 			AddClipFormatListener addListener = (AddClipFormatListener) GetProcAddress(hUser32, "AddClipboardFormatListener");
 			if(addListener)
 			{
-				Log(_T("Connecting to clipboard with function AddClipboardFormatListener"));
+				Log(_T("Connect to Clipboard - AddClipboardFormatListener"));
 				useSetClipboardWnd = false;
-				addListener(m_hWnd);				
+				addListener(m_hWnd);
 			}
 		}
 	}
-	
+
 	if(useSetClipboardWnd)
 	{
-		Log(_T("Connecting to clipboard with function SetClipboardViewer"));
-		m_hNextClipboardViewer = CWnd::SetClipboardViewer();		
+		Log(_T("Connect to Clipboard - SetClipboardViewer"));
+		m_hNextClipboardViewer = CWnd::SetClipboardViewer();
 	}
 
 	m_bCalling_SetClipboardViewer = false;
@@ -111,31 +109,29 @@ void CClipboardViewer::SetEnsureConnectedTimer()
 // disconnects as a clipboard viewer
 void CClipboardViewer::Disconnect(bool bSendPing)
 {
-	Log(_T("Disconnect From Clipboard"));
-
 	KillTimer(TIMER_ENSURE_VIEWER_IN_CHAIN);
 	bool removeOldWay = true;
 
 	if(IsVista())
 	{
 		HMODULE hUser32 = LoadLibrary(_T("USER32.dll"));
-		if (hUser32) 
+		if (hUser32)
 		{
 			typedef BOOL (__stdcall *RemoveClipFormatListener)( HWND hwnd );
 
 			RemoveClipFormatListener removeListener = (RemoveClipFormatListener) GetProcAddress(hUser32, "RemoveClipboardFormatListener");
 			if(removeListener)
 			{
-				Log(_T("Disconnecting from clipboard with function RemoveClipboardFormatListener"));
+				Log(_T("Disconnect From Clipboard - RemoveClipboardFormatListener"));
 				removeOldWay = false;
-				removeListener(m_hWnd);				
+				removeListener(m_hWnd);
 			}
 		}
 	}
-	
+
 	if(removeOldWay)
 	{
-		Log(_T("Disconnecting from clipboard with function ChangeClipboardChain"));
+		Log(_T("Disconnect From Clipboard - ChangeClipboardChain"));
 
 		BOOL bRet = CWnd::ChangeClipboardChain(m_hNextClipboardViewer);
 		if(!bRet)
@@ -219,11 +215,9 @@ void CClipboardViewer::OnDestroy()
 	CWnd::OnDestroy();
 }
 
-void CClipboardViewer::OnChangeCbChain(HWND hWndRemove, HWND hWndAfter) 
+void CClipboardViewer::OnChangeCbChain(HWND hWndRemove, HWND hWndAfter)
 {
-	Log(_T("OnChangeCbChain"));
-	
-	// If the next window is closing, repair the chain. 
+	// If the next window is closing, repair the chain.
 	if(m_hNextClipboardViewer == hWndRemove)
     {
 		m_hNextClipboardViewer = hWndAfter;
@@ -244,9 +238,7 @@ void CClipboardViewer::OnChangeCbChain(HWND hWndRemove, HWND hWndAfter)
 
 LRESULT CClipboardViewer::OnClipboardChange(WPARAM wParam, LPARAM lPara)
 {
-	Log(StrF(_T("OnClipboardChange - Start")));
 	OnDrawClipboard();
-	Log(StrF(_T("OnClipboardChange - End")));
 
 	return TRUE;
 }
@@ -303,9 +295,7 @@ void CClipboardViewer::OnDrawClipboard()
 			if(GetIgnoreClipboardChange() == false)
 			{
 				if(ValidActiveWnd())
-				{          
-					Log(StrF(_T("OnDrawClipboard:: *** SetTimer *** %d"), GetTickCount()));
-
+				{
 					KillTimer(TIMER_DRAW_CLIPBOARD);
 					SetTimer(TIMER_DRAW_CLIPBOARD, CGetSetOptions::m_lProcessDrawClipboardDelay, NULL);		
 				}
@@ -363,8 +353,6 @@ bool CClipboardViewer::ValidActiveWnd()
 
 	CString includeApps = CGetSetOptions::GetCopyAppInclude().MakeLower();
 
-	Log(StrF(_T("INCLUDE app names: %s, Active App: %s"), includeApps, m_activeWindow));
-
 	bool tokenMatch = false;
 
 	CTokenizer token(includeApps, CGetSetOptions::GetCopyAppSeparator());
@@ -376,8 +364,6 @@ bool CClipboardViewer::ValidActiveWnd()
 		{
 			if(CWildCardMatch::WildMatch(line.Trim(), m_activeWindow, ""))
 			{
-				Log(StrF(_T("Inlclude app names Found Match %s - %s"), line, m_activeWindow));
-
 				tokenMatch = true;
 				break;
 			}
@@ -390,8 +376,6 @@ bool CClipboardViewer::ValidActiveWnd()
 
 		if(excludeApps != "")
 		{
-			Log(StrF(_T("EXCLUDE app names %s, Active App: %s"), excludeApps, m_activeWindow));
-
 			CTokenizer token2(excludeApps, CGetSetOptions::GetCopyAppSeparator());
 			CString line2;
 			while(token2.Next(line2))
@@ -433,10 +417,8 @@ void CClipboardViewer::OnTimer(UINT_PTR nIDEvent)
 
 			if(dwNow - m_dwLastCopy > CGetSetOptions::m_dwSaveClipDelay || m_dwLastCopy > dwNow)
 			{
-				if (GetIgnoreClipboardChange() == false)				
+				if (GetIgnoreClipboardChange() == false)
 				{
-					Log(StrF(_T("OnDrawClipboard::OnTimer %d"), dwNow));
-
 					m_pHandler->OnClipboardChange(m_activeWindow, m_activeWindowTitle);
 
 					m_dwLastCopy = dwNow;
