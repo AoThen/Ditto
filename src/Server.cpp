@@ -272,7 +272,7 @@ void CServer::OnDataStart(CSendInfo &info)
 
 	CString csFormat = CTextConvert::Utf8ToUnicode(info.m_cDesc);
 	m_cf.m_cfType = GetFormatID(csFormat);
-	m_cf.m_hgData = 0;
+	m_cf.Free();
 	
 	long lInSize = info.m_lParameter1;
 	long lOutSize = 0;
@@ -323,7 +323,6 @@ void CServer::OnDataEnd(CSendInfo &info)
 			AddRemoteCF_HDROPFormat();
 
 		m_pClip->m_Formats.Add(m_cf);
-		m_cf.m_hgData = 0; // now owned by pClip
 	}
 	else
 	{
@@ -404,8 +403,5 @@ void CServer::AddRemoteCF_HDROPFormat()
 	cf.m_cfType = theApp.m_RemoteCF_HDROP;
 
 	m_pClip->m_Formats.Add(cf);
-
-	//m_pClip->m_Formats now owns the data
-	cf.m_hgData = NULL;
 }
 

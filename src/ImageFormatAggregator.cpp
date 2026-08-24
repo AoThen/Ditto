@@ -18,9 +18,6 @@ bool CImageFormatAggregator::AddClip(LPVOID lpData, int nDataSize, int nPos, int
 	HGLOBAL hGlobal = ::NewGlobalP(lpData, nDataSize);
 	
 	CClipFormat data(cfType, hGlobal);
-	//m_images owns the data now
-	data.AutoDeleteData(false);
-
 	m_images.Add(data);
 
 	return true;

@@ -102,8 +102,6 @@ BOOL COleClipSource::DoImmediateRender()
 			{
 				CClipFormat cf(CF_DIB, bigImage.GetHGlobal());
 				clip.m_Formats.Add(cf);
-				//clip.m_Formats now owns the global data
-				cf.m_autoDeleteData = false;
 			}
 		}
 		else
@@ -114,8 +112,6 @@ BOOL COleClipSource::DoImmediateRender()
 			{
 				CClipFormat cf(CF_TEXT, CFText.GetHGlobal());
 				clip.m_Formats.Add(cf);
-				//clip.m_Formats now owns the global data
-				cf.m_autoDeleteData = false;
 			}
 
 			CStringW SepW = CGetSetOptions::GetMultiPasteSeparator();
@@ -124,8 +120,6 @@ BOOL COleClipSource::DoImmediateRender()
 			{
 				CClipFormat cf(CF_UNICODETEXT, CFUnicodeText.GetHGlobal());
 				clip.m_Formats.Add(cf);
-				//clip.m_Formats now owns the global data
-				cf.m_autoDeleteData = false;
 			}
 
 			if (m_pasteOptions.LimitFormatsToText() == false)
@@ -135,8 +129,6 @@ BOOL COleClipSource::DoImmediateRender()
 				{
 					CClipFormat cf(CF_HDROP, HDrop.GetHGlobal());
 					clip.m_Formats.Add(cf);
-					//clip.m_Formats now owns the global data
-					cf.m_autoDeleteData = false;
 				}
 
 				CRichTextAggregator RichText(SepA);
@@ -144,8 +136,6 @@ BOOL COleClipSource::DoImmediateRender()
 				{
 					CClipFormat cf(theApp.m_RTFFormat, RichText.GetHGlobal());
 					clip.m_Formats.Add(cf);
-					//clip.m_Formats now owns the global data
-					cf.m_autoDeleteData = false;
 				}
 
 				CHTMLFormatAggregator Html(SepA);
@@ -153,8 +143,6 @@ BOOL COleClipSource::DoImmediateRender()
 				{
 					CClipFormat cf(theApp.m_HTML_Format, Html.GetHGlobal());
 					clip.m_Formats.Add(cf);
-					//clip.m_Formats now owns the global data
-					cf.m_autoDeleteData = false;
 				}
 			}
 		}
@@ -768,7 +756,6 @@ void COleClipSource::PlainTextFilter(CClip &clip)
 
 			CClipFormat format(CF_UNICODETEXT, HDrop.GetHGlobalAsString());
 			clip.m_Formats.Add(format);
-			format.m_autoDeleteData = false; //owned by m_DelayRenderedFormats
 		}
 	}
 }
@@ -1223,9 +1210,6 @@ void COleClipSource::SaveDittoFileDataToFile(CClip &clip)
 
 		CClipFormat cf(CF_HDROP, hDrpData.CreateCF_HDROPBuffer());
 		clip.m_Formats.Add(cf);
-
-		//clip.m_Formats now owns the global data
-		cf.m_autoDeleteData = false;
 	}
 }
 
@@ -1458,7 +1442,6 @@ BOOL COleClipSource::OnRenderGlobalData(LPFORMATETC lpFormatEtc, HGLOBAL* phGlob
 
 		CClipFormat format(lpFormatEtc->cfFormat, hCopy);
 		m_DelayRenderedFormats.Add(format);
-		format.m_autoDeleteData = false; //owned by m_DelayRenderedFormats
 	}
 
 	BOOL bRet = FALSE;
@@ -1616,9 +1599,6 @@ void COleClipSource::PutGuidOntoClipboard(CClip& clip)
 	CClipFormat cf(CF_UNICODETEXT, hGlobal);
 	clip.m_Formats.Add(cf);
 
-	//clip.m_Formats now owns the global data
-	cf.m_autoDeleteData = false;
-
 	Log(_T("End of put Guid on clipboard"));
 }
 
@@ -1679,7 +1659,6 @@ void COleClipSource::PasteAsImage(CClip& clip)
 
 	CClipFormat cfDib(CF_DIB, (HGLOBAL)hDib);
 	clip.m_Formats.Add(cfDib);
-	cfDib.m_autoDeleteData = false;
 
 	IStream* pStream = nullptr;
 	if (SUCCEEDED(CreateStreamOnHGlobal(nullptr, TRUE, &pStream)))
@@ -1700,7 +1679,6 @@ void COleClipSource::PasteAsImage(CClip& clip)
 
 				CClipFormat cfPng(theApp.m_PNG_Format, hPng);
 				clip.m_Formats.Add(cfPng);
-				cfPng.m_autoDeleteData = false;
 			}
 		}
 		pStream->Release();

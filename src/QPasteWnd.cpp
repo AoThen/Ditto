@@ -8101,8 +8101,6 @@ bool CQPasteWnd::DoActionEmailTo()
 		{
 			CClipFormat cf(theApp.m_HTML_Format, Html.GetHGlobal());
 			clip.m_Formats.Add(cf);
-			//clip.m_Formats now owns the global data
-			cf.m_autoDeleteData = false;
 		}
 
 		CCF_UnicodeTextAggregator CFUnicodeText(SepW);
@@ -8110,8 +8108,6 @@ bool CQPasteWnd::DoActionEmailTo()
 		{
 			CClipFormat cf(CF_UNICODETEXT, CFUnicodeText.GetHGlobal());
 			clip.m_Formats.Add(cf);
-			//clip.m_Formats now owns the global data
-			cf.m_autoDeleteData = false;
 		}
 		else
 		{
@@ -8121,8 +8117,6 @@ bool CQPasteWnd::DoActionEmailTo()
 			{
 				CClipFormat cf(CF_TEXT, CFText.GetHGlobal());
 				clip.m_Formats.Add(cf);
-				//clip.m_Formats now owns the global data
-				cf.m_autoDeleteData = false;
 			}
 		}
 	}
@@ -8232,8 +8226,6 @@ bool CQPasteWnd::DoActionGmail()
 		{
 			CClipFormat cf(CF_UNICODETEXT, CFUnicodeText.GetHGlobal());
 			clip.m_Formats.Add(cf);
-			//clip.m_Formats now owns the global data
-			cf.m_autoDeleteData = false;
 		}
 		else
 		{
@@ -8243,8 +8235,6 @@ bool CQPasteWnd::DoActionGmail()
 			{
 				CClipFormat cf(CF_TEXT, CFText.GetHGlobal());
 				clip.m_Formats.Add(cf);
-				//clip.m_Formats now owns the global data
-				cf.m_autoDeleteData = false;
 			}
 		}
 	}

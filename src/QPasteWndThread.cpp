@@ -412,10 +412,7 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 					ATL::CCritSecLock csLock(pasteWnd->m_CritSection.m_sect);
 
 					pasteWnd->m_cf_rtfCache[it->m_parentId] = *it;
-					it->m_autoDeleteData = false;
-					//the cache now owns the format data, set it to delete the data in the destructor
-					pasteWnd->m_cf_rtfCache[it->m_parentId].m_autoDeleteData = true;
-
+					//the cache now owns the format data
 					Log(StrF(_T("Loaded, extra data for clip %d, rtf cache count: %d"), it->m_parentId, pasteWnd->m_cf_rtfCache.size()));
 				}
 
