@@ -33,6 +33,17 @@ struct QuickSyncContext {
 	HANDLE hStopEvent;         // stop event for early exit during shutdown
 };
 
+// Context for fire-and-forget delete/dont-sync notification threads
+struct DeleteSyncContext {
+	void* pManager;            // CCloudSyncManager*
+	LONG* pCounter;            // pointer to active thread counter
+	CRITICAL_SECTION* pCS;     // critical section for thread-safe checks
+	HANDLE hStopEvent;         // stop event for early exit during shutdown
+	int action;                // action id, see QueueDeleteSyncAction
+	std::vector<int> localClipIds;
+	int localGroupId;
+};
+
 class CCloudSyncManager
 {
 public:
@@ -102,6 +113,14 @@ public:
 private:
 	// Ensure HTTP client is created/reused for the current server URL
 	void EnsureHttpClient();
+
+	// Fire-and-forget notification of delete/dont-sync actions to the server
+	// (runs on a short-lived worker thread, never blocks the caller)
+	BOOL QueueDeleteSyncAction(int action, const std::vector<int>& localClipIds, int localGroupId);
+	static UINT DeleteSyncThreadProc(LPVOID pParam);
+	void DeleteRemoteClipsInternal(const std::vector<int>& localClipIds);
+	void MarkClipsDontSyncInternal(const std::vector<int>& localClipIds);
+	std::unique_ptr<httplib::Client> CreateShortTimeoutHttpClient();
 
 	// Check if user expects encryption (via registry setting)
 	BOOL IsEncryptionExpected();

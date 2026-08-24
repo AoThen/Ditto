@@ -736,6 +736,143 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 	return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Async delete/dont-sync notification: fire-and-forget worker so the UI
+// thread never performs blocking HTTP during clip/group deletion.
+// ---------------------------------------------------------------------------
+enum { DSA_DELETE_CLIPS = 1, DSA_DONT_SYNC = 2, DSA_DELETE_GROUP = 3 };
+
+BOOL CCloudSyncManager::QueueDeleteSyncAction(int action, const std::vector<int>& localClipIds, int localGroupId)
+{
+	DeleteSyncContext* ctx = new DeleteSyncContext;
+	ctx->pManager = this;
+	ctx->pCounter = &m_nActiveQuickSyncThreads;
+	ctx->pCS = &m_csSync;
+	ctx->hStopEvent = m_hStopEvent;
+	ctx->action = action;
+	ctx->localClipIds = localClipIds;
+	ctx->localGroupId = localGroupId;
+
+	EnterCriticalSection(&m_csSync);
+	BOOL bShouldRun = (m_pSyncThread != nullptr && m_hStopEvent != nullptr);
+	if (bShouldRun)
+	{
+		m_nActiveQuickSyncThreads++;
+	}
+	LeaveCriticalSection(&m_csSync);
+
+	if (!bShouldRun)
+	{
+		OutputDebugStringA("[CloudSync] Skip delete-sync: manager shutting down or not running.\n");
+		delete ctx;
+		return FALSE;
+	}
+
+	if (AfxBeginThread(DeleteSyncThreadProc, ctx) == nullptr)
+	{
+		OutputDebugStringA("[CloudSync] Failed to spawn delete-sync thread.\n");
+		EnterCriticalSection(&m_csSync);
+		m_nActiveQuickSyncThreads--;
+		LeaveCriticalSection(&m_csSync);
+		delete ctx;
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+UINT CCloudSyncManager::DeleteSyncThreadProc(LPVOID pParam)
+{
+	DeleteSyncContext* ctx = static_cast<DeleteSyncContext*>(pParam);
+	if (!ctx || !ctx->pManager || !ctx->pCounter || !ctx->pCS)
+	{
+		delete ctx;
+		return 1;
+	}
+
+	CCloudSyncManager* pThis = static_cast<CCloudSyncManager*>(ctx->pManager);
+
+	try
+	{
+		EnterCriticalSection(ctx->pCS);
+		BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
+		if (bAlive)
+		{
+			LeaveCriticalSection(ctx->pCS);
+
+			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
+			{
+				OutputDebugStringA("[CloudSync] delete-sync: stop signaled, exiting.\n");
+				EnterCriticalSection(ctx->pCS);
+				(*ctx->pCounter)--;
+				LeaveCriticalSection(ctx->pCS);
+				delete ctx;
+				return 0;
+			}
+
+			switch (ctx->action)
+			{
+				case DSA_DELETE_CLIPS:
+					pThis->DeleteRemoteClipsInternal(ctx->localClipIds);
+					break;
+				case DSA_DONT_SYNC:
+					pThis->MarkClipsDontSyncInternal(ctx->localClipIds);
+					break;
+				case DSA_DELETE_GROUP:
+					pThis->OnGroupDeletedInternal(ctx->localGroupId);
+					break;
+				default:
+					break;
+			}
+		}
+		else
+		{
+			LeaveCriticalSection(ctx->pCS);
+			OutputDebugStringA("[CloudSync] delete-sync skipped: manager shutting down.\n");
+		}
+	}
+	catch (...)
+	{
+		LogMessage(_T("DeleteSyncThreadProc: exception caught, ensuring counter decrement."));
+	}
+
+	EnterCriticalSection(ctx->pCS);
+	(*ctx->pCounter)--;
+	LeaveCriticalSection(ctx->pCS);
+
+	delete ctx;
+	return 0;
+}
+
+std::unique_ptr<httplib::Client> CCloudSyncManager::CreateShortTimeoutHttpClient()
+{
+	EnterCriticalSection(&m_csSync);
+	CString serverUrl = m_serverUrl;
+	LeaveCriticalSection(&m_csSync);
+
+	CStringA serverUrlA(serverUrl);
+	std::string url = serverUrlA.GetString();
+	if (url.find("https://") != 0)
+	{
+		// Enforce HTTPS: reject plain http for security (consistent with CloudAuth)
+		if (url.find("http://") == 0)
+		{
+			OutputDebugStringA("[CloudSync] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			return nullptr;
+		}
+		url = "https://" + url;
+	}
+
+	auto client = std::make_unique<httplib::Client>(url);
+	client->set_connection_timeout(3, 0);
+	client->set_read_timeout(10, 0);
+	client->set_write_timeout(10, 0);
+	client->set_default_headers({
+		{"Authorization", "Bearer " + std::string(CStringA(CGetSetOptions::GetCloudDeviceToken()))}
+	});
+	return client;
+}
+
 void CCloudSyncManager::TriggerSync()
 {
 	PushGroups();
@@ -3349,10 +3486,8 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 	if (remoteGroupId.empty()) return;
 	try
 	{
-		EnsureHttpClient();
-		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Delete(("/api/v1/groups/" + remoteGroupId).c_str()) : httplib::Result();
-		LeaveCriticalSection(&m_csHttpClient);
+		auto client = CreateShortTimeoutHttpClient();
+		auto res = client ? client->Delete(("/api/v1/groups/" + remoteGroupId).c_str()) : httplib::Result();
 		if (res && (res->status == 200 || res->status == 404))
 		{
 			DeleteRemoteGroupIdMappingByRemote(remoteGroupId);
@@ -3372,14 +3507,19 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 
 // ---------------------------------------------------------------------------
 // MarkClipsDontSync: Mark clips as dont-sync on server
+// (async: queued to a short-lived worker thread)
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 {
 	if (localClipIds.empty()) return;
+	QueueDeleteSyncAction(DSA_DONT_SYNC, localClipIds, -1);
+}
+
+void CCloudSyncManager::MarkClipsDontSyncInternal(const std::vector<int>& localClipIds)
+{
+	if (localClipIds.empty()) return;
 	try
 	{
-		EnsureHttpClient();
-
 		std::vector<std::string> remoteIds;
 		for (int localId : localClipIds)
 		{
@@ -3399,9 +3539,8 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 		nlohmann::json body;
 		body["ids"] = remoteIds;
 
-		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : httplib::Result();
-		LeaveCriticalSection(&m_csHttpClient);
+		auto client = CreateShortTimeoutHttpClient();
+		auto res = client ? client->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : httplib::Result();
 
 		{
 			CString msg;
@@ -3426,14 +3565,19 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 
 // ---------------------------------------------------------------------------
 // DeleteRemoteClips: Notify server to soft-delete clips by remote ID
+// (async: queued to a short-lived worker thread)
 // ---------------------------------------------------------------------------
 void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 {
 	if (localClipIds.empty()) return;
+	QueueDeleteSyncAction(DSA_DELETE_CLIPS, localClipIds, -1);
+}
+
+void CCloudSyncManager::DeleteRemoteClipsInternal(const std::vector<int>& localClipIds)
+{
+	if (localClipIds.empty()) return;
 	try
 	{
-		EnsureHttpClient();
-
 		std::vector<std::string> remoteIds;
 		for (int localId : localClipIds)
 		{
@@ -3447,9 +3591,8 @@ void CCloudSyncManager::DeleteRemoteClips(const std::vector<int>& localClipIds)
 		nlohmann::json body;
 		body["ids"] = remoteIds;
 
-		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : httplib::Result();
-		LeaveCriticalSection(&m_csHttpClient);
+		auto client = CreateShortTimeoutHttpClient();
+		auto res = client ? client->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : httplib::Result();
 		if (res && (res->status == 200 || res->status == 404))
 		{
 			for (int localId : localClipIds)
@@ -3812,6 +3955,12 @@ void CCloudSyncManager::TriggerQuickSync()
 }
 
 void CCloudSyncManager::OnGroupDeleted(int localGroupId)
+{
+	if (localGroupId <= 0) return;
+	QueueDeleteSyncAction(DSA_DELETE_GROUP, std::vector<int>(), localGroupId);
+}
+
+void CCloudSyncManager::OnGroupDeletedInternal(int localGroupId)
 {
 	LogMessage(_T("OnGroupDeleted: notifying server and removing group mapping."));
 	try
