@@ -39,9 +39,8 @@ bool CClipboardSaveRestore::Save(BOOL textOnly)
 							cf.m_cfType = nFormat;
 
 							m_Clipboard.Add(cf);
-
-							//m_Clipboard owns the data now
-							cf.m_hgData = NULL;
+							// the array element owns its own deep copy; release our local handle
+							cf.Free();
 						}
 
 						GlobalUnlock(hGlobal);

@@ -452,13 +452,13 @@ bool CClip::AddFormat(CLIPFORMAT cfType, void* pData, UINT nLen, bool setDesc)
 	{
 		pFormat->Free();
 		pFormat->m_hgData = format.m_hgData;
+		format.m_hgData = 0;
 	}
 	else
 	{
 		m_Formats.Add(format);
 	}
 	
-	format.m_hgData = 0; // now owned by m_Formats
 	return true;
 }
 
@@ -506,10 +506,10 @@ CString HtmlFragmentToPlainText(const CStringA& htmlBytes)
 	}
 
 	plainText.Replace("&nbsp;", " ");
-	plainText.Replace("&amp;", "&");
 	plainText.Replace("&lt;", "<");
 	plainText.Replace("&gt;", ">");
 	plainText.Replace("&quot;", "\"");
+	plainText.Replace("&amp;", "&");
 	plainText.Trim();
 
 	if(plainText.IsEmpty())
@@ -717,7 +717,6 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		if(cf.m_cfType == cfDesc.m_cfType)
 		{
 			cf = cfDesc;
-			cfDesc.m_hgData = 0; // cf owns it now (to go into m_Formats)
 		}
 		else if(!oleData.IsDataAvailable(cf.m_cfType))
 		{
@@ -761,6 +760,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 				}
 
 				m_Formats.Add(cf);
+				cf.Free();
 				bSuccess = true;
 			}
 			else
@@ -769,7 +769,6 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 				cf.Free();
 				Log(StrF(_T("Data length is 0 for type %s"), GetFormatName(cf.m_cfType)));
 			}
-			cf.m_hgData = 0; // m_Formats owns it now
 		}
 
 		Log(StrF(_T("End of load - type %s, Success: %d"), GetFormatName(cf.m_cfType), bSuccess));
@@ -964,7 +963,7 @@ void CClip::StripExcelOuterQuotesFromGlobal(HGLOBAL &hGlobal, CLIPFORMAT cfType)
 		str.Replace(L"\"\"", L"\"");
 
 		SIZE_T newSize = (str.GetLength() + 1) * sizeof(wchar_t);
-		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE, newSize);
+		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, newSize);
 		if (!hNew) return;
 		void *pNew = GlobalLock(hNew);
 		if (!pNew) { GlobalFree(hNew); return; }
@@ -987,7 +986,7 @@ void CClip::StripExcelOuterQuotesFromGlobal(HGLOBAL &hGlobal, CLIPFORMAT cfType)
 		str.Replace("\"\"", "\"");
 
 		SIZE_T newSize = str.GetLength() + 1;
-		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE, newSize);
+		HGLOBAL hNew = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, newSize);
 		if (!hNew) return;
 		void *pNew = GlobalLock(hNew);
 		if (!pNew) { GlobalFree(hNew); return; }
@@ -1168,8 +1167,17 @@ int CClip::FindDuplicate()
 		//   text is being copied repeatedly (e.g., from delayed rendering or app focus loss).
 		if (!CGetSetOptions::m_bAllowDuplicates && m_CRC == m_LastAddedCRC && m_LastAddedCRC != 0)
 		{
-			Log(StrF(_T("FindDuplicate: CRC cache hit, id=%d"), m_lastAddedID));
-			return m_lastAddedID;
+			// 校验缓存条目仍存在（可能已被删除）
+			CppSQLite3Query qCheck = theApp.m_db.execQueryEx(_T("SELECT 1 FROM Main WHERE lID = %d"), m_lastAddedID);
+			if (!qCheck.eof())
+			{
+				Log(StrF(_T("FindDuplicate: CRC cache hit, id=%d"), m_lastAddedID));
+				return m_lastAddedID;
+			}
+			// 条目已删除，失效缓存并穿透到数据库查重
+			m_LastAddedCRC = 0;
+			m_lastAddedID = 0;
+			Log(_T("FindDuplicate: CRC cache stale (clip deleted), falling through to db check"));
 		}
 
 		//1. CRC match in database
@@ -1187,7 +1195,7 @@ int CClip::FindDuplicate()
 		if(nID < 0 && !m_Desc.IsEmpty())
 		{
 			CppSQLite3Query q = theApp.m_db.execQueryEx(
-				_T("SELECT lID, mText FROM Main ORDER BY clipOrder DESC LIMIT 50"));
+				_T("SELECT lID, mText FROM Main WHERE bIsGroup = 0 ORDER BY clipOrder DESC LIMIT 50"));
 			while(!q.eof())
 			{
 				if(m_Desc == q.getStringField(_T("mText")))
@@ -2088,11 +2096,12 @@ bool CClip::LoadFormats(int id, bool bOnlyLoad_CF_TEXT, bool includeRichTextForT
 			cf.m_hgData = hGlobal;
 			m_Formats.Add(cf);
 
+			// The array element now owns its own deep copy; release our local handle
+			cf.Free();
+			hGlobal = 0;
+
 			q.nextRow();
 		}
-
-		// formats owns all the data
-		cf.m_hgData = 0;
 	}
 	CATCH_SQLITE_EXCEPTION_AND_RETURN(false)
 		

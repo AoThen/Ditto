@@ -128,7 +128,7 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 				delay *= 2;
 
 				Log(StrF(_T("LoadFromClipboard #%d - Before"), retry + 1));
-				bResult = pClip->LoadFromClipboard(pSupportedTypes, activeWindow);
+				bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
 				Log(StrF(_T("LoadFromClipboard #%d - After"), retry + 1));
 			}
 		}

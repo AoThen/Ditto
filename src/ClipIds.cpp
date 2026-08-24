@@ -295,9 +295,10 @@ BOOL CClipIDs::CopyTo(int parentId)
 		theApp.m_db.execDML(_T("ROLLBACK;"));
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
 		ASSERT(FALSE);
+		return FALSE;
 	}
 		
-	return FALSE;
+	return TRUE;
 }
 
 BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
@@ -309,6 +310,9 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 	BOOL bRet = TRUE;
 	INT_PTR count = GetSize();
 	int batchCount = 25;
+
+	// Invalidate the last-added CRC cache so a deleted clip can be re-copied
+	CClip::m_LastAddedCRC = 0;
 
 	std::vector<int> remoteDeleteIds;
 

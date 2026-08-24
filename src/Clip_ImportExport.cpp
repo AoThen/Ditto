@@ -262,7 +262,8 @@ bool CClip_ImportExport::ImportFromSqliteV1(CppSQLite3DB& db, CppSQLite3Query& q
 						if (cf.m_hgData)
 						{
 							m_Formats.Add(cf);
-							cf.m_hgData = NULL; //m_format owns m_hgData now
+							// element now owns its own deep copy; release local handle
+							cf.Free();
 						}
 						else
 						{

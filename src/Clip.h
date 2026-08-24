@@ -111,7 +111,7 @@ public:
 	virtual IClipFormat *GetAt(int nPos) { return &this->ElementAt(nPos); }
 	virtual void DeleteAt(int nPos) { this->RemoveAt(nPos); }
 	virtual void DeleteAll() { this->RemoveAll(); }
-	virtual INT_PTR AddNew(CLIPFORMAT type, HGLOBAL data) {CClipFormat ft(type, data, -1); ft.m_autoDeleteData = false; return this->Add(ft); }
+	virtual INT_PTR AddNew(CLIPFORMAT type, HGLOBAL data) {CClipFormat ft(type, data, -1); return this->Add(ft); }
 	virtual IClipFormat *FindFormatEx(CLIPFORMAT type)	{ return FindFormat((UINT)type); }
 	virtual bool RemoveFormat(CLIPFORMAT type);
 };

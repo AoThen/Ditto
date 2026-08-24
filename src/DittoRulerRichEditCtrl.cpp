@@ -229,7 +229,6 @@ bool CDittoRulerRichEditCtrl::LoadRTFData(CClip &Clip)
 	int nLength = csRTF.GetLength() + 1;
 	format.m_hgData = NewGlobalP(csRTF.GetBuffer(nLength), nLength);
 	Clip.m_Formats.Add(format);
-	format.m_hgData = NULL; //Clip.m_formats owns data now
 
 	return true;
 }
@@ -271,7 +270,6 @@ bool CDittoRulerRichEditCtrl::LoadTextData(CClip &Clip)
 	m_csDescription = m_csDescription.Left(15);
 
 	Clip.m_Formats.Add(format);
-	format.m_hgData = NULL; //Clip.m_formats owns data now
 
 	return true;
 }
