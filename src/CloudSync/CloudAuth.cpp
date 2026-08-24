@@ -103,10 +103,12 @@ HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, 
 	return HttpResult{res->status, res->body, true};
 }
 
-// Helper: convert std::string to CString
+// Helper: convert std::string to CString (UTF-8 JSON → Unicode)
 static CString StdStringToCString(const std::string& str)
 {
-	return CString(str.c_str());
+	if (str.empty())
+		return CString();
+	return CString(CA2W(str.c_str(), CP_UTF8));
 }
 
 LoginResult CCloudAuth::Login(const CString& serverUrl,

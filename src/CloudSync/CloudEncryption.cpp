@@ -10,6 +10,7 @@ using json = nlohmann::json;
 std::unique_ptr<httplib::Client> CCloudEncryption::m_httpClient;
 CString CCloudEncryption::m_httpClientUrl;
 CCriticalSection CCloudEncryption::m_csHttpClient;
+CStringA CCloudEncryption::m_lastHttpToken;
 
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
@@ -39,6 +40,16 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 		// No scheme - default to https
 		url = "https://" + url;
 	}
+	// Detect token change: if token differs from last used, force client rebuild
+	CStringA currentToken = CStringA(deviceToken);
+	if (m_httpClient && m_httpClientUrl == serverUrl)
+	{
+		if (m_lastHttpToken != currentToken)
+		{
+			m_httpClient.reset();
+			m_httpClientUrl.Empty();
+		}
+	}
 	if (!m_httpClient || m_httpClientUrl != serverUrl)
 	{
 		m_httpClient = std::make_unique<httplib::Client>(url);
@@ -51,6 +62,7 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 			m_httpClient->set_default_headers(headers);
 		}
 		m_httpClientUrl = serverUrl;
+		m_lastHttpToken = currentToken;
 	}
 }
 
@@ -587,7 +599,8 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 
 	if (!IsEncryptionReady())
 	{
-		return encryptedBase64;
+		OutputDebugStringA("[CloudEncryption] DecryptClipData: encryption not ready, returning empty.\n");
+		return CStringA("");
 	}
 
 	CStringA result = CCloudCrypto::Decrypt(encryptedBase64);
@@ -597,5 +610,16 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 BOOL CCloudEncryption::IsEncryptionReady()
 {
 	BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
-	return enabled;
+	if (!enabled)
+		return FALSE;
+
+	// 检查密钥材料是否存在
+	if (CGetSetOptions::GetCloudEncryptionKey().IsEmpty())
+		return FALSE;
+
+	// 检查是否处于恢复模式（密码错误/密钥丢失）
+	if (CGetSetOptions::GetCloudEncryptionNeedsRecovery())
+		return FALSE;
+
+	return TRUE;
 }

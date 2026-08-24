@@ -75,6 +75,7 @@ private:
 	static std::unique_ptr<httplib::Client> m_httpClient;
 	static CString m_httpClientUrl;
 	static CCriticalSection m_csHttpClient;
+	static CStringA m_lastHttpToken;
 
 	// Create or reuse HTTP client for the given server URL and device token
 	static void EnsureHttpClient(const CString& serverUrl, const CString& deviceToken);

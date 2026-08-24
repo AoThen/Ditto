@@ -83,6 +83,8 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_MESSAGE(WM_PASTE_CLIP, OnPasteClip)
 	ON_MESSAGE(WM_EDIT_CLIP, OnEditClip)
 	ON_MESSAGE(WM_CLOUD_TRIGGER_SYNC, OnTriggerCloudSync)
+	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, OnCloudAuthRequired)
+	ON_MESSAGE(WM_CLOUD_REINIT_SYNC, OnCloudReinitSync)
 	ON_MESSAGE(WM_OCR_COMPLETED, OnOcrCompleted)
 	ON_MESSAGE(WM_OCR_BATCH_DONE, OnOcrBatchDone)
 
@@ -1618,6 +1620,34 @@ void CMainFrame::OnSetFocus(CWnd* pOldWnd)
 LRESULT CMainFrame::OnTriggerCloudSync(WPARAM wParam, LPARAM lParam)
 {
 	theApp.m_CloudSyncManager.OnClipAdded(nullptr);
+	return 0;
+}
+
+// ---------------------------------------------------------------------------
+// 云同步自定义消息：由 CloudSyncManager 的工作线程 PostMessage 到主窗口，
+// 主窗口必须负责接收并转发，避免消息黑洞导致同步停摆无提示。
+// ---------------------------------------------------------------------------
+LRESULT CMainFrame::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	UINT statusCode = static_cast<UINT>(wParam);
+
+	CString csLog;
+	csLog.Format(_T("CloudSync: auth required (status=%u)"), statusCode);
+	LogMessage(csLog);
+
+	// 401/999 类错误意味着凭据或加密状态已失效，同步已停摆；
+	// 尝试让同步管理器重启以恢复（若仍失败，用户可在设置页处理）。
+	theApp.m_CloudSyncManager.ReinitializeSync();
+	return 0;
+}
+
+LRESULT CMainFrame::OnCloudReinitSync(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(wParam);
+	UNREFERENCED_PARAMETER(lParam);
+	LogMessage(_T("CloudSync: reinit sync requested (main window)"));
+	theApp.m_CloudSyncManager.ReinitializeSync();
 	return 0;
 }
 

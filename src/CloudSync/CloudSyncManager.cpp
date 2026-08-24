@@ -129,7 +129,9 @@ CCloudSyncManager::~CCloudSyncManager()
 	// Only delete critical sections if all threads have exited cleanly.
 	// If Stop() timed out, threads may still be running — skip cleanup
 	// to avoid use-after-free. OS reclaims CRITICAL_SECTION on process exit.
-	BOOL bAllThreadsDead = (m_pSyncThread == nullptr && m_pWsThread == nullptr);
+	// Check ALL thread sources, including quick-sync pool and encryption retry.
+	BOOL bAllThreadsDead = (m_pSyncThread == nullptr && m_pWsThread == nullptr &&
+		m_pEncRetryThread == nullptr && m_nActiveQuickSyncThreads == 0);
 	if (bAllThreadsDead)
 	{
 		DeleteCriticalSection(&m_csSync);
@@ -316,7 +318,7 @@ void CCloudSyncManager::StartEncryptionRetry()
 		return;
 	}
 
-	m_pEncRetryThread = AfxBeginThread(EncryptionRetryThreadProc, this, THREAD_PRIORITY_BELOW_NORMAL, 0, 0);
+	m_pEncRetryThread = AfxBeginThread(EncryptionRetryThreadProc, this, THREAD_PRIORITY_BELOW_NORMAL, 0, CREATE_SUSPENDED);
 	if (m_pEncRetryThread == nullptr)
 	{
 		LogMessage(_T("StartEncryptionRetry: failed to create thread"));
@@ -326,6 +328,7 @@ void CCloudSyncManager::StartEncryptionRetry()
 	}
 
 	m_pEncRetryThread->m_bAutoDelete = FALSE;
+	m_pEncRetryThread->ResumeThread();
 	LogMessage(_T("StartEncryptionRetry: retry thread started"));
 }
 
@@ -1085,8 +1088,10 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 				// Skip pull this cycle: pulling with a stale/invalid credential is
 				// pointless and would spam an error dialog every cycle.
 				LogMessage(_T("Sync: push failed, skipping pull this cycle"));
+				EnterCriticalSection(&pThis->m_csStatus);
 				pThis->m_csSyncStatus = _T("Error");
 				pThis->m_csLastError = _T("Push failed - skipping pull this cycle");
+				LeaveCriticalSection(&pThis->m_csStatus);
 				continue;
 			}
 
@@ -1453,7 +1458,15 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 				if (i > start)
 				{
 					CStringA ansiPath(pPaths + start, (int)(i - start));
-					paths.push_back(std::string(ansiPath.GetString()));
+					// Convert ANSI path to UTF-8 for JSON compatibility
+					int nWide = MultiByteToWideChar(CP_ACP, 0, ansiPath, ansiPath.GetLength(), nullptr, 0);
+					if (nWide > 0)
+					{
+						std::wstring widePath(nWide, L'\0');
+						MultiByteToWideChar(CP_ACP, 0, ansiPath, ansiPath.GetLength(), &widePath[0], nWide);
+						CT2A utf8Path(widePath.c_str(), CP_UTF8);
+						paths.push_back(std::string(utf8Path.m_psz));
+					}
 				}
 			}
 		}
@@ -1653,6 +1666,7 @@ void CCloudSyncManager::PullChanges()
 
 			// Process each new clip
 			int mergedCount = 0;
+			int decryptFailedCount = 0;
 			BOOL bForce = FALSE;
 			if (hasClips)
 			{
@@ -1673,6 +1687,7 @@ void CCloudSyncManager::PullChanges()
 							CString msg;
 							msg.Format(_T("PullChanges: decryption failed for clip, skipping"));
 							LogMessage(msg);
+							decryptFailedCount++;
 							continue;
 						}
 						// H1 FIX: Write decrypted formats back to clip (DecryptClipFormats received a copy)
@@ -1774,8 +1789,9 @@ void CCloudSyncManager::PullChanges()
 				}
 			}
 
-			// Only advance cursor if we actually processed clips successfully
-			if (mergedCount > 0 || deletedCount > 0)
+			// Advance cursor if any data was received this page, regardless of merge/decrypt outcome.
+			// This prevents infinite re-download when key mismatch causes all clips to fail decrypt.
+			if (hasClips || hasDeletions)
 			{
 				EnterCriticalSection(&m_csSync);
 				m_lastSyncTime = newSyncTime;
@@ -1784,7 +1800,12 @@ void CCloudSyncManager::PullChanges()
 			}
 
 			CString msg;
-			if (deletedCount > 0)
+			if (decryptFailedCount > 0)
+			{
+				msg.Format(_T("PullChanges: %d clips received, %d merged, %d deletions, %d decrypt failures"),
+					hasClips ? (int)clipsNode->size() : 0, mergedCount, deletedCount, decryptFailedCount);
+			}
+			else if (deletedCount > 0)
 			{
 				msg.Format(_T("PullChanges: received %d clips (%d merged), %d deletions"),
 					hasClips ? clipsNode->size() : 0, mergedCount, deletedCount);
@@ -2087,7 +2108,23 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 					}
 					else
 					{
-						formatJson["data"] = std::string(reinterpret_cast<const char*>(cData), nDataLen);
+						// CF_TEXT is ANSI (current ACP). JSON payload must be valid UTF-8
+						// to avoid nlohmann::json::dump() throwing on invalid bytes,
+						// which would permanently stall the push queue.
+						int nChars = MultiByteToWideChar(CP_ACP, 0,
+							reinterpret_cast<const char*>(cData), nDataLen, nullptr, 0);
+						if (nChars <= 0)
+						{
+							formatJson["data"] = "";
+						}
+						else
+						{
+							std::wstring wideData(nChars, L'\0');
+							MultiByteToWideChar(CP_ACP, 0,
+								reinterpret_cast<const char*>(cData), nDataLen, &wideData[0], nChars);
+							CT2A utf8Data(wideData.c_str(), CP_UTF8);
+							formatJson["data"] = std::string(utf8Data.m_psz);
+						}
 					}
 				}
 				else
@@ -2307,7 +2344,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				csSQL.Format(_T("SELECT lID, lModifiedDate, CRC FROM Main WHERE mText = ? AND bIsGroup = 0 LIMIT 1"));
 				
 				CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
-				stmt.bind(1, CString(desc.c_str()));
+				stmt.bind(1, CString(CA2W(desc.c_str(), CP_UTF8)));
 				CppSQLite3Query q = stmt.execQuery();
 				
 				if (q.eof() == false)
@@ -2358,16 +2395,31 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			}
 		}
 
-		// Delete existing clip if we found one that needs to be replaced
-		if (existingId > 0)
+		// Delete existing clip if we found one that needs to be replaced.
+		// Only delete-then-rebuild when remote has formats; otherwise update
+		// metadata in place to preserve local format data.
+		bool remoteHasFormats = remoteClip.contains("formats") &&
+			remoteClip["formats"].is_array() && !remoteClip["formats"].empty();
+		if (existingId > 0 && remoteHasFormats)
 		{
 			DeleteLocalClip(existingId);
 			existingId = -1;  // Will create fresh clip below
 		}
+		else if (existingId > 0)
+		{
+			// Remote has no formats — keep local formats, update metadata only
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
+			CString csUpdateSQL;
+			csUpdateSQL.Format(_T("UPDATE Main SET lModifiedDate = %lld, CRC = %d WHERE lID = %d"),
+				(__int64)remoteUpdatedAt, crc, existingId);
+			theApp.m_db.execDML(csUpdateSQL);
+			SaveRemoteIdMapping(existingId, serverIdStr);
+			return existingId;
+		}
 
 		// Create new clip in local database
 		CClip newClip;
-		newClip.m_Desc = CString(desc.c_str());
+		newClip.m_Desc = CString(CA2W(desc.c_str(), CP_UTF8));
 		newClip.m_CRC = crc;
 		newClip.m_parentId = -1;  // Top-level clip
 		// Handle group_id from remote
@@ -2443,6 +2495,52 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				// Base64 data is typically longer than the decoded size, contains only [A-Za-z0-9+/=]
 				bool isBase64 = (dataSize > 0 && dataStr.length() > static_cast<size_t>(dataSize));
 
+				// Special handling for CF_HDROP: push side replaces file data with
+				// JSON path metadata {"type":"file_paths","paths":[...],"count":N}.
+				// Rebuild a valid DROPFILES structure so pasting file references works.
+				if (formatType == 15 && !dataStr.empty())
+				{
+					try
+					{
+						auto pathMeta = nlohmann::json::parse(dataStr);
+						if (pathMeta.is_object() && pathMeta.value("type", "") == "file_paths" && pathMeta.contains("paths"))
+						{
+							auto paths = pathMeta["paths"];
+							// Build DROPFILES header + wide-char file paths (double NUL terminated)
+							DROPFILES df = { sizeof(DROPFILES), {0,0}, FALSE, TRUE };
+							std::wstring wideBuf;
+							for (const auto& p : paths)
+							{
+								std::string utf8 = p.get<std::string>();
+								CA2W w(utf8.c_str(), CP_UTF8);
+								wideBuf += w.m_psz;
+								wideBuf += L'\0';
+							}
+							wideBuf += L'\0'; // double NUL terminator
+							SIZE_T totalSize = sizeof(DROPFILES) + (wideBuf.length() * sizeof(wchar_t));
+							hGlobal = GlobalAlloc(GMEM_MOVEABLE | GMEM_SHARE, totalSize);
+							if (hGlobal)
+							{
+								BYTE* pData = (BYTE*)GlobalLock(hGlobal);
+								if (pData)
+								{
+									memcpy(pData, &df, sizeof(DROPFILES));
+									memcpy(pData + sizeof(DROPFILES), wideBuf.data(), wideBuf.length() * sizeof(wchar_t));
+								}
+								GlobalUnlock(hGlobal);
+								if (!pData)
+								{
+									GlobalFree(hGlobal);
+									hGlobal = nullptr;
+								}
+							}
+						}
+					}
+					catch (...) { /* not JSON pathMeta — fall through to normal binary path */ }
+				}
+
+				if (hGlobal == nullptr)
+				{
 				if (formatType == CF_UNICODETEXT)
 				{
 					CStringA utf8Data(dataStr.c_str());
@@ -2454,24 +2552,48 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 						if (hGlobal)
 						{
 							wchar_t* pData = (wchar_t*)GlobalLock(hGlobal);
-							MultiByteToWideChar(CP_UTF8, 0,
-								utf8Data.GetString(), utf8Data.GetLength(),
-								pData, wideLen);
-							pData[wideLen] = L'\0';
+							if (pData)
+							{
+								MultiByteToWideChar(CP_UTF8, 0,
+									utf8Data.GetString(), utf8Data.GetLength(),
+									pData, wideLen);
+								pData[wideLen] = L'\0';
+							}
 							GlobalUnlock(hGlobal);
+							if (!pData)
+							{
+								GlobalFree(hGlobal);
+								hGlobal = nullptr;
+							}
 						}
 					}
 				}
 				else if (formatType == CF_TEXT)
 				{
-					// Plain text
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, dataStr.length() + 1);
+					// Push side converted ACP→UTF-8, so we need the reverse UTF-8→ACP
+					CStringW wideText = CA2W(dataStr.c_str(), CP_UTF8);
+					CT2A ansiText(wideText, CP_ACP);
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, ansiText.m_psz ? strlen(ansiText.m_psz) + 1 : 1);
 					if (hGlobal)
 					{
 						char* pData = (char*)GlobalLock(hGlobal);
-						memcpy(pData, dataStr.c_str(), dataStr.length());
-						pData[dataStr.length()] = '\0';
+						if (pData)
+						{
+							if (ansiText.m_psz)
+							{
+								strcpy(pData, ansiText.m_psz);
+							}
+							else
+							{
+								pData[0] = '\0';
+							}
+						}
 						GlobalUnlock(hGlobal);
+						if (!pData)
+						{
+							GlobalFree(hGlobal);
+							hGlobal = nullptr;
+						}
 					}
 				}
 				else if (isBase64)
@@ -2485,22 +2607,47 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 						if (hGlobal)
 						{
 							BYTE* pData = (BYTE*)GlobalLock(hGlobal);
-							memcpy(pData, decoded.data(), decoded.size());
+							if (pData)
+							{
+								memcpy(pData, decoded.data(), decoded.size());
+							}
 							GlobalUnlock(hGlobal);
+							if (!pData)
+							{
+								GlobalFree(hGlobal);
+								hGlobal = nullptr;
+							}
 						}
 					}
 				}
 				else
 				{
-					// Plain text fallback
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, dataStr.length() + 1);
+					// Plain text fallback (UTF-8 → ACP)
+					CStringW wideText = CA2W(dataStr.c_str(), CP_UTF8);
+					CT2A ansiText(wideText, CP_ACP);
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, ansiText.m_psz ? strlen(ansiText.m_psz) + 1 : 1);
 					if (hGlobal)
 					{
 						char* pData = (char*)GlobalLock(hGlobal);
-						memcpy(pData, dataStr.c_str(), dataStr.length());
-						pData[dataStr.length()] = '\0';
+						if (pData)
+						{
+							if (ansiText.m_psz)
+							{
+								strcpy(pData, ansiText.m_psz);
+							}
+							else
+							{
+								pData[0] = '\0';
+							}
+						}
 						GlobalUnlock(hGlobal);
+						if (!pData)
+						{
+							GlobalFree(hGlobal);
+							hGlobal = nullptr;
+						}
 					}
+				}
 				}
 
 				if (hGlobal)
@@ -2511,7 +2658,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 					{
 						case 1:  cfType = CF_TEXT; break;
 						case 13: cfType = CF_UNICODETEXT; break;
-						case 8:  cfType = RegisterClipboardFormat(_T("CF_DIB")); break;
+						case 8:  cfType = CF_DIB; break;
 						case 49: cfType = RegisterClipboardFormat(_T("HTML Format")); break;
 						case 15: cfType = CF_HDROP; break;
 						default: cfType = formatType; break;
@@ -2597,6 +2744,14 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 		
 		theApp.m_db.execDML(csDeleteSQL);
 
+		// Clean up the mapping table to avoid stale entries that could collide
+		// with future clips reusing the same local_id slot.
+		{
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+				_T("DELETE FROM CloudClipMap WHERE local_id = ?"));
+			stmt.bind(1, clipId);
+			stmt.execDML();
+		}
 		CString msg;
 		msg.Format(_T("DeleteLocalClip: clip %d deleted from local DB"), clipId);
 		LogMessage(msg);
@@ -3052,6 +3207,8 @@ void CCloudSyncManager::PullGroups()
 
 		int page = 1;
 		bool hasMore = true;
+		// 仅当全部分页成功拉取时才执行清理；中途失败（网络/鉴权/解析）不得据不完整快照删除本地
+		bool bAllPagesOk = true;
 
 		while (hasMore)
 		{
@@ -3060,13 +3217,19 @@ void CCloudSyncManager::PullGroups()
 			auto res = m_httpClient ? m_httpClient->Get(url.c_str()) : httplib::Result();
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res || res->status != 200)
+			{
+				bAllPagesOk = false;
 				break;
+			}
 
 			try
 			{
 				auto resp = nlohmann::json::parse(res->body);
 				if (!resp.contains("data") || !resp["data"].contains("items"))
+				{
+					bAllPagesOk = false;
 					break;
+				}
 
 				auto& items = resp["data"]["items"];
 
@@ -3087,10 +3250,9 @@ void CCloudSyncManager::PullGroups()
 
 					if (localId <= 0)
 					{
-						CString csName(name.c_str());
+						CString csName = CString(CA2W(name.c_str(), CP_UTF8));
 						csName.Replace(_T("'"), _T("''"));
-						CString csDesc(description.c_str());
-						csDesc.Replace(_T("'"), _T("''"));
+						CString csDesc = CString(CA2W(description.c_str(), CP_UTF8));
 
 						CString csSQL;
 						csSQL.Format(_T("INSERT INTO Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder, lDontSync) ")
@@ -3105,9 +3267,9 @@ void CCloudSyncManager::PullGroups()
 					}
 					else
 					{
-						CString csName(name.c_str());
+						CString csName = CString(CA2W(name.c_str(), CP_UTF8));
 						csName.Replace(_T("'"), _T("''"));
-						CString csDesc(description.c_str());
+						CString csDesc = CString(CA2W(description.c_str(), CP_UTF8));
 						csDesc.Replace(_T("'"), _T("''"));
 
 						CString csSQL;
@@ -3144,11 +3306,13 @@ void CCloudSyncManager::PullGroups()
 			catch (...)
 			{
 				LogMessage(_T("PullGroups: failed to parse page, breaking pagination"));
+				bAllPagesOk = false;
 				break;
 			}
 		}
 
-		// 清理已不在服务端存在的群组映射
+		// 清理已不在服务端存在的群组映射（仅在全部分页成功时执行）
+		if (bAllPagesOk)
 		{
 			CSingleLock lockDb(&theApp.m_csDb, TRUE);
 			CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT remote_id, local_id FROM CloudGroupMap"));
@@ -3241,7 +3405,10 @@ void CCloudSyncManager::MarkClipsDontSync(const std::vector<int>& localClipIds)
 
 		{
 			CString msg;
-			msg.Format(_T("MarkClipsDontSync: server notified for %d local clips"), localClipIds.size());
+			if (res && res->status == 200)
+				msg.Format(_T("MarkClipsDontSync: server notified for %d local clips"), localClipIds.size());
+			else
+				msg.Format(_T("MarkClipsDontSync: server response status=%d"), res ? res->status : -1);
 			LogMessage(msg);
 		}
 	}
