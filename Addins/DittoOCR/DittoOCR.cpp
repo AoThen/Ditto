@@ -69,6 +69,9 @@ static ScaleParam GetScaleParam(cv::Mat& src, int targetSize) {
     sp.dstHeight = (int)(src.rows * ratio);
     sp.dstWidth = (sp.dstWidth / 32) * 32;
     sp.dstHeight = (sp.dstHeight / 32) * 32;
+    // 图像过小时整数除法可能得到 0，钳制到至少 32 以保护后续处理
+    sp.dstWidth = std::max(sp.dstWidth, 32);
+    sp.dstHeight = std::max(sp.dstHeight, 32);
     sp.ratioWidth = (float)sp.dstWidth / src.cols;
     sp.ratioHeight = (float)sp.dstHeight / src.rows;
     return sp;
@@ -131,6 +134,9 @@ static std::vector<cv::Point> UnClip(std::vector<cv::Point>& box, float unClipRa
     float perimeter = (float)(cv::norm(box[0] - box[1]) + cv::norm(box[1] - box[2]) +
                               cv::norm(box[2] - box[3]) + cv::norm(box[3] - box[0]));
     float area = (float)cv::contourArea(box);
+    // 退化盒：周长或面积非法时直接返回，避免除零/距离异常
+    if (perimeter <= 0.0f || area <= 0.0f)
+        return box;
     float distance = area * unClipRatio / perimeter;
 
     ClipperLib::Path poly;
@@ -322,6 +328,12 @@ OCR_API void* OcrInit(const char* modelsDir)
         auto recOutputName = std::string(recSession->GetOutputNameAllocated(0, allocator).get());
 
         std::vector<std::string> characterDict = ParseCharacterDict(configPath);
+
+        // 字典为空时后续识别必然失败，提前返回避免加载无效模型
+        if (characterDict.empty()) {
+            OCR_LOG("OcrInit: characterDict is empty, aborting init");
+            return nullptr;
+        }
 
 #ifdef OCR_DEBUG
         {
