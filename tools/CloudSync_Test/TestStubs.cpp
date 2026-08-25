@@ -35,6 +35,7 @@ CString CGetSetOptions::GetDiffApp() { return CString(); }
 CString CGetSetOptions::ResolvePath(CString path) { return path; }
 CString CGetSetOptions::GetPath(long /*lPathID*/) { return CString(); }
 CString CGetSetOptions::GetCopyAppSeparator() { return CString(); }
+BOOL CGetSetOptions::GetCloudEncryptionNeedsRecovery() { return FALSE; }
 
 // -------------------------------------------------------------------
 // log / StrF stubs
