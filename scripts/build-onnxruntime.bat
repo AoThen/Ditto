@@ -324,9 +324,11 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
 )
 
-REM Write lib paths to a response file - a single expanded command line hits
-REM the cmd.exe 8191 char limit once the collected lib count grows past ~120.
-set "RSP_FILE=%TEMP%\ort_merge.rsp"
+REM Write lib paths to a response file and use @file syntax (no quotes
+REM around the filename - MSVC lib.exe rejects @"quoted_path").
+REM The file is created in the current directory (onnxsrc) to avoid any
+REM TEMP path issues with spaces or trailing backslashes.
+set "RSP_FILE=ort_merge.rsp"
 type nul > "%RSP_FILE%"
 set LIB_COUNT=0
 for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
@@ -341,7 +343,7 @@ if "!LIB_COUNT!"=="0" (
 ) else (
     echo [BUILD] Merging !LIB_COUNT! libs via response file:
     type "%RSP_FILE%"
-    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" @"%RSP_FILE%"
+    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" @ort_merge.rsp
     if errorlevel 1 (
         echo [BUILD] WARNING: Final merge failed
     ) else (
