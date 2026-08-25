@@ -206,22 +206,21 @@ REM -------------------------------------------------------------------
 echo [BUILD] Step 4b/6: Collecting third-party libs from build tree
 
 REM The install directory only contains onnxruntime's own libs.
-REM Third-party deps (protobuf, re2, onnx, absl, etc.) are in the build tree.
-REM Search for all .lib files and copy them to install-static/lib.
+REM Third-party deps (protobuf, re2, onnx, flatbuffers, etc.) live under
+REM Release\_deps - they are built with /MT too (protobuf_MSVC_STATIC_RUNTIME=ON,
+REM CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded), so collecting them is safe.
+REM Step 4b3 per-lib CRT check and the workflow publish guard catch any /MD leak.
 for /f "delims=" %%f in ('dir /s /b "%BUILD_DIR%\*.lib" 2^>nul') do (
     echo %%f | findstr /i "\\install\\" >nul
     if errorlevel 1 (
-        echo %%f | findstr /i "\\_deps\\" >nul
-        if errorlevel 1 (
-            if exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
-                rem file already exists, skip
+        if exist "%STATIC_INSTALL_DIR%\lib\%%~nxf" (
+            rem file already exists, skip
+        ) else (
+            copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
+            if errorlevel 1 (
+                rem copy failed, continue
             ) else (
-                copy /y "%%f" "%STATIC_INSTALL_DIR%\lib\" >nul 2>nul
-                if errorlevel 1 (
-                    rem copy failed, continue
-                ) else (
-                    echo [BUILD]   Copied: %%~nxf
-                )
+                echo [BUILD]   Copied: %%~nxf
             )
         )
     )
