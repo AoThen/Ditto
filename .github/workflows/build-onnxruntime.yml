@@ -107,8 +107,13 @@ jobs:
           if errorlevel 1 exit /b 1
           rem Guard 5: public headers must be packaged - consumers cannot compile without them
           if not exist "onnxsrc\build-x64-v143-mt\install-static\include\onnxruntime_cxx_api.h" exit /b 1
-          rem Guard 6: protobuf implementation members must be present
+          rem Guard 6: third-party implementation members must be present
+          rem (mangled-name namespaces: google::protobuf, onnx::, flatbuffers::)
           findstr /i "protobuf" lib_members.txt >nul
+          if errorlevel 1 exit /b 1
+          findstr /i "SparseTensorProto" lib_members.txt >nul
+          if errorlevel 1 exit /b 1
+          findstr /i "flatbuffers" lib_members.txt >nul
           if errorlevel 1 exit /b 1
           del crt_directives.txt lib_members.txt
           echo Artifact verification passed - /MT CRT, core symbols, headers and third-party members present

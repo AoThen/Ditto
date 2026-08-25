@@ -324,26 +324,31 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
 )
 
-set all_libs=
+REM Write lib paths to a response file - a single expanded command line hits
+REM the cmd.exe 8191 char limit once the collected lib count grows past ~120.
+set "RSP_FILE=%TEMP%\ort_merge.rsp"
+type nul > "%RSP_FILE%"
+set LIB_COUNT=0
 for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
-    if /i "%%f"=="onnxruntime.lib" (
-        rem skip onnxruntime.lib itself
-    ) else (
-        set all_libs=!all_libs! "%STATIC_INSTALL_DIR%\lib\%%f"
+    if /i not "%%f"=="onnxruntime.lib" (
+        >> "%RSP_FILE%" echo "%STATIC_INSTALL_DIR%\lib\%%f"
+        set /a LIB_COUNT+=1
     )
 )
 
-if "!all_libs!" == "" (
+if "!LIB_COUNT!"=="0" (
     echo [BUILD] WARNING: No libs found in install-static/lib
 ) else (
-    echo [BUILD] Merging all libs into onnxruntime.lib
-    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !all_libs!
+    echo [BUILD] Merging !LIB_COUNT! libs via response file:
+    type "%RSP_FILE%"
+    lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" @"%RSP_FILE%"
     if errorlevel 1 (
         echo [BUILD] WARNING: Final merge failed
     ) else (
         echo [BUILD] onnxruntime.lib created successfully - all deps included
     )
 )
+del "%RSP_FILE%" 2>nul
 echo [BUILD] Step 4c/6 complete.
 
 REM -------------------------------------------------------------------
