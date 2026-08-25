@@ -50,7 +50,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: onnxsrc\build-x64-v143-mt
-          key: onnxruntime-build-x64-v143-mt-v3-${{ env.ONNX_VERSION }}-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
+          key: onnxruntime-build-x64-v143-mt-v4-${{ env.ONNX_VERSION }}-${{ hashFiles('.github/workflows/build-onnxruntime.yml') }}-${{ hashFiles('scripts/build-onnxruntime.bat') }}
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -83,6 +83,30 @@ jobs:
               7z a %GITHUB_WORKSPACE%\onnxruntime-static-windows-x64-${{ env.ONNX_VERSION }}.7z NUL
             )
           )
+
+      - name: Verify artifact before publish
+        shell: cmd
+        run: |
+          set "ONNX_LIB=onnxsrc\build-x64-v143-mt\install-static\lib\onnxruntime.lib"
+          where dumpbin >nul 2>nul
+          if errorlevel 1 exit /b 1
+          if not exist "%ONNX_LIB%" exit /b 1
+          rem Guard 1: no dynamic CRT /MD directive allowed
+          dumpbin /directives "%ONNX_LIB%" > crt_directives.txt
+          findstr /i "DEFAULTLIB:MSVCRT" crt_directives.txt >nul
+          if not errorlevel 1 exit /b 1
+          rem Guard 2: static CRT /MT marker must be present
+          findstr /i "DEFAULTLIB:LIBCMT" crt_directives.txt >nul
+          if errorlevel 1 exit /b 1
+          rem Guard 3: ORT core symbols must be present (merged lib completeness)
+          dumpbin /linkermember:1 "%ONNX_LIB%" > lib_members.txt
+          findstr /i "OrtGetApiBase" lib_members.txt >nul
+          if errorlevel 1 exit /b 1
+          rem Guard 4: re2 member objects must be present
+          findstr /i "re2" lib_members.txt >nul
+          if errorlevel 1 exit /b 1
+          del crt_directives.txt lib_members.txt
+          echo Artifact verification passed - /MT CRT, OrtGetApiBase and re2 members present
 
       - name: Create Release
         uses: ncipollo/release-action@v1

@@ -172,66 +172,24 @@ if exist "%INSTALL_DIR%" (
 )
 
 REM -------------------------------------------------------------------
-REM 3. Collect static libs from the link tlog
-REM -------------------------------------------------------------------
-echo [BUILD] Step 3/6: Collecting static libs from link tlog
-
-set TLOG=%BUILD_DIR%\%CONFIG%\onnxruntime.dir\%CONFIG%\onnxruntime.tlog\link.read.1.tlog
-echo [BUILD] Looking for tlog: %TLOG%
-
-set libs=
-if exist "%TLOG%" (
-    echo [BUILD] Tlog found, parsing
-    for /f "delims=" %%L in ('type "%TLOG%"') do (
-        set LINE=%%L
-        set LINE=!LINE:^=!
-        if /i "!LINE:~-4!" == ".LIB" (
-            set LINE=!LINE:"=!
-            set libs=!libs! !LINE!
-        )
-    )
-    if "!libs!" == "" (
-        echo [BUILD] WARNING: No .lib files found in link tlog
-    ) else (
-        echo [BUILD] Found libs: !libs!
-    )
-) else (
-    echo [BUILD] WARNING: link tlog not found at %TLOG%
-)
-echo [BUILD] Step 3/6 complete.
-
-REM -------------------------------------------------------------------
-REM 4. Merge static libs with lib.exe (only if tlog had libs)
+REM 3. Copy ORT core libs from install dir into merge staging area
+REM    (cmake --install outputs onnxruntime_*.lib split static libs;
+REM     the old tlog-parsing approach never worked due to UTF-16 and
+REM     is removed - without this step the merged lib would lack
+REM     core symbols like OrtGetApiBase)
 REM -------------------------------------------------------------------
 if exist "%STATIC_INSTALL_DIR%\lib" (rem) else mkdir "%STATIC_INSTALL_DIR%\lib"
 
-if "!libs!" == "" (
-    echo [BUILD] Step 4/6: Skipping lib merge [no libs from tlog]
+echo [BUILD] Step 3/6: Copying ORT core libs from install dir
+
+if exist "%INSTALL_DIR%\lib\*.lib" (
+    xcopy "%INSTALL_DIR%\lib\*.lib" "%STATIC_INSTALL_DIR%\lib\" /y >nul
+    echo [BUILD]   Copied ORT core libs from %INSTALL_DIR%\lib:
+    dir /b "%INSTALL_DIR%\lib\*.lib" 2>nul
 ) else (
-    echo [BUILD] Step 4/6: Merging static libs
-    where lib.exe >nul 2>nul
-    if errorlevel 1 (
-        echo [BUILD] WARNING: lib.exe not found, copying libs individually
-        for %%L in (!libs!) do (
-            copy "%%L" "%STATIC_INSTALL_DIR%\lib\" >nul
-            if errorlevel 1 (
-                echo [BUILD] WARNING: Failed to copy %%L
-            )
-        )
-    ) else (
-        echo [BUILD] Merging with lib.exe
-        lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" !libs!
-        if errorlevel 1 (
-            echo [BUILD] WARNING: lib.exe failed to merge, copying libs individually
-            for %%L in (!libs!) do (
-                copy "%%L" "%STATIC_INSTALL_DIR%\lib\" >nul
-            )
-        ) else (
-            echo [BUILD] onnxruntime.lib created successfully
-        )
-    )
+    echo [BUILD] WARNING: no .lib files at %INSTALL_DIR%\lib - merged lib would lack ORT core symbols
 )
-echo [BUILD] Step 4/6 complete.
+echo [BUILD] Step 3/6 complete.
 
 REM -------------------------------------------------------------------
 REM 4b. Collect third-party libs from build tree
@@ -528,51 +486,56 @@ exit /b 1
 
 REM -------------------------------------------------------------------
 REM Subroutine: report MSVCRT found in onnxruntime.lib and exit with error
+REM Flat structure - no for loops, no delayed expansion, no nested blocks
 REM -------------------------------------------------------------------
 :report_msvcrt_found
-setlocal EnableDelayedExpansion
 echo [BUILD]   MSVCRT references found in onnxruntime.lib:
-set count=0
-set line=0
-for /f "usebackq delims=" %%a in ("%TEMP%\msvcrt_matches.txt") do (
-    set /a count+=1
-    if !line! lss 5 (
-        echo [BUILD]     %%a
-        set /a line+=1
-    )
-)
-echo [BUILD]   Count: !count! MSVCRT references
+findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt"
 echo [BUILD] ERROR: onnxruntime.lib contains MSVCRT references - /MD detected
 echo [BUILD]   This will cause LNK2038 mismatch with DittoOCR - expects /MT
 del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
-endlocal & exit /b 1
+exit /b 1
 
 REM -------------------------------------------------------------------
-REM Verify CRT subroutine (extracted to isolate from parser state pollution)
+REM Verify CRT subroutine
+REM Flat goto structure: no nested if/else blocks, no & chains, and all
+REM echo messages are free of unescaped parentheses - a ")" inside a
+REM parenthesized block prematurely closes it and causes the fatal
+REM "not was unexpected at this time." parse error.
 REM -------------------------------------------------------------------
 :verify_crt
 echo [BUILD] Step 4e/6: Verifying CRT in onnxruntime.lib
 
-if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
-    where dumpbin >nul 2>nul
-    if errorlevel 1 (
-        echo [BUILD] WARNING: dumpbin not found, skipping CRT verification
-    ) else (
-        dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
-        findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
-        if errorlevel 1 (
-            findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
-            if errorlevel 1 (
-                echo [BUILD] WARNING: LIBCMT (static CRT) not found in onnxruntime.lib
-            ) else (
-                echo [BUILD] OK: onnxruntime.lib uses static CRT (LIBCMT) - /MT confirmed
-            )
-            del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
-        ) else (
-            call :report_msvcrt_found & endlocal & exit /b 1
-        )
-    )
-) else (
-    echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
-)
+if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" goto verify_crt_have_lib
+echo [BUILD] WARNING: onnxruntime.lib not found, skipping CRT verification
+exit /b 0
+
+:verify_crt_have_lib
+where dumpbin >nul 2>nul
+if errorlevel 1 goto verify_crt_no_dumpbin
+
+dumpbin /directives "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" > "%TEMP%\onnx_crt_directives.txt"
+
+rem MSVCRT directive means dynamic CRT /MD - fatal for DittoOCR /MT link
+findstr /i "DEFAULTLIB:MSVCRT" "%TEMP%\onnx_crt_directives.txt" > "%TEMP%\msvcrt_matches.txt"
+if errorlevel 1 goto verify_crt_check_libcmt
+call :report_msvcrt_found
+exit /b 1
+
+:verify_crt_check_libcmt
+findstr /i "DEFAULTLIB:LIBCMT" "%TEMP%\onnx_crt_directives.txt" >nul
+if errorlevel 1 goto verify_crt_no_libcmt
+echo [BUILD] OK: onnxruntime.lib uses static CRT LIBCMT - /MT confirmed
+goto verify_crt_cleanup
+
+:verify_crt_no_libcmt
+echo [BUILD] WARNING: LIBCMT static CRT marker not found in onnxruntime.lib
+goto verify_crt_cleanup
+
+:verify_crt_cleanup
+del "%TEMP%\onnx_crt_directives.txt" "%TEMP%\msvcrt_matches.txt" 2>nul
+exit /b 0
+
+:verify_crt_no_dumpbin
+echo [BUILD] WARNING: dumpbin not found, skipping CRT verification
 exit /b 0
