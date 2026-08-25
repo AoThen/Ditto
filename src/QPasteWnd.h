@@ -88,7 +88,7 @@ public:
 
 
 typedef std::map < int, CMainTable > MainTypeMap;
-typedef std::map < int, CClipFormatQListCtrl > CF_DibTypeMap;
+typedef CLruCache < int, CClipFormatQListCtrl, 500 > CF_DibTypeMap;
 typedef std::map < int, char > CF_NoDibTypeMap;
 
 

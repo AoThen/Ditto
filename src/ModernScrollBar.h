@@ -43,7 +43,7 @@ public:
 	bool IsMouseOver() const { return m_isMouseOver; }
 	
 	// DPI awareness
-	void SetDPI(CDPI* pDPI) { m_pDPI = pDPI; }
+	void SetDPI(CDPI* pDPI);
 	
 	// Get orientation
 	ScrollBarOrientation GetOrientation() const { return m_orientation; }
@@ -85,6 +85,7 @@ private:
 	int m_scrollBarHoverWidth;
 	int m_cornerRadius;
 	int m_minThumbSize;  // Min thumb width or height depending on orientation
+	int m_throttleThreshold;  // Drag throttle threshold in pixels
 	
 	// State
 	bool m_isMouseOver;

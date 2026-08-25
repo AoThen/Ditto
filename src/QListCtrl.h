@@ -15,8 +15,85 @@
 #include "GdiImageDrawer.h"
 #include "DPI.h"
 #include <map>
+#include <list>
 #include <string>
 #include <utility>
+
+// LRU cache with fixed capacity - evicts least recently used entries when full
+template<typename Key, typename Value, int MaxSize = 500>
+class CLruCache
+{
+public:
+    using ListType = std::list<std::pair<const Key, Value>>;
+    using MapType = std::map<Key, typename ListType::iterator>;
+    using iterator = typename ListType::iterator;
+    using const_iterator = typename ListType::const_iterator;
+
+    iterator find(const Key& key)
+    {
+        auto it = m_map.find(key);
+        if (it == m_map.end())
+            return m_list.end();
+        m_list.splice(m_list.begin(), m_list, it->second);
+        return m_list.begin();
+    }
+
+    const_iterator find(const Key& key) const
+    {
+        auto it = m_map.find(key);
+        if (it == m_map.end())
+            return m_list.end();
+        return it->second;
+    }
+
+    iterator end() { return m_list.end(); }
+    const_iterator end() const { return m_list.end(); }
+
+    iterator begin() { return m_list.begin(); }
+    const_iterator begin() const { return m_list.begin(); }
+
+    Value& operator[](const Key& key)
+    {
+        auto it = m_map.find(key);
+        if (it != m_map.end())
+        {
+            m_list.splice(m_list.begin(), m_list, it->second);
+            return m_list.begin()->second;
+        }
+        m_list.push_front({key, Value()});
+        m_map[key] = m_list.begin();
+        EvictIfNeeded();
+        return m_list.begin()->second;
+    }
+
+    void erase(iterator it)
+    {
+        m_map.erase(it->first);
+        m_list.erase(it);
+    }
+
+    void clear()
+    {
+        m_list.clear();
+        m_map.clear();
+    }
+
+    size_t size() const { return m_list.size(); }
+
+private:
+    void EvictIfNeeded()
+    {
+        while (m_list.size() > MaxSize)
+        {
+            auto last = std::prev(m_list.end());
+            m_map.erase(last->first);
+            m_list.pop_back();
+        }
+    }
+
+    ListType m_list;
+    MapType m_map;
+};
 
 #define NM_SEARCH_ENTER_PRESSED		WM_USER+0x100
 #define NM_RIGHT					WM_USER+0x101
@@ -188,7 +265,7 @@ protected:
 	HFONT m_SmallFont;
 	CAccels	m_Accels;
 	CMapIDtoCF m_RTFData;
-	std::map<int, CString> m_rtfCache;
+	CLruCache<int, CString, 500> m_rtfCache;
 	CToolTipEx *m_pToolTip;
 	HWND m_toolTipHwnd;
 	CFont m_Font;
@@ -207,7 +284,7 @@ protected:
 	CString m_searchText;
 	CString m_pinyinQuery;
 	bool m_bPinyinSearch;
-	std::map<CString, std::pair<std::string, std::string>> m_pinyinCache;
+	CLruCache<CString, std::pair<std::string, std::string>, 500> m_pinyinCache;
 	BOOL m_showIfClipWasPasted;
 	CAccels *m_pToolTipActions;
 	CRichEditCtrlEx m_rtfFormater;

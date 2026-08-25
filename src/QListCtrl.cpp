@@ -1881,6 +1881,13 @@ CClipFormatQListCtrl* CQListCtrl::GetItem_CF_RTF_ClipFormat(int nItem)
 void CQListCtrl::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 {
 	CListCtrl::OnHScroll(nSBCode, nPos, pScrollBar);
+
+	// Notify parent to update modern scrollbar
+	CWnd* pParent = GetParent();
+	if (pParent && pParent->GetSafeHwnd())
+	{
+		pParent->PostMessage(NM_UPDATE_SCROLLBAR, TRUE, 0);
+	}
 }
 
 void CQListCtrl::DestroyAndCreateAccelerator(BOOL bCreate, CppSQLite3DB& db)

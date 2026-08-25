@@ -22,6 +22,7 @@ CModernScrollBar::CModernScrollBar()
 	, m_scrollBarHoverWidth(12)
 	, m_cornerRadius(4)
 	, m_minThumbSize(30)
+	, m_throttleThreshold(8)
 	, m_isMouseOver(false)
 	, m_isDragging(false)
 	, m_dragStartPos(0)
@@ -75,6 +76,12 @@ void CModernScrollBar::SetColors(COLORREF trackColor, COLORREF thumbColor, COLOR
 	
 	if (m_hWnd && IsWindowVisible())
 		Invalidate();
+}
+
+void CModernScrollBar::SetDPI(CDPI* pDPI)
+{
+	m_pDPI = pDPI;
+	m_throttleThreshold = pDPI ? pDPI->Scale(8) : 8;
 }
 
 void CModernScrollBar::UpdateScrollBar()
@@ -352,15 +359,14 @@ void CModernScrollBar::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (m_isDragging && m_pListCtrl)
 	{
-		if (m_orientation == ScrollBarOrientation::Vertical)
+		int delta = (m_orientation == ScrollBarOrientation::Vertical)
+			? point.y - m_dragStartPos
+			: point.x - m_dragStartPos;
+
+		// Throttle: only scroll when accumulated delta exceeds threshold
+		if (abs(delta) > m_throttleThreshold)
 		{
-			int deltaY = point.y - m_dragStartPos;
-			ScrollToPosition(m_dragStartScrollPos + deltaY);
-		}
-		else
-		{
-			int deltaX = point.x - m_dragStartPos;
-			ScrollToPosition(m_dragStartScrollPos + deltaX);
+			ScrollToPosition(m_dragStartScrollPos + delta);
 		}
 	}
 

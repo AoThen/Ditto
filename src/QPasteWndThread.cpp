@@ -256,43 +256,6 @@ void CQPasteWndThread::OnLoadItems(void *param)
     SetEvent(m_SearchingEvent);
 }
 
-void ReduceMapItems(CF_DibTypeMap &mapItem, CCriticalSection &critSection, CString mapName)
-{
-	ATL::CCritSecLock csLock(critSection.m_sect);
-
-	int maxSize = 50;
-	int reduceToSize = 30;
-
-	if (mapItem.size() > maxSize)
-	{
-		//create a vector so we can sort and keep the last x number of events
-		vector<INT64> counterArray;
-		for (CF_DibTypeMap::iterator iterDib = mapItem.begin(); iterDib != mapItem.end(); iterDib++)
-		{
-			counterArray.push_back(iterDib->second.m_counter);
-		}
-		std::sort(counterArray.begin(), counterArray.end());
-		counterArray.erase(counterArray.begin(), counterArray.end() - reduceToSize);
-
-		//remove the oldest x number if bitmaps
-		for (CF_DibTypeMap::iterator iterDib = mapItem.begin(); iterDib != mapItem.end();)
-		{
-			if (std::binary_search(counterArray.begin(), counterArray.end(), iterDib->second.m_counter) == false)
-			{
-				Log(StrF(_T("reduced size of %s cache, Id: %d, Row: %d"), mapName, iterDib->second.m_parentId, iterDib->second.m_clipRow));
-
-				mapItem.erase(iterDib++);
-			}
-			else
-			{
-				++iterDib;
-			}
-		}
-
-		Log(StrF(_T("reduced size of %s cache, count: %d"), mapName, mapItem.size()));
-	}
-}
-
 void CQPasteWndThread::OnLoadExtraData(void *param)
 {
     ResetEvent(m_SearchingEvent);
@@ -437,11 +400,9 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 
 		if (it->m_cfType == CF_DIB)
 		{
-			ReduceMapItems(pasteWnd->m_cf_dibCache, pasteWnd->m_CritSection, _T("image"));
 		}
 		else if (it->m_cfType == theApp.m_RTFFormat)
 		{
-			ReduceMapItems(pasteWnd->m_cf_rtfCache, pasteWnd->m_CritSection, _T("rtf"));
 		}
     }
 
