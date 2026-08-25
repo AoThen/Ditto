@@ -10,6 +10,7 @@
 #include "Path.h"
 #include "zlib.h"
 #include "shared\TextConvert.h"
+#include "shared\SecureStore.h"
 #include <vector>
 using namespace nsPath;
 
@@ -191,7 +192,28 @@ BOOL OpenDatabase(CString dbPath)
 
 
 		theApp.m_db.close();
-		theApp.m_db.open(dbPath);
+
+		// Local database encryption (sqlite3mc): off by default; when enabled,
+		// the key is generated once and DPAPI-protected in the registry.
+		CString csDbKey;
+		if (CGetSetOptions::GetLocalDbEncryptionEnabled())
+		{
+			csDbKey = CGetSetOptions::GetLocalDbEncryptionKey();
+			if (csDbKey.IsEmpty())
+			{
+				Log(_T("OpenDatabase - encryption enabled but no key found, opening unencrypted"));
+				OutputDebugString(_T("OpenDatabase - encryption enabled but no key found, opening unencrypted\n"));
+			}
+		}
+
+		if (csDbKey.IsEmpty())
+		{
+			theApp.m_db.open(dbPath);
+		}
+		else
+		{
+			theApp.m_db.openEncrypted(dbPath, csDbKey.GetString());
+		}
 
 		Log(_T("OpenDatabase - db.open OK"));
 		OutputDebugString(_T("OpenDatabase - db.open OK\n"));

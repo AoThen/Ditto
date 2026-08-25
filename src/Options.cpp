@@ -8,6 +8,7 @@
 #include "CP_Main.h"
 #include "ActionEnums.h"
 #include "shared\Tokenizer.h"
+#include "shared\SecureStore.h"
 #include <set>
 #include <Wincrypt.h>
 
@@ -1587,12 +1588,12 @@ BOOL CGetSetOptions::GetFastThumbnailMode()
 
 void CGetSetOptions::SetExtraNetworkPassword(CString csPassword)
 {
-	SetProfileString("NetworkExtraPassword", csPassword);
+	SetProfileString("NetworkExtraPassword", CSecureStore::Protect(csPassword));
 }
 
 CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 {
-	CString cs = GetProfileString("NetworkExtraPassword", "");
+	CString cs = CSecureStore::Unprotect(GetProfileString("NetworkExtraPassword", ""));
 
 	if(bFillArray)
 	{
@@ -1627,12 +1628,12 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 void CGetSetOptions::SetNetworkPassword(CString csPassword)
 {
 	m_csPassword = CTextConvert::UnicodeToUTF8(csPassword);
-	SetProfileString("NetworkStringPassword", csPassword);
+	SetProfileString("NetworkStringPassword", CSecureStore::Protect(csPassword));
 }
 
 CStringA CGetSetOptions::GetNetworkPassword()
 {
-	CString cs = GetProfileString("NetworkStringPassword", "LetMeIn");
+	CString cs = CSecureStore::Unprotect(GetProfileString("NetworkStringPassword", "LetMeIn"));
 	CStringA csReturn = CTextConvert::UnicodeToUTF8(cs);
 	return csReturn;
 }
@@ -1651,7 +1652,7 @@ void CGetSetOptions::SetCloudServerUrl(LPCTSTR lpszValue)
 
 CStringA CGetSetOptions::GetCloudDeviceToken()
 {
-	CString cs = GetProfileString("CloudDeviceToken", _T(""));
+	CString cs = CSecureStore::Unprotect(GetProfileString("CloudDeviceToken", _T("")));
 	CT2A utf8(cs, CP_UTF8);
 	return CStringA(utf8);
 }
@@ -1659,7 +1660,7 @@ CStringA CGetSetOptions::GetCloudDeviceToken()
 void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
 {
 	CString wide(lpszValue);
-	SetProfileString("CloudDeviceToken", wide);
+	SetProfileString("CloudDeviceToken", CSecureStore::Protect(wide));
 }
 
 CStringA CGetSetOptions::GetCloudDeviceId()
@@ -1732,12 +1733,56 @@ void CGetSetOptions::SetCloudDeviceName(LPCTSTR lpszValue)
 
 CString CGetSetOptions::GetCloudEncryptionKey()
 {
-	return GetProfileString("CloudEncryptionKey", _T(""));
+	return CSecureStore::Unprotect(GetProfileString("CloudEncryptionKey", _T("")));
 }
 
 void CGetSetOptions::SetCloudEncryptionKey(LPCTSTR lpszValue)
 {
-	SetProfileString("CloudEncryptionKey", lpszValue);
+	SetProfileString("CloudEncryptionKey", CSecureStore::Protect(lpszValue));
+}
+
+// ---------------------------------------------------------------------------
+// Local database encryption (sqlite3mc). Infrastructure only: the setting is
+// off by default and there is no automatic migration of an existing database.
+// ---------------------------------------------------------------------------
+
+BOOL CGetSetOptions::GetLocalDbEncryptionEnabled()
+{
+	return GetProfileLong("LocalDbEncryptionEnabled", FALSE);
+}
+
+void CGetSetOptions::SetLocalDbEncryptionEnabled(BOOL bEnabled)
+{
+	SetProfileLong("LocalDbEncryptionEnabled", bEnabled ? 1 : 0);
+}
+
+CString CGetSetOptions::GetLocalDbEncryptionKey()
+{
+	return CSecureStore::Unprotect(GetProfileString("LocalDbEncryptionKey", _T("")));
+}
+
+void CGetSetOptions::SetLocalDbEncryptionKey(LPCTSTR lpszValue)
+{
+	SetProfileString("LocalDbEncryptionKey", CSecureStore::Protect(lpszValue));
+}
+
+CString CGetSetOptions::GenerateNewLocalDbEncryptionKey()
+{
+	BYTE raw[32];
+	HCRYPTPROV hProv = NULL;
+	if (!CryptAcquireContext(&hProv, NULL, MS_DEF_PROV, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+		return _T("");
+	BOOL bOk = CryptGenRandom(hProv, sizeof(raw), raw);
+	CryptReleaseContext(hProv, 0);
+	if (!bOk)
+		return _T("");
+
+	CString csHex;
+	for (int i = 0; i < sizeof(raw); i++)
+		csHex.Format(_T("%s%02X"), csHex.GetString(), raw[i]);
+
+	SecureZeroMemory(raw, sizeof(raw));
+	return csHex;
 }
 
 CString CGetSetOptions::GetCloudEncryptionSalt()

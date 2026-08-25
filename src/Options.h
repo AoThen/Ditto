@@ -302,6 +302,13 @@ public:
 	static void     SetCloudEncryptionSalt(LPCTSTR lpszValue);
 	static BOOL     GetCloudSyncEncryptionEnabled();
 	static void     SetCloudSyncEncryptionEnabled(BOOL bValue);
+
+	// Local database encryption (sqlite3mc) - infrastructure, off by default
+	static BOOL     GetLocalDbEncryptionEnabled();
+	static void     SetLocalDbEncryptionEnabled(BOOL bEnabled);
+	static CString  GetLocalDbEncryptionKey();
+	static void     SetLocalDbEncryptionKey(LPCTSTR lpszValue);
+	static CString  GenerateNewLocalDbEncryptionKey();
 	static BOOL     GetCloudEncryptionNeedsRecovery();
 	static void     SetCloudEncryptionNeedsRecovery(BOOL bValue);
 	static __int64  GetCloudLastSyncTime();

@@ -37,7 +37,8 @@ static CString StdStringToCString(const std::string& str)
 BOOL CCloudKeyExport::ExportKey(
 	const CString& filePath,
 	const CString& username,
-	const CString& password)
+	const CString& password,
+	CString* psError)
 {
 	try
 	{
@@ -52,6 +53,7 @@ BOOL CCloudKeyExport::ExportKey(
 		if (keyBase64.IsEmpty() || saltBase64.IsEmpty())
 		{
 			OutputDebugStringA("[KeyExport] No encryption key found.\n");
+			if (psError) *psError = _T("No encryption key is configured.");
 			return FALSE;
 		}
 
@@ -60,6 +62,7 @@ BOOL CCloudKeyExport::ExportKey(
 		if (keyBytes.size() != 32)
 		{
 			OutputDebugStringA("[KeyExport] Invalid key size.\n");
+			if (psError) *psError = _T("Stored encryption key has an invalid size.");
 			return FALSE;
 		}
 
@@ -109,6 +112,7 @@ BOOL CCloudKeyExport::ExportKey(
 		if (!file.Open(filePath, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary))
 		{
 			OutputDebugString(_T("[KeyExport] Failed to open file for writing.\n"));
+			if (psError) *psError = _T("Cannot open the file for writing. Check the path and permissions.");
 			return FALSE;
 		}
 
@@ -123,11 +127,16 @@ BOOL CCloudKeyExport::ExportKey(
 		CString err;
 		err.Format(_T("[KeyExport] Export error: %hs"), e.what());
 		OutputDebugString(err);
+		if (psError)
+		{
+			psError->Format(_T("Export failed: %hs"), e.what());
+		}
 		return FALSE;
 	}
 	catch (...)
 	{
 		OutputDebugString(_T("[KeyExport] Export exception.\n"));
+		if (psError) *psError = _T("Export failed due to an unexpected error.");
 		return FALSE;
 	}
 }
@@ -138,7 +147,8 @@ BOOL CCloudKeyExport::ExportKey(
 BOOL CCloudKeyExport::ImportKey(
 	const CString& filePath,
 	const CString& password,
-	DittoKeyData& outKeyData)
+	DittoKeyData& outKeyData,
+	CString* psError)
 {
 	try
 	{
@@ -147,6 +157,7 @@ BOOL CCloudKeyExport::ImportKey(
 		if (!file.Open(filePath, CFile::modeRead | CFile::typeBinary))
 		{
 			OutputDebugString(_T("[KeyExport] Failed to open key file.\n"));
+			if (psError) *psError = _T("Cannot read the key file. Check the path and permissions.");
 			return FALSE;
 		}
 
@@ -155,6 +166,7 @@ BOOL CCloudKeyExport::ImportKey(
 		{
 			OutputDebugString(_T("[KeyExport] Key file too large.\n"));
 			file.Close();
+			if (psError) *psError = _T("The key file is too large and cannot be a valid key file.");
 			return FALSE;
 		}
 
@@ -171,6 +183,7 @@ BOOL CCloudKeyExport::ImportKey(
 		if (!keyJson.contains("version") || keyJson["version"].get<int>() != 1)
 		{
 			OutputDebugStringA("[KeyExport] Unsupported key file version.\n");
+			if (psError) *psError = _T("Unsupported key file version.");
 			return FALSE;
 		}
 
@@ -187,6 +200,7 @@ BOOL CCloudKeyExport::ImportKey(
 		if (encryptedPayload.size() < 12 + 16)
 		{
 			OutputDebugStringA("[KeyExport] Encrypted key too short.\n");
+			if (psError) *psError = _T("The key file data is truncated or corrupted.");
 			return FALSE;
 		}
 
@@ -206,6 +220,7 @@ BOOL CCloudKeyExport::ImportKey(
 		if (decryptedKey.empty())
 		{
 			OutputDebugStringA("[KeyExport] Decryption failed (wrong password?).\n");
+			if (psError) *psError = _T("Decryption failed. The password is most likely incorrect.");
 			return FALSE;
 		}
 
@@ -215,6 +230,7 @@ BOOL CCloudKeyExport::ImportKey(
 		if (expectedChecksum != actualChecksum)
 		{
 			OutputDebugStringA("[KeyExport] Checksum mismatch (key corrupted).\n");
+			if (psError) *psError = _T("Checksum mismatch: the key file is corrupted.");
 			return FALSE;
 		}
 

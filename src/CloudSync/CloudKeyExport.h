@@ -29,18 +29,22 @@ class CCloudKeyExport
 public:
 	// Export current encryption key to .dittokey file
 	// Requires the user's password to encrypt the key
+	// psError (optional) receives a human-readable failure reason
 	static BOOL ExportKey(
 		const CString& filePath,
 		const CString& username,
-		const CString& password
+		const CString& password,
+		CString* psError = nullptr
 	);
 
 	// Import key from .dittokey file
 	// Requires the user's password to decrypt the key
+	// psError (optional) receives a human-readable failure reason
 	static BOOL ImportKey(
 		const CString& filePath,
 		const CString& password,
-		DittoKeyData& outKeyData
+		DittoKeyData& outKeyData,
+		CString* psError = nullptr
 	);
 
 	// Initialize crypto from imported key data
