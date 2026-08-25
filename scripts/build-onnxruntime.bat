@@ -189,6 +189,15 @@ if exist "%INSTALL_DIR%\lib\*.lib" (
 ) else (
     echo [BUILD] WARNING: no .lib files at %INSTALL_DIR%\lib - merged lib would lack ORT core symbols
 )
+
+echo [BUILD] Step 3.5/6: Copying ORT headers from install dir
+
+if exist "%INSTALL_DIR%\include" (
+    xcopy "%INSTALL_DIR%\include" "%STATIC_INSTALL_DIR%\include\" /s /e /y /i >nul
+    echo [BUILD]   Copied headers from %INSTALL_DIR%\include
+) else (
+    echo [BUILD] ERROR: no include dir at %INSTALL_DIR%\include - consumers cannot compile
+)
 echo [BUILD] Step 3/6 complete.
 
 REM -------------------------------------------------------------------
