@@ -148,7 +148,7 @@ BOOL CFileSend::SendFile(CString csFile)
 			Info.m_cDesc[sizeof(Info.m_cDesc)-1] = 0;			
 
 			Info.m_lParameter1 = (long)file.GetLength();
-if(m_Send.SendCSendData(Info, MyEnums::DATA_START))
+			if(m_Send.SendCSendData(Info, MyEnums::DATA_START))
 			{
 				long lReadBytes = 0;
 				BOOL bError = FALSE;

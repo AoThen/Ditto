@@ -135,7 +135,7 @@ long CFileRecieve::RecieveFiles(SOCKET sock, CString csIP, CFileTransferProgress
 					lastWriteTime.dwLowDateTime = Info.m_lParameter1;
 					lastWriteTime.dwHighDateTime = Info.m_lParameter2;
 
-HANDLE filename = CreateFile(fileName, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+					HANDLE filename = CreateFile(fileName, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 					if (filename != INVALID_HANDLE_VALUE)
 					{
 						if (SetFileTime(filename, NULL, NULL, &lastWriteTime) == FALSE)
@@ -143,7 +143,6 @@ HANDLE filename = CreateFile(fileName, FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | 
 							LogSendRecieveInfo(StrF(_T("Failed to set file time for: %s"), fileName));
 						}
 						CloseHandle(filename);
-					}
 					}
 				}
 			}
