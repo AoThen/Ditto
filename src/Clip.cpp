@@ -1050,8 +1050,6 @@ HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
 				m_Desc += "\n";
 			}
 		}
-		
-		GlobalUnlock(m_Formats[nCF_HDROPIndex].m_hgData);
 	}
 	else
 	{
@@ -1063,7 +1061,7 @@ HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
 
 bool CClip::AddToDB(bool bCheckForDuplicates)
 {
-	bool bResult;
+	bool bResult = false;
 	try
 	{
 		m_Time = CTime::GetCurrentTime().GetTime();
@@ -2589,7 +2587,7 @@ int CClipList::AddToDB(bool bLatestOrder)
 	int savedCount = 0;
 	CClip* pClip;
 	POSITION pos;
-	bool bResult;
+	bool bResult = false;
 
 	INT_PTR remaining = GetCount();
 	pos = GetHeadPosition();

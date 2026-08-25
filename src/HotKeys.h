@@ -2,6 +2,9 @@
 
 #include "shared\ArrayEx.h"
 
+// Default hotkey value: Ctrl + ` (tilde)
+constexpr DWORD HOTKEY_DEFAULT_CTRL_TILDA = 704;
+
 class CHotKey
 {
 public:

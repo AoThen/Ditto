@@ -74,11 +74,17 @@ BOOL CProcessPaste::DoPaste()
 		ex->GetErrorMessage(szCause, 255);
 		m_lastErrorMessage.Format(_T("Paste exception: %s"), szCause);
 		Log(m_lastErrorMessage);
+
+		delete m_pOle;
+		m_pOle = NULL;
 	}
 	catch (...) 
 	{
 		m_lastErrorMessage = _T("Paste generic exception");
 		Log(m_lastErrorMessage);
+
+		delete m_pOle;
+		m_pOle = NULL;
 	}
 
 	// The Clipboard now owns the allocated memory

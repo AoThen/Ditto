@@ -42,7 +42,7 @@ END_MESSAGE_MAP()
 
 BOOL CImageViewer::Create(CWnd* pParent)
 {
-	BOOL bSuccess;
+	BOOL bSuccess = FALSE;
 
 	// Register window class
 	CString csClassName = AfxRegisterWndClass(CS_OWNDC | CS_HREDRAW | CS_VREDRAW,

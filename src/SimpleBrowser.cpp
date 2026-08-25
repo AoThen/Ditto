@@ -494,14 +494,12 @@ void SimpleBrowser::Print(LPCTSTR header,LPCTSTR footer)
 
 		hr = _Browser->ExecWB(OLECMDID_PRINT,OLECMDEXECOPT_DODEFAULT,&parameter,NULL);
 
-		// release SAFEARRAY
+		// release SAFEARRAY and BSTR variants
 
-		if (!SUCCEEDED(hr)) {
-			VariantClear(&header_variant);
-			VariantClear(&footer_variant);
-			if (parameter_array != NULL) {
-				SafeArrayDestroy(parameter_array);
-			}
+		VariantClear(&header_variant);
+		VariantClear(&footer_variant);
+		if (parameter_array != NULL) {
+			SafeArrayDestroy(parameter_array);
 		}
 
 	}

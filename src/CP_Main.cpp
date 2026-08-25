@@ -16,6 +16,7 @@
 #include "ShowTaskBarIcon.h"
 #include "ClipboardOCR.h"
 #include "NoDbFrameWnd.h"
+#include "CloudSync/CloudCrypto.h"
 #include <clocale>
 
 #ifdef _DEBUG
@@ -514,7 +515,7 @@ void CCP_MainApp::AfterMainCreate()
 	g_HotKeys.Init(m_MainhWnd);
 
 	// create hotkeys here.  They are automatically deleted on exit
-	m_pDittoHotKey = new CHotKey(CString("DittoHotKey"), 704); //704 is ctrl-tilda
+	m_pDittoHotKey = new CHotKey(CString("DittoHotKey"), HOTKEY_DEFAULT_CTRL_TILDA);
 	m_pDittoHotKey2 = new CHotKey(CString("DittoHotKey2"));
 	m_pDittoHotKey3 = new CHotKey(CString("DittoHotKey3"));
 
@@ -1024,6 +1025,10 @@ int CCP_MainApp::ExitInstance()
 	{
 		Log(_T("CloseHandle skipped (no mutex)"));
 	}
+
+	// Clear encryption key from memory before MFC cleanup
+	CCloudCrypto::Reset();
+	Log(_T("CCloudCrypto::Reset completed"));
 
 	// Let CWinApp::ExitInstance() handle OLE cleanup and MFC internal state cleanup.
 	// Previously skipped due to second-instance AfxOleInit() issues;

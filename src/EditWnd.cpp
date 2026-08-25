@@ -9,6 +9,13 @@
 #include "ProcessPaste.h"
 
 IMPLEMENT_DYNAMIC(CEditWnd, CWnd)
+
+constexpr int FONT_WEIGHT_NORMAL = FW_NORMAL;   // 400
+constexpr int FONT_OUT_PRECIS = OUT_STROKE_PRECIS;   // 3
+constexpr int FONT_CLIP_PRECIS = CLIP_STROKE_PRECIS; // 2
+constexpr int FONT_QUALITY = DRAFT_QUALITY;           // 1
+constexpr int FONT_PITCH_FAMILY = VARIABLE_PITCH | FF_SWISS; // 34
+
 CEditWnd::CEditWnd()
 {
 	m_lastSaveID = -1;
@@ -46,7 +53,7 @@ int CEditWnd::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	m_tabControl.Create(WS_CHILD|WS_VISIBLE|WS_TABSTOP|SCS_TOP, CRect(0, 0, 0, 0), this, 101);
 	
 	//m_font.CreatePointFont(m_dpi.Scale(90), _T("Arial Unicode MS"), this->GetDC());
-	m_font.CreateFont(-m_dpi.Scale(13), 0, 0, 0, 400, 0, 0, 0, DEFAULT_CHARSET, 3, 2, 1, 34, _T("Segoe UI"));
+	m_font.CreateFont(-m_dpi.Scale(13), 0, 0, 0, FONT_WEIGHT_NORMAL, 0, 0, 0, DEFAULT_CHARSET, FONT_OUT_PRECIS, FONT_CLIP_PRECIS, FONT_QUALITY, FONT_PITCH_FAMILY, _T("Segoe UI"));
 	m_updateDescriptionButton.Create(theApp.m_Language.GetString("Update_Desc", "Update clip description on save?"), WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX, CRect(0,0,0,0), this, 101);
 	m_updateDescriptionButton.SetFont(&m_font);
 

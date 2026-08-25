@@ -21,7 +21,7 @@ bool CDittoAddin::DoLoad(LPCTSTR lpszDllName, CDittoInfo DittoInfo)
 
 	if(lpszDllName)
 	{
-		_tcscpy(m_DllName, lpszDllName);
+		_tcscpy_s(m_DllName, MAX_PATH, lpszDllName);
 
 		m_hModule = ::LoadLibrary(lpszDllName);
 

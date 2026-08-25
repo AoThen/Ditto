@@ -25,7 +25,11 @@ std::mutex CCloudCrypto::s_aesMutex;
 void CCloudCrypto::Reset()
 {
 	std::lock_guard<std::mutex> lock(s_aesMutex);
-	m_aesKey.clear();
+	if (!m_aesKey.empty())
+	{
+		SecureZeroMemory(m_aesKey.data(), m_aesKey.size());
+		m_aesKey.clear();
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +260,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 
 	BCRYPT_ALG_HANDLE hAlg = nullptr;
 	BCRYPT_KEY_HANDLE hKey = nullptr;
-	BYTE pbKeyObject[4096]; // max key object buffer
+	std::vector<BYTE> pbKeyObject;
 	DWORD cbKeyObject = 0;
 	DWORD cbData = 0;
 
@@ -275,6 +279,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
+	pbKeyObject.resize(cbKeyObject);
 
 	// Set chaining mode to GCM
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
@@ -288,7 +293,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmEncrypt(
 	}
 
 	// Generate key from raw bytes
-	status = BCryptGenerateSymmetricKey(hAlg, &hKey, pbKeyObject, cbKeyObject,
+	status = BCryptGenerateSymmetricKey(hAlg, &hKey, pbKeyObject.data(), (ULONG)pbKeyObject.size(),
 		const_cast<PUCHAR>(key.data()), static_cast<ULONG>(key.size()), 0);
 	if (!BCRYPT_SUCCESS(status) || hKey == nullptr)
 	{
@@ -356,7 +361,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 {
 	BCRYPT_ALG_HANDLE hAlg = nullptr;
 	BCRYPT_KEY_HANDLE hKey = nullptr;
-	BYTE pbKeyObject[4096];
+	std::vector<BYTE> pbKeyObject;
 	DWORD cbKeyObject = 0;
 	DWORD cbData = 0;
 
@@ -374,6 +379,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 		return std::vector<BYTE>();
 	}
+	pbKeyObject.resize(cbKeyObject);
 
 	status = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE,
 		reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(BCRYPT_CHAIN_MODE_GCM)),
@@ -385,7 +391,7 @@ std::vector<BYTE> CCloudCrypto::AesGcmDecrypt(
 		return std::vector<BYTE>();
 	}
 
-	status = BCryptGenerateSymmetricKey(hAlg, &hKey, pbKeyObject, cbKeyObject,
+	status = BCryptGenerateSymmetricKey(hAlg, &hKey, pbKeyObject.data(), (ULONG)pbKeyObject.size(),
 		const_cast<PUCHAR>(key.data()), static_cast<ULONG>(key.size()), 0);
 	if (!BCRYPT_SUCCESS(status) || hKey == nullptr)
 	{
@@ -480,7 +486,7 @@ std::vector<BYTE> CCloudCrypto::PBKDF2(
 // ---------------------------------------------------------------------------
 // HmacSha256: RFC 2104
 // ---------------------------------------------------------------------------
-std::vector<BYTE> CCloudCrypto::HmacSha256(
+[[deprecated]] std::vector<BYTE> CCloudCrypto::HmacSha256(
 	const std::vector<BYTE>& key,
 	const std::vector<BYTE>& message)
 {

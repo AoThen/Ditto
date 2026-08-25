@@ -50,6 +50,7 @@ public:
 		int dkLen
 	);
 
+	[[deprecated("Use PBKDF2 or CNG BCryptHash instead")]]
 	static std::vector<BYTE> HmacSha256(
 		const std::vector<BYTE>& key,
 		const std::vector<BYTE>& message

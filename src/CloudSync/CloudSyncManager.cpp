@@ -15,6 +15,10 @@ using json = nlohmann::json;
 
 const int CCloudSyncManager::CLOUD_PUSH_BATCH_SIZE = 200;
 
+// FILETIME epoch is January 1, 1601. Unix epoch is January 1, 1970.
+// Offset = 369 years * 365.25 days * 86400 seconds * 10000000 100-ns intervals
+constexpr ULONGLONG FILETIME_EPOCH_OFFSET = 116444736000000000ULL;
+
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
 {
@@ -1359,7 +1363,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				SYSTEMTIME st;
 				FILETIME ft;
 				ULARGE_INTEGER uli;
-				uli.QuadPart = ((ULONGLONG)sinceTime * 10000000ULL) + 116444736000000000ULL;
+				uli.QuadPart = ((ULONGLONG)sinceTime * 10000000ULL) + FILETIME_EPOCH_OFFSET;
 				ft.dwLowDateTime = uli.LowPart;
 				ft.dwHighDateTime = uli.HighPart;
 				FileTimeToSystemTime(&ft, &st);
@@ -1906,7 +1910,7 @@ void CCloudSyncManager::PullChanges()
 					ULARGE_INTEGER uli;
 					uli.LowPart = ft.dwLowDateTime;
 					uli.HighPart = ft.dwHighDateTime;
-					newSyncTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+					newSyncTime = static_cast<time_t>((uli.QuadPart - FILETIME_EPOCH_OFFSET) / 10000000ULL);
 				}
 			}
 			else if (dataNode->contains("sync_time"))
@@ -1922,7 +1926,7 @@ void CCloudSyncManager::PullChanges()
 					ULARGE_INTEGER uli;
 					uli.LowPart = ft.dwLowDateTime;
 					uli.HighPart = ft.dwHighDateTime;
-					newSyncTime = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+					newSyncTime = static_cast<time_t>((uli.QuadPart - FILETIME_EPOCH_OFFSET) / 10000000ULL);
 				}
 			}
 
@@ -2343,7 +2347,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 					ULARGE_INTEGER uli;
 					uli.LowPart = ft.dwLowDateTime;
 					uli.HighPart = ft.dwHighDateTime;
-					remoteUpdatedAt = static_cast<time_t>((uli.QuadPart - 116444736000000000ULL) / 10000000ULL);
+					remoteUpdatedAt = static_cast<time_t>((uli.QuadPart - FILETIME_EPOCH_OFFSET) / 10000000ULL);
 				}
 			}
 		}
@@ -2718,7 +2722,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 						{
 							if (ansiText.m_psz)
 							{
-								strcpy(pData, ansiText.m_psz);
+								strcpy_s(pData, GlobalSize(hGlobal), ansiText.m_psz);
 							}
 							else
 							{
@@ -2770,7 +2774,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 						{
 							if (ansiText.m_psz)
 							{
-								strcpy(pData, ansiText.m_psz);
+								strcpy_s(pData, GlobalSize(hGlobal), ansiText.m_psz);
 							}
 							else
 							{
@@ -3237,10 +3241,10 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 	{
 		// Collect all groups first (under DB lock), then release lock before HTTP calls
 		struct GroupInfo {
-			int localId;
+			int localId = 0;
 			CString name;
 			CString desc;
-			int localParentId;
+			int localParentId = 0;
 			std::string remoteId;
 			std::string parentRemoteId;
 		};
