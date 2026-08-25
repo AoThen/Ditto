@@ -41,7 +41,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build (${{ matrix.config }} x64)
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
 
       - name: Build OCR dependencies and models
         shell: cmd

@@ -1,0 +1,9 @@
+{
+  "name": "ditto-clipboard",
+  "version-string": "1.0.0",
+  "homepage": "https://github.com/AoThen/Ditto",
+  "description": "Ditto clipboard manager (C++/MFC client)",
+  "dependencies": [
+    "openssl"
+  ]
+}

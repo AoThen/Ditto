@@ -133,7 +133,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build (Release x64)
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
 
   # ── Windows Client Tests (C++/Google Test) ────────────────
   client-test-windows:
@@ -157,7 +157,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build CloudSync_Test (Release x64)
-        run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
 
       - name: Run tests
         run: CloudSync_Test\x64\Release\CloudSync_Test.exe
@@ -189,7 +189,7 @@ jobs:
         run: nuget restore CP_Main_10.sln
 
       - name: Build (${{ matrix.config }} x64) and dependencies
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64
+        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
 
       - name: Build OCR dependencies and models
         shell: cmd

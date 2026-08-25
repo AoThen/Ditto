@@ -176,14 +176,17 @@
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
-    <VcpkgEnableManifest>false</VcpkgEnableManifest>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgTriplet Condition="'$(Platform)'=='Win32'">x86-windows-static-md</VcpkgTriplet>
+    <VcpkgTriplet Condition="'$(Platform)'=='x64'">x64-windows-static-md</VcpkgTriplet>
+    <VcpkgTriplet Condition="'$(Platform)'=='ARM64'">arm64-windows-static-md</VcpkgTriplet>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;WIN32;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     <StringPooling>true</StringPooling>
     <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -201,7 +204,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>release\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -244,7 +247,7 @@
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     <StringPooling>true</StringPooling>
     <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -262,7 +265,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>release64\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -303,7 +306,7 @@
       <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    <PreprocessorDefinitions>WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;WIN64;NDEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;SQLITE_OMIT_FTS3;SQLITE_OMIT_FTS4;SQLITE_OMIT_FTS5;SQLITE_OMIT_RTREE;SQLITE_OMIT_JSON;SQLITE_OMIT_SESSION;SQLITE_OMIT_PREUPDATE_HOOK;SQLITE_OMIT_SNAPSHOT;SQLITE_OMIT_AUTOMATIC_INDEX;SQLITE_OMIT_COMPILEOPTION_DIAGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     <StringPooling>true</StringPooling>
     <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -321,7 +324,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(Platform)\$(Configuration)\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -361,7 +364,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;WIN32;_DEBUG;_WINDOWS;_MBCS;AFTER_98;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -378,7 +381,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>debug\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -420,7 +423,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -437,7 +440,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>debug64\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -478,7 +481,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>$(ProjectDir)src\shared;$(ProjectDir)src\zlib;$(ProjectDir)src\CloudSync;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CPPHTTPLIB_OPENSSL_SUPPORT;_DEBUG;_WINDOWS;_MBCS;UNICODE;HAVE_CONFIG_H;_WINSOCK_DEPRECATED_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SQLITE_THREADSAFE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -495,7 +498,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;libssl.lib;libcrypto.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;Winmm.lib;Pdh.lib;Version.lib;Shlwapi.lib;bcrypt.lib;crypt32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>$(Platform)\$(Configuration)\Ditto.exe</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
