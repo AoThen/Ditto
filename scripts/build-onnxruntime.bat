@@ -324,16 +324,15 @@ if exist "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" (
     del "%STATIC_INSTALL_DIR%\lib\onnxruntime.lib"
 )
 
-REM Write lib paths to a response file and use @file syntax (no quotes
-REM around the filename - MSVC lib.exe rejects @"quoted_path").
-REM The file is created in the current directory (onnxsrc) to avoid any
-REM TEMP path issues with spaces or trailing backslashes.
-set "RSP_FILE=ort_merge.rsp"
-type nul > "%RSP_FILE%"
+REM Write lib paths to a response file at ort_merge.rsp in the current
+REM directory (onnxsrc).  Hardcode the filename to avoid any variable
+REM expansion issues across the for /f do block boundary.
+REM The @file syntax requires no quotes around the filename.
+type nul > ort_merge.rsp
 set LIB_COUNT=0
 for /f "delims=" %%f in ('dir /b "%STATIC_INSTALL_DIR%\lib\*.lib" 2^>nul') do (
     if /i not "%%f"=="onnxruntime.lib" (
-        >> "%RSP_FILE%" echo "%STATIC_INSTALL_DIR%\lib\%%f"
+        >> ort_merge.rsp echo "%STATIC_INSTALL_DIR%\lib\%%f"
         set /a LIB_COUNT+=1
     )
 )
@@ -342,7 +341,7 @@ if "!LIB_COUNT!"=="0" (
     echo [BUILD] WARNING: No libs found in install-static/lib
 ) else (
     echo [BUILD] Merging !LIB_COUNT! libs via response file:
-    type "%RSP_FILE%"
+    type ort_merge.rsp
     lib.exe /OUT:"%STATIC_INSTALL_DIR%\lib\onnxruntime.lib" @ort_merge.rsp
     if errorlevel 1 (
         echo [BUILD] WARNING: Final merge failed
@@ -350,7 +349,7 @@ if "!LIB_COUNT!"=="0" (
         echo [BUILD] onnxruntime.lib created successfully - all deps included
     )
 )
-del "%RSP_FILE%" 2>nul
+del ort_merge.rsp 2>nul
 echo [BUILD] Step 4c/6 complete.
 
 REM -------------------------------------------------------------------
