@@ -8,6 +8,10 @@
 #include <string>
 #include <cstring>
 
+// HmacSha256 is deprecated in favor of PBKDF2/CNG, but these tests intentionally
+// cover its retained implementation as regression protection - silence C4996.
+#pragma warning(disable : 4996)
+
 // ============================================================================
 // Helper: Convert std::string to CStringA
 // ============================================================================
