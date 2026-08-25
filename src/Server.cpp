@@ -19,6 +19,11 @@ static char THIS_FILE[]=__FILE__;
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
+// Cap on concurrent client threads: each accepted connection spawns a thread;
+// an unbounded accept loop lets a LAN flood exhaust memory/handles.
+static const LONG MAX_CLIENT_THREADS = 16;
+static volatile LONG g_nActiveClientThreads = 0;
+
 UINT  MTServerThread(LPVOID pParam)
 {		
 	static bool bRunning = false;
@@ -86,7 +91,28 @@ UINT  MTServerThread(LPVOID pParam)
 
 		if (socket != INVALID_SOCKET)
 		{
-			AfxBeginThread(ClientThread, (LPVOID)pParams);
+			// Reject the connection when the thread cap is reached
+			if (InterlockedIncrement(&g_nActiveClientThreads) > MAX_CLIENT_THREADS)
+			{
+				LogSendRecieveInfo("MTServerThread: client thread cap reached, closing incoming connection");
+				InterlockedDecrement(&g_nActiveClientThreads);
+				closesocket(socket);
+				delete pParams;
+				Sleep(100);
+				continue;
+			}
+
+			CWinThread* pThread = AfxBeginThread(ClientThread, (LPVOID)pParams);
+			if (pThread == NULL)
+			{
+				// Thread creation failed: ClientThread will never run,
+				// so release the slot here to avoid a permanent leak.
+				LogSendRecieveInfo("MTServerThread: AfxBeginThread failed, releasing client thread slot");
+				InterlockedDecrement(&g_nActiveClientThreads);
+				closesocket(socket);
+				delete pParams;
+				Sleep(100);
+			}
 		}
 		else
 		{
@@ -114,6 +140,9 @@ UINT  ClientThread(LPVOID pParam)
 	Server.RunThread(pParams);
 
 	delete pParams;
+
+	// Mirror of the InterlockedIncrement in MTServerThread's accept loop
+	InterlockedDecrement(&g_nActiveClientThreads);
 
 	LogSendRecieveInfo("*********************End of ClientThread*********************");
 	

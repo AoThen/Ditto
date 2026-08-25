@@ -46,6 +46,12 @@ long CFileRecieve::RecieveFiles(SOCKET sock, CString csIP, CFileTransferProgress
 		{
 		case MyEnums::START:
 			nNumFiles = Info.m_lParameter1;
+			if(nNumFiles < 0)
+			{
+				LogSendRecieveInfo(StrF(_T("Start receiving files: invalid file count %d, aborting"), nNumFiles));
+				bBreak = true;
+				break;
+			}
 			if(m_pProgress != NULL)
 			{
 				m_pProgress->SetNumFiles(nNumFiles);
@@ -239,7 +245,10 @@ long CFileRecieve::RecieveFileData(ULONG lFileSize, CString csFileName, CString 
 
 		if(lBytesRead >= lFileSize)
 		{
-			m_pProgress->SetSingleFilePos(100);
+			if(m_pProgress != NULL)
+			{
+				m_pProgress->SetSingleFilePos(100);
+			}
 			bRet = TRUE;
 			break;
 		}

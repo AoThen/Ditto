@@ -191,7 +191,8 @@ private:
         }
 
         // Derive AES-256 key from hash
-        if (!CryptDeriveKey(m_hProv, CALG_AES_256, hHash, CRYPT_EXPORTABLE, &m_hKey))
+        // (no CRYPT_EXPORTABLE: the key never leaves the process)
+        if (!CryptDeriveKey(m_hProv, CALG_AES_256, hHash, 0, &m_hKey))
         {
             CryptDestroyHash(hHash);
             Cleanup();

@@ -25,14 +25,16 @@ CRecieveSocket::~CRecieveSocket()
 }
 
 void CRecieveSocket::FreeDecryptedData()
-{ 
-	if(CGetSetOptions::m_csPassword == "")
-	{
-		delete [] m_pDataReturnedFromDecrypt;
-	}
-	else
+{
+	// Decrypted buffers are always allocated by CEncryption (LocalAlloc);
+	// freeing them with delete[] would corrupt the heap (mismatched allocator).
+	if (m_pEncryptor != NULL)
 	{
 		m_pEncryptor->FreeBuffer(m_pDataReturnedFromDecrypt);
+	}
+	else if (m_pDataReturnedFromDecrypt != NULL)
+	{
+		::LocalFree(m_pDataReturnedFromDecrypt);
 	}
 	m_pDataReturnedFromDecrypt = NULL;
 }
@@ -47,6 +49,18 @@ LPVOID CRecieveSocket::ReceiveEncryptedData(long lInSize, long &lOutSize)
 
 	if(m_pDataReturnedFromDecrypt)
 		FreeDecryptedData();
+
+	// The size comes from the network (CSendInfo::m_lParameter1) and must be
+	// validated before allocating memory: reject absurd/negative/undersized
+	// values to prevent crashes or remote memory-exhaustion DoS.
+	// Minimum valid payload = IV (16 bytes); Decrypt() rejects anything smaller.
+	const long MIN_ENCRYPTED_CHUNK = 16;
+	const long MAX_ENCRYPTED_CHUNK = 256 * 1024 * 1024; // 256 MB
+	if(lInSize < MIN_ENCRYPTED_CHUNK || lInSize > MAX_ENCRYPTED_CHUNK)
+	{
+		LogSendRecieveInfo(StrF(_T("ReceiveEncryptedData:: Invalid size %d, rejecting"), lInSize));
+		return NULL;
+	}
 
 	char *pInput = new char[lInSize];
 
