@@ -1689,15 +1689,17 @@ LRESULT CMainFrame::OnOcrCompleted(WPARAM wParam, LPARAM lParam)
 				combined += *pOcrText;
 			}
 
-			combined.Replace(L"'", L"''");
-
 			auto py = CPinyinConvert::TextToPinyin(combined);
 			CStringW pinyinW = py.first;
 			CStringW abbrW = py.second;
 
-			theApp.m_db.execDMLEx(
-				_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s' WHERE lID = %d"),
-				combined, pinyinW, abbrW, clipId);
+			CppSQLite3Statement stmtUpdate = theApp.m_db.compileStatement(
+				_T("UPDATE Main SET mText = ?, pinyin = ?, pinyinAbbr = ? WHERE lID = ?"));
+			stmtUpdate.bind(1, combined);
+			stmtUpdate.bind(2, pinyinW);
+			stmtUpdate.bind(3, abbrW);
+			stmtUpdate.bind(4, clipId);
+			stmtUpdate.execDML();
 
 			Log(StrF(_T("OCR: OnOcrCompleted updated clip %d, mText len=%d"), clipId, combined.GetLength()));
 

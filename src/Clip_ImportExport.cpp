@@ -33,8 +33,10 @@ bool CClip_ImportExport::ExportToSqliteDB(CppSQLite3DB& db)
 	try
 	{
 		//Add to Main Table
-		m_Desc.Replace(_T("'"), _T("''"));
-		db.execDMLEx(_T("insert into Main values(NULL, %d, '%s');"), CURRENT_EXPORT_VERSION, m_Desc);
+		CppSQLite3Statement stmtMain = db.compileStatement(_T("insert into Main values(NULL, ?, ?);"));
+		stmtMain.bind(1, CURRENT_EXPORT_VERSION);
+		stmtMain.bind(2, m_Desc);
+		stmtMain.execDML();
 		long lId = (long)db.lastRowId();
 
 		//Add to Data table

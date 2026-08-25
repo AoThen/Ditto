@@ -146,22 +146,35 @@ bool CClipIDs::AggregateData(IClipAggregator &Aggregator, UINT cfType, BOOL bRev
 			}
 
 			CString sqlCF_HDROP = _T("");
+			bool bAddHDrop = false;
 			if (textOnly &&
 				cfType == CF_UNICODETEXT || cfType == CF_TEXT)
 			{
-				sqlCF_HDROP.Format(_T("OR Data.strClipBoardFormat = '%s'"), GetFormatName(CF_HDROP));
+				sqlCF_HDROP = _T(" OR Data.strClipBoardFormat = ?");
+				bAddHDrop = true;
 			}
 
-			csSQL.Format(_T("SELECT * FROM Data ")
-				_T("INNER JOIN Main ON Main.lID = Data.lParentID ")
-				_T("WHERE (Data.strClipBoardFormat = '%s'")
-				_T(" %s) ")
-				_T("AND Main.lID = %d"),
-				GetFormatName(cfType),
-				sqlCF_HDROP,
-				ElementAt(nIndex));
+			csSQL = _T("SELECT * FROM Data ");
+			csSQL += _T("INNER JOIN Main ON Main.lID = Data.lParentID ");
+			csSQL += _T("WHERE (Data.strClipBoardFormat = ?");
+			csSQL += sqlCF_HDROP;
+			csSQL += _T(") AND Main.lID = ?");
 
-			CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(csSQL);
+			CString csFormatName = GetFormatName(cfType);
+			stmt.bind(1, csFormatName);
+			if (bAddHDrop)
+			{
+				CString csHDropName = GetFormatName(CF_HDROP);
+				stmt.bind(2, csHDropName);
+				stmt.bind(3, ElementAt(nIndex));
+			}
+			else
+			{
+				stmt.bind(2, ElementAt(nIndex));
+			}
+			CppSQLite3Query q = stmt.execQuery();
+			stmt.finalize();
 
 			if(q.eof() == false)
 			{

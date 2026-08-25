@@ -614,21 +614,17 @@ long NewGroupID(int parentID, CString text, CString description)
 	
 	try
 	{
-		//sqlite doesn't like single quotes ' replace them with double ''
 		if(text.IsEmpty())
-			text = time.Format("NewGroup %y/%m/%d %H:%M:%S");
-		text.Replace(_T("'"), _T("''"));
+			text = time.Format(_T("NewGroup %y/%m/%d %H:%M:%S"));
 
-		CString cs;
-
-		cs.Format(_T("insert into Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(%d, '%s', '%s', %d, 1, %d, -(2147483647), -(2147483647));"),
-							(int)time.GetTime(),
-							text,
-							description,
-							(int)time.GetTime(),
-							parentID);
-
-		theApp.m_db.execDML(cs);
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+			_T("insert into Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder) values(?, ?, ?, ?, 1, ?, -(2147483647), -(2147483647));"));
+		stmt.bind(1, (int)time.GetTime());
+		stmt.bind(2, text);
+		stmt.bind(3, description);
+		stmt.bind(4, (int)time.GetTime());
+		stmt.bind(5, parentID);
+		stmt.execDML();
 
 		lID = (long)theApp.m_db.lastRowId();
 	}

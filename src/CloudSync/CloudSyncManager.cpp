@@ -3392,14 +3392,15 @@ void CCloudSyncManager::PullGroups()
 					if (localId <= 0)
 					{
 						CString csName = CString(CA2W(name.c_str(), CP_UTF8));
-						csName.Replace(_T("'"), _T("''"));
 						CString csDesc = CString(CA2W(description.c_str(), CP_UTF8));
 
-						CString csSQL;
-						csSQL.Format(_T("INSERT INTO Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder, lDontSync) ")
-							_T("VALUES (%lld, '%s', '%s', 0, 1, -1, -(2147483647), -(2147483647), 0)"),
-							CTime::GetCurrentTime().GetTime(), csName, csDesc);
-						theApp.m_db.execDML(csSQL);
+						CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+							_T("INSERT INTO Main (lDate, mText, m_Description, lDontAutoDelete, bIsGroup, lParentID, stickyClipOrder, stickyClipGroupOrder, lDontSync) ")
+							_T("VALUES (?, ?, ?, 0, 1, -1, -(2147483647), -(2147483647), 0)"));
+						stmt.bind(1, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+						stmt.bind(2, csName);
+						stmt.bind(3, csDesc);
+						stmt.execDML();
 
 						localId = (int)theApp.m_db.lastRowId();
 
@@ -3409,14 +3410,15 @@ void CCloudSyncManager::PullGroups()
 					else
 					{
 						CString csName = CString(CA2W(name.c_str(), CP_UTF8));
-						csName.Replace(_T("'"), _T("''"));
 						CString csDesc = CString(CA2W(description.c_str(), CP_UTF8));
-						csDesc.Replace(_T("'"), _T("''"));
 
-						CString csSQL;
-						csSQL.Format(_T("UPDATE Main SET mText = '%s', m_Description = '%s', lModifiedDate = %lld WHERE lID = %d"),
-							csName, csDesc, CTime::GetCurrentTime().GetTime(), localId);
-						theApp.m_db.execDML(csSQL);
+						CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+							_T("UPDATE Main SET mText = ?, m_Description = ?, lModifiedDate = ? WHERE lID = ?"));
+						stmt.bind(1, csName);
+						stmt.bind(2, csDesc);
+						stmt.bind(3, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+						stmt.bind(4, localId);
+						stmt.execDML();
 					}
 				}
 

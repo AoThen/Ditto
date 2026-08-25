@@ -1184,7 +1184,11 @@ BOOL CCP_MainApp::GetClipData(long parentId, CClipFormat &Clip)
 
 	try
 	{
-		CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT ooData FROM Data WHERE lParentID = %d AND strClipboardFormat = '%s'"), parentId, GetFormatName(Clip.m_cfType));
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(_T("SELECT ooData FROM Data WHERE lParentID = ? AND strClipboardFormat = ?"));
+		stmt.bind(1, (int)parentId);
+		CString csFormatName = GetFormatName(Clip.m_cfType);
+		stmt.bind(2, csFormatName);
+		CppSQLite3Query q = stmt.execQuery();
 		if(q.eof() == false)
 		{
 			int nDataLen = 0;

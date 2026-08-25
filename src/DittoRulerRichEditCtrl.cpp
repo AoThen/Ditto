@@ -79,25 +79,43 @@ long CDittoRulerRichEditCtrl::GetTypeFlags(long lID)
 	try
 	{
 		CLIPFORMAT cfType = CF_TEXT;
-		CppSQLite3Query q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Data WHERE lParentID = %d AND strClipboardFormat = '%s'"), lID, GetFormatName(cfType));
+		CString csFormatName;
+		CppSQLite3Statement stmt;
+
+		stmt = theApp.m_db.compileStatement(_T("SELECT lID FROM Data WHERE lParentID = ? AND strClipboardFormat = ?"));
+		csFormatName = GetFormatName(cfType);
+		stmt.bind(1, (int)lID);
+		stmt.bind(2, csFormatName);
+		CppSQLite3Query q = stmt.execQuery();
 		if(q.eof() == false)
 		{
 			lRet |= stCF_TEXT;
 		}
+		stmt.finalize();
 
 		cfType = CF_UNICODETEXT;
-		q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Data WHERE lParentID = %d AND strClipboardFormat = '%s'"), lID, GetFormatName(cfType));
+		stmt = theApp.m_db.compileStatement(_T("SELECT lID FROM Data WHERE lParentID = ? AND strClipboardFormat = ?"));
+		csFormatName = GetFormatName(cfType);
+		stmt.bind(1, (int)lID);
+		stmt.bind(2, csFormatName);
+		q = stmt.execQuery();
 		if(q.eof() == false)
 		{
 			lRet |= stCF_UNICODETEXT;
 		}
+		stmt.finalize();
 
 		cfType = RegisterClipboardFormat(_T("Rich Text Format"));
-		q = theApp.m_db.execQueryEx(_T("SELECT lID FROM Data WHERE lParentID = %d AND strClipboardFormat = '%s'"), lID, GetFormatName(cfType));
+		stmt = theApp.m_db.compileStatement(_T("SELECT lID FROM Data WHERE lParentID = ? AND strClipboardFormat = ?"));
+		csFormatName = GetFormatName(cfType);
+		stmt.bind(1, (int)lID);
+		stmt.bind(2, csFormatName);
+		q = stmt.execQuery();
 		if(q.eof() == false)
 		{
 			lRet |= stRTF;
 		}
+		stmt.finalize();
 	}
 	CATCH_SQLITE_EXCEPTION
 

@@ -558,12 +558,16 @@ CppSQLite3Query CppSQLite3Statement::execQuery()
 	if (nRet == SQLITE_DONE)
 	{
 		// no rows
-		return CppSQLite3Query(mpDB, mpVM, true/*eof*/, false);
+		sqlite3_stmt* pVM = mpVM;
+		mpVM = 0; // ownership transfers to the query (only one owner allowed)
+		return CppSQLite3Query(mpDB, pVM, true/*eof*/, true);
 	}
 	else if (nRet == SQLITE_ROW)
 	{
 		// at least 1 row
-		return CppSQLite3Query(mpDB, mpVM, false/*eof*/, false);
+		sqlite3_stmt* pVM = mpVM;
+		mpVM = 0; // ownership transfers to the query (only one owner allowed)
+		return CppSQLite3Query(mpDB, pVM, false/*eof*/, true);
 	}
 	else
 	{
@@ -597,6 +601,20 @@ void CppSQLite3Statement::bind(int nParam, const int nValue)
 	{
 		throw CppSQLite3Exception(nRes,
 								_T("Error binding int param"),
+								DONT_DELETE_MSG);
+	}
+}
+
+
+void CppSQLite3Statement::bind(int nParam, const sqlite3_int64 nValue)
+{
+	checkVM();
+	int nRes = sqlite3_bind_int64(mpVM, nParam, nValue);
+
+	if (nRes != SQLITE_OK)
+	{
+		throw CppSQLite3Exception(nRes,
+								_T("Error binding int64 param"),
 								DONT_DELETE_MSG);
 	}
 }
@@ -781,6 +799,22 @@ bool CppSQLite3DB::DBEncrypted()
 	}
 
 	return encrypted;
+}
+
+void CppSQLite3DB::openEncrypted(const TCHAR* szFile, const TCHAR* szKey)
+{
+	open(szFile);
+
+	if (szKey != NULL && szKey[0] != _T('\0'))
+	{
+		CT2A keyUtf8(szKey, CP_UTF8);
+		int nLen = (int)strlen(keyUtf8);
+		if (nLen > 0 && sqlite3_key(mpDB, keyUtf8, nLen) != SQLITE_OK)
+		{
+			SQLITE3_ERRMSG(mpDB);
+			throw CppSQLite3Exception(SQLITE_ERROR, (TCHAR*)szError, DONT_DELETE_MSG);
+		}
+	}
 }
 
 void CppSQLite3DB::open(const TCHAR* szFile)

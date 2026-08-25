@@ -59,12 +59,13 @@ void CGroupName::OnOK()
 				CString origDesc = q.getStringField(_T("m_Description"));
 				if (m_csName != origName || m_csDescription != origDesc)
 				{
-					CString escName = m_csName;
-					CString escDesc = m_csDescription;
-					escName.Replace(_T("'"), _T("''"));
-					escDesc.Replace(_T("'"), _T("''"));
-					theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', m_Description = '%s', lModifiedDate = %lld WHERE lID = %d"),
-						escName, escDesc, CTime::GetCurrentTime().GetTime(), m_groupId);
+					CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+						_T("UPDATE Main SET mText = ?, m_Description = ?, lModifiedDate = ? WHERE lID = ?"));
+					stmt.bind(1, m_csName);
+					stmt.bind(2, m_csDescription);
+					stmt.bind(3, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+					stmt.bind(4, m_groupId);
+					stmt.execDML();
 				}
 			}
 		}

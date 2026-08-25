@@ -66,9 +66,11 @@ BOOL COptionsTypes::OnApply()
 			int nCount = m_List.GetCount();
 			for(int i = 0; i < nCount; i++)
 			{
-				m_List.GetText(i, csText);
+			m_List.GetText(i, csText);
 
-				theApp.m_db.execDMLEx(_T("INSERT INTO Types VALUES(NULL, '%s');"), csText);
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(_T("INSERT INTO Types VALUES(NULL, ?);"));
+			stmt.bind(1, csText);
+			stmt.execDML();
 			}
 		}
 		CATCH_SQLITE_EXCEPTION

@@ -150,6 +150,7 @@ public:
 
     void bind(int nParam, const TCHAR* szValue);
     void bind(int nParam, const int nValue);
+    void bind(int nParam, const sqlite3_int64 nValue);
     void bind(int nParam, const double dwValue);
     void bind(int nParam, const unsigned char* blobValue, int nLen);
     void bindNull(int nParam);
@@ -177,6 +178,10 @@ public:
     virtual ~CppSQLite3DB();
 
     void open(const TCHAR* szFile);
+
+    // Opens the database and applies an encryption key (sqlite3mc).
+    // Only meaningful when compiled against the sqlite3mc amalgamation.
+    void openEncrypted(const TCHAR* szFile, const TCHAR* szKey);
 
     void SetRegexCaseInsensitive(bool insensitive);
 

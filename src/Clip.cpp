@@ -1336,40 +1336,35 @@ bool CClip::AddToMainTable()
 {
 	try
 	{
-		m_Desc.Replace(_T("'"), _T("''"));
-		m_csQuickPaste.Replace(_T("'"), _T("''"));
-		m_description.Replace(_T("'"), _T("''"));
-
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
 
-		CString cs;
-		cs.Format(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate, pinyin, pinyinAbbr) ")
-						_T("values(%lld, '%s', %d, %d, %d, %d, %d, '%s', %f, %f, %d, %lld, %f, %f, %d, %d, %d, '%s', %lld, '%s', '%s');"),
-							m_Time.GetTime(),
-							m_Desc,
-							m_shortCut,
-							m_dontAutoDelete,
-							m_CRC,
-							m_bIsGroup,
-							m_parentId,
-							m_csQuickPaste,
-							m_clipOrder,
-							m_clipGroupOrder,
-							m_globalShortCut,
-							CTime::GetCurrentTime().GetTime(),
-							m_stickyClipOrder,
-							m_stickyClipGroupOrder,
-							m_moveToGroupShortCut,
-							m_globalMoveToGroupShortCut,
-							m_dontSync,
-							m_description,
-							m_Time.GetTime(),
-							pinyinW,
-							abbrW);
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(_T("INSERT into Main (lDate, mText, lShortCut, lDontAutoDelete, CRC, bIsGroup, lParentID, QuickPasteText, clipOrder, clipGroupOrder, globalShortCut, lastPasteDate, stickyClipOrder, stickyClipGroupOrder, MoveToGroupShortCut, GlobalMoveToGroupShortCut, lDontSync, m_Description, lModifiedDate, pinyin, pinyinAbbr) ")
+						_T("values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"));
+		stmt.bind(1, (sqlite3_int64)m_Time.GetTime());
+		stmt.bind(2, m_Desc);
+		stmt.bind(3, m_shortCut);
+		stmt.bind(4, m_dontAutoDelete);
+		stmt.bind(5, (int)m_CRC);
+		stmt.bind(6, m_bIsGroup);
+		stmt.bind(7, m_parentId);
+		stmt.bind(8, m_csQuickPaste);
+		stmt.bind(9, m_clipOrder);
+		stmt.bind(10, m_clipGroupOrder);
+		stmt.bind(11, m_globalShortCut);
+		stmt.bind(12, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+		stmt.bind(13, m_stickyClipOrder);
+		stmt.bind(14, m_stickyClipGroupOrder);
+		stmt.bind(15, m_moveToGroupShortCut);
+		stmt.bind(16, m_globalMoveToGroupShortCut);
+		stmt.bind(17, m_dontSync);
+		stmt.bind(18, m_description);
+		stmt.bind(19, (sqlite3_int64)m_Time.GetTime());
+		stmt.bind(20, pinyinW);
+		stmt.bind(21, abbrW);
 
-		theApp.m_db.execDML(cs);
+		stmt.execDML();
 
 		m_id = (long)theApp.m_db.lastRowId();
 
@@ -1390,50 +1385,48 @@ bool CClip::ModifyMainTable()
 	bool bRet = false;
 	try
 	{
-		m_Desc.Replace(_T("'"), _T("''"));
-		m_csQuickPaste.Replace(_T("'"), _T("''"));
-		m_description.Replace(_T("'"), _T("''"));
-
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET lShortCut = %d, ")
-			_T("mText = '%s', ")
-			_T("lParentID = %d, ")
-			_T("lDontAutoDelete = %d, ")
-			_T("QuickPasteText = '%s', ")
-			_T("clipOrder = %f, ")
-			_T("clipGroupOrder = %f, ")
-			_T("globalShortCut = %d, ")
-			_T("stickyClipOrder = %f, ")
-			_T("stickyClipGroupOrder = %f, ")
-			_T("MoveToGroupShortCut = %d, ")
-			_T("GlobalMoveToGroupShortCut = %d, ")
-			_T("lDontSync = %d, ")
-			_T("m_Description = '%s', ")
-			_T("pinyin = '%s', ")
-			_T("pinyinAbbr = '%s', ")
-			_T("lModifiedDate = %lld ")
-			_T("WHERE lID = %d;"),
-			m_shortCut,
-			m_Desc,
-			m_parentId,
-			m_dontAutoDelete,
-			m_csQuickPaste,
-			m_clipOrder,
-			m_clipGroupOrder,
-			m_globalShortCut,
-			m_stickyClipOrder,
-			m_stickyClipGroupOrder,
-			m_moveToGroupShortCut,
-			m_globalMoveToGroupShortCut,
-			m_dontSync,
-			m_description,
-			pinyinW,
-			abbrW,
-			CTime::GetCurrentTime().GetTime(),  // Update modification time
-			m_id);
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(_T("UPDATE Main SET lShortCut = ?, ")
+			_T("mText = ?, ")
+			_T("lParentID = ?, ")
+			_T("lDontAutoDelete = ?, ")
+			_T("QuickPasteText = ?, ")
+			_T("clipOrder = ?, ")
+			_T("clipGroupOrder = ?, ")
+			_T("globalShortCut = ?, ")
+			_T("stickyClipOrder = ?, ")
+			_T("stickyClipGroupOrder = ?, ")
+			_T("MoveToGroupShortCut = ?, ")
+			_T("GlobalMoveToGroupShortCut = ?, ")
+			_T("lDontSync = ?, ")
+			_T("m_Description = ?, ")
+			_T("pinyin = ?, ")
+			_T("pinyinAbbr = ?, ")
+			_T("lModifiedDate = ? ")
+			_T("WHERE lID = ?;"));
+		stmt.bind(1, m_shortCut);
+		stmt.bind(2, m_Desc);
+		stmt.bind(3, m_parentId);
+		stmt.bind(4, m_dontAutoDelete);
+		stmt.bind(5, m_csQuickPaste);
+		stmt.bind(6, m_clipOrder);
+		stmt.bind(7, m_clipGroupOrder);
+		stmt.bind(8, m_globalShortCut);
+		stmt.bind(9, m_stickyClipOrder);
+		stmt.bind(10, m_stickyClipGroupOrder);
+		stmt.bind(11, m_moveToGroupShortCut);
+		stmt.bind(12, m_globalMoveToGroupShortCut);
+		stmt.bind(13, m_dontSync);
+		stmt.bind(14, m_description);
+		stmt.bind(15, pinyinW);
+		stmt.bind(16, abbrW);
+		stmt.bind(17, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+		stmt.bind(18, m_id);
+
+		stmt.execDML();
 
 		bRet = true;
 
@@ -1449,19 +1442,19 @@ bool CClip::ModifyDescription()
 	bool bRet = false;
 	try
 	{
-		m_Desc.Replace(_T("'"), _T("''"));
-
 		auto py = CPinyinConvert::TextToPinyin(m_Desc);
 		CString pinyinW = py.first;
 		CString abbrW = py.second;
 
-		theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld ")
-			_T("WHERE lID = %d;"),
-			m_Desc,
-			pinyinW,
-			abbrW,
-			CTime::GetCurrentTime().GetTime(),  // Update modification time
-			m_id);
+		CppSQLite3Statement stmt = theApp.m_db.compileStatement(_T("UPDATE Main SET mText = ?, pinyin = ?, pinyinAbbr = ?, lModifiedDate = ? ")
+			_T("WHERE lID = ?;"));
+		stmt.bind(1, m_Desc);
+		stmt.bind(2, pinyinW);
+		stmt.bind(3, abbrW);
+		stmt.bind(4, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+		stmt.bind(5, m_id);
+
+		stmt.execDML();
 
 		bRet = true;
 
@@ -2550,13 +2543,17 @@ bool CClip::SaveFromEditWnd(BOOL bUpdateDesc)
 
 		if (bUpdateDesc)
 		{
-			m_Desc.Replace(_T("'"), _T("''"));
-
 			auto py = CPinyinConvert::TextToPinyin(m_Desc);
 			CString pinyinW = py.first;
 			CString abbrW = py.second;
 
-			theApp.m_db.execDMLEx(_T("UPDATE Main SET mText = '%s', pinyin = '%s', pinyinAbbr = '%s', lModifiedDate = %lld WHERE lID = %d"), m_Desc, pinyinW, abbrW, CTime::GetCurrentTime().GetTime(), m_id);
+			CppSQLite3Statement stmtDesc = theApp.m_db.compileStatement(_T("UPDATE Main SET mText = ?, pinyin = ?, pinyinAbbr = ?, lModifiedDate = ? WHERE lID = ?"));
+			stmtDesc.bind(1, m_Desc);
+			stmtDesc.bind(2, pinyinW);
+			stmtDesc.bind(3, abbrW);
+			stmtDesc.bind(4, (sqlite3_int64)CTime::GetCurrentTime().GetTime());
+			stmtDesc.bind(5, m_id);
+			stmtDesc.execDML();
 		}
 
 		bRet = true;
