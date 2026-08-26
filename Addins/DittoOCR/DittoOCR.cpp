@@ -1,4 +1,5 @@
 #define OCRDLL_EXPORTS
+#define OCR_DEBUG
 #ifdef OCR_DEBUG
 #define _CRT_SECURE_NO_WARNINGS
 #endif
