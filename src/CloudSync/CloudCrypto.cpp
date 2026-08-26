@@ -455,7 +455,9 @@ std::vector<BYTE> CCloudCrypto::PBKDF2(
 	int iterations,
 	int dkLen)
 {
-	if (password.empty() || salt.empty() || iterations <= 0 || dkLen <= 0)
+	// RFC 8018 allows an empty password input; only the other parameters
+	// are invalid when empty (restores semantics lost in 73563f2, see eed1904).
+	if (salt.empty() || iterations <= 0 || dkLen <= 0)
 		return std::vector<BYTE>();
 
 	// Use the built-in CNG PBKDF2 implementation (PBKDF2-HMAC-SHA256).

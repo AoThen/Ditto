@@ -410,18 +410,17 @@ TEST_F(CloudEncryption_ClipData, DecryptWhenReady)
 	EXPECT_EQ(plaintext, decrypted);
 }
 
-TEST_F(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsAsIs)
+TEST_F(CloudEncryption_ClipData, DecryptWhenNotReady_ReturnsEmpty)
 {
 	// Don't initialize crypto
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(FALSE);
 
 	// Use ACTUAL CCloudEncryption::DecryptClipData() wrapper method
-	// When not ready, it should return data as-is (fallback for unencrypted data)
+	// When not ready, it returns empty (7d1cec1: never fall back to raw data)
 	CStringA encryptedData("some-data");
 	CStringA decrypted = CCloudEncryption::DecryptClipData(encryptedData);
-	
-	// Should return as-is when not ready (fallback behavior)
-	EXPECT_EQ(decrypted, encryptedData);
+
+	EXPECT_TRUE(decrypted.IsEmpty());
 }
 
 TEST_F(CloudEncryption_ClipData, DecryptTamperedData_ReturnsEmpty)
@@ -512,9 +511,10 @@ TEST_F(CloudEncryption_ClipData, DecryptInvalidBase64_ReturnsEmpty)
 
 TEST_F(CloudEncryption_Ready, ReadyWhenEnabled)
 {
-	// Enable encryption
+	// Enable encryption and provide key material (7d1cec1 requires both)
 	CGetSetOptions::SetCloudSyncEncryptionEnabled(TRUE);
-	
+	CGetSetOptions::SetCloudEncryptionKey(_T("unit-test-key-material"));
+
 	// Should be ready
 	BOOL ready = CCloudEncryption::IsEncryptionReady();
 	EXPECT_TRUE(ready);
