@@ -37,6 +37,9 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
+      - name: Setup vcpkg MSBuild integration
+        run: C:\vcpkg\vcpkg.exe integrate install
+
       - name: Restore NuGet packages
         run: nuget restore CP_Main_10.sln
 
