@@ -28,11 +28,11 @@ REM 1. 下载 ONNX Runtime（如果不存在）
 if not exist "%DEPS_DIR%\%ONNX_DIR%\windows-x64" (
     echo Downloading ONNX Runtime v%ONNX_VER%...
     if not exist "%DEPS_DIR%" mkdir "%DEPS_DIR%"
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/onnxruntime-%ONNX_VER%/onnxruntime-static-windows-x64-%ONNX_VER%.7z' -OutFile '%TEMP%\onnx.7z'"
-    7z t "%TEMP%\onnx.7z" >nul
+    REM Download + integrity test with up to 3 attempts (flaky CDN truncation)
+    powershell -Command "$ProgressPreference='SilentlyContinue'; $u='https://github.com/AoThen/Ditto/releases/download/onnxruntime-%ONNX_VER%/onnxruntime-static-windows-x64-%ONNX_VER%.7z'; $o='%TEMP%\onnx.7z'; foreach($i in 1..3){ try { Invoke-WebRequest -Uri $u -OutFile $o -ErrorAction Stop; & 7z t $o *> $null; if ($LASTEXITCODE -eq 0) { exit 0 } } catch { }; Remove-Item $o -ErrorAction SilentlyContinue; Start-Sleep -Seconds 5 }; exit 1"
     if errorlevel 1 (
-        echo ONNX Runtime archive is corrupted, aborting
-        del "%TEMP%\onnx.7z"
+        echo ONNX Runtime download failed integrity check after 3 attempts, aborting
+        del "%TEMP%\onnx.7z" 2>nul
         exit /b 1
     )
     REM 解压到临时目录，再移动到 windows-x64，兼容不同版本归档的目录结构
@@ -85,11 +85,10 @@ if not exist "%DEPS_DIR%\%ONNX_DIR%\windows-x64" (
 REM 2. 下载 OpenCV（如果不存在）
 if not exist "%DEPS_DIR%\%OPENCV_DIR%\windows-x64" (
     echo Downloading OpenCV v%OPENCV_VER%...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/AoThen/Ditto/releases/download/opencv-%OPENCV_VER%/opencv-static-windows-x64-%OPENCV_VER%.7z' -OutFile '%TEMP%\opencv.7z'"
-    7z t "%TEMP%\opencv.7z" >nul
+    powershell -Command "$ProgressPreference='SilentlyContinue'; $u='https://github.com/AoThen/Ditto/releases/download/opencv-%OPENCV_VER%/opencv-static-windows-x64-%OPENCV_VER%.7z'; $o='%TEMP%\opencv.7z'; foreach($i in 1..3){ try { Invoke-WebRequest -Uri $u -OutFile $o -ErrorAction Stop; & 7z t $o *> $null; if ($LASTEXITCODE -eq 0) { exit 0 } } catch { }; Remove-Item $o -ErrorAction SilentlyContinue; Start-Sleep -Seconds 5 }; exit 1"
     if errorlevel 1 (
-        echo OpenCV archive is corrupted, aborting
-        del "%TEMP%\opencv.7z"
+        echo OpenCV download failed integrity check after 3 attempts, aborting
+        del "%TEMP%\opencv.7z" 2>nul
         exit /b 1
     )
     7z x "%TEMP%\opencv.7z" -o"%DEPS_DIR%\%OPENCV_DIR%" -y
