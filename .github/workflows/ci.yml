@@ -240,7 +240,7 @@ jobs:
             Addins\DittoOCR\ocr-deps\**\*.log
           retention-days: 7
 
-      - name: Locate Debug CRT directory
+      - name: Locate Debug CRT directories
         shell: cmd
         run: |
           for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VS_PATH=%%i
@@ -249,12 +249,18 @@ jobs:
             exit /b 0
           )
           for /d %%d in ("%VS_PATH%\VC\Redist\MSVC\14.*") do set DEBUG_CRT_DIR=%%d\debug_nonredist\x64\Microsoft.VC143.DebugCRT
+          for /d %%d in ("%VS_PATH%\VC\Redist\MSVC\14.*") do set DEBUG_MFC_DIR=%%d\debug_nonredist\x64\Microsoft.VC143.DebugMFC
+          for /d %%d in ("%ProgramFiles(x86)%\Windows Kits\10\bin\10.*") do set UCRT_DEBUG_DIR=%%d\x64\ucrt
           if not exist "%DEBUG_CRT_DIR%" (
             echo WARNING: Debug CRT directory not found at %DEBUG_CRT_DIR%
             exit /b 0
           )
           echo Found Debug CRT: %DEBUG_CRT_DIR%
+          echo Found Debug MFC: %DEBUG_MFC_DIR%
+          echo Found ucrtbased: %UCRT_DEBUG_DIR%
           echo DEBUG_CRT_DIR=%DEBUG_CRT_DIR%>> %GITHUB_ENV%
+          echo DEBUG_MFC_DIR=%DEBUG_MFC_DIR%>> %GITHUB_ENV%
+          echo UCRT_DEBUG_DIR=%UCRT_DEBUG_DIR%>> %GITHUB_ENV%
 
       - name: Package portable zip
         shell: cmd
@@ -274,11 +280,13 @@ jobs:
           xcopy /s /e /i Addins\DittoOCR\models DittoPortable\Addins\DittoOCR\models\
           if "%RUNTIME_SUFFIX%"=="d" (
             if defined DEBUG_CRT_DIR (
-              copy "%DEBUG_CRT_DIR%\vcruntime140.dll" DittoPortable\vcruntime140d.dll
-              copy "%DEBUG_CRT_DIR%\vcruntime140_1.dll" DittoPortable\vcruntime140_1d.dll
-              copy "%DEBUG_CRT_DIR%\msvcp140.dll" DittoPortable\msvcp140d.dll
-              copy "%DEBUG_CRT_DIR%\mfc140u.dll" DittoPortable\mfc140ud.dll
-              copy "%DEBUG_CRT_DIR%\ucrtbased.dll" DittoPortable\ucrtbased.dll
+              rem Debug redist DLLs carry the "d" suffix and MFC/UCRT live in
+              rem their own directories (DebugMFC / Windows Kits ucrt).
+              copy "%DEBUG_CRT_DIR%\vcruntime140d.dll" DittoPortable\
+              copy "%DEBUG_CRT_DIR%\vcruntime140_1d.dll" DittoPortable\
+              copy "%DEBUG_CRT_DIR%\msvcp140d.dll" DittoPortable\
+              if defined DEBUG_MFC_DIR copy "%DEBUG_MFC_DIR%\mfc140ud.dll" DittoPortable\
+              if defined UCRT_DEBUG_DIR copy "%UCRT_DEBUG_DIR%\ucrtbased.dll" DittoPortable\
             ) else (
               copy "%WINDIR%\System32\vcruntime140d.dll" DittoPortable\
               copy "%WINDIR%\System32\vcruntime140_1d.dll" DittoPortable\
