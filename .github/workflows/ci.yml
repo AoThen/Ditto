@@ -254,7 +254,7 @@ jobs:
             exit /b 0
           )
           echo Found Debug CRT: %DEBUG_CRT_DIR%
-          echo DEBUG_CRT_DIR=%DEBUG_CRT_DIR% >> %GITHUB_ENV%
+          echo DEBUG_CRT_DIR=%DEBUG_CRT_DIR%>> %GITHUB_ENV%
 
       - name: Package portable zip
         shell: cmd
