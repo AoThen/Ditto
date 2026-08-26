@@ -176,6 +176,11 @@ jobs:
       fail-fast: false
     name: Windows Client Portable ZIP (${{ matrix.config }})
     runs-on: windows-2022
+    # Workflow-level concurrency would make the two matrix jobs cancel
+    # each other (same group); scope it per matrix leg instead.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-portable-${{ matrix.config }}
+      cancel-in-progress: false
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
