@@ -404,8 +404,10 @@ func (s *ClipService) DeleteClip(userID uint, clipID, deviceID string) error {
 	})
 }
 
-// BatchMarkDontSync marks clips as dont-sync, clears their formats
-func (s *ClipService) BatchMarkDontSync(userID uint, clipIDs []string) (int64, error) {
+// BatchMarkDontSync marks clips as dont-sync, clears their formats.
+// deviceID records the device that marked them so other devices (whose pull
+// filters by `device_id != mine`) learn about the change.
+func (s *ClipService) BatchMarkDontSync(userID uint, clipIDs []string, deviceID string) (int64, error) {
 	var marked int64
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		// Verify ownership
@@ -422,8 +424,13 @@ func (s *ClipService) BatchMarkDontSync(userID uint, clipIDs []string) (int64, e
 			return err
 		}
 
-		// Set dont_sync=true
-		result := tx.Model(&model.Clip{}).Where("id IN ? AND user_id = ?", clipIDs, userID).Update("dont_sync", true)
+		// Set dont_sync=true and update last-writer device + timestamp
+		result := tx.Model(&model.Clip{}).Where("id IN ? AND user_id = ?", clipIDs, userID).
+			Updates(map[string]interface{}{
+				"dont_sync":  true,
+				"device_id":  deviceID,
+				"updated_at": time.Now(),
+			})
 		if result.Error != nil {
 			return result.Error
 		}
@@ -470,6 +477,7 @@ type SyncRequest struct {
 	DeviceID  string         `json:"device_id"`
 	PushClips []PushClipItem `json:"push_clips"`
 	Limit     int            `json:"limit"` // P9 FIX: Max clips to pull (default 1000, max 5000)
+	Force     bool           `json:"force"` // Force push: skip dedup/CRC/LWW, local content wins
 }
 
 const (
@@ -585,23 +593,13 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			}
 			chunk := allPrepared[start:end]
 
-			// Calculate this batch's new bytes for quota check inside transaction
-			var batchNewBytes int64
-			for _, p := range chunk {
-				for _, f := range p.formats {
-					batchNewBytes += int64(len(f.Data))
-				}
-			}
-
 			err := database.DB.Transaction(func(tx *gorm.DB) error {
-				// Check storage quota inside transaction to prevent TOCTOU
+				// Storage quota baseline inside transaction to prevent TOCTOU.
+				// The actual net-growth check runs after the push loop (see below).
 				var currentBytes int64
 				if err := tx.Raw("SELECT COALESCE(SUM(LENGTH(data)),0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ?)", userID).Scan(&currentBytes).Error; err != nil {
 					return err
 				}
-			if currentBytes+batchNewBytes >= s.storageQuotaBytes {
-				return fmt.Errorf("sync: storage quota exceeded (max %dMB)", s.storageQuotaBytes/(1024*1024))
-			}
 
 				// Collect CRCs for dedup within this batch
 				crcSet := make(map[int64]struct{})
@@ -634,6 +632,32 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				for _, p := range chunk {
 					chunkIDs = append(chunkIDs, p.item.ID)
 				}
+
+				// Existing formats per clip for quota net-growth accounting:
+				// formats replaced by a content update count only by their delta.
+				oldBytesByClip := make(map[string]int64)
+				var oldRows []struct {
+					ClipID string `gorm:"column:clip_id"`
+					Bytes  int64  `gorm:"column:bytes"`
+				}
+				if err := tx.Raw("SELECT clip_id, SUM(LENGTH(data)) AS bytes FROM clip_formats WHERE clip_id IN ? GROUP BY clip_id", chunkIDs).Scan(&oldRows).Error; err != nil {
+					return err
+				}
+				for _, r := range oldRows {
+					oldBytesByClip[r.ClipID] = r.Bytes
+				}
+				// netNewBytes accumulates the actual storage growth this batch will
+				// cause: only formats that will really be inserted are counted, and
+				// formats replaced by a content update subtract their old size.
+				// Skipped clips (dedup/CRC/same-content) contribute nothing.
+				var netNewBytes int64
+				formatsBytes := func(fmts []preparedFormat) int64 {
+					var n int64
+					for _, f := range fmts {
+						n += int64(len(f.Data))
+					}
+					return n
+				}
 				var existingClips []model.Clip
 				if err := tx.Unscoped().Where("id IN ? AND user_id = ?", chunkIDs, userID).Find(&existingClips).Error; err != nil {
 					return err
@@ -654,7 +678,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					// not skipped. The dedup key for CRC=0 degrades to "userID:clipID",
 					// which would falsely skip re-pushes of the same clip within 5 minutes.
 					existing, exists := existingMap[pc.ID]
-					if !exists || !existing.DeletedAt.Valid {
+					if !req.Force && (!exists || !existing.DeletedAt.Valid) {
 						if isDeduped(dedupKey(userID, pc.ID, pc.CRC)) {
 							skippedCount++
 							continue
@@ -673,6 +697,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						).Error; err != nil {
 							return err
 						}
+						netNewBytes += formatsBytes(p.formats)
 
 						for _, pf := range p.formats {
 							batchFormats = append(batchFormats, model.ClipFormat{
@@ -698,7 +723,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					if !exists {
 						// CRC-based de-duplication for new clips — skip if same CRC already exists
 						crcKey := fmt.Sprintf("%d", pc.CRC)
-						if pc.CRC != 0 {
+						if !req.Force && pc.CRC != 0 {
 							if _, exists := existingCRCs[crcKey]; exists {
 								skippedCount++
 								continue
@@ -728,6 +753,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						if pc.CRC != 0 {
 							existingCRCs[crcKey] = clip.ID
 						}
+						netNewBytes += formatsBytes(p.formats)
 
 						for _, pf := range p.formats {
 							batchFormats = append(batchFormats, model.ClipFormat{
@@ -747,7 +773,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						pushedCount++
-					} else if !syncTime.After(existing.UpdatedAt) {
+					} else if !req.Force && !syncTime.After(existing.UpdatedAt) {
 						// LWW: push is older or equal -> loser, keep as conflict copy
 						conflictID := fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID)
 						conflictClip := model.Clip{
@@ -767,6 +793,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						if err := tx.Create(&conflictClip).Error; err != nil {
 							return err
 						}
+						netNewBytes += formatsBytes(p.formats)
 
 						for _, pf := range p.formats {
 							batchFormats = append(batchFormats, model.ClipFormat{
@@ -782,7 +809,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					} else {
 						// LWW: push is strictly newer -> winner
 						if pc.CRC != existing.CRC {
-							// Content changed: update with server time
+							// Content changed: update with server time. device_id is updated to the
+							// last writer so `device_id != mine` pulls return clips edited
+							// on other devices while hiding this device's own writes.
+							netNewBytes += formatsBytes(p.formats) - oldBytesByClip[existing.ID]
 							if err := tx.Model(&existing).Updates(map[string]interface{}{
 								"description":      pc.Description,
 								"pinyin":           utils.ConvertToPinyin(pc.Description),
@@ -791,6 +821,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								"short_cut":        pc.ShortCut,
 								"clip_order":       pc.ClipOrder,
 								"clip_group_order": pc.ClipGroupOrder,
+								"device_id":        req.DeviceID,
 								"updated_at":       syncTime,
 							}).Error; err != nil {
 								return err
@@ -825,6 +856,12 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						pushedCount++
 					}
+				}
+
+				// Quota check on net growth: only real insertions count, and replaced
+				// formats are subtracted, so force uploads of unchanged clips pass.
+				if currentBytes+netNewBytes >= s.storageQuotaBytes {
+					return fmt.Errorf("sync: storage quota exceeded (max %dMB)", s.storageQuotaBytes/(1024*1024))
 				}
 
 				// Batch insert all accumulated formats
@@ -869,6 +906,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	var clips []model.Clip
+	// P0 FIX: device_id tracks the LAST writer (see the winner-update branch in
+	// the push step). Pulling `device_id != mine` therefore correctly hides this
+	// device's own writes while still returning edits made on other devices —
+	// e.g. an edit made by device B on a clip originally created by device A.
 	query := database.DB.Where("user_id = ? AND is_conflict_copy = ? AND updated_at > ? AND device_id != ?",
 		userID, false, req.Since, req.DeviceID).Order("updated_at DESC").Limit(pullLimit + 1)
 
@@ -933,11 +974,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	// Query soft-deleted clips since 'since' timestamp (for deletion sync).
-	// FIX: Do NOT filter by device_id. The clip row keeps the creator's device_id
-	// (not the deleter's), so filtering here would prevent the creator device from
-	// learning about deletions made by other devices. Deleting is idempotent on the
-	// client side (missing local clip is silently ignored), so returning all
-	// soft-deleted clips is safe.
+	// Do NOT filter by device_id: a soft-deleted clip keeps the id of whoever
+	// last wrote it (not necessarily the deleter), and deletion must be learned
+	// by all devices. Deleting is idempotent on the client side (a missing local
+	// clip is silently ignored), so returning all soft-deleted clips is safe.
 	var deletedClips []model.Clip
 	if err := database.DB.Unscoped().Where("user_id = ? AND deleted_at > ?",
 		userID, req.Since).Find(&deletedClips).Error; err != nil {

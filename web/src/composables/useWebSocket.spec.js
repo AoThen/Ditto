@@ -203,4 +203,33 @@ describe('useWebSocket', () => {
     expect(mod.disconnectWebSocket).toBeDefined()
     expect(typeof mod.disconnectWebSocket).toBe('function')
   })
+
+  it('ignores clips_added originating from own device', () => {
+    mod.useWebSocket().connect()
+
+    const events = []
+    window.addEventListener('ws-clip-added', (e) => events.push(e.detail))
+
+    mockWs.onmessage({ data: JSON.stringify({ type: 'clips_added', data: { clips: [
+      { id: 'own', device_id: 'test-device' },
+      { id: 'other', device_id: 'other-device' },
+    ] } }) })
+
+    expect(events).toHaveLength(1)
+    expect(events[0].id).toBe('other')
+  })
+
+  it('ignores clips_deleted originating from own device', () => {
+    mod.useWebSocket().connect()
+
+    const events = []
+    window.addEventListener('ws-clips-deleted', (e) => events.push(e.detail))
+
+    mockWs.onmessage({ data: JSON.stringify({ type: 'clips_deleted', data: { clip_ids: ['own'], device_id: 'test-device' } }) })
+    expect(events).toHaveLength(0)
+
+    mockWs.onmessage({ data: JSON.stringify({ type: 'clips_deleted', data: { clip_ids: ['other'], device_id: 'other-device' } }) })
+    expect(events).toHaveLength(1)
+    expect(events[0]).toEqual(['other'])
+  })
 })

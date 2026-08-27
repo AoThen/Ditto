@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -902,7 +903,8 @@ func TestSync_PullChanges(t *testing.T) {
 	}
 	require.NoError(t, database.DB.Create(&otherClip).Error)
 
-	// Use test-device-1 as current device so setup clip is excluded from pull
+	// Use test-device-1 as current device so setup clip (last writer = this device)
+	// is excluded from pull, while the other-device clip is returned.
 	req := &SyncRequest{
 		Since:    time.Now().Add(-time.Hour),
 		DeviceID: "test-device-1",
@@ -913,6 +915,215 @@ func TestSync_PullChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, resp.NewClips, 1)
 	assert.Equal(t, "other-device-clip", resp.NewClips[0].ID)
+}
+
+// TestPullCrossDeviceUpdate verifies the P0-A fix: a clip created by device A
+// and later edited on device B must be pulled back by device A. device_id now
+// tracks the last writer, so B's edit flips it to devB and A's pull returns it.
+func TestPullCrossDeviceUpdate(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	devA := "device-A"
+	devB := "device-B"
+
+	// Device A creates the clip.
+	dataA := base64.StdEncoding.EncodeToString([]byte("original"))
+	_, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: devA,
+		PushClips: []PushClipItem{{
+			ID: "x", Description: "original", CRC: 111,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: dataA, Encrypted: false}},
+		}},
+	}, devA)
+	require.NoError(t, err)
+
+	var clip model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "x").First(&clip).Error)
+	assert.Equal(t, devA, clip.DeviceID, "creator becomes the initial last writer")
+
+	// Device B edits the same clip. Server-side LWW (syncTime) makes B the winner,
+	// and device_id must flip to devB.
+	dataB := base64.StdEncoding.EncodeToString([]byte("edited by B"))
+	_, err = svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: devB,
+		PushClips: []PushClipItem{{
+			ID: "x", Description: "edited by B", CRC: 222,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: dataB, Encrypted: false}},
+		}},
+	}, devB)
+	require.NoError(t, err)
+	require.NoError(t, database.DB.Where("id = ?", "x").First(&clip).Error)
+	assert.Equal(t, devB, clip.DeviceID, "editing device becomes the last writer")
+
+	// Device A pulls — it must now receive the updated clip (device_id != devA).
+	resp, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: devA,
+		Limit:    100,
+	}, devA)
+	require.NoError(t, err)
+
+	var found *ClipDetail
+	for i := range resp.NewClips {
+		if resp.NewClips[i].ID == "x" {
+			found = &resp.NewClips[i]
+			break
+		}
+	}
+	require.NotNil(t, found, "device A must see device B's edit of clip x")
+	assert.Equal(t, "edited by B", found.Description)
+
+	// Device B pulls again — it must NOT get its own clip back (last writer = B).
+	respB, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: devB,
+		Limit:    100,
+	}, devB)
+	require.NoError(t, err)
+	for _, c := range respB.NewClips {
+		assert.NotEqual(t, "x", c.ID, "device B must not receive its own clip back")
+	}
+}
+
+// TestSyncForceOverrides verifies the Force flag: force push skips dedup/CRC and
+// the LWW loser branch, so the local content unconditionally wins (used by
+// C++ "force upload").
+func TestSyncForceOverrides(t *testing.T) {
+	svc, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	data := base64.StdEncoding.EncodeToString([]byte("content"))
+	_, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: "device-B",
+		PushClips: []PushClipItem{{
+			ID: "x", Description: "old", CRC: 111,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: data, Encrypted: false}},
+		}},
+	}, "device-B")
+	require.NoError(t, err)
+
+	// Make the existing clip's updated_at lie in the future, simulating clock skew.
+	// Without force, the next push would be a LWW loser and create a conflict copy.
+	require.NoError(t, database.DB.Model(&model.Clip{}).Where("id = ?", "x").
+		Update("updated_at", time.Now().Add(time.Hour)).Error)
+
+	newData := base64.StdEncoding.EncodeToString([]byte("new content"))
+	resp, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: "device-A",
+		Force:    true,
+		PushClips: []PushClipItem{{
+			ID: "x", Description: "new", CRC: 222,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: newData, Encrypted: false}},
+		}},
+	}, "device-A")
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount, "force push should update, not create a conflict copy")
+
+	var clip model.Clip
+	require.NoError(t, database.DB.Unscoped().Where("id = ?", "x").First(&clip).Error)
+	assert.Equal(t, "new", clip.Description)
+	assert.False(t, clip.IsConflictCopy)
+
+	// No conflict copy should have been created for x.
+	var conflictCount int64
+	require.NoError(t, database.DB.Model(&model.Clip{}).
+		Where("user_id = ? AND win_clip_id = ?", userID, "x").Count(&conflictCount).Error)
+	assert.Equal(t, int64(0), conflictCount)
+}
+
+// TestQuotaUpdateNetBytes verifies the P2-2 fix: replacing an existing clip's
+// content counts toward the quota by net growth, not by full new bytes. Updating
+// a 900KB clip to 200KB must succeed even though 900KB+200KB exceeds a 1MB quota.
+func TestQuotaUpdateNetBytes(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+	// Rebuild service with a 1MB quota.
+	svc = NewClipService(nil, 1000, 1000, 5000, 1)
+
+	// Give the setup clip a 900KB format.
+	big := bytes.Repeat([]byte("A"), 900*1024)
+	require.NoError(t, database.DB.Where("clip_id = ?", "test-clip-1").Delete(&model.ClipFormat{}).Error)
+	require.NoError(t, database.DB.Create(&model.ClipFormat{
+		ClipID: "test-clip-1", FormatType: 1, Data: big, Encrypted: false,
+	}).Error)
+
+	// Update it to 200KB. Old logic would reject (900KB+200KB > 1MB).
+	small := bytes.Repeat([]byte("B"), 200*1024)
+	resp, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{{
+			ID: "test-clip-1", Description: "shrunk", CRC: 54321,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: base64.StdEncoding.EncodeToString(small), Encrypted: false}},
+		}},
+	}, deviceID)
+	require.NoError(t, err, "content shrink to below quota must not be rejected")
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	// A brand-new clip pushing past the quota should still be rejected.
+	tooBig := bytes.Repeat([]byte("C"), 900*1024)
+	_, err = svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{{
+			ID: "over-quota", Description: "too big", CRC: 99999,
+			UpdatedAt: time.Now(),
+			Formats:   []PushFormatItem{{FormatType: 1, Data: base64.StdEncoding.EncodeToString(tooBig), Encrypted: false}},
+		}},
+	}, deviceID)
+	require.Error(t, err, "new data pushing past the quota must be rejected")
+}
+
+// TestQuotaForceDoesNotOvercount verifies that a force upload of mostly
+// unchanged clips does not falsely exceed the quota: skipped clips (same content,
+// not actually inserted) contribute zero net bytes toward the limit.
+func TestQuotaForceDoesNotOvercount(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+	svc = NewClipService(nil, 1000, 1000, 5000, 1) // 1MB quota
+
+	// test-clip-1 holds a 600KB format.
+	big := bytes.Repeat([]byte("A"), 600*1024)
+	require.NoError(t, database.DB.Where("clip_id = ?", "test-clip-1").Delete(&model.ClipFormat{}).Error)
+	require.NoError(t, database.DB.Create(&model.ClipFormat{
+		ClipID: "test-clip-1", FormatType: 1, Data: big, Encrypted: false,
+	}).Error)
+
+	// Force-upload: test-clip-1 is unchanged (CRC 12345 matches → skipped, no
+	// net bytes), test-clip-2 is new (400KB). Net growth = 400KB < 1MB must pass.
+	newClipData := bytes.Repeat([]byte("B"), 400*1024)
+	_, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		Force:    true,
+		PushClips: []PushClipItem{
+			{
+				ID: "test-clip-1", Description: "Test clip 1", CRC: 12345,
+				UpdatedAt: time.Now(),
+				Formats:   []PushFormatItem{{FormatType: 1, Data: base64.StdEncoding.EncodeToString(big), Encrypted: false}},
+			},
+			{
+				ID: "test-clip-2", Description: "new", CRC: 98765,
+				UpdatedAt: time.Now(),
+				Formats:   []PushFormatItem{{FormatType: 1, Data: base64.StdEncoding.EncodeToString(newClipData), Encrypted: false}},
+			},
+		},
+	}, deviceID)
+	require.NoError(t, err, "force upload of unchanged clips must not overcount against quota")
+
+	var count int64
+	require.NoError(t, database.DB.Model(&model.Clip{}).Where("id = ?", "test-clip-2").Count(&count).Error)
+	assert.Equal(t, int64(1), count)
 }
 
 func TestListConflictClips_WithConflicts(t *testing.T) {

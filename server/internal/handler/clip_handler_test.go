@@ -40,7 +40,7 @@ type mockClipSvc struct {
 	listConflictClipsFn  func(userID uint, page, perPage int) (*response.PaginatedResponse, error)
 	resolveConflictClipFn func(userID uint, conflictClipID string, action string) error
 	batchDeleteClipsFn   func(userID uint, clipIDs []string, deviceID string) (int64, error)
-	batchMarkDontSyncFn  func(userID uint, clipIDs []string) (int64, error)
+	batchMarkDontSyncFn  func(userID uint, clipIDs []string, deviceID string) (int64, error)
 }
 
 func (m *mockClipSvc) ListClips(userID uint, page, perPage int, search, groupID, sortBy, sortOrder string) (*response.PaginatedResponse, error) {
@@ -67,8 +67,8 @@ func (m *mockClipSvc) ResolveConflictClip(userID uint, conflictClipID string, ac
 func (m *mockClipSvc) BatchDeleteClips(userID uint, clipIDs []string, deviceID string) (int64, error) {
 	return m.batchDeleteClipsFn(userID, clipIDs, deviceID)
 }
-func (m *mockClipSvc) BatchMarkDontSync(userID uint, clipIDs []string) (int64, error) {
-	return m.batchMarkDontSyncFn(userID, clipIDs)
+func (m *mockClipSvc) BatchMarkDontSync(userID uint, clipIDs []string, deviceID string) (int64, error) {
+	return m.batchMarkDontSyncFn(userID, clipIDs, deviceID)
 }
 
 func setupClipTest(t *testing.T) (*gin.Context, *httptest.ResponseRecorder) {
@@ -556,8 +556,9 @@ func TestBatchDeleteClips_MissingBody(t *testing.T) {
 func TestBatchMarkDontSync_Success(t *testing.T) {
 	c, w := setupClipTest(t)
 	mock := &mockClipSvc{
-		batchMarkDontSyncFn: func(userID uint, clipIDs []string) (int64, error) {
+		batchMarkDontSyncFn: func(userID uint, clipIDs []string, deviceID string) (int64, error) {
 			assert.Equal(t, []string{"c1", "c2"}, clipIDs)
+			assert.Equal(t, "test-device", deviceID)
 			return 2, nil
 		},
 	}

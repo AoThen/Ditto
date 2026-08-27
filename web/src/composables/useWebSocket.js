@@ -35,6 +35,10 @@ function stopPingTimer() {
 }
 
 function handleMessage(msg) {
+  // P2-1 FIX: ignore broadcasts that originated from this device (a mirrored
+  // push or delete) to avoid redundant sync triggers and UI noise.
+  const isOwnDevice = (deviceId) => deviceId && useUserStore().deviceId === deviceId
+
   switch (msg.type) {
     case 'connected':
       console.log('[WS] Server says:', msg.data.message)
@@ -42,15 +46,18 @@ function handleMessage(msg) {
     case 'ping':
       break
     case 'clip_added':
-      { const clipStore = useClipStore(); if (msg?.data) clipStore.notifyClipAdded(msg.data) }
+      { const clipStore = useClipStore(); if (msg?.data && !isOwnDevice(msg.data.device_id)) clipStore.notifyClipAdded(msg.data) }
       break
     case 'clips_added':
       {
         const clips = msg?.data?.clips
         if (Array.isArray(clips)) {
             const clipStore = useClipStore()
-            clips.forEach(c => clipStore.notifyClipAdded(c))
-            ElMessage.info(`收到 ${clips.length} 条新的剪贴板内容`)
+            const filtered = clips.filter(c => !isOwnDevice(c.device_id))
+            filtered.forEach(c => clipStore.notifyClipAdded(c))
+            if (filtered.length > 0) {
+              ElMessage.info(`收到 ${filtered.length} 条新的剪贴板内容`)
+            }
         } else {
             console.warn('[WS] Malformed clips_added message:', msg)
         }
@@ -58,6 +65,10 @@ function handleMessage(msg) {
       break
     case 'clips_deleted':
       {
+        if (isOwnDevice(msg.data?.device_id)) {
+          console.log('[WS] Ignoring own deletion broadcast')
+          break
+        }
         const clipStore = useClipStore()
         clipStore.notifyClipDeleted(msg.data)
       }

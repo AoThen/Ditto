@@ -278,9 +278,10 @@ import { Download, ArrowDown, CopyDocument } from '@element-plus/icons-vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { downloadBlob } from '@/api/request'
 import { formatDate } from '@/composables/useFormatDate'
+import { useClipStore } from '@/stores/clip'
 
 const ws = useWebSocket()
-const lastSyncTime = ref(null)
+const clipStore = useClipStore()
 
 // Listen for WS clip notifications
 function onWsClipAdded(event) {
@@ -292,13 +293,30 @@ function onWsClipAdded(event) {
   incrementalSync(event.detail?.device_id)
 }
 
+// P0-B FIX: React to deletion broadcasts so the list stays in sync when another
+// device deletes clips. (Own-device deletions are filtered in useWebSocket and
+// already handled locally by handleDelete/handleBatchDelete.)
+function onWsClipsDeleted(event) {
+  const clipIds = event.detail || []
+  if (!Array.isArray(clipIds) || clipIds.length === 0) return
+  const idSet = new Set(clipIds.map(String))
+  const before = clipList.value.length
+  clipList.value = clipList.value.filter((c) => !idSet.has(String(c.id)))
+  const removed = before - clipList.value.length
+  if (removed > 0) {
+    total.value = Math.max(0, total.value - removed)
+    ElMessage.info(`有 ${removed} 条剪贴板被其他设备删除`)
+  }
+}
+
 async function incrementalSync(deviceId) {
   try {
-    const since = lastSyncTime.value || '1970-01-01T00:00:00Z'
+    // P1-A FIX: share a single persistent sync cursor with useWebSocket.
+    const since = clipStore.lastSyncTime || '1970-01-01T00:00:00Z'
     const res = await getChanges(since)
     if (res.code === 0) {
       const { clips, deleted_ids, server_time } = res.data
-      if (server_time) lastSyncTime.value = server_time
+      if (server_time) clipStore.updateSyncTime(server_time)
 
       let changed = false
       if (deleted_ids?.length > 0) {
@@ -842,8 +860,11 @@ async function fetchGroups() {
 
 onMounted(async () => {
   window.addEventListener('ws-clip-added', onWsClipAdded)
+  window.addEventListener('ws-clips-deleted', onWsClipsDeleted)
   await Promise.all([fetchClips(), fetchConflictClips()])
-  lastSyncTime.value = new Date().toISOString()
+  // P1-A FIX: advance the shared cursor after the full list is loaded so a
+  // subsequent WS-triggered incremental sync does not re-fetch everything.
+  clipStore.updateSyncTime(new Date().toISOString())
   fetchGroups()
 })
 
@@ -854,6 +875,7 @@ onUnmounted(() => {
     searchTimer = null
   }
   window.removeEventListener('ws-clip-added', onWsClipAdded)
+  window.removeEventListener('ws-clips-deleted', onWsClipsDeleted)
 })
 </script>
 

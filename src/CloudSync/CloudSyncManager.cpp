@@ -3888,9 +3888,44 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 		json j = json::parse(msg);
 		std::string type = j.value("type", "");
 
-		if (type == "clip_added" || type == "clips_added")
+		if (type == "clip_added" || type == "clips_added" || type == "clips_deleted")
 		{
-			LogMessage(_T("OnWsMessage: clip/clips_added received, triggering sync."));
+			// P2-1 FIX: Ignore broadcasts that originated from this device
+			// (mirrored push/delete) to avoid redundant sync cycles.
+			BOOL bOwnBroadcast = FALSE;
+			if (j.contains("data") && j["data"].is_object())
+			{
+				if (type == "clip_added")
+				{
+					std::string devId = j["data"].value("device_id", "");
+					bOwnBroadcast = (!devId.empty() && devId == std::string(m_deviceId));
+				}
+				else if (type == "clips_added" && j["data"].contains("clips") && j["data"]["clips"].is_array())
+				{
+					for (const auto& c : j["data"]["clips"])
+					{
+						if (c.is_object() && c.value("device_id", "") == std::string(m_deviceId))
+						{
+							bOwnBroadcast = TRUE;
+							break;
+						}
+					}
+				}
+				else if (type == "clips_deleted")
+				{
+					std::string devId = j["data"].value("device_id", "");
+					bOwnBroadcast = (!devId.empty() && devId == std::string(m_deviceId));
+				}
+			}
+			if (bOwnBroadcast)
+			{
+				LogMessage(_T("OnWsMessage: ignoring broadcast from this device."));
+				return;
+			}
+
+			// P0-C FIX: deletions are now also broadcast; any remote change
+			// (added, updated or deleted) triggers a sync so local state stays fresh.
+			LogMessage(_T("OnWsMessage: clip/clips_added/clips_deleted received, triggering sync."));
 			SetEvent(m_hWsTrigger);
 		}
 		else if (type == "connected")

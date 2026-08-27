@@ -25,7 +25,7 @@ type ClipServiceInterface interface {
 	ListConflictClips(userID uint, page, perPage int) (*response.PaginatedResponse, error)
 	ResolveConflictClip(userID uint, conflictClipID string, action string) error
 	BatchDeleteClips(userID uint, clipIDs []string, deviceID string) (int64, error)
-	BatchMarkDontSync(userID uint, clipIDs []string) (int64, error)
+	BatchMarkDontSync(userID uint, clipIDs []string, deviceID string) (int64, error)
 }
 
 type ClipHandler struct {
@@ -300,6 +300,7 @@ func (h *ClipHandler) BatchDeleteClips(c *gin.Context) {
 // BatchMarkDontSync handles POST /api/v1/clips/batch-dont-sync
 func (h *ClipHandler) BatchMarkDontSync(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
 
 	var req struct {
 		IDs []string `json:"ids" binding:"required"`
@@ -315,7 +316,7 @@ func (h *ClipHandler) BatchMarkDontSync(c *gin.Context) {
 		return
 	}
 
-	marked, err := h.service.BatchMarkDontSync(userID, req.IDs)
+	marked, err := h.service.BatchMarkDontSync(userID, req.IDs, deviceID)
 	if err != nil {
 		log.Printf("[BatchMarkDontSync] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "操作失败")
