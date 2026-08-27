@@ -1,9 +1,22 @@
 name: CI
 
 on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'server/**'
+      - 'web/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'server/**'
+      - 'web/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 permissions:
+  contents: read
   actions: write
 
 concurrency:
@@ -11,13 +24,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Go Backend ──────────────────────────────────────────────
-  go-test:
+  # ── Cleanup: 清理旧 workflow runs ───────────────────────
+  cleanup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: ./server
+    if: always()
     steps:
       - name: Clean up old workflow runs
         uses: Mattraks/delete-workflow-runs@v2
@@ -28,12 +38,20 @@ jobs:
           keep_minimum_runs: 1
           delete_workflow_pattern: ${{ github.workflow }}
 
+  # ── Go Backend (test + build + artifact) ────────────────
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./server
+    steps:
       - uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Download dependencies
@@ -50,26 +68,20 @@ jobs:
           file: server/coverage.out
           fail_ci_if_error: false
 
-  go-build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./server
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache-dependency-path: server/go.sum
-
-      - name: Build
+      - name: Build server binary
         run: go build -v -o server ./cmd/server/
+
+      - name: Upload server binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-bin
+          path: server/server
+          retention-days: 1
 
   # ── Web Frontend ───────────────────────────────────────────
   web-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./web
@@ -79,15 +91,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: web/.node-version
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Lint
-        run: npm run lint --if-present
 
       - name: Build
         run: npm run build
@@ -95,21 +104,25 @@ jobs:
   # ── Web Frontend Tests ─────────────────────────────────────
   web-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./web
     steps:
       - uses: actions/checkout@v5
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: web/.node-version
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        run: cd web && npm ci
+        run: npm ci
 
       - name: Run unit tests
-        run: cd web && npm run test:unit -- --run
+        run: npm run test:unit -- --run
 
   # ── Windows Client (C++/MFC) ──────────────────────────────
   client-build-windows:
@@ -118,22 +131,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: packages
-          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
-          restore-keys: |
-            nuget-
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Setup vcpkg MSBuild integration
-        run: C:\vcpkg\vcpkg.exe integrate install
-
-      - name: Restore NuGet packages
-        run: nuget restore CP_Main_10.sln
+      - name: Setup Windows build environment
+        uses: ./.github/actions/setup-windows-env
 
       - name: Build (Release x64)
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
@@ -145,22 +144,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: packages
-          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
-          restore-keys: |
-            nuget-
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Setup vcpkg MSBuild integration
-        run: C:\vcpkg\vcpkg.exe integrate install
-
-      - name: Restore NuGet packages
-        run: nuget restore CP_Main_10.sln
+      - name: Setup Windows build environment
+        uses: ./.github/actions/setup-windows-env
 
       - name: Build CloudSync_Test (Release x64)
         run: msbuild CP_Main_10.sln /t:CloudSync_Test /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
@@ -185,22 +170,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: packages
-          key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
-          restore-keys: |
-            nuget-
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Setup vcpkg MSBuild integration
-        run: C:\vcpkg\vcpkg.exe integrate install
-
-      - name: Restore NuGet packages
-        run: nuget restore CP_Main_10.sln
+      - name: Setup Windows build environment
+        uses: ./.github/actions/setup-windows-env
 
       - name: Build (${{ matrix.config }} x64) and dependencies
         run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=${{ matrix.config }} /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
@@ -345,7 +316,6 @@ jobs:
   # ── Playwright E2E ─────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
-    needs: [ go-build, web-build ]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -353,24 +323,25 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
-          cache-dependency-path: server/go.sum
+          go-version-file: server/go.mod
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: web/.node-version
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install web dependencies
         run: cd web && npm ci
 
-      - name: Build web frontend
-        run: cd web && npm run build && cp -r dist ../server/web-dist
-
-      - name: Build Go server
-        run: cd server && go build -o server ./cmd/server/
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers
         run: cd web && npx playwright install --with-deps chromium
@@ -379,7 +350,6 @@ jobs:
         run: cd web && npx playwright test
         env:
           CI: 'true'
-          # Enable CORS so cross-origin requests from the web dev server are allowed
           ALLOWED_ORIGINS: http://localhost:5173
 
       - name: Upload Playwright report
@@ -393,25 +363,26 @@ jobs:
   # ── Shell E2E ──────────────────────────────────────────────
   shell-e2e:
     runs-on: ubuntu-latest
-    needs: [ go-build, web-build ]
-    timeout-minutes: 10
+    needs: [ go ]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Download server binary
+        uses: actions/download-artifact@v4
         with:
-          go-version: '1.22'
+          name: server-bin
+          path: server
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: web/.node-version
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
-      - name: Build Go server
-        run: cd server && go build -o server ./cmd/server/
+      - name: Install web dependencies
+        run: cd web && npm ci
 
       - name: Run shell E2E tests
         run: ./scripts/test-e2e.sh

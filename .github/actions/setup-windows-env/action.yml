@@ -1,0 +1,30 @@
+name: Setup Windows build environment
+description: Cache NuGet, configure MSBuild, vcpkg and restore packages
+
+inputs:
+  solution:
+    description: "Solution file to restore (default: CP_Main_10.sln)"
+    default: "CP_Main_10.sln"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: packages
+        key: nuget-${{ hashFiles('packages.config') }}-${{ hashFiles('tools/CloudSync_Test/packages.config') }}
+        restore-keys: |
+          nuget-
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup vcpkg MSBuild integration
+      shell: cmd
+      run: C:\vcpkg\vcpkg.exe integrate install
+
+    - name: Restore NuGet packages
+      shell: cmd
+      run: nuget restore ${{ inputs.solution }}
