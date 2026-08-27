@@ -112,7 +112,7 @@ func main() {
 	// Initialize services
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(h, cfg.MaxPushLimit, cfg.DefaultSyncPullLimit, cfg.MaxSyncPullLimit)
+	clipSvc := service.NewClipService(h, cfg.MaxPushLimit, cfg.DefaultSyncPullLimit, cfg.MaxSyncPullLimit, cfg.StorageQuotaMB)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	rateLimiter := middleware.NewRateLimiter()

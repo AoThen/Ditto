@@ -19,12 +19,12 @@ import (
 type ClipServiceInterface interface {
 	ListClips(userID uint, page, perPage int, search, groupID, sortBy, sortOrder string) (*response.PaginatedResponse, error)
 	GetClip(userID uint, clipID string) (*service.ClipDetail, error)
-	DeleteClip(userID uint, clipID string) error
+	DeleteClip(userID uint, clipID, deviceID string) error
 	Sync(userID uint, req *service.SyncRequest, deviceID string) (*service.SyncResponse, error)
 	DownloadClipFormat(userID uint, clipID string, formatType int) (*service.DownloadResult, error)
 	ListConflictClips(userID uint, page, perPage int) (*response.PaginatedResponse, error)
 	ResolveConflictClip(userID uint, conflictClipID string, action string) error
-	BatchDeleteClips(userID uint, clipIDs []string) (int64, error)
+	BatchDeleteClips(userID uint, clipIDs []string, deviceID string) (int64, error)
 	BatchMarkDontSync(userID uint, clipIDs []string) (int64, error)
 }
 
@@ -83,9 +83,10 @@ func (h *ClipHandler) GetClip(c *gin.Context) {
 // DeleteClip handles DELETE /api/v1/clips/:id
 func (h *ClipHandler) DeleteClip(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
 	clipID := c.Param("id")
 
-	if err := h.service.DeleteClip(userID, clipID); err != nil {
+	if err := h.service.DeleteClip(userID, clipID, deviceID); err != nil {
 		if errors.Is(err, service.ErrClipNotFound) {
 			response.Error(c, http.StatusNotFound, 40400, "剪贴板不存在")
 			return
@@ -102,6 +103,9 @@ func (h *ClipHandler) DeleteClip(c *gin.Context) {
 func (h *ClipHandler) Sync(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	deviceID := middleware.GetDeviceID(c)
+
+	// P2 FIX: Limit request body size to prevent resource exhaustion (20MB)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 20<<20)
 
 	var req service.SyncRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -267,6 +271,7 @@ func (h *ClipHandler) ResolveConflictClip(c *gin.Context) {
 // BatchDeleteClips handles POST /api/v1/clips/batch-delete
 func (h *ClipHandler) BatchDeleteClips(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	deviceID := middleware.GetDeviceID(c)
 
 	var req struct {
 		IDs []string `json:"ids" binding:"required"`
@@ -282,7 +287,7 @@ func (h *ClipHandler) BatchDeleteClips(c *gin.Context) {
 		return
 	}
 
-	deleted, err := h.service.BatchDeleteClips(userID, req.IDs)
+	deleted, err := h.service.BatchDeleteClips(userID, req.IDs, deviceID)
 	if err != nil {
 		log.Printf("[BatchDeleteClips] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "批量删除失败")

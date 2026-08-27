@@ -59,7 +59,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(nil, 1000, 1000, 5000) // nil broadcaster for tests (no WS needed)
+	clipSvc := service.NewClipService(nil, 1000, 1000, 5000, 100) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()
@@ -209,7 +209,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(nil, 1000, 1000, 5000) // nil broadcaster for tests (no WS needed)
+	clipSvc := service.NewClipService(nil, 1000, 1000, 5000, 100) // nil broadcaster for tests (no WS needed)
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()
@@ -359,7 +359,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 
 	authSvc := service.NewAuthService(cfg)
 	deviceSvc := service.NewDeviceService()
-	clipSvc := service.NewClipService(h, 1000, 1000, 5000) // hub as broadcaster for real-time push
+	clipSvc := service.NewClipService(h, 1000, 1000, 5000, 100) // hub as broadcaster for real-time push
 	encryptionSvc := service.NewEncryptionService()
 	groupSvc := service.NewGroupService()
 	statsSvc := service.NewStatsService()

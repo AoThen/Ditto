@@ -34,6 +34,7 @@ type Config struct {
 	DefaultSyncPullLimit int         // Default pull limit per sync
 	MaxSyncPullLimit   int           // Maximum pull limit per sync
 	SlowThreshold      time.Duration // GORM slow query threshold
+	StorageQuotaMB     int           // Per-user storage quota in MB (default 100)
 }
 
 // loadOrGenerateJWTSecret handles JWT secret loading with secure auto-generation
@@ -195,6 +196,13 @@ func Load() *Config {
 		}
 	}
 
+	storageQuotaMB := 100 // Default: 100MB
+	if env := os.Getenv("STORAGE_QUOTA_MB"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			storageQuotaMB = n
+		}
+	}
+
 	return &Config{
 		Port:               port,
 		DatabasePath:       dbPath,
@@ -212,5 +220,6 @@ func Load() *Config {
 		MaxSyncPullLimit:      maxSyncPullLimit,
 		SlowThreshold:         slowThreshold,
 		SoftDeleteRetention:   softDeleteRetention,
+		StorageQuotaMB:        storageQuotaMB,
 	}
 }

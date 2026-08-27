@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useClipStore } from '@/stores/clip'
+import { getChanges } from '@/api/clips'
 import { ElMessage } from 'element-plus'
 
 const WS_URL = import.meta.env.VITE_WS_URL || ''
@@ -55,6 +56,12 @@ function handleMessage(msg) {
         }
       }
       break
+    case 'clips_deleted':
+      {
+        const clipStore = useClipStore()
+        clipStore.notifyClipDeleted(msg.data)
+      }
+      break
     case 'goaway':
       ElMessage.warning('服务器正在关闭连接')
       disconnect()
@@ -64,8 +71,33 @@ function handleMessage(msg) {
   }
 }
 
-function scheduleReconnect() {
-  if (sharedReconnectTimer) return
+// P2 FIX: Fetch incremental changes since last sync to catch up missed data on reconnect
+async function fetchSyncCatchUp() {
+  try {
+    const clipStore = useClipStore()
+    const since = clipStore.lastSyncTime || '2000-01-01T00:00:00Z'
+    const res = await getChanges(since)
+    if (res?.code === 0 && res?.data) {
+      const data = res.data
+      // Process any new clips from the catch-up
+      if (Array.isArray(data.clips) && data.clips.length > 0) {
+        data.clips.forEach(clip => clipStore.notifyClipAdded(clip))
+      }
+      // Process any deletions
+      if (Array.isArray(data.deleted_ids) && data.deleted_ids.length > 0) {
+        clipStore.notifyClipDeleted({ clip_ids: data.deleted_ids })
+      }
+      // Update sync time watermark
+      if (data.server_time) {
+        clipStore.updateSyncTime(data.server_time)
+      }
+    }
+  } catch (e) {
+    console.warn('[WS] Catch-up fetch failed:', e)
+  }
+}
+
+function scheduleReconnect() {  if (sharedReconnectTimer) return
 
   if (sharedReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
     console.log(`[WS] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
@@ -110,6 +142,17 @@ function connect() {
       sharedIsConnected.value = true
       sharedReconnectAttempts = 0
       startPingTimer()
+      // P2 FIX: On reconnect, fetch incremental changes to catch up missed data.
+      // Only catch up on initial connect or after a reconnection (not on every ping).
+      const wasReconnecting = localStorage.getItem('ditto_ws_reconnecting') === '1'
+      if (!wasReconnecting) {
+        // First connection — just set the flag, no catch-up needed (page load handles it)
+        localStorage.setItem('ditto_ws_reconnecting', '1')
+      } else {
+        // Reconnected — fetch catch-up
+        localStorage.removeItem('ditto_ws_reconnecting')
+        fetchSyncCatchUp()
+      }
     }
 
     sharedWs.onmessage = (event) => {

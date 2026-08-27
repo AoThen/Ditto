@@ -29,6 +29,11 @@ var (
 )
 
 func dedupKey(userID uint, clipID string, crc int64) string {
+	// When CRC=0 (e.g. CF_HDROP format), skip CRC to avoid a stable false-negative
+	// in the dedup cache that would cause repeated identical re-pushes to be skipped.
+	if crc == 0 {
+		return fmt.Sprintf("%d:%s", userID, clipID)
+	}
 	return fmt.Sprintf("%d:%s:%d", userID, clipID, crc)
 }
 
@@ -72,14 +77,16 @@ type ClipService struct {
 	maxPushLimit         int
 	defaultSyncPullLimit int
 	maxSyncPullLimit     int
+	storageQuotaBytes    int64
 }
 
-func NewClipService(broadcaster Broadcaster, maxPushLimit, defaultSyncPullLimit, maxSyncPullLimit int) *ClipService {
+func NewClipService(broadcaster Broadcaster, maxPushLimit, defaultSyncPullLimit, maxSyncPullLimit, storageQuotaMB int) *ClipService {
 	return &ClipService{
 		broadcaster:          broadcaster,
 		maxPushLimit:         maxPushLimit,
 		defaultSyncPullLimit: defaultSyncPullLimit,
 		maxSyncPullLimit:     maxSyncPullLimit,
+		storageQuotaBytes:    int64(storageQuotaMB) * 1024 * 1024,
 	}
 }
 
@@ -365,7 +372,7 @@ func getContentTypeForFormat(formatType int) (string, string) {
 }
 
 // DeleteClip removes a clip and its formats
-func (s *ClipService) DeleteClip(userID uint, clipID string) error {
+func (s *ClipService) DeleteClip(userID uint, clipID, deviceID string) error {
 	return database.DB.Transaction(func(tx *gorm.DB) error {
 		// Verify ownership
 		var clip model.Clip
@@ -382,7 +389,18 @@ func (s *ClipService) DeleteClip(userID uint, clipID string) error {
 		}
 
 		// Delete clip
-		return tx.Delete(&clip).Error
+		if err := tx.Delete(&clip).Error; err != nil {
+			return err
+		}
+
+		// Broadcast deletion to other devices
+		if s.broadcaster != nil {
+			s.broadcaster.BroadcastToOthers(int64(userID), nil, "clips_deleted", map[string]interface{}{
+				"clip_ids":  []string{clipID},
+				"device_id": deviceID,
+			})
+		}
+		return nil
 	})
 }
 
@@ -416,7 +434,7 @@ func (s *ClipService) BatchMarkDontSync(userID uint, clipIDs []string) (int64, e
 }
 
 // BatchDeleteClips removes multiple clips and their formats for a user
-func (s *ClipService) BatchDeleteClips(userID uint, clipIDs []string) (int64, error) {
+func (s *ClipService) BatchDeleteClips(userID uint, clipIDs []string, deviceID string) (int64, error) {
 	var deleted int64
 	err := database.DB.Transaction(func(tx *gorm.DB) error {
 		// Delete formats for all clips
@@ -432,7 +450,18 @@ func (s *ClipService) BatchDeleteClips(userID uint, clipIDs []string) (int64, er
 		deleted = result.RowsAffected
 		return nil
 	})
-	return deleted, err
+	if err != nil {
+		return 0, err
+	}
+
+	// Broadcast deletion to other devices
+	if s.broadcaster != nil && deleted > 0 {
+		s.broadcaster.BroadcastToOthers(int64(userID), nil, "clips_deleted", map[string]interface{}{
+			"clip_ids":  clipIDs,
+			"device_id": deviceID,
+		})
+	}
+	return deleted, nil
 }
 
 // SyncRequest represents the sync API request
@@ -570,9 +599,9 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				if err := tx.Raw("SELECT COALESCE(SUM(LENGTH(data)),0) FROM clip_formats WHERE clip_id IN (SELECT id FROM clips WHERE user_id = ?)", userID).Scan(&currentBytes).Error; err != nil {
 					return err
 				}
-				if currentBytes+batchNewBytes > 100*1024*1024 { // 100MB default limit
-					return fmt.Errorf("sync: storage quota exceeded (max 100MB)")
-				}
+			if currentBytes+batchNewBytes >= s.storageQuotaBytes {
+				return fmt.Errorf("sync: storage quota exceeded (max %dMB)", s.storageQuotaBytes/(1024*1024))
+			}
 
 				// Collect CRCs for dedup within this batch
 				crcSet := make(map[int64]struct{})
@@ -606,7 +635,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					chunkIDs = append(chunkIDs, p.item.ID)
 				}
 				var existingClips []model.Clip
-				if err := tx.Where("id IN ? AND user_id = ?", chunkIDs, userID).Find(&existingClips).Error; err != nil {
+				if err := tx.Unscoped().Where("id IN ? AND user_id = ?", chunkIDs, userID).Find(&existingClips).Error; err != nil {
 					return err
 				}
 				existingMap := make(map[string]model.Clip, len(existingClips))
@@ -621,12 +650,50 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 					pc := p.item
 
 					// Idempotency check: skip if recently processed
-					if isDeduped(dedupKey(userID, pc.ID, pc.CRC)) {
-						skippedCount++
-						continue
+					// NOTE: Skip dedup for soft-deleted clips — they need to be restored,
+					// not skipped. The dedup key for CRC=0 degrades to "userID:clipID",
+					// which would falsely skip re-pushes of the same clip within 5 minutes.
+					existing, exists := existingMap[pc.ID]
+					if !exists || !existing.DeletedAt.Valid {
+						if isDeduped(dedupKey(userID, pc.ID, pc.CRC)) {
+							skippedCount++
+							continue
+						}
 					}
 
-					existing, exists := existingMap[pc.ID]
+					if exists && existing.DeletedAt.Valid {
+						// P1 FIX: Soft-deleted clip re-pushed — restore instead of creating duplicate.
+						// Deletion hard-deletes formats, so we restore the clip row and rebuild formats.
+						// Use raw SQL to clear deleted_at (GORM Updates ignores nil on gorm.DeletedAt).
+						if err := tx.Exec(
+							"UPDATE clips SET description = ?, pinyin = ?, crc = ?, group_id = ?, short_cut = ?, clip_order = ?, clip_group_order = ?, device_id = ?, updated_at = ?, dont_sync = 0, deleted_at = NULL WHERE id = ?",
+							pc.Description, utils.ConvertToPinyin(pc.Description), pc.CRC,
+							pc.GroupID, pc.ShortCut, pc.ClipOrder, pc.ClipGroupOrder,
+							req.DeviceID, syncTime, pc.ID,
+						).Error; err != nil {
+							return err
+						}
+
+						for _, pf := range p.formats {
+							batchFormats = append(batchFormats, model.ClipFormat{
+								ClipID:     pc.ID,
+								FormatType: pf.FormatType,
+								Data:       pf.Data,
+								Encrypted:  pf.Encrypted,
+								CreatedAt:  syncTime,
+							})
+						}
+
+						pushedClipIDs = append(pushedClipIDs, pc.ID)
+						pushedClips = append(pushedClips, pushedClipInfo{
+							ID:          pc.ID,
+							Description: pc.Description,
+						})
+
+						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
+						pushedCount++
+						continue
+					}
 
 					if !exists {
 						// CRC-based de-duplication for new clips — skip if same CRC already exists
@@ -826,6 +893,16 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	}
 
 	newClips := make([]ClipDetail, 0, len(clips))
+
+	// Load device names for sync response (matching ListClips behavior)
+	deviceIDs := make(map[string]struct{})
+	for _, clip := range clips {
+		if clip.DeviceID != "" {
+			deviceIDs[clip.DeviceID] = struct{}{}
+		}
+	}
+	deviceNames := loadDeviceNames(deviceIDs)
+
 	for _, clip := range clips {
 		formats := formatsByClip[clip.ID]
 
@@ -846,6 +923,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 			CreatedAt:      clip.CreatedAt.UTC().Format(time.RFC3339),
 			UpdatedAt:      clip.UpdatedAt.UTC().Format(time.RFC3339),
 			GroupID:        clip.GroupID,
+			DeviceName:     deviceNames[clip.DeviceID],
 			ShortCut:       clip.ShortCut,
 			PasteCount:     clip.PasteCount,
 			ClipOrder:      clip.ClipOrder,
@@ -854,10 +932,15 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		})
 	}
 
-	// Query soft-deleted clips since 'since' timestamp (for deletion sync)
+	// Query soft-deleted clips since 'since' timestamp (for deletion sync).
+	// FIX: Do NOT filter by device_id. The clip row keeps the creator's device_id
+	// (not the deleter's), so filtering here would prevent the creator device from
+	// learning about deletions made by other devices. Deleting is idempotent on the
+	// client side (missing local clip is silently ignored), so returning all
+	// soft-deleted clips is safe.
 	var deletedClips []model.Clip
-	if err := database.DB.Unscoped().Where("user_id = ? AND deleted_at > ? AND device_id != ?",
-		userID, req.Since, req.DeviceID).Find(&deletedClips).Error; err != nil {
+	if err := database.DB.Unscoped().Where("user_id = ? AND deleted_at > ?",
+		userID, req.Since).Find(&deletedClips).Error; err != nil {
 		log.Printf("[Sync] Error querying deleted clips: %v", err)
 	}
 

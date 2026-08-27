@@ -447,7 +447,7 @@ func setupClipServiceTest(t *testing.T) (*ClipService, uint, string, func()) {
 	err = database.Init(dbPath, 500*time.Millisecond)
 	require.NoError(t, err)
 
-	svc := NewClipService(nil, 1000, 1000, 5000)
+	svc := NewClipService(nil, 1000, 1000, 5000, 100)
 
 	user := model.User{
 		Username:     "clipuser",
@@ -666,7 +666,7 @@ func TestDeleteClip_Success(t *testing.T) {
 	svc, userID, _, cleanup := setupClipServiceTest(t)
 	defer cleanup()
 
-	err := svc.DeleteClip(userID, "test-clip-1")
+	err := svc.DeleteClip(userID, "test-clip-1", "test-device")
 	require.NoError(t, err)
 
 	var count int64
@@ -681,7 +681,7 @@ func TestDeleteClip_NotFound(t *testing.T) {
 	svc, userID, _, cleanup := setupClipServiceTest(t)
 	defer cleanup()
 
-	err := svc.DeleteClip(userID, "non-existent-id")
+	err := svc.DeleteClip(userID, "non-existent-id", "test-device")
 	assert.Error(t, err)
 	assert.Equal(t, "剪贴板不存在", err.Error())
 }

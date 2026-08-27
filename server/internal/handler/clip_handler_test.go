@@ -34,12 +34,12 @@ func TestMain(m *testing.M) {
 type mockClipSvc struct {
 	listClipsFn          func(userID uint, page, perPage int, search, groupID, sortBy, sortOrder string) (*response.PaginatedResponse, error)
 	getClipFn            func(userID uint, clipID string) (*service.ClipDetail, error)
-	deleteClipFn         func(userID uint, clipID string) error
+	deleteClipFn         func(userID uint, clipID, deviceID string) error
 	syncFn               func(userID uint, req *service.SyncRequest, deviceID string) (*service.SyncResponse, error)
 	downloadClipFormatFn func(userID uint, clipID string, formatType int) (*service.DownloadResult, error)
 	listConflictClipsFn  func(userID uint, page, perPage int) (*response.PaginatedResponse, error)
 	resolveConflictClipFn func(userID uint, conflictClipID string, action string) error
-	batchDeleteClipsFn   func(userID uint, clipIDs []string) (int64, error)
+	batchDeleteClipsFn   func(userID uint, clipIDs []string, deviceID string) (int64, error)
 	batchMarkDontSyncFn  func(userID uint, clipIDs []string) (int64, error)
 }
 
@@ -49,8 +49,8 @@ func (m *mockClipSvc) ListClips(userID uint, page, perPage int, search, groupID,
 func (m *mockClipSvc) GetClip(userID uint, clipID string) (*service.ClipDetail, error) {
 	return m.getClipFn(userID, clipID)
 }
-func (m *mockClipSvc) DeleteClip(userID uint, clipID string) error {
-	return m.deleteClipFn(userID, clipID)
+func (m *mockClipSvc) DeleteClip(userID uint, clipID, deviceID string) error {
+	return m.deleteClipFn(userID, clipID, deviceID)
 }
 func (m *mockClipSvc) Sync(userID uint, req *service.SyncRequest, deviceID string) (*service.SyncResponse, error) {
 	return m.syncFn(userID, req, deviceID)
@@ -64,8 +64,8 @@ func (m *mockClipSvc) ListConflictClips(userID uint, page, perPage int) (*respon
 func (m *mockClipSvc) ResolveConflictClip(userID uint, conflictClipID string, action string) error {
 	return m.resolveConflictClipFn(userID, conflictClipID, action)
 }
-func (m *mockClipSvc) BatchDeleteClips(userID uint, clipIDs []string) (int64, error) {
-	return m.batchDeleteClipsFn(userID, clipIDs)
+func (m *mockClipSvc) BatchDeleteClips(userID uint, clipIDs []string, deviceID string) (int64, error) {
+	return m.batchDeleteClipsFn(userID, clipIDs, deviceID)
 }
 func (m *mockClipSvc) BatchMarkDontSync(userID uint, clipIDs []string) (int64, error) {
 	return m.batchMarkDontSyncFn(userID, clipIDs)
@@ -179,8 +179,9 @@ func TestGetClip_NotFound(t *testing.T) {
 func TestDeleteClip_Success(t *testing.T) {
 	c, w := setupClipTest(t)
 	mock := &mockClipSvc{
-		deleteClipFn: func(userID uint, clipID string) error {
+		deleteClipFn: func(userID uint, clipID, deviceID string) error {
 			assert.Equal(t, "clip-123", clipID)
+			assert.Equal(t, "test-device", deviceID)
 			return nil
 		},
 	}
@@ -200,7 +201,7 @@ func TestDeleteClip_Success(t *testing.T) {
 func TestDeleteClip_NotFound(t *testing.T) {
 	c, w := setupClipTest(t)
 	mock := &mockClipSvc{
-		deleteClipFn: func(userID uint, clipID string) error {
+		deleteClipFn: func(userID uint, clipID, deviceID string) error {
 			return service.ErrClipNotFound
 		},
 	}
@@ -507,8 +508,9 @@ func TestResolveConflictClip_MissingBody(t *testing.T) {
 func TestBatchDeleteClips_Success(t *testing.T) {
 	c, w := setupClipTest(t)
 	mock := &mockClipSvc{
-		batchDeleteClipsFn: func(userID uint, clipIDs []string) (int64, error) {
+		batchDeleteClipsFn: func(userID uint, clipIDs []string, deviceID string) (int64, error) {
 			assert.Equal(t, []string{"c1", "c2"}, clipIDs)
+			assert.Equal(t, "test-device", deviceID)
 			return 2, nil
 		},
 	}

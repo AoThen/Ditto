@@ -109,6 +109,47 @@ func TestGetChanges_PullOnly(t *testing.T) {
 	assert.NotNil(t, data["deleted_ids"])
 }
 
+// TestGetChanges_CrossDeviceDeletion — create on device A, delete via device B,
+// then verify device A learns about the deletion in deleted_ids.
+func TestGetChanges_CrossDeviceDeletion(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	// Register one user, then obtain tokens for two separate devices.
+	statusCode, _ := testutil.RegisterUser(t, server, "crossdeluser", "crossdel@test.com", "password123")
+	require.Equal(t, http.StatusOK, statusCode)
+
+	loginA, loginABody, _ := testutil.LoginUserWithDeviceName(t, server, "crossdeluser", "password123", "device-a")
+	require.Equal(t, http.StatusOK, loginA)
+	_, _, dataA := testutil.ParseResponse(t, loginABody)
+	tokenA, _ := dataA["device_token"].(string)
+	devA, _ := dataA["device_id"].(string)
+	require.NotEmpty(t, tokenA)
+
+	loginB, loginBBody, _ := testutil.LoginUserWithDeviceName(t, server, "crossdeluser", "password123", "device-b")
+	require.Equal(t, http.StatusOK, loginB)
+	_, _, dataB := testutil.ParseResponse(t, loginBBody)
+	tokenB, _ := dataB["device_token"].(string)
+	require.NotEmpty(t, tokenB)
+
+	clipID := fmt.Sprintf("clip-crossdel-%d", time.Now().UnixNano())
+	createClipViaSync(t, server, tokenA, devA, clipID, "Cross-device delete", "to be deleted by B")
+
+	// Device B deletes the clip created by device A
+	delStatus, delBody := testutil.AuthDelete(t, server, "/api/v1/clips/"+clipID, tokenB)
+	require.Equal(t, http.StatusOK, delStatus, "delete failed: %s", string(delBody))
+
+	// Device A pulls changes — must learn about the deletion
+	since := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/clips/changes?since="+since, tokenA)
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data := testutil.ParseResponse(t, respBody)
+	require.Equal(t, 0, code)
+
+	deleted, ok := data["deleted_ids"].([]interface{})
+	require.True(t, ok, "deleted_ids should be a list")
+	assert.Contains(t, deleted, clipID, "creator device should be notified of the deletion")
+}
+
 func TestGetChanges_EmptySince(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 

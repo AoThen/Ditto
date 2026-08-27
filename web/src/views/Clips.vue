@@ -456,6 +456,8 @@ function getFormatName(formatType) {
 }
 
 // Data decoding helpers
+import { base64ToUtf8 } from '@/utils/base64'
+
 function decodeTextData(fmt) {
   if (!fmt || !fmt.data) return '(无数据)'
   // If data is hex-encoded, decode it
@@ -465,6 +467,12 @@ function decodeTextData(fmt) {
     } catch (e) {
       return '(文本解码失败)'
     }
+  }
+  // Text formats are stored as base64(UTF-8 bytes) by the backend.
+  // Without this decode, Chinese/emoji text previews and copies show base64 garbage.
+  if (isTextFormat(fmt.format_type)) {
+    const decoded = base64ToUtf8(fmt.data)
+    if (decoded !== null) return decoded
   }
   // Otherwise assume plain text
   return fmt.data
@@ -478,6 +486,11 @@ function decodeHTMLData(fmt) {
     } catch (e) {
       return '<html><body><p>HTML 解码失败</p></body></html>'
     }
+  }
+  // HTML format data is also base64(UTF-8 bytes)
+  if (isHTMLFormat(fmt.format_type)) {
+    const decoded = base64ToUtf8(fmt.data)
+    if (decoded !== null) return decoded
   }
   return fmt.data
 }

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"ditto-cloud-server/internal/database"
+	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/tests/testutil"
 
 	"github.com/stretchr/testify/assert"
@@ -328,4 +330,34 @@ func TestBatchMarkDontSync_Success(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "clip should still exist in list after dont-sync")
+}
+
+// TestSoftDeleteRePush — push a clip, delete it (soft), then re-push the same ID;
+// the clip must be restored without a primary-key conflict or spurious conflict copy.
+func TestSoftDeleteRePush(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	clipID := fmt.Sprintf("clip-restore-%d", time.Now().UnixNano())
+	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "Restore me", "will be deleted then restored")
+
+	// Soft-delete the clip
+	delStatus, delBody := testutil.AuthDelete(t, server, "/api/v1/clips/"+clipID, user.Token)
+	require.Equal(t, http.StatusOK, delStatus, "delete failed: %s", string(delBody))
+
+	// Verify it's gone from normal queries (soft-deleted)
+	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/clips/"+clipID, user.Token)
+	assert.Equal(t, http.StatusNotFound, statusCode)
+
+	// Re-push the same clip ID
+	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "Restore me", "restored content")
+
+	// Should be restored and visible again
+	statusCode, respBody = testutil.AuthGet(t, server, "/api/v1/clips/"+clipID, user.Token)
+	require.Equal(t, http.StatusOK, statusCode, "expected 200 after restore, got %d: %s", statusCode, string(respBody))
+
+	// Verify no conflict copy was created (only one clip with this ID)
+	var count int64
+	database.DB.Model(&model.Clip{}).Where("id = ?", clipID).Count(&count)
+	assert.Equal(t, int64(1), count, "should have exactly one clip after restore, not a conflict copy")
 }
