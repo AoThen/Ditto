@@ -124,19 +124,6 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit -- --run
 
-  # ── Windows Client (C++/MFC) ──────────────────────────────
-  client-build-windows:
-    runs-on: windows-2022
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Windows build environment
-        uses: ./.github/actions/setup-windows-env
-
-      - name: Build (Release x64)
-        run: msbuild CP_Main_10.sln /t:CP_Main /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot=C:\vcpkg
-
   # ── Windows Client Tests (C++/Google Test) ────────────────
   client-test-windows:
     runs-on: windows-2022

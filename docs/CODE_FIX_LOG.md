@@ -2,7 +2,7 @@
 
 日期：2026-08-08
 范围：Go 云同步契约 + C++ 客户端安全/功能修复（A1-A10, B1-B7, C1-C5）
-验证：Go 端 `go test ./...` 全绿（29 用例）；C++ 端经 GitHub Actions client-build-windows 验证
+验证：Go 端 `go test ./...` 全绿（29 用例）；C++ 端经 GitHub Actions client-build-portable 验证
 
 ## 批 1：云同步契约（Go 服务端）
 
@@ -52,4 +52,4 @@
 ## 验证结果
 
 - Go：`go test ./...`（含 tests/ 集成）全部通过；gofmt 干净
-- C++：无法本机编译，依赖 CI `client-build-windows` job 验证（验证后补记结果）
+- C++：无法本机编译，依赖 CI `client-build-portable` job 验证（验证后补记结果）
