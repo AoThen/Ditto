@@ -247,7 +247,7 @@
 	<Ditto_Options_Shortcuts>
 		<Item English_Text = "Activate Ditto" ID = "2048">啟動 Ditto</Item>
 		<Item English_Text = "Win" ID = "2035">Win</Item>
-		<Item English_Text = "Named Copy" ID = "2049">已命名的複製</Item>
+		<Item English_Text = "Text Only Paste" ID = "2049">僅貼上純文字</Item>
 		<Item English_Text = "Win" ID = "2036">Win</Item>
 		<Item English_Text = "Global Hot Keys for Last Ten Items Copied" ID = "2051">最新十組複製項目的全域快捷鍵</Item>
 		<Item English_Text = "Send Paste (Otherwise it will just load the item on the clipboard)" ID = "1042">傳送貼上 (否則只會載入剪貼簿上的項目)</Item>

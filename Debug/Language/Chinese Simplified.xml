@@ -65,7 +65,7 @@
 		<Item English_Text = "Auto Delete" ID = "32821">自动删除</Item>
 		<Item English_Text = "Remove Hot Key" ID = "32822">移除热键</Item>
 		<Item English_Text = "Options..." ID = "32805">选项...</Item>
-		<Item English_Text = "Help" ID = "32842">H 帮助</Item>
+		<Item English_Text = "Help" ID = "32842">帮助</Item>
 		<Item English_Text = "Disconnect from Clipboard" ID = "32775">断开剪贴板连接</Item>
 		<Item English_Text = "Exit Program" ID = "32806">退出程序</Item>
 		
@@ -130,10 +130,10 @@
 		
 		<Item English_Text = "Show Startup Message" ID = "32959">显示启动信息</Item>
 		<Item English_Text = "Filter On Selected Clip" ID = "32910">使用所选剪贴项进行过滤</Item>		
-		<Item English_Text = "Invert Case" ID = "32958">翻转大小写</Item>
+		<Item English_Text = "Invert Case" ID = "32958">交换大小写</Item>
 		<Item English_Text = "Trim White Space" ID = "32946">修剪空白字符</Item>
-		<Item English_Text = "Slugify" ID = " 32954">slug格式</Item>		
-		<Item English_Text = "Paste, Don't Change Clip Order" ID = " 32945">粘贴，不要改变剪贴项顺序</Item>		
+		<Item English_Text = "Slugify" ID = "32954">URL 友好化（slugify）</Item>		
+		<Item English_Text = "Paste, Don't Change Clip Order" ID = "32945">粘贴，不要改变剪贴项顺序</Item>		
 		<Item English_Text = "Gmail, Content In Body" ID = "32952">Gmail，正文中的内容</Item>
 		<Item English_Text = "EMail, Clip Export As Attachment" ID = "32953">电子邮件，导出剪贴项为附件</Item>
 		<Item English_Text = "EMail, Content As Attachment" ID = "32956">电子邮件，内容作为附件</Item>
@@ -153,7 +153,7 @@
 		<Item English_Text = "CamelCase" ID = "32971">驼峰命名法</Item>
 		<Item English_Text = "Multiple Images Horizontally" ID = "32976">水平显示多图</Item>
 		<Item English_Text = "Multiple Images Vertically" ID = "32978">竖直显示多图</Item>
-		<Item English_Text = "Ascii Text Only" ID = "32979">仅Ascii字符</Item>
+		<Item English_Text = "Ascii Text Only" ID = "32979">仅 ASCII 字符</Item>
 		<Item English_Text = "Replace Top Sticky Clip" ID = "32938">替换固定到顶部</Item>
 		<Item English_Text = "Set Drag File Name" ID = "32970">设置拖拽文件名</Item>
 		
@@ -187,7 +187,7 @@
 		<Item English_Text = "Hotkey available globally" ID = "1026">全局可用热键</Item>
 		<Item English_Text = "Last Used" ID = "2043">最后使用</Item>
 		<Item English_Text = "Quick Paste Text" ID = "2125">快速粘贴文本</Item>
-		<Item English_Text = "Selected format MD5" ID = "2167">选择MD5格式</Item>
+		<Item English_Text = "Selected format MD5" ID = "2167">所选格式的 MD5</Item>
 		<Item English_Text = "Dont Sync" ID = "2176">不同步</Item>
 		<Item English_Text = "This will also mark all sub-groups and content under this group as not synced. Are you sure?" ID = "GroupDontSyncConfirm">将同时标记该组下所有子分组和内容为不同步，确定？</Item>
 				
@@ -242,15 +242,15 @@
 		<Item English_Text = "Supported Types" ID = "-1" PropertyPage = "true">支持类型</Item>
 		
 		//New item added 12/17/16
-		<Item English_Text = "Current Clipboard Types" ID = "2128">当前剪贴板类型 </Item>
-		<Item English_Text = "Primary Clipboard Types" ID = "2145">主要剪贴板类型 </Item>
-		<Item English_Text = "Custom Clipboard Type" ID = "2130">自定义剪贴板类型 </Item>
+		<Item English_Text = "Current Clipboard Types" ID = "2128">当前剪贴板类型</Item>
+		<Item English_Text = "Primary Clipboard Types" ID = "2145">主要剪贴板类型</Item>
+		<Item English_Text = "Custom Clipboard Type" ID = "2130">自定义剪贴板类型</Item>
 		
 	</Ditto_Options_Supported_Types>
 	<Ditto_Options_Shortcuts>
 		<Item English_Text = "Activate Ditto" ID = "2048">激活 Ditto</Item>
 		<Item English_Text = "Win" ID = "2035"></Item>
-		<Item English_Text = "Named Copy" ID = "2049">复制项命名</Item>
+		<Item English_Text = "Text Only Paste" ID = "2049">纯文本粘贴</Item>
 		<Item English_Text = "Win" ID = "2036"></Item>
 		<Item English_Text = "Global Hot Keys for Last Ten Items Copied" ID = "2051">最后十个复制项目的全局热键</Item>
 		<Item English_Text = "Send Paste (Otherwise it will just load the item on the clipboard)" ID = "1042">发送粘贴（否则只会加载剪贴板中的项目）</Item>
@@ -517,15 +517,15 @@
 		<Item English_Text = "Ditto is running minimized, Ditto can be opened by hot keys or by clicking the task tray icon" ID = "StartupMsg">Ditto 正以最小化方式运行，可通过热键或单击任务栏图标打开</Item>
 		<Item English_Text = "There are no results for" ID = "NoSearchResults">没有任何结果</Item>
 		<Item English_Text = "Warning this can take quite a long time and require up to double the hard drive space as your current database size, Continue?" ID = "CompactRepairWarning">警告，这可能需要相当长的时间，并且需要两倍于你当前数据库大小的硬盘空间，是否继续？</Item>
-		<Item English_Text = "Prompt For Name" ID = "prompt_for_name">提示名字</Item>
+		<Item English_Text = "Prompt For Name" ID = "prompt_for_name">提示输入名称</Item>
 		<Item English_Text = "(Follow windows light/dark themes)" ID = "FollowWindowsTheme">（遵循 Windows 明/暗主题）</Item>
 		
 		<Item English_Text = "Backing up database" ID = "BackupDbMsg">备份数据库信息</Item>
 		<Item English_Text = "Restoring database" ID = "RestoreDbMsg">还原数据库信息</Item>
-		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips">删除所有不在组中、标记为永不自动删除、拥有快捷键或置顶的剪辑。\n\n此操作无法撤销。</Item>
+		<Item English_Text = "Delete all clips that are not groups, in groups, marked as never auto delete, has a shortcut key or marked as sticky.\n\nThis cannot be undone." ID = "Delete_All_Non_Used_Clips">删除所有不在组中、标记为永不自动删除、拥有快捷键或置顶的剪贴项。\n\n此操作无法撤销。</Item>
 		<Item English_Text = "Delete Group?" ID = "Delete_Clip_Groups">删除组？</Item>
-		<Item English_Text = "There are no starred clips" ID = "NoStarredClips">没有星标剪辑</Item>
-		<Item English_Text = "[Starred clips]" ID = "starred_clips">[星标剪辑]</Item>
+		<Item English_Text = "There are no starred clips" ID = "NoStarredClips">没有星标剪贴项</Item>
+		<Item English_Text = "[Starred clips]" ID = "starred_clips">[星标剪贴项]</Item>
 		<Item English_Text = "Exception: %hs" ID = "CloudStatusEncryptionException">异常：%hs</Item>
 		
 		<Item English_Text = "Ditto was unable to open its database, waiting until it can be opened. Update the path in Options if needed. Path: " ID = "StartupNoDbMsg">Ditto 无法打开数据库，将等待它可以打开的时候。 如果需要，更新选项中的路径。 路径： </Item>
@@ -778,8 +778,8 @@
 		<Item English_Text = "Toggle On File Logging" ID = "7">切换到文件记录</Item>
 		<Item English_Text = "Toggle OutputDebugString Logging" ID = "8">切换到输出调试字符串记录</Item>
 		<Item English_Text = "Close Window" ID = "9">关闭窗口</Item>
-		<Item English_Text = "NEXTTABCONTROL" ID = "10">后一项tab控件</Item>
-		<Item English_Text = "PREVTABCONTROL" ID = "11">前一项tab控件</Item>
+		<Item English_Text = "NEXTTABCONTROL" ID = "10">下一个标签控件</Item>
+		<Item English_Text = "PREVTABCONTROL" ID = "11">上一个标签控件</Item>
 		<Item English_Text = "View Groups" ID = "12">查看组</Item>
 		<Item English_Text = "New Clip" ID = "13">新建剪贴项</Item>
 		<Item English_Text = "Edit Clip" ID = "14">编辑剪贴项</Item>
@@ -855,7 +855,7 @@
 		<Item English_Text = "Delete Clip Data" ID = "84">删除剪贴数据</Item>
 		<Item English_Text = "Replace Top Sticky Clip" ID = "85">替换置顶剪贴项</Item>
 		<Item English_Text = "Prompt send to friend" ID = "86">发送给朋友的提示语</Item>
-		<Item English_Text = "Save copied file (cf_hdrop) contents into Ditto" ID = "87">保存复制文件 (cf_hdrop) 内容到剪贴板</Item>
+		<Item English_Text = "Save copied file (cf_hdrop) contents into Ditto" ID = "87">保存复制的文件 (cf_hdrop) 内容到 Ditto</Item>
 		<Item English_Text = "Toggle clipboard connection" ID = "88">切换剪贴板连接</Item>
 		<Item English_Text = "Move Selection Up" ID = "89">上移选中对象</Item>
 		<Item English_Text = "Move Selection Down" ID = "90">下移选中对象</Item>
@@ -864,8 +864,8 @@
 		<Item English_Text = "Toggle Search Method" ID = "93">切换搜索方法</Item>
 		<Item English_Text = "Move Clip Last" ID = "95">移动条目到最后</Item>
 		<Item English_Text = "Paste, Don't Change Clip Order" ID = "96">粘贴，但不改变条目顺序</Item>
-		<Item English_Text = "Paste, Trim White Space" ID = "97">粘贴，自动清除空格</Item>
-		<Item English_Text = "Set Transparency None" ID = "98">透明度： 0</Item>
+		<Item English_Text = "Paste, Trim White Space" ID = "97">粘贴，修剪首尾空白</Item>
+		<Item English_Text = "Set Transparency None" ID = "98">透明度：0</Item>
 		<Item English_Text = "Set Transparency 5%" ID = "99">透明度： 5%</Item>
 		<Item English_Text = "Set Transparency 10%" ID = "100">透明度：10%</Item>
 		<Item English_Text = "Set Transparency 15%" ID = "101">透明度：15%</Item>
@@ -881,7 +881,7 @@
 		<Item English_Text = "EMail, Clip Export As Attachment" ID = "111">邮件，剪贴板导出为附件</Item>
 		<Item English_Text = "EMail, Content As Attachment" ID = "112">邮件，内容作为附件</Item>
 		<Item English_Text = "Gmail" ID = "113">Gmail</Item>
-		<Item English_Text = "Slugify" ID = "114">url友好化(slugify)</Item>
+		<Item English_Text = "Slugify" ID = "114">URL 友好化（slugify）</Item>
 		<Item English_Text = "Invert Case" ID = "115">交换大小写</Item>
 		<Item English_Text = "Copy Selection" ID = "116">复制</Item>
 		<Item English_Text = "Force Close Window" ID = "117">强制关闭窗口</Item>
