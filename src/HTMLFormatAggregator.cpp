@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include ".\htmlformataggregator.h"
 #include "Misc.h"
-#include "shared\Tokenizer.h"
 
 CHTMLFormatAggregator::CHTMLFormatAggregator(CStringA csSepator) :
 	m_csSeparator(csSepator)
@@ -65,56 +64,71 @@ HGLOBAL CHTMLFormatAggregator::GetHGlobal()
 
 bool CHTMFormatStruct::GetData(LPCSTR HTML)
 {
-	CTokenizer Tokenizer(HTML, "\r\n");
-	CString Token;
-	while(Tokenizer.Next(Token))
-	{
-		CTokenizer ItemTokenizer(Token, ":");
-		CString csParam;
-		ItemTokenizer.Next(csParam);
-		CString csValue = ItemTokenizer.Tail();
+	CStringA csHTML(HTML);
 
-		if(csParam == "Version")
-		{
-			m_csVersion = csValue;
-		}
-		else if(csParam == "StartHTML")
-		{
-			m_lStartHTML = ATOI(csValue);
-		}
-		else if(csParam == "EndHTML")
-		{
-			m_lEndHTML = ATOI(csValue);
-		}
-		else if(csParam == "StartFragment")
-		{
-			m_lStartFragment = ATOI(csValue);
-		}
-		else if(csParam == "EndFragment")
-		{
-			m_lEndFragment = ATOI(csValue);
-		}
-		else if(csParam == "SourceURL")
-		{
-			m_csSourceURL = csValue;
-			break;
-		}
-		else if(csParam.Left(5) == "<html")
-		{
-			break;
-		}
-	}
-
-	if(m_lStartFragment >= 0 && m_lEndFragment >= 0 && m_lStartFragment < m_lEndFragment)
-	{
-		m_csFragment = Tokenizer.m_cs.Mid(m_lStartFragment, m_lEndFragment-m_lStartFragment);
-		m_csFragment = m_csFragment.Trim();
-	}
-
-	if(m_csFragment.IsEmpty())
-	{
+	// Drop trailing NUL padding that may have been inserted by AddClip
+	int nLen = csHTML.GetLength();
+	while (nLen > 0 && csHTML[nLen - 1] == '\0')
+		nLen--;
+	if (nLen <= 0)
 		return false;
+	csHTML = csHTML.Left(nLen);
+
+	// Parse the ASCII header lines. All values are byte offsets or strings
+	// in the original UTF-8 source, so we must stay in byte space and
+	// never convert through the system ANSI codepage.
+	int nPos = 0;
+	while (nPos < nLen)
+	{
+		int nLineEnd = csHTML.Find("\r\n", nPos);
+		if (nLineEnd < 0)
+			nLineEnd = nLen;
+
+		CStringA line = csHTML.Mid(nPos, nLineEnd - nPos);
+		int nColon = line.Find(':');
+		if (nColon >= 0)
+		{
+			CStringA csParam = line.Left(nColon);
+			csParam.Trim();
+			CStringA csValue = line.Mid(nColon + 1);
+			csValue.Trim();
+
+			if (csParam.CompareNoCase("Version") == 0)
+				m_csVersion = csValue;
+			else if (csParam.CompareNoCase("StartHTML") == 0)
+				m_lStartHTML = atol(csValue);
+			else if (csParam.CompareNoCase("EndHTML") == 0)
+				m_lEndHTML = atol(csValue);
+			else if (csParam.CompareNoCase("StartFragment") == 0)
+				m_lStartFragment = atol(csValue);
+			else if (csParam.CompareNoCase("EndFragment") == 0)
+				m_lEndFragment = atol(csValue);
+			else if (csParam.CompareNoCase("SourceURL") == 0)
+			{
+				m_csSourceURL = csValue;
+				break;
+			}
+		}
+		else if (line.Find("<html") >= 0)
+		{
+			break;
+		}
+
+		if (nLineEnd >= nLen)
+			break;
+		nPos = nLineEnd + 2;
 	}
+
+	if (m_lStartFragment >= 0 && m_lEndFragment >= 0 &&
+		m_lStartFragment < m_lEndFragment &&
+		m_lEndFragment <= nLen)
+	{
+		m_csFragment = csHTML.Mid(m_lStartFragment, m_lEndFragment - m_lStartFragment);
+		m_csFragment.Trim();
+	}
+
+	if (m_csFragment.IsEmpty())
+		return false;
 
 	return true;
 }
