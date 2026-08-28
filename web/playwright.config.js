@@ -26,7 +26,7 @@ export default defineConfig({
     {
       command: 'cd ../server && go run ./cmd/server/',
       url: 'http://localhost:8080/health',
-      timeout: 30000,
+      timeout: 120000,
       reuseExistingServer: !process.env.CI,
     },
     {
