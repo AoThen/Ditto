@@ -9,10 +9,10 @@ test.describe('Clip Management', () => {
   })
 
   test('should create clip via API and verify', async ({ page }) => {
-    const { deviceId } = await loginAsNewUser(page)
+    const { deviceId, request } = await loginAsNewUser(page)
 
     const clipId = `clip-e2e-${Date.now()}`
-    const syncResp = await page.request.post('/api/v1/clips/sync', {
+    const syncResp = await request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -28,7 +28,7 @@ test.describe('Clip Management', () => {
     })
     expect(syncResp.status()).toBe(200)
 
-    const clipsResp = await page.request.get('/api/v1/clips?page=1&per_page=10')
+    const clipsResp = await request.get('/api/v1/clips?page=1&per_page=10')
     const clipsData = await clipsResp.json()
     expect(clipsData.data.total).toBeGreaterThanOrEqual(1)
     const found = clipsData.data.items?.some(item => item.description === 'E2E API Test Clip')
@@ -36,9 +36,9 @@ test.describe('Clip Management', () => {
   })
 
   test('should search clips', async ({ page }) => {
-    const { deviceId } = await loginAsNewUser(page)
+    const { deviceId, request } = await loginAsNewUser(page)
 
-    await page.request.post('/api/v1/clips/sync', {
+    await request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -53,20 +53,20 @@ test.describe('Clip Management', () => {
       }
     })
 
-    const clipsResp = await page.request.get('/api/v1/clips?search=UniqueSearchTerm123')
+    const clipsResp = await request.get('/api/v1/clips?search=UniqueSearchTerm123')
     const clipsData = await clipsResp.json()
     expect(clipsData.data.total).toBeGreaterThanOrEqual(1)
 
-    const emptyResp = await page.request.get('/api/v1/clips?search=nonexistent_xyz_123')
+    const emptyResp = await request.get('/api/v1/clips?search=nonexistent_xyz_123')
     const emptyData = await emptyResp.json()
     expect(emptyData.data.total).toBe(0)
   })
 
   test('should delete a clip via API', async ({ page }) => {
-    const { deviceId } = await loginAsNewUser(page)
+    const { deviceId, request } = await loginAsNewUser(page)
 
     const clipId = `clip-delete-${Date.now()}`
-    await page.request.post('/api/v1/clips/sync', {
+    await request.post('/api/v1/clips/sync', {
       data: {
         since: '2000-01-01T00:00:00Z',
         device_id: deviceId,
@@ -81,13 +81,13 @@ test.describe('Clip Management', () => {
       }
     })
 
-    const beforeResp = await page.request.get(`/api/v1/clips/${clipId}`)
+    const beforeResp = await request.get(`/api/v1/clips/${clipId}`)
     expect(beforeResp.status()).toBe(200)
 
-    const deleteResp = await page.request.delete(`/api/v1/clips/${clipId}`)
+    const deleteResp = await request.delete(`/api/v1/clips/${clipId}`)
     expect(deleteResp.status()).toBe(200)
 
-    const afterResp = await page.request.get(`/api/v1/clips/${clipId}`)
+    const afterResp = await request.get(`/api/v1/clips/${clipId}`)
     expect(afterResp.status()).toBe(404)
   })
 })

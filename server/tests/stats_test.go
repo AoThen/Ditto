@@ -133,3 +133,21 @@ func TestStats_OverviewAfterSync(t *testing.T) {
 	assert.Equal(t, float64(1), data["total_clips"])
 	assert.Equal(t, float64(1), data["total_devices"])
 }
+
+func TestStats_SyncLogs_ActionFilter(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	clipID := fmt.Sprintf("clip-stats-action-%d", time.Now().UnixNano())
+	createClipViaSync(t, server, user.Token, user.DeviceID, clipID, "Action clip", "Content")
+
+	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/stats/sync-logs?action=push", user.Token)
+	require.Equal(t, http.StatusOK, statusCode)
+	code, _, data := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, code)
+
+	items := data["items"].([]interface{})
+	for _, item := range items {
+		assert.Equal(t, "push", item.(map[string]interface{})["action"])
+	}
+}

@@ -102,6 +102,16 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		}
 	}
 
+	// Semi-protected routes (need valid token but not device-specific)
+	semiProtected := v1.Group("")
+	semiProtected.Use(middleware.Auth(cfg))
+	{
+		semiAuth := semiProtected.Group("/auth")
+		{
+			semiAuth.POST("/refresh", authHandler.Refresh)
+		}
+	}
+
 	// Protected routes
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
@@ -112,6 +122,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		{
 			devices.GET("", deviceHandler.ListDevices)
 			devices.DELETE("/:id", deviceHandler.RemoveDevice)
+			devices.PATCH("/:id", deviceHandler.UpdateDevice)
 		}
 
 		clips := protected.Group("/clips")
@@ -125,6 +136,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)
 			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
@@ -249,6 +261,12 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 		}
 	}
 
+	semiProtected := v1.Group("")
+	semiProtected.Use(middleware.Auth(cfg))
+	{
+		semiProtected.POST("/auth/refresh", authHandler.Refresh)
+	}
+
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
 	{
@@ -258,6 +276,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 		{
 			devices.GET("", deviceHandler.ListDevices)
 			devices.DELETE("/:id", deviceHandler.RemoveDevice)
+			devices.PATCH("/:id", deviceHandler.UpdateDevice)
 		}
 
 		clips := protected.Group("/clips")
@@ -271,6 +290,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)
 			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
@@ -400,6 +420,12 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 		}
 	}
 
+	semiProtected := v1.Group("")
+	semiProtected.Use(middleware.Auth(cfg))
+	{
+		semiProtected.POST("/auth/refresh", authHandler.Refresh)
+	}
+
 	protected := v1.Group("")
 	protected.Use(middleware.Auth(cfg))
 	{
@@ -409,6 +435,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 		{
 			devices.GET("", deviceHandler.ListDevices)
 			devices.DELETE("/:id", deviceHandler.RemoveDevice)
+			devices.PATCH("/:id", deviceHandler.UpdateDevice)
 		}
 
 		clips := protected.Group("/clips")
@@ -422,6 +449,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 			clips.POST("/sync", clipHandler.Sync)
 			clips.POST("/conflicts/:id/resolve", clipHandler.ResolveConflictClip)
 			clips.POST("/remove-from-group", groupHandler.RemoveClipsFromGroup)
+			clips.POST("/batch-delete", clipHandler.BatchDeleteClips)
 			clips.POST("/batch-dont-sync", clipHandler.BatchMarkDontSync)
 		}
 
@@ -578,6 +606,12 @@ func AuthPut(t *testing.T, server *httptest.Server, path, token string, body int
 	return doJSON(t, server, "PUT", path, token, body, "")
 }
 
+// AuthPatch performs an authenticated PATCH request.
+func AuthPatch(t *testing.T, server *httptest.Server, path, token string, body interface{}) (int, []byte) {
+	t.Helper()
+	return doJSON(t, server, "PATCH", path, token, body, "")
+}
+
 // AuthPostWithIP performs an authenticated POST request with a specific X-Forwarded-For IP.
 func AuthPostWithIP(t *testing.T, server *httptest.Server, path, token string, body interface{}, forwardedFor string) (int, []byte) {
 	t.Helper()
@@ -588,6 +622,18 @@ func AuthPostWithIP(t *testing.T, server *httptest.Server, path, token string, b
 func PostWithIP(t *testing.T, server *httptest.Server, path, forwardedFor string, body interface{}) (int, []byte) {
 	t.Helper()
 	return doJSON(t, server, "POST", path, "", body, forwardedFor)
+}
+
+// RefreshWithCookies calls POST /api/v1/auth/refresh with the given cookie jar string.
+func RefreshWithCookies(t *testing.T, server *httptest.Server, cookieStr string) (int, []byte) {
+	t.Helper()
+	return doJSONWithCookie(t, server, "POST", "/api/v1/auth/refresh", cookieStr, nil)
+}
+
+// LogoutWithCookies calls POST /api/v1/auth/logout with the given cookie jar string.
+func LogoutWithCookies(t *testing.T, server *httptest.Server, cookieStr string) (int, []byte) {
+	t.Helper()
+	return doJSONWithCookie(t, server, "POST", "/api/v1/auth/logout", cookieStr, nil)
 }
 
 // LoginUserWithDeviceName logs in a user with a specific device name via HTTP.
@@ -706,7 +752,39 @@ func doJSON(t *testing.T, server *httptest.Server, method, path, token string, b
 	return resp.StatusCode, respBody
 }
 
-// doJSONWithCookies is like doJSON but also returns Set-Cookie headers.
+// doJSONWithCookie performs a JSON HTTP request with Cookie header (for refresh/logout).
+func doJSONWithCookie(t *testing.T, server *httptest.Server, method, path, cookieStr string, body interface{}) (int, []byte) {
+	t.Helper()
+
+	var reqBody io.Reader
+	if body != nil {
+		jsonBytes, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("failed to marshal request body: %v", err)
+		}
+		reqBody = bytes.NewReader(jsonBytes)
+	}
+
+	req, err := http.NewRequest(method, server.URL+path, reqBody)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Cookie", cookieStr)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+
+	return resp.StatusCode, respBody
+}
 // H1: Used to extract HttpOnly tokens from login responses.
 func doJSONWithCookies(t *testing.T, server *httptest.Server, method, path, token string, body interface{}, forwardedFor string) (int, []byte, []string) {
 	t.Helper()

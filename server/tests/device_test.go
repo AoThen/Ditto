@@ -122,3 +122,45 @@ func TestDevice_Remove(t *testing.T) {
 	// Verify the correct device remains (base64-encoded "DeviceToKeep")
 	assert.Equal(t, "dev-1-RGV2aWNlVG9LZWVw", devices[0].ID)
 }
+
+func TestDevice_Rename_Success(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	body := map[string]string{"device_name": "My Renamed Device"}
+	statusCode, respBody := testutil.AuthPatch(t, server, "/api/v1/devices/"+user.DeviceID, user.Token, body)
+	assert.Equal(t, http.StatusOK, statusCode)
+	code, message, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "设备名称已更新", message)
+
+	_, devicesResp := testutil.AuthGet(t, server, "/api/v1/devices", user.Token)
+	_, devices := parseDeviceListResponse(t, devicesResp)
+	for _, d := range devices {
+		if d.ID == user.DeviceID {
+			assert.Equal(t, "My_Renamed_Device", d.DeviceName)
+			return
+		}
+	}
+	t.Fatal("renamed device not found in list")
+}
+
+func TestDevice_Rename_InvalidInput(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	body := map[string]string{"device_name": ""}
+	statusCode, respBody := testutil.AuthPatch(t, server, "/api/v1/devices/"+user.DeviceID, user.Token, body)
+	assert.Equal(t, http.StatusBadRequest, statusCode)
+	code, _, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 40000, code)
+}
+
+func TestDevice_Rename_NotFound(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	body := map[string]string{"device_name": "Nonexistent"}
+	statusCode, _ := testutil.AuthPatch(t, server, "/api/v1/devices/nonexistent-device-id", user.Token, body)
+	assert.Equal(t, http.StatusInternalServerError, statusCode)
+}

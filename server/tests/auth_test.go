@@ -221,3 +221,39 @@ func TestAuth_ExpiredToken(t *testing.T) {
 	assert.Equal(t, 40102, code)
 	assert.Contains(t, message, "无效")
 }
+
+func TestAuth_Refresh_Success(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "refreshuser", "refreshuser@example.com", "password123")
+	_, _, setCookies := testutil.LoginUserWithCookies(t, server, "refreshuser", "password123")
+	deviceToken := testutil.ExtractCookie(setCookies, "device_token")
+	require.NotEmpty(t, deviceToken)
+
+	cookies := fmt.Sprintf("device_token=%s", deviceToken)
+	statusCode, respBody := testutil.RefreshWithCookies(t, server, cookies)
+	assert.Equal(t, http.StatusOK, statusCode)
+	code, message, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "Token 刷新成功", message)
+}
+
+func TestAuth_Logout_Success(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "logoutuser", "logoutuser@example.com", "password123")
+	_, _, setCookies := testutil.LoginUserWithCookies(t, server, "logoutuser", "password123")
+
+	deviceToken := testutil.ExtractCookie(setCookies, "device_token")
+	require.NotEmpty(t, deviceToken)
+
+	cookies := fmt.Sprintf("device_token=%s", deviceToken)
+	statusCode, respBody := testutil.LogoutWithCookies(t, server, cookies)
+	assert.Equal(t, http.StatusOK, statusCode)
+	code, message, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "已退出登录", message)
+
+	loginRespCode, _ := testutil.AuthGet(t, server, "/api/v1/devices", deviceToken)
+	assert.Equal(t, http.StatusUnauthorized, loginRespCode)
+}

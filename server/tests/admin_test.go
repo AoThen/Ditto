@@ -201,3 +201,57 @@ func TestAdmin_ResetPassword(t *testing.T) {
 	statusCode, _ := testutil.LoginUser(t, server, "resetme", "newpass456")
 	assert.Equal(t, http.StatusOK, statusCode)
 }
+
+func TestAdmin_GetUser(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	token, _ := testutil.RegisterAndLogin(t, server, "admin7", "admin7@example.com", "adminpass123")
+
+	_, respBody := testutil.AuthPost(t, server, "/api/v1/admin/users", token, map[string]string{
+		"username": "getuser",
+		"email":    "getuser@example.com",
+		"password": "pass123",
+	})
+	_, _, data := testutil.ParseResponse(t, respBody)
+	userID := fmt.Sprintf("%.0f", data["user_id"].(float64))
+
+	respCode, respBody := testutil.AuthGet(t, server, "/api/v1/admin/users/"+userID, token)
+	assert.Equal(t, http.StatusOK, respCode)
+	respCode, _, respData := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, respCode)
+	assert.Equal(t, "getuser", respData["username"])
+	assert.Equal(t, "getuser@example.com", respData["email"])
+}
+
+func TestAdmin_GetUser_NotFound(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	token, _ := testutil.RegisterAndLogin(t, server, "admin8", "admin8@example.com", "adminpass123")
+
+	respCode, _ := testutil.AuthGet(t, server, "/api/v1/admin/users/99999", token)
+	assert.Equal(t, http.StatusNotFound, respCode)
+}
+
+func TestAdmin_UpdateUser(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	token, _ := testutil.RegisterAndLogin(t, server, "admin9", "admin9@example.com", "adminpass123")
+
+	_, respBody := testutil.AuthPost(t, server, "/api/v1/admin/users", token, map[string]string{
+		"username": "updateme",
+		"email":    "updateme@example.com",
+		"password": "pass123",
+	})
+	_, _, data := testutil.ParseResponse(t, respBody)
+	userID := fmt.Sprintf("%.0f", data["user_id"].(float64))
+
+	respCode, respBody := testutil.AuthPut(t, server, "/api/v1/admin/users/"+userID, token, map[string]string{
+		"role": "user",
+	})
+	assert.Equal(t, http.StatusOK, respCode)
+	respCode, message, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, respCode)
+	assert.Equal(t, "用户更新成功", message)
+
+	respCode, respBody = testutil.AuthGet(t, server, "/api/v1/admin/users/"+userID, token)
+	assert.Equal(t, http.StatusOK, respCode)
+	_, _, respData := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, "user", respData["role"])
+}

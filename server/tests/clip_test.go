@@ -361,3 +361,70 @@ func TestSoftDeleteRePush(t *testing.T) {
 	database.DB.Model(&model.Clip{}).Where("id = ?", clipID).Count(&count)
 	assert.Equal(t, int64(1), count, "should have exactly one clip after restore, not a conflict copy")
 }
+
+func TestBatchDeleteClips_Success(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	var clipIDs []string
+	for i := 0; i < 3; i++ {
+		clipID := fmt.Sprintf("clip-batchdel-%d-%d", time.Now().UnixNano(), i)
+		createClipViaSync(t, server, user.Token, user.DeviceID, clipID, fmt.Sprintf("Batch %d", i), "Content")
+		clipIDs = append(clipIDs, clipID)
+	}
+
+	statusCode, respBody := testutil.AuthPost(t, server, "/api/v1/clips/batch-delete", user.Token,
+		map[string]interface{}{"ids": clipIDs})
+	assert.Equal(t, http.StatusOK, statusCode)
+	code, _, data := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 0, code)
+	deleted := int(data["deleted"].(float64))
+	assert.Equal(t, 3, deleted)
+
+	statusCode, respBody = testutil.AuthGet(t, server, "/api/v1/clips", user.Token)
+	require.Equal(t, http.StatusOK, statusCode)
+	_, _, data = testutil.ParseResponse(t, respBody)
+	items, _ := data["items"].([]interface{})
+	assert.Len(t, items, 0)
+}
+
+func TestBatchDeleteClips_EmptyList(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	statusCode, respBody := testutil.AuthPost(t, server, "/api/v1/clips/batch-delete", user.Token,
+		map[string]interface{}{"ids": []string{}})
+	assert.Equal(t, http.StatusBadRequest, statusCode)
+	code, _, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 40000, code)
+}
+
+func TestSync_PushLimitExceeded(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	pushClips := make([]map[string]interface{}, 10000)
+	for i := range pushClips {
+		pushClips[i] = map[string]interface{}{
+			"id":          fmt.Sprintf("clip-limit-%d", i),
+			"description": "Limit test",
+			"crc":         int64(i),
+			"group_id":    "",
+			"short_cut":   0,
+			"formats": []map[string]interface{}{
+				{"format_type": 13, "data": base64.StdEncoding.EncodeToString([]byte("x"))},
+			},
+		}
+	}
+
+	syncBody := map[string]interface{}{
+		"since":      "2000-01-01T00:00:00Z",
+		"device_id":  user.DeviceID,
+		"push_clips": pushClips,
+	}
+
+	statusCode, respBody := testutil.AuthPost(t, server, "/api/v1/clips/sync", user.Token, syncBody)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, statusCode)
+	code, _, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 41300, code)
+}
