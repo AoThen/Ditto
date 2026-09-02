@@ -1076,14 +1076,11 @@ void CQListCtrl::DrawCopiedColorCode(CString& csText, CRect& rcText, CDC* pDC)
 	}
 
 	// 4. --- Non-W3C Format Parsing ---
-	// Fast reject for non-color text: most non-color text starts with
-	// non-digit, non-'(' and isn't a 6-char hex string
+	// Fast reject for non-color text: bare hex without #/0x prefix is not
+	// treated as a color, so only digit- or paren-leading text can match below
 	int textLen = parseText.GetLength();
 	if (textLen >= 3 && !_istdigit(parseText[0]) && parseText[0] != _T('('))
-	{
-		if (textLen != 6 || !IsHexString(parseText))
-			return;
-	}
+		return;
 
 	int r, g, b, chars_consumed = 0;
 
@@ -1124,17 +1121,6 @@ void CQListCtrl::DrawCopiedColorCode(CString& csText, CRect& rcText, CDC* pDC)
 	if (swscanf(parseText, _T("%d %d %d %n"), &r, &g, &b, &chars_consumed) == 3 && chars_consumed == parseText.GetLength())
 	{
 		if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255)
-		{
-			DrawColorBox(RGB(r, g, b));
-			return;
-		}
-	}
-
-	// Check for 6-digit hex: "FF00CC"
-	if (parseText.GetLength() == 6 && IsHexString(parseText))
-	{
-		// Use %n here as well for consistency, though length check is sufficient.
-		if (swscanf(parseText, _T("%2x%2x%2x%n"), &r, &g, &b, &chars_consumed) == 3 && chars_consumed == 6)
 		{
 			DrawColorBox(RGB(r, g, b));
 			return;
