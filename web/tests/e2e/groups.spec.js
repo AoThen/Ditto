@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import { loginAsNewUser } from './helpers'
 
 test.describe('Group Management', () => {
-  test('should show empty groups after login', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should show empty groups after login', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     await page.goto('/dashboard/groups')
     await expect(page.getByRole('heading', { name: '分组管理' })).toBeVisible({ timeout: 10000 })
@@ -11,8 +11,8 @@ test.describe('Group Management', () => {
     await expect(page.getByText('暂无分组')).toBeVisible({ timeout: 10000 })
   })
 
-  test('should create a group via UI', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should create a group via UI', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
     await page.goto('/dashboard/groups')
 
     await page.getByRole('button', { name: '创建分组' }).click()
@@ -26,8 +26,8 @@ test.describe('Group Management', () => {
     await expect(page.locator('.group-tree-card .el-table').getByText('Test Group', { exact: true })).toBeVisible()
   })
 
-  test('should create and delete a group via API', async ({ page }) => {
-    const { request } = await loginAsNewUser(page)
+  test('should create and delete a group via API', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     const createResp = await request.post('/api/v1/groups', {
       data: {
@@ -56,8 +56,8 @@ test.describe('Group Management', () => {
     expect(stillFound).toBe(false)
   })
 
-  test('should create parent and child groups', async ({ page }) => {
-    const { request } = await loginAsNewUser(page)
+  test('should create parent and child groups', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     const parentResp = await request.post('/api/v1/groups', {
       data: {
@@ -84,8 +84,8 @@ test.describe('Group Management', () => {
     expect(childData.data.parent_id).toBe(parentId)
   })
 
-  test('should move clips to group via API', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should move clips to group via API', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     const clipId = `clip-group-${Date.now()}`
     await request.post('/api/v1/clips/sync', {
@@ -124,8 +124,8 @@ test.describe('Group Management', () => {
     expect(clipData.data.group_id).toBe(groupId)
   })
 
-  test('should navigate to groups from sidebar', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should navigate to groups from sidebar', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     await expect(page.getByRole('menuitem', { name: '分组管理' })).toBeVisible()
 

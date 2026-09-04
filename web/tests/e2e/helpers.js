@@ -6,7 +6,7 @@ const TEST_PASSWORD = process.env.E2E_PASSWORD || 'e2e_test_pass_123'
 
 let deviceSeq = 0
 
-export async function loginAsNewUser(page) {
+export async function loginAsNewUser(page, request) {
   // Idempotent registration — tolerate 403 (closed) and 400 (already exists)
   const regResp = await page.request.post('/api/v1/auth/register', {
     data: {
@@ -38,10 +38,7 @@ export async function loginAsNewUser(page) {
 
   await page.unroute('**/api/v1/auth/login')
 
-  // Obtain a device token via the API and create a dedicated APIRequestContext
-  // that always attaches the Authorization header. page.request.* uses its own
-  // APIRequestContext which does NOT inherit setExtraHTTPHeaders, so we must
-  // create a new context with the token baked in.
+  // Obtain a device token via the API
   const loginResp = await page.request.post('/api/v1/auth/login', {
     data: { username: TEST_USERNAME, password: TEST_PASSWORD },
     headers: { 'X-Device-Name': deviceName },
@@ -53,13 +50,8 @@ export async function loginAsNewUser(page) {
 
   const deviceId = loginData?.data?.device_id
 
-  // Create an authenticated APIRequestContext — use this for all API calls in tests
-  const authRequest = await test.newContext({
-    baseURL: 'http://localhost:8080',
-    extraHTTPHeaders: {
-      Authorization: `Bearer ${token}`,
-    },
-  }).request
+  // Inject Bearer token into the shared request fixture for authenticated API calls
+  await request.setExtraHTTPHeaders({ Authorization: `Bearer ${token}` })
 
-  return { username: TEST_USERNAME, deviceId, request: authRequest }
+  return { username: TEST_USERNAME, deviceId, request }
 }

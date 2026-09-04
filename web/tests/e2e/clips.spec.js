@@ -2,14 +2,14 @@ import { test, expect } from '@playwright/test'
 import { loginAsNewUser } from './helpers'
 
 test.describe('Clip Management', () => {
-  test('should show empty clip list after login', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should show empty clip list after login', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
     await expect(page).toHaveURL(/\/dashboard/)
     await expect(page.getByText('暂无数据', { exact: true })).toBeVisible({ timeout: 10000 })
   })
 
-  test('should create clip via API and verify', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should create clip via API and verify', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     const clipId = `clip-e2e-${Date.now()}`
     const syncResp = await request.post('/api/v1/clips/sync', {
@@ -35,8 +35,8 @@ test.describe('Clip Management', () => {
     expect(found).toBe(true)
   })
 
-  test('should search clips', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should search clips', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     await request.post('/api/v1/clips/sync', {
       data: {
@@ -62,8 +62,8 @@ test.describe('Clip Management', () => {
     expect(emptyData.data.total).toBe(0)
   })
 
-  test('should delete a clip via API', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should delete a clip via API', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     const clipId = `clip-delete-${Date.now()}`
     await request.post('/api/v1/clips/sync', {

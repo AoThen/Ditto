@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import { loginAsNewUser } from './helpers'
 
 test.describe('Sync Logs & Stats', () => {
-  test('should get sync logs after sync operation', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should get sync logs after sync operation', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     await request.post('/api/v1/clips/sync', {
       data: {
@@ -32,8 +32,8 @@ test.describe('Sync Logs & Stats', () => {
     expect(logEntry.status).toBe('success')
   })
 
-  test('should get stats overview', async ({ page }) => {
-    const { request } = await loginAsNewUser(page)
+  test('should get stats overview', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     const statsResp = await request.get('/api/v1/stats/overview')
     expect(statsResp.status()).toBe(200)
@@ -44,8 +44,8 @@ test.describe('Sync Logs & Stats', () => {
     expect(statsData.data).toHaveProperty('total_storage')
   })
 
-  test('should filter sync logs by device_id', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should filter sync logs by device_id', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     await request.post('/api/v1/clips/sync', {
       data: {
@@ -73,8 +73,8 @@ test.describe('Sync Logs & Stats', () => {
     }
   })
 
-  test('should show sync logs in UI (StatsDashboard)', async ({ page }) => {
-    const { deviceId, request } = await loginAsNewUser(page)
+  test('should show sync logs in UI (StatsDashboard)', async ({ page, request }) => {
+    const { deviceId } = await loginAsNewUser(page, request)
 
     await request.post('/api/v1/clips/sync', {
       data: {

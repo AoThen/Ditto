@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test'
 import { loginAsNewUser } from './helpers'
 
 test.describe('Authentication', () => {
-  test('should register a new user successfully', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should register a new user successfully', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
     await expect(page).toHaveURL(/\/dashboard/)
   })
 
-  test('should login with valid credentials', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should login with valid credentials', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
     await expect(page).toHaveURL(/\/dashboard/)
     await expect(page.getByText('Ditto Cloud')).toBeVisible()
   })
@@ -23,8 +23,8 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('should logout successfully', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should logout successfully', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     await page.getByRole('button', { name: '退出登录' }).click()
 

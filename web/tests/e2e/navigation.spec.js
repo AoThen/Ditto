@@ -7,8 +7,8 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('should navigate between clips and settings', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should navigate between clips and settings', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
 
     await expect(page).toHaveURL(/\/dashboard/)
 
@@ -19,8 +19,8 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL(/\/dashboard\/clips/)
   })
 
-  test('should preserve login on page reload', async ({ page }) => {
-    await loginAsNewUser(page)
+  test('should preserve login on page reload', async ({ page, request }) => {
+    await loginAsNewUser(page, request)
     await expect(page).toHaveURL(/\/dashboard/)
 
     await page.reload()
