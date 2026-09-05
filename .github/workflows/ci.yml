@@ -6,12 +6,20 @@ on:
     paths:
       - 'server/**'
       - 'web/**'
+      - 'src/**'
+      - 'Addins/**'
+      - 'scripts/**'
+      - 'DittoSetup/**'
       - '.github/workflows/ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'server/**'
       - 'web/**'
+      - 'src/**'
+      - 'Addins/**'
+      - 'scripts/**'
+      - 'DittoSetup/**'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -59,8 +67,11 @@ jobs:
 
       - name: Run tests
         env:
-          BCRYPT_COST: "4"
-        run: go test -v -race -timeout 300s -coverprofile=coverage.out ./...
+          # Cost 10 is bcrypt's usable floor (pkg/crypto clamps anything lower
+          # up to it), so the suite runs ~4x slower than with a test-only cost.
+          # Keep the per-package timeout well above the measured ~260s.
+          BCRYPT_COST: "10"
+        run: go test -v -race -timeout 900s -coverprofile=coverage.out ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
