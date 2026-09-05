@@ -184,11 +184,28 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 		return
 	}
 
+	// Page/limit are optional: paging is required to drain large backlogs, since
+	// a single response is capped and would otherwise leave changes unfetched.
+	pullLimit := 0
+	if s := c.Query("limit"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			pullLimit = n
+		}
+	}
+	pullPage := 1
+	if s := c.Query("page"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			pullPage = n
+		}
+	}
+
 	// Reuse Sync service for pull-only: empty push_clips
 	req := &service.SyncRequest{
 		Since:     since,
 		DeviceID:  deviceID,
 		PushClips: []service.PushClipItem{}, // No push, just pull
+		Limit:     pullLimit,
+		Page:      pullPage,
 	}
 
 	result, err := h.service.Sync(userID, req, deviceID)
@@ -206,6 +223,7 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 		Clips       []service.ClipDetail `json:"clips"`
 		ServerTime  string               `json:"server_time"`
 		HasMore     bool                 `json:"has_more"`
+		NextPage    int                  `json:"next_page"`
 		DeletedIDs  []string             `json:"deleted_ids"`
 		DontSyncIDs []string             `json:"dont_sync_ids"`
 	}
@@ -214,6 +232,7 @@ func (h *ClipHandler) GetChanges(c *gin.Context) {
 		Clips:       result.NewClips,
 		ServerTime:  result.SyncTime,
 		HasMore:     result.HasMore,
+		NextPage:    result.NextPage,
 		DeletedIDs:  result.DeletedIDs,
 		DontSyncIDs: result.DontSyncIDs,
 	})

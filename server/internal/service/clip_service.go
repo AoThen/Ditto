@@ -159,9 +159,10 @@ func (s *ClipService) ListClips(userID uint, page, perPage int, search, groupID,
 	}
 
 	if search != "" {
-		likeDesc := "%" + search + "%"
-		likePinyin := "%" + strings.ToLower(search) + "%"
-		query = query.Where("description LIKE ? OR pinyin LIKE ?", likeDesc, likePinyin)
+		// Escape LIKE wildcards so a "%" search cannot match every clip.
+		likeDesc := utils.WrapLike(search)
+		likePinyin := utils.WrapLike(strings.ToLower(search))
+		query = query.Where("description LIKE ? ESCAPE '\\' OR pinyin LIKE ? ESCAPE '\\'", likeDesc, likePinyin)
 	}
 
 	var total int64
@@ -477,11 +478,15 @@ type SyncRequest struct {
 	DeviceID  string         `json:"device_id"`
 	PushClips []PushClipItem `json:"push_clips"`
 	Limit     int            `json:"limit"` // P9 FIX: Max clips to pull (default 1000, max 5000)
+	Page      int            `json:"page"`  // 1-based page of the pull result
 	Force     bool           `json:"force"` // Force push: skip dedup/CRC/LWW, local content wins
 }
 
 const (
 	PushBatchSize = 100
+	// LWWConflictTolerance absorbs client clock skew when comparing a pushed
+	// clip's edit timestamp against the stored one.
+	LWWConflictTolerance = 5 * time.Minute
 )
 
 // PushClipItem represents a clip being pushed from client
@@ -511,8 +516,39 @@ type SyncResponse struct {
 	UpdatedCount int          `json:"updated_count"`
 	SkippedCount int          `json:"skipped_count"` // LWW: clips skipped due to conflict
 	SyncTime     string       `json:"sync_time"`
-	HasMore      bool         `json:"has_more"` // P9 FIX: true if more clips exist beyond this batch
+	HasMore      bool         `json:"has_more"`  // P9 FIX: true if more clips exist beyond this batch
+	NextPage     int          `json:"next_page"` // 1-based page to fetch after this one, 0 when done
 	DontSyncIDs  []string     `json:"dont_sync_ids"`
+}
+
+// lwwLoser reports whether an incoming push must be kept as a conflict copy
+// instead of overwriting the stored clip.
+//
+// Timestamp source: the client-reported edit time (pc.UpdatedAt) is compared
+// against the stored clip's updated_at. syncTime is intentionally NOT used here:
+// it is always newer than the stored timestamp, which made the conflict branch
+// unreachable — concurrent edits from two devices would silently overwrite each
+// other instead of being preserved.
+//
+// A zero client timestamp (legacy clients that never send updated_at) keeps the
+// previous winner behaviour, otherwise every push from such a client would be
+// demoted into a conflict copy.
+//
+// The tolerance absorbs client clock skew: a device that is only a few minutes
+// ahead/behind still wins, while a device editing content that provably predates
+// the stored version is kept as a conflict copy.
+//
+// Identical content never conflicts: the CRC is compared first so a device
+// re-pushing an unchanged clip with a stale local timestamp falls through to the
+// winner branch and is skipped, instead of storing a duplicate of the winner.
+func lwwLoser(pc PushClipItem, existing model.Clip, force bool) bool {
+	if force || pc.CRC == existing.CRC {
+		return false
+	}
+	if pc.UpdatedAt.IsZero() {
+		return false
+	}
+	return pc.UpdatedAt.Before(existing.UpdatedAt.Add(-LWWConflictTolerance))
 }
 
 // Sync performs incremental sync for a user with LWW conflict resolution
@@ -773,8 +809,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						pushedCount++
-					} else if !req.Force && !syncTime.After(existing.UpdatedAt) {
-						// LWW: push is older or equal -> loser, keep as conflict copy
+					} else if lwwLoser(pc, existing, req.Force) {
+						// LWW: push is older than the stored version -> loser, keep as conflict copy
 						conflictID := fmt.Sprintf("conflict-%d-%s", time.Now().UnixNano(), pc.ID)
 						conflictClip := model.Clip{
 							ID:             conflictID,
@@ -805,9 +841,12 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							})
 						}
 
+						// Remember the push: the conflict id is timestamp-based and
+						// would otherwise be recreated on every client retry.
+						markDeduped(dedupKey(userID, pc.ID, pc.CRC))
 						skippedCount++
 					} else {
-						// LWW: push is strictly newer -> winner
+						// LWW: push is not older than the stored version -> winner
 						if pc.CRC != existing.CRC {
 							// Content changed: update with server time. device_id is updated to the
 							// last writer so `device_id != mine` pulls return clips edited
@@ -904,14 +943,23 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	if pullLimit > s.maxSyncPullLimit {
 		pullLimit = s.maxSyncPullLimit
 	}
+	pullPage := req.Page
+	if pullPage <= 0 {
+		pullPage = 1
+	}
 
 	var clips []model.Clip
 	// P0 FIX: device_id tracks the LAST writer (see the winner-update branch in
 	// the push step). Pulling `device_id != mine` therefore correctly hides this
 	// device's own writes while still returning edits made on other devices —
 	// e.g. an edit made by device B on a clip originally created by device A.
+	//
+	// Paging is offset-based rather than an updated_at cursor: all clips pushed
+	// in a single sync call share one server timestamp (often identical within
+	// the same second), so `updated_at > cursor` would silently drop the whole
+	// tie group.
 	query := database.DB.Where("user_id = ? AND is_conflict_copy = ? AND updated_at > ? AND device_id != ?",
-		userID, false, req.Since, req.DeviceID).Order("updated_at DESC").Limit(pullLimit + 1)
+		userID, false, req.Since, req.DeviceID).Order("updated_at DESC").Offset((pullPage - 1) * pullLimit).Limit(pullLimit + 1)
 
 	if err := query.Find(&clips).Error; err != nil {
 		return nil, err
@@ -921,6 +969,10 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 	hasMore := len(clips) > pullLimit
 	if hasMore {
 		clips = clips[:pullLimit] // Trim to the requested limit
+	}
+	nextPage := 0
+	if hasMore {
+		nextPage = pullPage + 1
 	}
 
 	// P2 FIX: Batch-load formats instead of N+1 queries
@@ -1013,6 +1065,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		SkippedCount: skippedCount,
 		SyncTime:     syncTime.UTC().Format(time.RFC3339),
 		HasMore:      hasMore,
+		NextPage:     nextPage,
 	}, nil
 }
 

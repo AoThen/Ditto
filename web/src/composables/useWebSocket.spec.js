@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
+vi.mock('@/api/clips', () => ({
+  getChanges: vi.fn(),
+}))
+
 function createMockWs() {
   return {
     readyState: 1,
@@ -23,6 +27,10 @@ describe('useWebSocket', () => {
     vi.restoreAllMocks()
     setActivePinia(createPinia())
     vi.stubEnv('VITE_WS_URL', '')
+    // The reconnect flag and the sync watermark live in localStorage: leaving
+    // them set makes earlier tests trigger the reconnect catch-up path.
+    localStorage.clear()
+    vi.clearAllMocks()
     document.cookie = 'device_id=test-device'
 
     mockWs = createMockWs()
@@ -231,5 +239,40 @@ describe('useWebSocket', () => {
     mockWs.onmessage({ data: JSON.stringify({ type: 'clips_deleted', data: { clip_ids: ['other'], device_id: 'other-device' } }) })
     expect(events).toHaveLength(1)
     expect(events[0]).toEqual(['other'])
+  })
+
+  it('catch-up drains every page before advancing the sync watermark', async () => {
+    const { getChanges } = await import('@/api/clips')
+    const { useClipStore } = await import('@/stores/clip')
+    const clipStore = useClipStore()
+    clipStore.updateSyncTime('2024-01-01T00:00:00Z')
+    getChanges.mockImplementation(async (since, page) => page === 1
+      ? { code: 0, data: { clips: [], deleted_ids: [], has_more: true, server_time: '2024-02-01T00:00:00Z' } }
+      : { code: 0, data: { clips: [], deleted_ids: [], has_more: false, server_time: '2024-02-02T00:00:00Z' } })
+
+    localStorage.setItem('ditto_ws_reconnecting', '1')
+    mod.useWebSocket().connect()
+    mockWs.onopen()
+
+    await vi.waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2))
+    expect(clipStore.lastSyncTime).toBe('2024-02-02T00:00:00Z')
+    expect(localStorage.getItem('ditto_last_sync_time')).toBe('2024-02-02T00:00:00Z')
+  })
+
+  it('catch-up leaves the watermark alone when a page fails', async () => {
+    const { getChanges } = await import('@/api/clips')
+    const { useClipStore } = await import('@/stores/clip')
+    const clipStore = useClipStore()
+    clipStore.updateSyncTime('2024-01-01T00:00:00Z')
+    getChanges.mockImplementation(async (since, page) => page === 1
+      ? { code: 0, data: { clips: [], deleted_ids: [], has_more: true, server_time: '2024-02-01T00:00:00Z' } }
+      : { code: 50000, message: 'boom' })
+
+    localStorage.setItem('ditto_ws_reconnecting', '1')
+    mod.useWebSocket().connect()
+    mockWs.onopen()
+
+    await vi.waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2))
+    expect(clipStore.lastSyncTime).toBe('2024-01-01T00:00:00Z')
   })
 })

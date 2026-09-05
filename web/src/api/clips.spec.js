@@ -53,6 +53,24 @@ describe('clips API', () => {
     expect(request).toHaveBeenCalledWith({ url: '/api/v1/clips/changes', method: 'get', params: { since } })
   })
 
+  it('getChanges should omit page/limit on the first page when no limit is given', async () => {
+    await getChanges('2024-01-01T00:00:00Z', 1)
+    expect(request).toHaveBeenCalledWith({
+      url: '/api/v1/clips/changes',
+      method: 'get',
+      params: { since: '2024-01-01T00:00:00Z' }
+    })
+  })
+
+  it('getChanges should send page and limit for subsequent pages', async () => {
+    await getChanges('2024-01-01T00:00:00Z', 3, 1000)
+    expect(request).toHaveBeenCalledWith({
+      url: '/api/v1/clips/changes',
+      method: 'get',
+      params: { since: '2024-01-01T00:00:00Z', page: 3, limit: 1000 }
+    })
+  })
+
   it('deleteClip should be a function', () => {
     expect(typeof deleteClip).toBe('function')
   })

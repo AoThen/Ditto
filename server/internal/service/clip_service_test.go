@@ -779,6 +779,128 @@ func TestSync_NewerEditNoConflictCopy(t *testing.T) {
 	assert.Equal(t, int64(54321), winner.CRC)
 }
 
+// TestSync_LegacyZeroTimestampWins guards R1: a client that never sends
+// updated_at must not have every push demoted into a conflict copy, even when
+// the stored clip's timestamp is in the future.
+func TestSync_LegacyZeroTimestampWins(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	database.DB.Model(&model.Clip{}).Where("id = ?", "test-clip-1").
+		Update("updated_at", time.Now().Add(time.Hour))
+
+	data := base64.StdEncoding.EncodeToString([]byte("legacy content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Pushed legacy version",
+				CRC:         54321,
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.UpdatedCount)
+
+	var conflictCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, true).Count(&conflictCount)
+	assert.Equal(t, int64(0), conflictCount)
+
+	var winner model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&winner).Error)
+	assert.Equal(t, "Pushed legacy version", winner.Description)
+}
+
+// TestPullPaginationNoGapNoDuplicate drains a backlog page by page and asserts
+// every clip arrives exactly once — the regression that a capped single
+// response silently drops the rest.
+func TestPullPaginationNoGapNoDuplicate(t *testing.T) {
+	_, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	const total = 12
+	const limit = 3
+	base := time.Now().Add(-time.Hour)
+	for i := 0; i < total; i++ {
+		clip := model.Clip{
+			ID:          fmt.Sprintf("page-clip-%d", i),
+			UserID:      userID,
+			DeviceID:    "other-device",
+			Description: fmt.Sprintf("Page clip %d", i),
+			CRC:         int64(20000 + i),
+			// Distinct timestamps: the pull is ordered by updated_at DESC.
+			UpdatedAt: base.Add(time.Duration(i) * time.Second),
+		}
+		require.NoError(t, database.DB.Create(&clip).Error)
+	}
+
+	svc := NewClipService(nil, 1000, limit, 5000, 100)
+
+	seen := make(map[string]int)
+	firstNextPage := -1
+	for page := 1; page <= 100; page++ {
+		resp, err := svc.Sync(userID, &SyncRequest{
+			Since:    time.Now().Add(-2 * time.Hour),
+			DeviceID: "test-device-1",
+			Limit:    limit,
+			Page:     page,
+		}, "test-device-1")
+		require.NoError(t, err)
+		if page == 1 {
+			require.True(t, resp.HasMore)
+			firstNextPage = resp.NextPage
+		}
+		for _, c := range resp.NewClips {
+			seen[c.ID]++
+		}
+		if !resp.HasMore {
+			require.Equal(t, 0, resp.NextPage)
+			break
+		}
+	}
+
+	require.Equal(t, 2, firstNextPage, "the first page must point at the next page")
+	assert.Equal(t, total, len(seen), "every clip must be delivered")
+	for id, n := range seen {
+		assert.Equal(t, 1, n, "clip %s must not be delivered twice", id)
+	}
+}
+
+// TestPullPageIsStableForEmptyTail asks for a page beyond the backlog.
+func TestPullPageIsStableForEmptyTail(t *testing.T) {
+	_, userID, _, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	clip := model.Clip{
+		ID:          "tail-clip-1",
+		UserID:      userID,
+		DeviceID:    "other-device",
+		Description: "Tail clip 1",
+		CRC:         30001,
+		UpdatedAt:   time.Now().Add(-time.Hour),
+	}
+	require.NoError(t, database.DB.Create(&clip).Error)
+
+	svc := NewClipService(nil, 1000, 2, 5000, 100)
+	resp, err := svc.Sync(userID, &SyncRequest{
+		Since:    time.Now().Add(-2 * time.Hour),
+		DeviceID: "test-device-1",
+		Limit:    2,
+		Page:     99,
+	}, "test-device-1")
+	require.NoError(t, err)
+	assert.Empty(t, resp.NewClips)
+	assert.False(t, resp.HasMore)
+	assert.Equal(t, 0, resp.NextPage)
+}
+
 func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
 	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
 	defer cleanup()
@@ -786,7 +908,7 @@ func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
 	var existing model.Clip
 	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
 
-	// Set existing clip to the future so syncTime (now) is older → creates conflict copy
+	// Make the stored clip newer than the pushed edit time → creates conflict copy
 	database.DB.Model(&existing).Update("updated_at", time.Now().Add(time.Hour))
 	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
 
@@ -799,7 +921,7 @@ func TestSync_ConflictCopyNotPulledByOtherDevice(t *testing.T) {
 				ID:          "test-clip-1",
 				Description: "Loser version",
 				CRC:         54321,
-				UpdatedAt:   existing.UpdatedAt,
+				UpdatedAt:   existing.UpdatedAt.Add(-10 * time.Minute),
 				Formats: []PushFormatItem{
 					{FormatType: 1, Data: data, Encrypted: false},
 				},
@@ -1209,29 +1331,112 @@ func TestResolveConflictClip_Discard(t *testing.T) {
 	assert.Equal(t, int64(0), count)
 }
 
-// TestLWWClockSkew verifies that server-side syncTime eliminates clock skew issues.
-func TestLWWClockSkew(t *testing.T) {
-	syncTime := time.Now()
+// TestLWWLoser covers conflict-copy detection semantics, including cases the
+// previous server-time comparison could not express.
+func TestLWWLoser(t *testing.T) {
+	now := time.Now()
 
-	// Scenario: client clock is 24h slow.
-	// Old code used pc.UpdatedAt (client time) → push loses (wrong)
-	// New code uses syncTime (server time) → push wins (correct)
-	slowClientTime := syncTime.Add(-24 * time.Hour)
-	existingUpdatedAt := syncTime.Add(-time.Hour) // clip updated 1h ago on server
+	tests := []struct {
+		name            string
+		pushCRC         int64
+		pushUpdated     time.Time
+		existingCRC     int64
+		existingUpdated time.Time
+		force           bool
+		wantLoser       bool
+	}{
+		{"legacy zero timestamp always wins", 2, time.Time{}, 1, now.Add(-time.Hour), false, false},
+		{"force always wins", 2, now.Add(-24 * time.Hour), 1, now, true, false},
+		{"clearly older edit becomes conflict copy", 2, now.Add(-24 * time.Hour), 1, now.Add(-time.Hour), false, true},
+		{"identical content never conflicts", 1, now.Add(-24 * time.Hour), 1, now, false, false},
+		{"slow client clock inside tolerance wins", 2, now.Add(-3 * time.Minute), 1, now, false, false},
+		{"future dated edit wins", 2, now.Add(time.Hour), 1, now, false, false},
+		{"equal timestamps win", 2, now.Add(-time.Hour), 1, now.Add(-time.Hour), false, false},
+	}
 
-	// New code: syncTime is newer than existing → push WINS
-	winner := syncTime.After(existingUpdatedAt)
-	assert.True(t, winner, "syncTime is newer than existing, push should win")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := lwwLoser(
+				PushClipItem{ID: "c1", CRC: tt.pushCRC, UpdatedAt: tt.pushUpdated},
+				model.Clip{ID: "c1", CRC: tt.existingCRC, UpdatedAt: tt.existingUpdated},
+				tt.force,
+			)
+			assert.Equal(t, tt.wantLoser, got)
+		})
+	}
+}
 
-	// Old code: slowClientTime is NOT newer than existing → push LOSES (wrong!)
-	oldLoser := !slowClientTime.After(existingUpdatedAt)
-	assert.True(t, oldLoser,
-		"with slow client clock, old code incorrectly treated the push as loser")
+// TestSync_SameContentOldTimestampSkipped guards M1: re-pushing unchanged
+// content with a stale local clock must not store a copy of the winner.
+func TestSync_SameContentOldTimestampSkipped(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
 
-	// Opposite scenario: existing is newer than syncTime → push should be loser
-	existingFuture := syncTime.Add(time.Hour)
-	loser := !syncTime.After(existingFuture)
-	assert.True(t, loser, "existing is newer than syncTime, push should be loser")
+	database.DB.Model(&model.Clip{}).Where("id = ?", "test-clip-1").
+		Update("updated_at", time.Now().Add(time.Hour))
+
+	data := base64.StdEncoding.EncodeToString([]byte("hello world"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Test clip 1",
+				CRC:         12345, // identical to the stored clip
+				UpdatedAt:   time.Now().Add(-24 * time.Hour),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	resp, err := svc.Sync(userID, req, deviceID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.SkippedCount)
+
+	var conflictCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, true).Count(&conflictCount)
+	assert.Equal(t, int64(0), conflictCount, "unchanged content cannot conflict")
+}
+
+// TestSync_ConflictCopyDeduped guards M2: a client retry of the same losing
+// push must not pile up conflict copies (the conflict id is nanosecond-based).
+func TestSync_ConflictCopyDeduped(t *testing.T) {
+	svc, userID, deviceID, cleanup := setupClipServiceTest(t)
+	defer cleanup()
+
+	var existing model.Clip
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+	database.DB.Model(&existing).Update("updated_at", time.Now().Add(time.Hour))
+	require.NoError(t, database.DB.Where("id = ?", "test-clip-1").First(&existing).Error)
+
+	data := base64.StdEncoding.EncodeToString([]byte("loser content"))
+	req := &SyncRequest{
+		Since:    time.Now().Add(-time.Hour),
+		DeviceID: deviceID,
+		PushClips: []PushClipItem{
+			{
+				ID:          "test-clip-1",
+				Description: "Loser version",
+				CRC:         54321,
+				UpdatedAt:   existing.UpdatedAt.Add(-10 * time.Minute),
+				Formats: []PushFormatItem{
+					{FormatType: 1, Data: data, Encrypted: false},
+				},
+			},
+		},
+	}
+
+	for i := 0; i < 3; i++ {
+		_, err := svc.Sync(userID, req, deviceID)
+		require.NoError(t, err)
+	}
+
+	var conflictCount int64
+	database.DB.Model(&model.Clip{}).Where("user_id = ? AND is_conflict_copy = ?", userID, true).Count(&conflictCount)
+	assert.Equal(t, int64(1), conflictCount, "retried pushes must reuse the dedup cache")
 }
 
 // TestDedupCache verifies the in-memory idempotency cache.

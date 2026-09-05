@@ -15,11 +15,14 @@ export function getClip(id) {
   })
 }
 
-export function getChanges(since) {
+export function getChanges(since, page = 1, limit = 0) {
+  const params = { since }
+  if (page > 1) params.page = page
+  if (limit > 0) params.limit = limit
   return request({
     url: '/api/v1/clips/changes',
     method: 'get',
-    params: { since }
+    params
   })
 }
 

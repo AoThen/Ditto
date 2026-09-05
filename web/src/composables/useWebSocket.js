@@ -82,25 +82,33 @@ function handleMessage(msg) {
   }
 }
 
-// P2 FIX: Fetch incremental changes since last sync to catch up missed data on reconnect
+// Safety valve so a misbehaving server can never loop the catch-up forever.
+const CATCH_UP_MAX_PAGES = 10
+const CATCH_UP_PAGE_SIZE = 1000
+
+// P2 FIX: Fetch incremental changes since last sync to catch up missed data on reconnect.
+// Drains every page while has_more is true; the watermark only advances once the
+// backlog is fully consumed, otherwise the unfetched tail would be skipped forever.
 async function fetchSyncCatchUp() {
+  const clipStore = useClipStore()
+  const since = clipStore.lastSyncTime || '2000-01-01T00:00:00Z'
   try {
-    const clipStore = useClipStore()
-    const since = clipStore.lastSyncTime || '2000-01-01T00:00:00Z'
-    const res = await getChanges(since)
-    if (res?.code === 0 && res?.data) {
+    for (let page = 1; page <= CATCH_UP_MAX_PAGES; page++) {
+      const res = await getChanges(since, page, CATCH_UP_PAGE_SIZE)
+      if (res?.code !== 0 || !res?.data) break
       const data = res.data
-      // Process any new clips from the catch-up
       if (Array.isArray(data.clips) && data.clips.length > 0) {
         data.clips.forEach(clip => clipStore.notifyClipAdded(clip))
       }
-      // Process any deletions
       if (Array.isArray(data.deleted_ids) && data.deleted_ids.length > 0) {
         clipStore.notifyClipDeleted({ clip_ids: data.deleted_ids })
       }
-      // Update sync time watermark
-      if (data.server_time) {
-        clipStore.updateSyncTime(data.server_time)
+      if (!data.has_more) {
+        if (data.server_time) clipStore.updateSyncTime(data.server_time)
+        break
+      }
+      if (page === CATCH_UP_MAX_PAGES) {
+        console.warn('[WS] Catch-up reached page cap, will retry on next reconnect')
       }
     }
   } catch (e) {

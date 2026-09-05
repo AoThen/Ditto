@@ -309,19 +309,35 @@ function onWsClipsDeleted(event) {
   }
 }
 
+// Safety valve so a misbehaving server can never loop the sync forever.
+const SYNC_MAX_PAGES = 10
+const SYNC_PAGE_SIZE = 1000
+
 async function incrementalSync(deviceId) {
   try {
     // P1-A FIX: share a single persistent sync cursor with useWebSocket.
     const since = clipStore.lastSyncTime || '1970-01-01T00:00:00Z'
-    const res = await getChanges(since)
-    if (res.code === 0) {
-      const { clips, deleted_ids, server_time } = res.data
-      if (server_time) clipStore.updateSyncTime(server_time)
 
-      let changed = false
-      if (deleted_ids?.length > 0) {
-        clipList.value = clipList.value.filter(c => !deleted_ids.includes(c.id))
-        total.value = Math.max(0, total.value - deleted_ids.length)
+    // Drain every page: one response is capped by the server, and the watermark
+    // must only advance once the whole backlog was consumed — otherwise the
+    // unfetched tail would be skipped forever.
+    let changed = false
+    let serverTime = ''
+    let drained = false
+    // Deletions are not paged server-side: every response repeats the whole
+    // list, so track them across pages to avoid subtracting the same id twice.
+    const seenDeleted = new Set()
+    for (let page = 1; page <= SYNC_MAX_PAGES; page++) {
+      const res = await getChanges(since, page, SYNC_PAGE_SIZE)
+      if (res.code !== 0) break
+      const { clips, deleted_ids, server_time } = res.data
+      if (server_time) serverTime = server_time
+
+      const freshDeleted = (deleted_ids || []).filter(id => !seenDeleted.has(id))
+      freshDeleted.forEach(id => seenDeleted.add(id))
+      if (freshDeleted.length > 0) {
+        clipList.value = clipList.value.filter(c => !seenDeleted.has(c.id))
+        total.value = Math.max(0, total.value - freshDeleted.length)
         changed = true
       }
       if (clips?.length > 0) {
@@ -336,9 +352,17 @@ async function incrementalSync(deviceId) {
         }
         changed = true
       }
-      if (changed && deviceId) {
-        ElMessage.success(`收到来自 ${deviceId} 的新剪贴板`)
+      if (!res.data.has_more) {
+        drained = true
+        break
       }
+    }
+    // Only a fully drained backlog may move the cursor: the server timestamp is
+    // newer than the clips still sitting on the unfetched pages.
+    if (drained && serverTime) clipStore.updateSyncTime(serverTime)
+
+    if (changed && deviceId) {
+      ElMessage.success(`收到来自 ${deviceId} 的新剪贴板`)
     }
   } catch (err) {
     console.error('Incremental sync failed, falling back to full refresh:', err)
@@ -368,8 +392,9 @@ const conflictLoading = ref(false)
 const conflictDialogVisible = ref(false)
 const conflictPage = ref(1)
 const conflictTotal = ref(0)
-// MEDIUM FIX (M3): Use computed for conflictCount, never assign directly
-const conflictCount = computed(() => conflictClips.value.length)
+// The badge must show the total number of conflicts, not how many happen to be
+// on the currently loaded page.
+const conflictCount = ref(0)
 const resolvingId = ref(null)
 
 // Group state
@@ -741,6 +766,7 @@ async function fetchConflictClips() {
     if (res.code === 0) {
       conflictClips.value = res.data?.items || res.data || []
       conflictTotal.value = res.data?.total || 0
+      conflictCount.value = conflictTotal.value
     }
   } catch (err) {
     ElMessage.error('获取冲突剪贴板失败: ' + err.message)
