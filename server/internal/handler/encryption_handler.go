@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -33,6 +34,10 @@ func (h *EncryptionHandler) SetupEncryption(c *gin.Context) {
 	if err != nil {
 		if err == service.ErrEncryptionAlreadyEnabled {
 			response.Error(c, http.StatusConflict, 40901, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrInvalidEncPayload) {
+			response.Error(c, http.StatusBadRequest, 40001, err.Error())
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, 50000, "设置加密失败: "+err.Error())
@@ -90,6 +95,10 @@ func (h *EncryptionHandler) DisableEncryption(c *gin.Context) {
 			response.Error(c, http.StatusForbidden, 40301, err.Error())
 			return
 		}
+		if errors.Is(err, service.ErrInvalidEncPayload) {
+			response.Error(c, http.StatusBadRequest, 40001, err.Error())
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, 50000, "禁用加密失败: "+err.Error())
 		return
 	}
@@ -115,6 +124,10 @@ func (h *EncryptionHandler) ChangeEncryptionPassword(c *gin.Context) {
 		}
 		if err == service.ErrInvalidVerificationHash {
 			response.Error(c, http.StatusForbidden, 40301, err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrInvalidEncPayload) {
+			response.Error(c, http.StatusBadRequest, 40001, err.Error())
 			return
 		}
 		response.Error(c, http.StatusInternalServerError, 50000, "修改加密密码失败: "+err.Error())

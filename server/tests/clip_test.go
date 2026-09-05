@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -164,6 +165,41 @@ func TestListClips_Search(t *testing.T) {
 
 	items = data["items"].([]interface{})
 	assert.Len(t, items, 1)
+}
+
+// TestListClips_SearchEscapesWildcards guards R2: LIKE metacharacters in the
+// search term must be matched literally instead of expanding the query into a
+// full-table scan.
+func TestListClips_SearchEscapesWildcards(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	nano := time.Now().UnixNano()
+	createClipViaSync(t, server, user.Token, user.DeviceID,
+		fmt.Sprintf("clip-wildcard-%d-1", nano), "Important meeting notes", "Meeting content")
+	createClipViaSync(t, server, user.Token, user.DeviceID,
+		fmt.Sprintf("clip-wildcard-%d-2", nano), "Random text snippet", "Random content")
+	createClipViaSync(t, server, user.Token, user.DeviceID,
+		fmt.Sprintf("clip-wildcard-%d-3", nano), "Important password", "Password content")
+
+	searchCount := func(term string) int {
+		t.Helper()
+		statusCode, respBody := testutil.AuthGet(t, server,
+			"/api/v1/clips?search="+url.QueryEscape(term), user.Token)
+		require.Equal(t, http.StatusOK, statusCode)
+		code, _, data := testutil.ParseResponse(t, respBody)
+		assert.Equal(t, 0, code)
+		return len(data["items"].([]interface{}))
+	}
+
+	for _, term := range []string{"%", "_", "%a", "a%", "a_b"} {
+		assert.Equal(t, 0, searchCount(term),
+			"term %q must be matched literally, not as a wildcard", term)
+	}
+
+	// A plain literal search still works and is case-insensitive.
+	assert.Equal(t, 1, searchCount("snippet"))
+	assert.Equal(t, 1, searchCount("RANDOM"))
 }
 
 // TestGetClip_Detail — get single clip, expect full format data as base64

@@ -6,6 +6,7 @@ import (
 
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
+	"ditto-cloud-server/internal/utils"
 	"ditto-cloud-server/pkg/crypto"
 	"gorm.io/gorm"
 )
@@ -59,16 +60,16 @@ func (s *UserService) ListUsers(search string, page, pageSize int) ([]model.User
 
 	query := database.DB.Model(&model.User{})
 	if search != "" {
-		like := "%" + search + "%"
-		query = query.Where("username LIKE ? OR email LIKE ?", like, like)
+		like := utils.WrapLike(search)
+		query = query.Where("username LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'", like, like)
 	}
 	query.Count(&total)
 
 	offset := (page - 1) * pageSize
 	dbQuery := database.DB.Model(&model.User{}).Select("id, username, email, role, is_active, created_at, updated_at")
 	if search != "" {
-		like := "%" + search + "%"
-		dbQuery = dbQuery.Where("username LIKE ? OR email LIKE ?", like, like)
+		like := utils.WrapLike(search)
+		dbQuery = dbQuery.Where("username LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'", like, like)
 	}
 	if err := dbQuery.Order("id DESC").Offset(offset).Limit(pageSize).Find(&users).Error; err != nil {
 		return nil, 0, err

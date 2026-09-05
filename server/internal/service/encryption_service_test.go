@@ -262,3 +262,116 @@ func TestEncryptionService_Persistence(t *testing.T) {
 	assert.Equal(t, 32, len(settings.Salt))
 	assert.Equal(t, 2, settings.Version)
 }
+
+// TestEncryptionService_StoresBcryptWrappedHash verifies the password
+// verification hash is wrapped at rest and still verifies through the wrapper.
+func TestEncryptionService_StoresBcryptWrappedHash(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{
+		WrappedDEK:       wrappedDEK,
+		VerificationHash: vhash,
+	})
+	require.NoError(t, err)
+
+	var settings model.EncryptionSettings
+	require.NoError(t, database.DB.Where("user_id = ?", userID).First(&settings).Error)
+
+	stored := string(settings.VerificationHash)
+	assert.NotEqual(t, vhash, stored, "the raw hash must not be stored verbatim")
+	assert.Equal(t, byte('$'), stored[0], "the stored value should be a bcrypt hash")
+
+	// Verifying through the wrapper must still succeed.
+	assert.NoError(t, svc.DisableEncryption(userID, &DisableEncryptionRequest{VerificationHash: vhash}))
+}
+
+// TestEncryptionService_Disable_UpgradesLegacyHash simulates a row written
+// before the upgrade: an unwrapped hash must verify and be re-wrapped.
+func TestEncryptionService_Disable_UpgradesLegacyHash(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	rawHash, err := base64.StdEncoding.DecodeString(vhash)
+	require.NoError(t, err)
+	settings := model.EncryptionSettings{
+		UserID:           userID,
+		Version:          2,
+		Salt:             []byte{1, 2, 3},
+		WrappedDEK:       []byte(wrappedDEK),
+		VerificationHash: rawHash,
+		Enabled:          true,
+	}
+	require.NoError(t, database.DB.Create(&settings).Error)
+
+	require.NoError(t, svc.DisableEncryption(userID, &DisableEncryptionRequest{VerificationHash: vhash}))
+
+	var updated model.EncryptionSettings
+	require.NoError(t, database.DB.Where("user_id = ?", userID).First(&updated).Error)
+	assert.Equal(t, byte('$'), updated.VerificationHash[0], "the legacy hash must be re-wrapped")
+
+	// Re-enable and verify again against the now-wrapped value.
+	_, err = svc.SetupEncryption(userID, &SetupEncryptionRequest{
+		WrappedDEK:       wrappedDEK,
+		VerificationHash: vhash,
+	})
+	require.NoError(t, err)
+	require.NoError(t, svc.DisableEncryption(userID, &DisableEncryptionRequest{VerificationHash: vhash}))
+}
+
+func TestEncryptionService_RejectsOversizedWrappedDEK(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	_, vhash := makeTestDEK()
+	over := make([]byte, maxEncWrappedDEKLen+1)
+	for i := range over {
+		over[i] = byte(i)
+	}
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{
+		WrappedDEK:       base64.StdEncoding.EncodeToString(over),
+		VerificationHash: vhash,
+	})
+	assert.ErrorIs(t, err, ErrInvalidEncPayload)
+}
+
+func TestEncryptionService_RejectsOversizedSalt(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{
+		WrappedDEK:       wrappedDEK,
+		VerificationHash: vhash,
+	})
+	require.NoError(t, err)
+
+	over := make([]byte, maxEncSaltLen+1)
+	for i := range over {
+		over[i] = byte(i)
+	}
+	newWrappedDEK, newVHash := makeTestDEK()
+	_, err = svc.ChangeEncryptionPassword(userID, &ChangePasswordRequest{
+		OldVerificationHash: vhash,
+		NewWrappedDEK:       newWrappedDEK,
+		NewSalt:             base64.StdEncoding.EncodeToString(over),
+		NewVerificationHash: newVHash,
+	})
+	assert.ErrorIs(t, err, ErrInvalidEncPayload)
+}
+
+func TestEncryptionService_RejectsMalformedPasswordHint(t *testing.T) {
+	svc, userID, cleanup := setupEncryptionServiceTest(t)
+	defer cleanup()
+
+	wrappedDEK, vhash := makeTestDEK()
+	hint := string([]byte{0x00, 0x7F}) // NUL and DEL are control characters
+	_, err := svc.SetupEncryption(userID, &SetupEncryptionRequest{
+		WrappedDEK:       wrappedDEK,
+		VerificationHash: vhash,
+		PasswordHint:     hint,
+	})
+	assert.ErrorIs(t, err, ErrInvalidEncPayload)
+}

@@ -107,6 +107,31 @@ func TestBcryptCost_DefaultValue(t *testing.T) {
 	assert.LessOrEqual(t, BcryptCost, 15)
 }
 
+// TestGetBcryptCost_ClampsOutOfRange guards R12: an out-of-range BCRYPT_COST
+// must be clamped, never applied verbatim.
+func TestGetBcryptCost_ClampsOutOfRange(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want int
+	}{
+		{"unset", "", DefaultBcryptCost},
+		{"below minimum", "4", MinBcryptCost},
+		{"at minimum", "10", 10},
+		{"middle", "12", 12},
+		{"at maximum", "14", 14},
+		{"above maximum", "31", MaxBcryptCost},
+		{"negative", "-1", MinBcryptCost},
+		{"invalid", "abc", DefaultBcryptCost},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("BCRYPT_COST", tt.env)
+			assert.Equal(t, tt.want, getBcryptCost())
+		})
+	}
+}
+
 func TestHashPassword_SpecialCharacters(t *testing.T) {
 	passwords := []string{
 		"p@ssw0rd!",

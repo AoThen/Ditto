@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/base64"
 	"net/http"
 	"testing"
@@ -214,6 +215,12 @@ func TestEncryption_Persistence(t *testing.T) {
 	assert.True(t, settings.Enabled, "encryption should be enabled")
 	assert.Equal(t, 32, len(settings.Salt), "salt should be 32 bytes")
 	assert.Equal(t, 32, len(settings.WrappedDEK), "wrapped_dek should match input size (32 raw)")
-	assert.Equal(t, 32, len(settings.VerificationHash), "verification_hash should be 32 bytes")
+	// The verification hash is wrapped with bcrypt at rest: 60 bytes, prefixed
+	// with '$', and never equal to the raw client digest.
+	rawHash, err := base64.StdEncoding.DecodeString(crypto["verification_hash"])
+	require.NoError(t, err)
+	assert.Equal(t, byte('$'), settings.VerificationHash[0], "verification_hash should be stored as a bcrypt hash")
+	assert.Equal(t, 60, len(settings.VerificationHash), "bcrypt hashes are 60 bytes")
+	assert.False(t, bytes.Contains(settings.VerificationHash, rawHash), "the raw client digest must not be stored")
 	assert.Equal(t, 2, settings.Version, "version should be 2")
 }
