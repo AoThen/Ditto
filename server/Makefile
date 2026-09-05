@@ -34,7 +34,7 @@ docker-run:
 	docker run -d -p 8080:8080 \
 		-v ./data:/app/data \
 		-e DB_PATH=/app/data/ditto_cloud.db \
-		-e JWT_SECRET=dev-secret-key \
+		-e JWT_SECRET=dev-only-secret-change-me-32-bytes-min \
 		ditto-cloud-server
 
 # 数据库迁移（查看 SQL）

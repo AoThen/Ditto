@@ -15,12 +15,17 @@ import (
 
 const (
 	// IP-based rate limit
-	ipMaxFailures     = 5
-	ipBanDuration     = 15 * time.Minute
+	ipMaxFailures   = 5
+	ipBanDuration   = 15 * time.Minute
 
 	// User-based rate limit
-	userMaxFailures   = 10
-	userLockDuration  = 1 * time.Hour
+	userMaxFailures  = 10
+	userLockDuration = 1 * time.Hour
+
+	// failCountWindow is the sliding window behind the failure counters.
+	// Without it, fail_count only ever grew: a counter written days ago would
+	// still trip the ban, and SyncRateLimit would lock a user out forever.
+	failCountWindow = 60 * time.Second
 )
 
 type rateLimitCacheEntry struct {
@@ -127,13 +132,19 @@ func (rl *RateLimiter) IsUserLocked(username string) bool {
 }
 
 func (rl *RateLimiter) atomicIncrement(key string) *model.RateLimitRecord {
+	now := time.Now()
+	// Sliding window: a row whose last failure is older than failCountWindow is
+	// treated as a fresh start instead of being incremented.
 	database.DB.Exec(`
 		INSERT INTO rate_limit_records (key, fail_count, updated_at)
 		VALUES (?, 1, ?)
 		ON CONFLICT(key) DO UPDATE SET
-			fail_count = rate_limit_records.fail_count + 1,
+			fail_count = CASE
+				WHEN rate_limit_records.updated_at <= ? THEN 1
+				ELSE rate_limit_records.fail_count + 1
+			END,
 			updated_at = ?
-	`, key, time.Now(), time.Now())
+	`, key, now, now.Add(-failCountWindow), now)
 
 	var record model.RateLimitRecord
 	database.DB.Where("key = ?", key).First(&record)
@@ -180,7 +191,10 @@ func (rl *RateLimiter) SyncRateLimit() gin.HandlerFunc {
 
 		rl.mu.Lock()
 		record := rl.getRecord(key)
-		if record != nil && record.FailCount >= 60 {
+		// The counter decays inside atomicIncrement, but a blocked request never
+		// reaches it, so the gate must also check the window: otherwise one burst
+		// of 60 errors would latch the user out permanently.
+		if record != nil && record.FailCount >= 60 && time.Since(record.UpdatedAt) < failCountWindow {
 			rl.mu.Unlock()
 			response.Error(c, http.StatusTooManyRequests, 42902, "同步请求过于频繁，请稍后再试")
 			c.Abort()

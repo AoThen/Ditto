@@ -238,6 +238,140 @@ func TestAuth_Refresh_Success(t *testing.T) {
 	assert.Equal(t, "Token 刷新成功", message)
 }
 
+// TestAuth_Refresh_BearerReturnsTokens covers the desktop client path: it keeps
+// no cookie jar, so it refreshes with the refresh token as a bearer credential
+// and needs the rotated pair back in the body.
+func TestAuth_Refresh_BearerReturnsTokens(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "beareruser", "beareruser@example.com", "password123")
+	_, loginBody := testutil.LoginUser(t, server, "beareruser", "password123")
+	_, _, loginData := testutil.ParseResponse(t, loginBody)
+	access, _ := loginData["device_token"].(string)
+	refresh, _ := loginData["refresh_token"].(string)
+	require.NotEmpty(t, access)
+	require.NotEmpty(t, refresh)
+
+	statusCode, respBody := testutil.AuthPost(t, server, "/api/v1/auth/refresh?as=bearer", refresh, nil)
+	require.Equal(t, http.StatusOK, statusCode)
+	_, _, data := testutil.ParseResponse(t, respBody)
+
+	newAccess, ok := data["device_token"].(string)
+	require.True(t, ok, "device_token must be in the body when as=bearer is set")
+	require.NotEmpty(t, newAccess)
+	newRefresh, ok := data["refresh_token"].(string)
+	require.True(t, ok, "refresh_token must be in the body when as=bearer is set")
+	require.NotEmpty(t, newRefresh)
+
+	// The rotated access token authenticates...
+	statusCode, _ = testutil.AuthGet(t, server, "/api/v1/clips", newAccess)
+	assert.Equal(t, http.StatusOK, statusCode)
+
+	// ...and the superseded one is dead, since refresh bumps the token version.
+	statusCode, _ = testutil.AuthGet(t, server, "/api/v1/clips", access)
+	assert.Equal(t, http.StatusUnauthorized, statusCode)
+
+	// Without as=bearer the body carries no token, as before.
+	statusCode, respBody = testutil.AuthPost(t, server, "/api/v1/auth/refresh", newRefresh, nil)
+	require.Equal(t, http.StatusOK, statusCode)
+	_, _, plain := testutil.ParseResponse(t, respBody)
+	_, hasToken := plain["device_token"]
+	assert.False(t, hasToken, "the token must stay out of the body without as=bearer")
+}
+
+// TestAuth_Refresh_AfterAccessCookieExpiry covers the short access token: once
+// the browser stops sending that cookie, the refresh endpoint must still accept
+// the long-lived refresh cookie, or every web session dies after 15 minutes.
+func TestAuth_Refresh_AfterAccessCookieExpiry(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "lateuser", "lateuser@example.com", "password123")
+	_, _, setCookies := testutil.LoginUserWithCookies(t, server, "lateuser", "password123")
+	refreshCookie := testutil.ExtractCookie(setCookies, "refresh_token")
+	require.NotEmpty(t, refreshCookie)
+
+	statusCode, respBody := testutil.RefreshWithCookies(t, server, "refresh_token="+refreshCookie)
+	require.Equal(t, http.StatusOK, statusCode)
+	_, message, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, "Token 刷新成功", message)
+
+	// The refresh credential must not unlock ordinary endpoints.
+	statusCode, _ = testutil.AuthGet(t, server, "/api/v1/clips", refreshCookie)
+	assert.Equal(t, http.StatusUnauthorized, statusCode)
+}
+
+// TestAuth_Me covers the session probe the web panel runs at startup: it must
+// echo the identity behind the token, and must not answer without one.
+func TestAuth_Me(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	token, deviceID := testutil.RegisterAndLogin(t, server, "meuser", "meuser@example.com", "password123")
+
+	statusCode, respBody := testutil.AuthGet(t, server, "/api/v1/auth/me", token)
+	require.Equal(t, http.StatusOK, statusCode)
+	_, _, data := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, "meuser", data["username"])
+	assert.Equal(t, deviceID, data["device_id"])
+	// Registration closes after the first account, so this user is the admin.
+	assert.Equal(t, "admin", data["role"])
+
+	resp, err := http.Get(server.URL + "/api/v1/auth/me")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+// TestLogin_DeviceIDPerInstall guards the device identity fix: a client-supplied
+// install id yields one device row per install, namespaced so two accounts
+// cannot collide, while an absent id keeps the legacy name-derived behaviour.
+func TestLogin_DeviceIDPerInstall(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "deviduser", "deviduser@example.com", "password123")
+
+	loginWith := func(body map[string]string) map[string]interface{} {
+		t.Helper()
+		statusCode, respBody := testutil.PostJSON(t, server, "/api/v1/auth/login", body)
+		require.Equal(t, http.StatusOK, statusCode)
+		_, _, data := testutil.ParseResponse(t, respBody)
+		return data
+	}
+
+	first := loginWith(map[string]string{
+		"username": "deviduser", "password": "password123", "device_id": "install-aaa",
+	})
+	second := loginWith(map[string]string{
+		"username": "deviduser", "password": "password123", "device_id": "install-bbb",
+	})
+	legacy := loginWith(map[string]string{
+		"username": "deviduser", "password": "password123",
+		"device_id": "",
+	})
+
+	firstID, _ := first["device_id"].(string)
+	secondID, _ := second["device_id"].(string)
+	legacyID, _ := legacy["device_id"].(string)
+
+	assert.NotEqual(t, firstID, secondID, "distinct installs must get distinct device rows")
+	assert.NotEqual(t, firstID, legacyID, "the name-derived id must differ from a client id")
+
+	var rows int64
+	testutil.TestDB.Model(&model.Device{}).Where("user_id = (SELECT id FROM users WHERE username = ?)", "deviduser").Count(&rows)
+	assert.Equal(t, int64(3), rows)
+}
+
+func TestLogin_DeviceID_RejectsMalformed(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+
+	testutil.RegisterUser(t, server, "baddevid", "baddevid@example.com", "password123")
+
+	statusCode, respBody := testutil.PostJSON(t, server, "/api/v1/auth/login", map[string]string{
+		"username": "baddevid", "password": "password123", "device_id": "../../etc/passwd",
+	})
+	assert.Equal(t, http.StatusBadRequest, statusCode)
+	code, _, _ := testutil.ParseResponse(t, respBody)
+	assert.Equal(t, 40000, code)
+}
+
 func TestAuth_Logout_Success(t *testing.T) {
 	server, _ := testutil.SetupTestServer(t)
 

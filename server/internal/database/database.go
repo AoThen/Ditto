@@ -133,6 +133,10 @@ func InitSQLite(dbPath string, slowThreshold time.Duration) error {
 		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
+	if err := dropLegacyIndexes(DB); err != nil {
+		return err
+	}
+
 	if err := recordMigrationVersion(DB); err != nil {
 		return fmt.Errorf("failed to record migration version: %w", err)
 	}
@@ -144,6 +148,24 @@ func InitSQLite(dbPath string, slowThreshold time.Duration) error {
 
 func InitPostgres(dsn string, slowThreshold time.Duration) error {
 	return fmt.Errorf("PostgreSQL 驱动需要在 go.mod 中添加 gorm.io/driver/postgres")
+}
+
+// dropLegacyIndexes removes constraints that AutoMigrate never drops on its own.
+//
+// idx_user_device_name forced one device row per (user, name): a user signing in
+// on a second machine with the same device name got a UNIQUE constraint failure
+// instead of a new device row. The device id is the identity, the name is only a
+// label, so the constraint is dropped.
+func dropLegacyIndexes(db *gorm.DB) error {
+	const idxName = "idx_user_device_name"
+	if !db.Migrator().HasIndex(&model.Device{}, idxName) {
+		return nil
+	}
+	if err := db.Migrator().DropIndex(&model.Device{}, idxName); err != nil {
+		return fmt.Errorf("failed to drop legacy index %s: %w", idxName, err)
+	}
+	log.Printf("[Migration] Dropped legacy unique index %s on devices", idxName)
+	return nil
 }
 
 func recordMigrationVersion(db *gorm.DB) error {

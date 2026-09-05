@@ -60,6 +60,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { login } from '../api/auth'
+import { getInstallId } from '../utils/device'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -88,7 +89,7 @@ async function handleLogin() {
     loading.value = true
     try {
       // H1: Backend sets HttpOnly cookies, response only contains device_id
-      const res = await login(form)
+      const res = await login({ ...form, device_id: getInstallId() })
       if (res.code === 0) {
         userStore.setUserInfo({ device_id: res.data.device_id, username: form.username, role: res.data.role })
         ElMessage.success('登录成功')

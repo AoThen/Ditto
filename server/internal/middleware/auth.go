@@ -44,6 +44,16 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			tokenStr = c.GetHeader("Sec-WebSocket-Protocol")
 		}
 
+		// The access cookie is short-lived: once it lapses the browser stops
+		// sending it, so the refresh endpoint is the one place where the
+		// long-lived refresh cookie is an acceptable credential. Without this
+		// fallback the session could never be renewed from the web panel.
+		if tokenStr == "" && strings.HasSuffix(c.Request.URL.Path, "/auth/refresh") {
+			if cookie, err := c.Cookie("refresh_token"); err == nil && cookie != "" {
+				tokenStr = cookie
+			}
+		}
+
 		if tokenStr == "" {
 			response.Error(c, http.StatusUnauthorized, 40100, "未提供认证令牌")
 			c.Abort()

@@ -109,6 +109,7 @@ func SetupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		semiAuth := semiProtected.Group("/auth")
 		{
 			semiAuth.POST("/refresh", authHandler.Refresh)
+			semiAuth.GET("/me", authHandler.Me)
 		}
 	}
 
@@ -265,6 +266,7 @@ func SetupTestServerWithShortToken(t *testing.T) (*httptest.Server, *config.Conf
 	semiProtected.Use(middleware.Auth(cfg))
 	{
 		semiProtected.POST("/auth/refresh", authHandler.Refresh)
+		semiProtected.GET("/auth/me", authHandler.Me)
 	}
 
 	protected := v1.Group("")
@@ -424,6 +426,7 @@ func SetupTestServerWithWS(t *testing.T) (*httptest.Server, *config.Config, *hub
 	semiProtected.Use(middleware.Auth(cfg))
 	{
 		semiProtected.POST("/auth/refresh", authHandler.Refresh)
+		semiProtected.GET("/auth/me", authHandler.Me)
 	}
 
 	protected := v1.Group("")
@@ -539,6 +542,13 @@ func LoginUserWithCookies(t *testing.T, server *httptest.Server, username, passw
 		"password": password,
 	}
 	return doJSONWithCookies(t, server, "POST", "/api/v1/auth/login", "", body, "")
+}
+
+// PostJSON performs an unauthenticated JSON POST and returns the raw response,
+// for tests that need request fields the fixed helpers do not cover.
+func PostJSON(t *testing.T, server *httptest.Server, path string, body interface{}) (int, []byte) {
+	t.Helper()
+	return doJSON(t, server, "POST", path, "", body, "")
 }
 
 // RegisterAndLogin is a convenience function that registers then logs in a user.

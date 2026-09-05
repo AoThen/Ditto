@@ -243,7 +243,8 @@ func TestAdmin_UpdateUser(t *testing.T) {
 	userID := fmt.Sprintf("%.0f", data["user_id"].(float64))
 
 	respCode, respBody := testutil.AuthPut(t, server, "/api/v1/admin/users/"+userID, token, map[string]string{
-		"role": "user",
+		"role":     "user",
+		"password": "newpass456",
 	})
 	assert.Equal(t, http.StatusOK, respCode)
 	respCode, message, _ := testutil.ParseResponse(t, respBody)
@@ -254,4 +255,39 @@ func TestAdmin_UpdateUser(t *testing.T) {
 	assert.Equal(t, http.StatusOK, respCode)
 	_, _, respData := testutil.ParseResponse(t, respBody)
 	assert.Equal(t, "user", respData["role"])
+
+	// The new password must be in effect and the old one rejected.
+	statusCode, _ := testutil.LoginUser(t, server, "updateme", "newpass456")
+	assert.Equal(t, http.StatusOK, statusCode)
+	statusCode, _ = testutil.LoginUser(t, server, "updateme", "pass123")
+	assert.NotEqual(t, http.StatusOK, statusCode)
+}
+
+// TestAdmin_UpdateUser_RejectsWeakPassword guards R13: a password below the
+// minimum length must be rejected instead of silently truncating the user to a
+// blank hash.
+func TestAdmin_UpdateUser_RejectsWeakPassword(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	token, _ := testutil.RegisterAndLogin(t, server, "admin10", "admin10@example.com", "adminpass12345")
+
+	_, respBody := testutil.AuthPost(t, server, "/api/v1/admin/users", token, map[string]string{
+		"username": "weakpass",
+		"email":    "weakpass@example.com",
+		"password": "pass12345",
+	})
+	_, _, data := testutil.ParseResponse(t, respBody)
+	userID := fmt.Sprintf("%.0f", data["user_id"].(float64))
+
+	for _, weak := range []map[string]string{
+		{"role": "user", "password": ""},
+		{"role": "user", "password": "abc"},
+	} {
+		respCode, _ := testutil.AuthPut(t, server, "/api/v1/admin/users/"+userID, token, weak)
+		assert.Equal(t, http.StatusBadRequest, respCode,
+			"password %q must be rejected", weak["password"])
+	}
+
+	// The original password must still work.
+	statusCode, _ := testutil.LoginUser(t, server, "weakpass", "pass12345")
+	assert.Equal(t, http.StatusOK, statusCode)
 }

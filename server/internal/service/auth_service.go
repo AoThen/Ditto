@@ -56,6 +56,10 @@ type RegisterResponse struct {
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	// DeviceID is an optional per-install identifier sent by clients that can
+	// generate one (desktop app, web panel). Without it the device row is keyed
+	// by device name, so two devices sharing a name would share one row.
+	DeviceID string `json:"device_id"`
 }
 
 type LoginResponse struct {
@@ -73,6 +77,7 @@ var (
 	ErrUserLocked          = errors.New("账号已锁定")
 	ErrTooManyAttempts     = errors.New("尝试次数过多")
 	ErrRegistrationClosed  = errors.New("注册已关闭，请联系管理员")
+	ErrInvalidDeviceID     = errors.New("device_id 格式无效")
 )
 
 func (s *AuthService) Register(req *RegisterRequest) (*RegisterResponse, error) {
@@ -142,7 +147,7 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 	}
 
 	// Generate device ID
-	deviceID, err := generateDeviceID(user.ID, deviceName)
+	deviceID, err := resolveDeviceID(user.ID, deviceName, req.DeviceID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +264,38 @@ func generateDeviceID(userID uint, deviceName string) (string, error) {
 	}
 	encodedName := base64.RawURLEncoding.EncodeToString([]byte(safeName))
 	return fmt.Sprintf("dev-%d-%s", userID, encodedName), nil
+}
+
+// clientDeviceIDPattern bounds a client-supplied install identifier so it can be
+// embedded in the namespaced row id without surprises.
+var clientDeviceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// resolveDeviceID turns a client-supplied install identifier into a device row
+// id, namespaced by user so two accounts using the same identifier cannot
+// collide on the primary key. An empty identifier falls back to the legacy
+// name-derived id.
+func resolveDeviceID(userID uint, deviceName, clientDeviceID string) (string, error) {
+	if clientDeviceID == "" {
+		return generateDeviceID(userID, deviceName)
+	}
+	if !clientDeviceIDPattern.MatchString(clientDeviceID) {
+		return "", ErrInvalidDeviceID
+	}
+	// The "c" marker keeps a client id from colliding with a legacy name-derived
+	// row: both are otherwise "dev-<uid>-<opaque>" and the opaque part is chosen
+	// by the caller.
+	return fmt.Sprintf("dev-%d-c-%s", userID, clientDeviceID), nil
+}
+
+// CurrentUser loads the account behind a validated token. Exposed so the web
+// panel can confirm a session is still live instead of trusting a locally
+// stored "logged in" flag.
+func (s *AuthService) CurrentUser(userID uint) (*model.User, error) {
+	var user model.User
+	if err := database.DB.First(&user, userID).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // IsFirstUser returns true if no users exist in the database.

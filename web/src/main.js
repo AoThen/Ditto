@@ -44,4 +44,10 @@ window.addEventListener('unhandledrejection', async (event) => {
   }
 })
 
-app.mount('#app')
+// Validate the session against the server before the first render: the access
+// cookie is short-lived, so the locally restored flag alone must not decide what
+// the user sees. The probe is capped at 3s, so a dead API delays first paint by
+// at most that much (plus one refresh round-trip on an expired cookie).
+userStore.verifySession().finally(() => {
+  app.mount('#app')
+})

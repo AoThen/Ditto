@@ -181,6 +181,7 @@ func main() {
 		{
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", authHandler.Logout)
+			auth.GET("/me", authHandler.Me)
 		}
 	}
 

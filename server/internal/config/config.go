@@ -11,10 +11,14 @@ import (
 	"time"
 )
 
-// Token lifetime constants (single source of truth)
+// Token lifetime constants (single source of truth).
+// Access tokens are short-lived so a stolen token has a small blast radius;
+// the refresh token is what actually keeps a session alive across the 15
+// minutes. Clients must implement the refresh flow, otherwise every 15 minutes
+// they are logged out.
 const (
-	DefaultTokenExpiryAccess  = 30 * 24 * time.Hour // 30 days
-	DefaultTokenExpiryRefresh = 90 * 24 * time.Hour // 90 days
+	DefaultTokenExpiryAccess  = 15 * time.Minute
+	DefaultTokenExpiryRefresh = 7 * 24 * time.Hour
 )
 
 type Config struct {
@@ -107,9 +111,11 @@ func Load() *Config {
 	// C1 FIX: Auto-generate secure JWT secret if not set
 	jwtSecret := loadOrGenerateJWTSecret()
 
-	// Warn about weak secrets (only when explicitly set to a short/predictable value)
+	// A short secret can be brute-forced offline once an HMAC is captured, and
+	// every token issued before a rotation becomes invalid. Refuse to start
+	// instead of running in a knowingly weak configuration.
 	if len(jwtSecret) < 32 {
-		log.Printf("[WARNING] JWT_SECRET is shorter than 32 bytes. Use a strong random secret in production.")
+		log.Fatalf("[FATAL] JWT_SECRET must be at least 32 bytes (got %d). Generate one with: openssl rand -hex 32", len(jwtSecret))
 	}
 
 	cleanupInterval := 24 * time.Hour // Default: daily

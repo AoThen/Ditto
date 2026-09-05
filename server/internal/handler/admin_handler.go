@@ -25,8 +25,10 @@ type CreateUserRequest struct {
 }
 
 type UpdateUserRequest struct {
-	Email    *string `json:"email,omitempty"`
-	Password *string `json:"password,omitempty"`
+	Email *string `json:"email,omitempty"`
+	// min/max without omitempty on purpose: a nil pointer is skipped, but an
+	// explicit empty string must be rejected instead of silently accepted.
+	Password *string `json:"password,omitempty" binding:"min=6,max=64"`
 	IsActive *bool   `json:"is_active,omitempty"`
 	Role     *string `json:"role,omitempty"`
 }

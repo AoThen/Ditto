@@ -10,7 +10,8 @@ Go 后端服务，为 Ditto 剪贴板管理器提供云端同步功能。
 - ✅ WebSocket 实时推送
 - ✅ 端到端加密（AES-256-GCM）
 - ✅ 暴力破解防护（IP + 用户维度限流）
-- ✅ SQLite3 持久化（默认）/ PostgreSQL 支持
+- ✅ SQLite3 持久化（默认）
+- ⚠️ PostgreSQL 尚未接入：`DATABASE_DRIVER=postgres` 会直接报错退出，需先在 go.mod 引入 `gorm.io/driver/postgres` 并实现 `InitPostgres`
 
 ## 快速启动
 
@@ -40,7 +41,7 @@ docker build -t ditto-cloud-server .
 docker run -d -p 8080:8080 \
   -v ./data:/app/data \
   -e DB_PATH=/app/data/ditto_cloud.db \
-  -e JWT_SECRET=your-secret-key \
+  -e JWT_SECRET=your-32-bytes-or-longer-secret-here \
   ditto-cloud-server
 ```
 
@@ -98,7 +99,8 @@ server/
 # .env
 PORT=8080
 DATABASE_PATH=/app/data/ditto_cloud.db
-JWT_SECRET=your-secret-key-change-me
+# 至少 32 字节，否则服务启动即退出：openssl rand -hex 32
+JWT_SECRET=change-me-to-openssl-rand-hex-32-output
 JWT_ACCESS_TOKEN_EXPIRY=15
 JWT_REFRESH_TOKEN_EXPIRY=10080
 
@@ -156,7 +158,7 @@ go test ./internal/hub -v
 | ORM | GORM |
 | WebSocket | gorilla/websocket |
 | JWT | golang-jwt/jwt |
-| 数据库 | SQLite3 / PostgreSQL |
+| 数据库 | SQLite3（PostgreSQL 尚未接入） |
 | 加密 | crypto/aes + golang.org/x/crypto/pbkdf2 |
 | 日志 | zap |
 | 配置 | viper |

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ditto-cloud-server/internal/database"
+	"ditto-cloud-server/internal/model"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -295,4 +296,71 @@ func TestRateLimiter_UserLockDuration(t *testing.T) {
 	expectedBanUntil := time.Now().Add(1 * time.Hour)
 	// Allow 1 second tolerance
 	assert.WithinDuration(t, expectedBanUntil, banUntil, time.Second)
+}
+
+// TestRateLimiter_SyncRateLimit_WindowDecays guards the gate side of the sliding
+// window: a blocked request never reaches atomicIncrement, so the check itself
+// must ignore aged-out counters or one burst of errors would latch the user out
+// permanently.
+func TestRateLimiter_SyncRateLimit_WindowDecays(t *testing.T) {
+	rl, cleanup := setupRateLimitTest(t)
+	defer cleanup()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set("user_id", uint(7)) })
+	r.Use(rl.SyncRateLimit())
+	r.GET("/sync", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
+
+	do := func() int {
+		t.Helper()
+		req := httptest.NewRequest("GET", "/sync", nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	const key = "sync:user:7"
+	for i := 0; i < 60; i++ {
+		rl.atomicIncrement(key)
+	}
+	require.Equal(t, http.StatusTooManyRequests, do())
+
+	require.NoError(t, database.DB.Model(&model.RateLimitRecord{}).Where("key = ?", key).
+		Update("updated_at", time.Now().Add(-2*time.Minute)).Error)
+	// The cache entry expires on the same window; drop it to stand at the point
+	// where both have aged out.
+	rl.cache.Delete(key)
+
+	assert.Equal(t, http.StatusOK, do())
+}
+
+// TestRateLimiter_FailCountWindowDecays guards the sliding window: a counter
+// whose last failure is outside the window restarts instead of accumulating,
+// otherwise one burst of failures would keep re-arming the ban forever.
+func TestRateLimiter_FailCountWindowDecays(t *testing.T) {
+	rl, cleanup := setupRateLimitTest(t)
+	defer cleanup()
+
+	const ipKey = "login:ip:10.0.0.2"
+
+	for i := 0; i < 3; i++ {
+		rl.RecordLoginFailure("10.0.0.2", "windowuser")
+	}
+
+	var count int
+	database.DB.Raw("SELECT fail_count FROM rate_limit_records WHERE key = ?", ipKey).Scan(&count)
+	require.Equal(t, 3, count)
+
+	database.DB.Model(&model.RateLimitRecord{}).Where("key = ?", ipKey).
+		Update("updated_at", time.Now().Add(-2*time.Minute))
+
+	rl.RecordLoginFailure("10.0.0.2", "windowuser")
+
+	database.DB.Raw("SELECT fail_count FROM rate_limit_records WHERE key = ?", ipKey).Scan(&count)
+	assert.Equal(t, 1, count, "a stale counter must restart instead of growing")
+
+	var noBan int
+	database.DB.Raw("SELECT COUNT(*) FROM rate_limit_records WHERE key = ? AND ban_until IS NULL", ipKey).Scan(&noBan)
+	assert.Equal(t, 1, noBan, "a stale counter must not trigger the ban")
 }

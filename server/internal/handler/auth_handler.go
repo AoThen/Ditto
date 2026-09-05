@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"ditto-cloud-server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AuthHandler struct {
@@ -75,6 +77,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			// Record failure for rate limiting
 			h.rateLimiter.RecordLoginFailure(c.ClientIP(), req.Username)
 			response.Error(c, http.StatusUnauthorized, 40101, "用户名或密码错误")
+		case service.ErrInvalidDeviceID:
+			response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		default:
 			log.Printf("[Login] error: %v", err)
 			response.Error(c, http.StatusInternalServerError, 50000, "登录失败")
@@ -112,8 +116,41 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	// H1+H2: Set new Secure SameSite cookies
 	setAuthCookies(c, newToken, refreshToken, deviceID, h.service)
 
-	response.SuccessWithMessage(c, "Token 刷新成功", gin.H{
-		"device_id": deviceID,
+	data := gin.H{"device_id": deviceID}
+	// Desktop clients keep no cookie jar, so they opt in to receiving the
+	// rotated pair in the body with ?as=bearer.
+	if c.Query("as") == "bearer" {
+		data["device_token"] = newToken
+		data["refresh_token"] = refreshToken
+	}
+
+	response.SuccessWithMessage(c, "Token 刷新成功", data)
+}
+
+// Me handles GET /api/v1/auth/me. The Auth middleware has already rejected an
+// expired or rotated token, so a 200 here means the session is genuinely live.
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	user, err := h.service.CurrentUser(userID)
+	if err != nil {
+		// The middleware already loaded the account, so a miss here means the row
+		// vanished mid-request; anything else is a database fault worth logging.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Error(c, http.StatusUnauthorized, 40102, "用户不存在")
+			return
+		}
+		log.Printf("[Me] error: %v", err)
+		response.Error(c, http.StatusInternalServerError, 50000, "获取用户信息失败")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"user_id":   user.ID,
+		"username":  user.Username,
+		"email":     user.Email,
+		"role":      user.Role,
+		"device_id": middleware.GetDeviceID(c),
 	})
 }
 

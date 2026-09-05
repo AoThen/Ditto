@@ -241,6 +241,12 @@ func (h *Hub) BroadcastToOthers(userID int64, excludeConn interface{}, msgType s
 		}
 	}
 
+	// localBackend has no fan-out, so a publish here would only marshal JSON
+	// and tie up a wg slot before Shutdown; skip it.
+	if _, isLocal := h.backend.(*localBackend); isLocal {
+		return
+	}
+
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
@@ -250,7 +256,10 @@ func (h *Hub) BroadcastToOthers(userID int64, excludeConn interface{}, msgType s
 			ch <- h.backend.Publish(userID, jsonMsg)
 		}()
 		select {
-		case <-ch:
+		case err := <-ch:
+			if err != nil {
+				log.Printf("[ws] backend publish failed for user_id=%d: %v", userID, err)
+			}
 		case <-h.ctx.Done():
 		}
 	}()
