@@ -806,13 +806,18 @@ WebSocket ─► WSS (TLS)
 ┌─────────────────────────────────────────────────────────────┐
 │                    JWT Token 安全设计                         │
 │                                                             │
-│  Device Token（长期凭证）                                     │
-│    • 有效期: 90 天                                           │
+│  Device Token（Access，短期凭证）                             │
+│    • 有效期: 15 分钟（JWT_ACCESS_TOKEN_EXPIRY，单位分钟）     │
 │    • 载荷: { user_id, device_id, device_name }              │
 │    • 签名: HMAC-SHA256                                      │
 │    • 客户端存储: HKCU\Software\Ditto\CloudDeviceToken       │
 │    • 传输: Authorization: Bearer <token>                    │
 │    • 撤销: 用户可在 Web 端踢掉指定设备                        │
+│                                                             │
+│  Refresh Token（长期凭证）                                    │
+│    • 有效期: 7 天（JWT_REFRESH_TOKEN_EXPIRY，单位分钟）       │
+│    • 仅可用于 /auth/refresh，每次刷新轮换 token_version      │
+│    • 桌面端以 ?as=bearer 取回新的一对（无 Cookie 存储）      │
 │                                                             │
 │  Token 泄露应对:                                              │
 │    1. 用户发现异常 ──► Web 端"设备管理"                        │
@@ -864,7 +869,7 @@ WebSocket ─► WSS (TLS)
 |---------|------|---------|
 | **登录暴力破解** | IP 5 次/分 + 用户 10 次/小时 + bcrypt | 防止密码爆破 |
 | **重启绕过** | 限流计数器持久化到 SQLite | 重启不丢失 |
-| **Token 盗用** | 设备可撤销 + 90 天过期 | 限制泄露影响范围 |
+| **Token 盗用** | 设备可撤销 + Access Token 15 分钟过期 + Refresh 每次轮换 | 限制泄露影响范围 |
 | **端到端密码** | PBKDF2 10 万轮 + 不存明文 | 防止本地窃取 |
 | **传输安全** | HTTPS/TLS 1.2+ | 防止中间人窃听 |
 | **密码存储** | bcrypt cost=12 | 数据库泄露也无法反推 |

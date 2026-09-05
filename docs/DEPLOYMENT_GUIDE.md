@@ -328,8 +328,13 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### 场景 2: 小团队（5-20 用户）
 
+> ⚠️ **PostgreSQL 尚未接入**：服务端 `InitPostgres` 目前直接返回错误，叠加
+> `docker-compose.postgres.yml` 会在启动时退出。20 用户规模下 SQLite 单文件足够；
+> 确实需要 PostgreSQL 时，先在 `server/go.mod` 引入 `gorm.io/driver/postgres`
+> 并实现 `internal/database.InitPostgres`。
+
 ```bash
-# 添加 PostgreSQL 以获得更好的并发性能
+# 添加 PostgreSQL 以获得更好的并发性能（当前不可用，见上方说明）
 docker-compose -f docker-compose.prod.yml \
   -f docker-compose.postgres.yml \
   up -d
@@ -341,6 +346,10 @@ docker-compose -f docker-compose.prod.yml \
 - **总计: ~$19/月**
 
 ### 场景 3: 企业（100+ 用户）
+
+> ⚠️ **负载均衡需要共享消息总线**：Hub 目前只有进程内实现，实例 A 收到的
+> WebSocket 事件不会转发给实例 B，另一节点上的客户端只能等下一次周期同步补齐。
+> 多实例部署前先实现 `hub.Backend`（如 Redis pub/sub）。
 
 ```bash
 # 完整堆栈，包含负载均衡、PostgreSQL
@@ -816,8 +825,14 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Scenario 2: Small Team (5-20 Users)
 
+> ⚠️ **PostgreSQL is not wired up yet**: the server's `InitPostgres` returns an
+> error immediately, so layering `docker-compose.postgres.yml` exits at startup.
+> SQLite handles 20 users fine; to actually use PostgreSQL, add
+> `gorm.io/driver/postgres` to `server/go.mod` and implement
+> `internal/database.InitPostgres`.
+
 ```bash
-# Add PostgreSQL for better concurrency
+# Add PostgreSQL for better concurrency (currently unavailable, see note above)
 docker-compose -f docker-compose.prod.yml \
   -f docker-compose.postgres.yml \
   up -d
@@ -829,6 +844,12 @@ docker-compose -f docker-compose.prod.yml \
 - **Total: ~$19/month**
 
 ### Scenario 3: Enterprise (100+ Users)
+
+> ⚠️ **Load balancing requires a shared message bus.** The hub ships with an
+> in-process backend only, so a WebSocket event received by instance A is not
+> forwarded to instance B — clients on another node miss real-time pushes (they
+> still catch up on the next periodic sync). Implement a `hub.Backend` (e.g.
+> Redis pub/sub) before running more than one app instance.
 
 ```bash
 # Full stack with load balancing, PostgreSQL
