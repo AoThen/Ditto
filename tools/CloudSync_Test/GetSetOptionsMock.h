@@ -59,15 +59,11 @@ public:
 		s_deviceId = lpszValue;
 	}
 
-	static CString GetCloudServerUrl()
-	{
-		return s_serverUrl;
-	}
-
-	static void SetCloudServerUrl(LPCTSTR lpszValue)
-	{
-		s_serverUrl = lpszValue;
-	}
+	// NOTE: the server-url, refresh-token and install-id accessors are NOT
+	// defined here. CloudAuth.cpp is compiled against the real Options.h, so an
+	// inline definition here would only be emitted if some test happened to call
+	// it - which would then collide with the strong definitions in
+	// TestStubs.cpp. Keep every accessor in exactly one of the two places.
 
 	static BOOL GetCloudSyncEnabled()
 	{
@@ -107,7 +103,6 @@ public:
 		s_cloudSyncEnabled = FALSE;
 		s_deviceToken.Empty();
 		s_deviceId.Empty();
-		s_serverUrl.Empty();
 		s_deviceName.Empty();
 		s_lastSyncTime = 0;
 	}
@@ -118,7 +113,6 @@ private:
 	static BOOL s_cloudSyncEnabled;
 	static CStringA s_deviceToken;
 	static CStringA s_deviceId;
-	static CString s_serverUrl;
 	static CString s_deviceName;
 	static __int64 s_lastSyncTime;
 };
@@ -129,6 +123,5 @@ inline CString CGetSetOptions::s_testSalt;
 inline BOOL CGetSetOptions::s_cloudSyncEnabled = FALSE;
 inline CStringA CGetSetOptions::s_deviceToken;
 inline CStringA CGetSetOptions::s_deviceId;
-inline CString CGetSetOptions::s_serverUrl;
 inline CString CGetSetOptions::s_deviceName;
 inline __int64 CGetSetOptions::s_lastSyncTime = 0;

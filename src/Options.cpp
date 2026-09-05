@@ -1676,6 +1676,31 @@ void CGetSetOptions::SetCloudDeviceId(LPCSTR lpszValue)
 	SetProfileString("CloudDeviceId", wide);
 }
 
+CStringA CGetSetOptions::GetCloudRefreshToken()
+{
+	CString cs = CSecureStore::Unprotect(GetProfileString("CloudRefreshToken", _T("")));
+	CT2A utf8(cs, CP_UTF8);
+	return CStringA(utf8);
+}
+
+void CGetSetOptions::SetCloudRefreshToken(LPCSTR lpszValue)
+{
+	CString wide(lpszValue);
+	SetProfileString("CloudRefreshToken", CSecureStore::Protect(wide));
+}
+
+// Per-install identifier sent on login so each machine gets its own device row.
+// Not a secret, so it is stored in the clear unlike the tokens.
+CString CGetSetOptions::GetCloudInstallId()
+{
+	return GetProfileString("CloudInstallId", _T(""));
+}
+
+void CGetSetOptions::SetCloudInstallId(LPCTSTR lpszValue)
+{
+	SetProfileString("CloudInstallId", lpszValue);
+}
+
 BOOL CGetSetOptions::GetCloudSyncEnabled()
 {
 	return GetProfileLong("CloudSyncEnabled", FALSE);

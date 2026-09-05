@@ -286,6 +286,10 @@ public:
 	static void     SetCloudDeviceToken(LPCSTR lpszValue);
 	static CStringA GetCloudDeviceId();
 	static void     SetCloudDeviceId(LPCSTR lpszValue);
+	static CStringA GetCloudRefreshToken();
+	static void     SetCloudRefreshToken(LPCSTR lpszValue);
+	static CString  GetCloudInstallId();
+	static void     SetCloudInstallId(LPCTSTR lpszValue);
 	static BOOL     GetCloudSyncEnabled();
 	static void     SetCloudSyncEnabled(BOOL bValue);
 	static BOOL     GetCloudPushOnCopy();

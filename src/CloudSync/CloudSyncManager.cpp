@@ -1400,6 +1400,18 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 
 			if (res->status == 401 || res->status == 403)
 			{
+				// Access tokens are short-lived: try the refresh token before
+				// bothering the user. On success the stored credential is replaced,
+				// so EnsureHttpClient rebuilds the client with it on the next cycle.
+				if (CCloudAuth::TryRefreshToken())
+				{
+					LogMessage(_T("PushNewClips: access token refreshed, resuming on next sync."));
+					EnterCriticalSection(&m_csStatus);
+					m_csLastError = _T("Push: token refreshed");
+					LeaveCriticalSection(&m_csStatus);
+					bResult = FALSE; goto cleanup;
+				}
+
 				LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = _T("Push: authentication failed");
@@ -1720,6 +1732,17 @@ void CCloudSyncManager::PullChanges()
 		// Handle authentication errors (401/403) - trigger re-auth flow
 		if (res->status == 401 || res->status == 403)
 		{
+			// Try the refresh token first: the access token expires on a schedule,
+			// so this is the normal path rather than an error worth showing.
+			if (CCloudAuth::TryRefreshToken())
+			{
+				LogMessage(_T("PullChanges: access token refreshed, resuming on next sync."));
+				EnterCriticalSection(&m_csStatus);
+				m_csLastError = _T("Pull: token refreshed");
+				LeaveCriticalSection(&m_csStatus);
+				return;
+			}
+
 			LogMessage(_T("PullChanges: token expired or invalid, clearing token for re-auth."));
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = _T("Pull: authentication failed");
@@ -3767,10 +3790,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		CStringA wsUrlA(wsUrlCStr);
 		std::string wsUrl(wsUrlA.GetString());
 
-		// Prepare auth headers: pass device_token as Sec-WebSocket-Protocol
-		EnterCriticalSection(&pThis->m_csHttpClient);
-		std::string token(pThis->m_deviceToken);
-		LeaveCriticalSection(&pThis->m_csHttpClient);
+		// Prepare auth headers: the server accepts the device token as a bearer
+		// credential. Read it fresh rather than using the cached member: the sync
+		// thread may have refreshed it while this thread was backing off.
+		CStringA wsTokenA = CGetSetOptions::GetCloudDeviceToken();
+		std::string token(wsTokenA.GetString());
 		httplib::Headers headers = {
 			{"Authorization", "Bearer " + token}
 		};
@@ -3803,6 +3827,10 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			CString msg;
 			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
 			LogMessage(msg);
+			// A rejected handshake is usually an expired access token: try the
+			// refresh token so the next attempt carries a live credential.
+			if (CCloudAuth::TryRefreshToken())
+				LogMessage(_T("WsThreadProc: access token refreshed for reconnect."));
 			EnterCriticalSection(&pThis->m_csWsClient);
 			bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 			pThis->m_pWsClient = nullptr;

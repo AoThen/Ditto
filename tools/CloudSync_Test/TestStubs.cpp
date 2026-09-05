@@ -43,3 +43,28 @@ BOOL CGetSetOptions::GetCloudEncryptionNeedsRecovery() { return FALSE; }
 void log(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
 void logclip(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
 CString StrF(const TCHAR* /*pszFormat*/, ...) { return CString(); }
+
+// -------------------------------------------------------------------
+// CGetSetOptions cloud-credential stubs
+//
+// CloudAuth.cpp reads and writes these. They must stay out of
+// GetSetOptionsMock.h: an inline definition there is only emitted when some
+// test happens to call it, which would leave CloudAuth.obj unresolved (and
+// would collide with these strong definitions once it did).
+// -------------------------------------------------------------------
+static CString s_stubServerUrl;
+static CStringA s_stubRefreshToken;
+static CString s_stubInstallId;
+
+CString CGetSetOptions::GetCloudServerUrl() { return s_stubServerUrl; }
+void CGetSetOptions::SetCloudServerUrl(LPCTSTR lpszValue) { s_stubServerUrl = lpszValue; }
+CStringA CGetSetOptions::GetCloudRefreshToken() { return s_stubRefreshToken; }
+void CGetSetOptions::SetCloudRefreshToken(LPCSTR lpszValue) { s_stubRefreshToken = lpszValue; }
+CString CGetSetOptions::GetCloudInstallId() { return s_stubInstallId; }
+void CGetSetOptions::SetCloudInstallId(LPCTSTR lpszValue) { s_stubInstallId = lpszValue; }
+
+// -------------------------------------------------------------------
+// Misc.cpp stubs
+// -------------------------------------------------------------------
+// Fixed id keeps the login payload deterministic in tests.
+CString NewGuidString() { return _T("11111111-2222-3333-4444-555555555555"); }

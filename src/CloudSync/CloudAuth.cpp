@@ -3,6 +3,9 @@
 #include "../httplib.h"
 #include "../json.hpp"
 #include "../Options.h"
+#include "../Misc.h"
+
+#include <mutex>
 
 using json = nlohmann::json;
 
@@ -71,6 +74,18 @@ HttpResult HttplibClientAdapter::Post(const std::string& path, const std::string
 	return HttpResult{res->status, res->body, true};
 }
 
+HttpResult HttplibClientAdapter::PostWithBearer(const std::string& path, const std::string& body,
+                                                const std::string& contentType, const std::string& bearerToken)
+{
+	if (!m_client) return HttpResult{};
+	httplib::Headers headers = {
+		{ "Authorization", "Bearer " + bearerToken }
+	};
+	auto res = m_client->Post(path, headers, body, contentType);
+	if (!res) return HttpResult{};
+	return HttpResult{res->status, res->body, true};
+}
+
 bool HttplibClientAdapter::IsValid() const
 {
 	return m_client != nullptr;
@@ -103,12 +118,50 @@ HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, 
 	return HttpResult{res->status, res->body, true};
 }
 
+// DoPostWithBearer - Same as DoPost, but authenticates with an explicit bearer
+// token. Used by the refresh flow, whose token is not the stored access token.
+HttpResult CCloudAuth::DoPostWithBearer(const std::string& path, const std::string& body,
+                                        const std::string& contentType, const std::string& bearerToken)
+{
+	if (m_testClient)
+	{
+		return m_testClient->PostWithBearer(path, body, contentType, bearerToken);
+	}
+	if (!m_httpClient)
+	{
+		return HttpResult{};
+	}
+	httplib::Headers headers = {
+		{ "Authorization", "Bearer " + bearerToken }
+	};
+	auto res = m_httpClient->Post(path, headers, body, contentType);
+	if (!res)
+	{
+		return HttpResult{};
+	}
+	return HttpResult{res->status, res->body, true};
+}
+
 // Helper: convert std::string to CString (UTF-8 JSON → Unicode)
 static CString StdStringToCString(const std::string& str)
 {
 	if (str.empty())
 		return CString();
 	return CString(CA2W(str.c_str(), CP_UTF8));
+}
+
+// Helper: stable per-install identifier sent on login. Without it the server
+// keys devices by name, so every Ditto install of one account shares a single
+// device row (and one token version).
+static CString GetOrCreateInstallId()
+{
+	CString id = CGetSetOptions::GetCloudInstallId();
+	if (id.IsEmpty())
+	{
+		id = NewGuidString();
+		CGetSetOptions::SetCloudInstallId(id);
+	}
+	return id;
 }
 
 LoginResult CCloudAuth::Login(const CString& serverUrl,
@@ -130,6 +183,7 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 		json body;
 		body["username"] = CStringToStdString(username);
 		body["password"] = CStringToStdString(password);
+		body["device_id"] = CStringToStdString(GetOrCreateInstallId());
 
 		std::string bodyStr = body.dump();
 		HttpResult httpRes = DoPost("/api/v1/auth/login", bodyStr, "application/json");
@@ -207,6 +261,15 @@ LoginResult CCloudAuth::Login(const CString& serverUrl,
 				// Persist token via CGetSetOptions
 				CT2A tokenA(result.deviceToken, CP_UTF8);
 				CGetSetOptions::SetCloudDeviceToken(tokenA);
+
+				// The access token is short-lived; the refresh token is what keeps
+				// a long-running session alive across restarts.
+				if (data.contains("refresh_token"))
+				{
+					result.refreshToken = StdStringToCString(data["refresh_token"].get<std::string>());
+					CT2A refreshA(result.refreshToken, CP_UTF8);
+					CGetSetOptions::SetCloudRefreshToken(refreshA);
+				}
 			}
 			else
 			{
@@ -327,6 +390,15 @@ LoginResult CCloudAuth::Register(const CString& serverUrl,
 				}
 				CT2A tokenA(result.deviceToken, CP_UTF8);
 				CGetSetOptions::SetCloudDeviceToken(tokenA);
+
+				// Kept in step with Login: an access token without its refresh
+				// counterpart dies as soon as it expires.
+				if (data.contains("refresh_token"))
+				{
+					result.refreshToken = StdStringToCString(data["refresh_token"].get<std::string>());
+					CT2A refreshA(result.refreshToken, CP_UTF8);
+					CGetSetOptions::SetCloudRefreshToken(refreshA);
+				}
 			}
 		}
 		catch (const json::parse_error& e)
@@ -355,6 +427,82 @@ BOOL CCloudAuth::IsLoggedIn()
 void CCloudAuth::Logout()
 {
 	CGetSetOptions::SetCloudDeviceToken("");
+	CGetSetOptions::SetCloudRefreshToken("");
+}
+
+// TryRefreshToken - Exchange the stored refresh token for a new access/refresh
+// pair. The server returns the pair in the body only when asked with
+// ?as=bearer, since this client keeps no cookie jar.
+//
+// The sync thread and the WS thread can both see a 401 at the same moment, and
+// the server rotates the token version on every refresh: two concurrent calls
+// would make the second one fail, and its caller would then clear the token the
+// first one had just stored. Serialising here removes both races.
+BOOL CCloudAuth::TryRefreshToken()
+{
+	static std::mutex refreshMutex;
+	std::lock_guard<std::mutex> lock(refreshMutex);
+	return TryRefreshTokenLocked();
+}
+
+BOOL CCloudAuth::TryRefreshTokenLocked()
+{
+	try
+	{
+		CStringA refreshToken = CGetSetOptions::GetCloudRefreshToken();
+		if (refreshToken.IsEmpty())
+			return FALSE;
+
+		CString serverUrl = CGetSetOptions::GetCloudServerUrl();
+		if (serverUrl.IsEmpty())
+			serverUrl = m_httpClientUrl;	// reuse whatever the last login used
+		if (serverUrl.IsEmpty())
+			return FALSE;
+
+		EnsureHttpClient(serverUrl);
+		if (!m_testClient && !m_httpClient)
+			return FALSE;
+
+		HttpResult httpRes = DoPostWithBearer(
+			"/api/v1/auth/refresh?as=bearer", "{}", "application/json",
+			std::string(refreshToken.GetString()));
+		if (!httpRes.success || httpRes.status != 200)
+			return FALSE;
+
+		auto responseJson = json::parse(httpRes.body);
+		if (!responseJson.contains("code") || responseJson["code"].get<int>() != 0)
+			return FALSE;
+		if (!responseJson.contains("data") || !responseJson["data"].contains("device_token"))
+			return FALSE;
+
+		const auto& data = responseJson["data"];
+		CString newToken = StdStringToCString(data["device_token"].get<std::string>());
+		if (newToken.IsEmpty())
+			return FALSE;
+		CT2A tokenA(newToken, CP_UTF8);
+		CGetSetOptions::SetCloudDeviceToken(tokenA);
+
+		// The server rotates the refresh token as well: the old one is dead once
+		// the token version is bumped, so it must be replaced in the same step.
+		if (data.contains("refresh_token"))
+		{
+			CString newRefresh = StdStringToCString(data["refresh_token"].get<std::string>());
+			if (!newRefresh.IsEmpty())
+			{
+				CT2A refreshA(newRefresh, CP_UTF8);
+				CGetSetOptions::SetCloudRefreshToken(refreshA);
+			}
+		}
+
+		OutputDebugStringA("[CloudAuth] access token refreshed\n");
+		return TRUE;
+	}
+	catch (const std::exception&)
+	{
+		// e.what() can quote part of the response body, which carries tokens.
+		OutputDebugStringA("[CloudAuth] refresh failed\n");
+		return FALSE;
+	}
 }
 
 void CCloudAuth::SetHttpClientForTest(std::shared_ptr<IHttpClient> mockClient)

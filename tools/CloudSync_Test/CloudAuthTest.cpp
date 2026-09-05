@@ -355,3 +355,92 @@ TEST(CloudAuth_Integration, RegisterThenLogin)
 	CGetSetOptions::SetCloudDeviceToken(CStringA("login-token"));
 	EXPECT_TRUE(CCloudAuth::IsLoggedIn());
 }
+
+// ============================================================================
+// TryRefreshToken Tests
+// ============================================================================
+
+namespace {
+
+// Answers the bearer-authenticated refresh call only, so a regression to the
+// plain Post() path is caught rather than silently accepted.
+class RefreshMockClient : public IHttpClient
+{
+public:
+	HttpResult Post(const std::string& /*path*/, const std::string& /*body*/,
+	                const std::string& /*contentType*/) override
+	{
+		return HttpResult{};
+	}
+
+	HttpResult PostWithBearer(const std::string& path, const std::string& /*body*/,
+	                          const std::string& /*contentType*/,
+	                          const std::string& bearer) override
+	{
+		bearerCalls++;
+		lastPath = path;
+		lastBearer = bearer;
+		return HttpResult{ status, responseBody, true };
+	}
+
+	bool IsValid() const override { return true; }
+	std::string GetBaseUrl() const override { return "https://mock-server"; }
+
+	int bearerCalls = 0;
+	std::string lastPath;
+	std::string lastBearer;
+	int status = 200;
+	std::string responseBody =
+		R"({"code":0,"data":{"device_token":"new-access","refresh_token":"new-refresh"}})";
+};
+
+} // namespace
+
+TEST(CloudAuth_TryRefreshToken, FailsWithoutStoredRefreshToken)
+{
+	auto client = std::make_shared<RefreshMockClient>();
+	CCloudAuth::SetHttpClientForTest(client);
+	CGetSetOptions::SetCloudRefreshToken(CStringA(""));
+
+	EXPECT_FALSE(CCloudAuth::TryRefreshToken());
+	EXPECT_EQ(0, client->bearerCalls);
+
+	CCloudAuth::ResetHttpClientForTest();
+}
+
+TEST(CloudAuth_TryRefreshToken, RotatesBothTokens)
+{
+	auto client = std::make_shared<RefreshMockClient>();
+	CCloudAuth::SetHttpClientForTest(client);
+	CGetSetOptions::SetCloudServerUrl(_T("https://mock-server"));
+	CGetSetOptions::SetCloudRefreshToken(CStringA("old-refresh"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("old-access"));
+
+	EXPECT_TRUE(CCloudAuth::TryRefreshToken());
+	EXPECT_EQ(1, client->bearerCalls);
+	EXPECT_EQ(std::string("/api/v1/auth/refresh?as=bearer"), client->lastPath);
+	EXPECT_EQ(std::string("old-refresh"), client->lastBearer);
+	// The old access token is dead the moment the version is bumped, so both
+	// halves of the pair have to be replaced together.
+	EXPECT_EQ(std::string("new-access"), std::string(CGetSetOptions::GetCloudDeviceToken().GetString()));
+	EXPECT_EQ(std::string("new-refresh"), std::string(CGetSetOptions::GetCloudRefreshToken().GetString()));
+
+	CCloudAuth::ResetHttpClientForTest();
+}
+
+TEST(CloudAuth_TryRefreshToken, KeepsStoredTokensWhenServerRejects)
+{
+	auto client = std::make_shared<RefreshMockClient>();
+	client->status = 401;
+	client->responseBody = R"({"code":40101,"message":"refresh failed"})";
+	CCloudAuth::SetHttpClientForTest(client);
+	CGetSetOptions::SetCloudServerUrl(_T("https://mock-server"));
+	CGetSetOptions::SetCloudRefreshToken(CStringA("old-refresh"));
+	CGetSetOptions::SetCloudDeviceToken(CStringA("old-access"));
+
+	EXPECT_FALSE(CCloudAuth::TryRefreshToken());
+	EXPECT_EQ(std::string("old-access"), std::string(CGetSetOptions::GetCloudDeviceToken().GetString()));
+	EXPECT_EQ(std::string("old-refresh"), std::string(CGetSetOptions::GetCloudRefreshToken().GetString()));
+
+	CCloudAuth::ResetHttpClientForTest();
+}
