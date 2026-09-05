@@ -59,11 +59,19 @@ public:
 		s_deviceId = lpszValue;
 	}
 
-	// NOTE: the server-url, refresh-token and install-id accessors are NOT
-	// defined here. CloudAuth.cpp is compiled against the real Options.h, so an
-	// inline definition here would only be emitted if some test happened to call
-	// it - which would then collide with the strong definitions in
-	// TestStubs.cpp. Keep every accessor in exactly one of the two places.
+	// Server-url / refresh-token / install-id accessors: DECLARED but not
+	// defined here. Their definitions live in TestStubs.cpp, because the test
+	// project does not compile Options.cpp. Declaring them here lets tests call
+	// them, while CloudAuth.cpp - compiled against the real Options.h - resolves
+	// the same symbols from TestStubs.cpp. They must NOT be defined inline here:
+	// an inline body is only emitted when a test happens to call it, which would
+	// leave CloudAuth.obj unresolved.
+	static CString  GetCloudServerUrl();
+	static void     SetCloudServerUrl(LPCTSTR lpszValue);
+	static CStringA GetCloudRefreshToken();
+	static void     SetCloudRefreshToken(LPCSTR lpszValue);
+	static CString  GetCloudInstallId();
+	static void     SetCloudInstallId(LPCTSTR lpszValue);
 
 	static BOOL GetCloudSyncEnabled()
 	{

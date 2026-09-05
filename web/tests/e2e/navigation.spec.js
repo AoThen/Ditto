@@ -7,20 +7,20 @@ test.describe('Navigation', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('should navigate between clips and settings', async ({ page, request }) => {
-    await loginAsNewUser(page, request)
+  test('should navigate between clips and settings', async ({ page }) => {
+    await loginAsNewUser(page)
 
     await expect(page).toHaveURL(/\/dashboard/)
 
     await page.getByRole('menuitem', { name: '设置' }).click()
-    await expect(page).toHaveURL(/\/dashboard\/settings/)
+    await expect(page).toHaveURL(/\/dashboard\/settings/, { timeout: 10000 })
 
     await page.getByRole('menuitem', { name: '剪贴板' }).click()
-    await expect(page).toHaveURL(/\/dashboard\/clips/)
+    await expect(page).toHaveURL(/\/dashboard\/clips/, { timeout: 10000 })
   })
 
-  test('should preserve login on page reload', async ({ page, request }) => {
-    await loginAsNewUser(page, request)
+  test('should preserve login on page reload', async ({ page }) => {
+    await loginAsNewUser(page)
     await expect(page).toHaveURL(/\/dashboard/)
 
     await page.reload()

@@ -6,7 +6,7 @@ const TEST_PASSWORD = process.env.E2E_PASSWORD || 'e2e_test_pass_123'
 
 let deviceSeq = 0
 
-export async function loginAsNewUser(page, request) {
+export async function loginAsNewUser(page) {
   // Idempotent registration — tolerate 403 (closed) and 400 (already exists)
   const regResp = await page.request.post('/api/v1/auth/register', {
     data: {
@@ -50,8 +50,9 @@ export async function loginAsNewUser(page, request) {
 
   const deviceId = loginData?.data?.device_id
 
-  // Inject Bearer token into the shared request fixture for authenticated API calls
-  await request.setExtraHTTPHeaders({ Authorization: `Bearer ${token}` })
-
-  return { username: TEST_USERNAME, deviceId, request }
+  // Authenticated API calls must use page.request, which shares the browser
+  // context's cookie jar (the HttpOnly auth cookies set by the UI login).
+  // The standalone `request` fixture is a separate context with no cookies, and
+  // Playwright 1.59 dropped its setExtraHTTPHeaders method.
+  return { username: TEST_USERNAME, deviceId }
 }

@@ -3,12 +3,12 @@ import { loginAsNewUser } from './helpers'
 
 test.describe('Authentication', () => {
   test('should register a new user successfully', async ({ page, request }) => {
-    await loginAsNewUser(page, request)
+    await loginAsNewUser(page)
     await expect(page).toHaveURL(/\/dashboard/)
   })
 
   test('should login with valid credentials', async ({ page, request }) => {
-    await loginAsNewUser(page, request)
+    await loginAsNewUser(page)
     await expect(page).toHaveURL(/\/dashboard/)
     await expect(page.getByText('Ditto Cloud')).toBeVisible()
   })
@@ -24,7 +24,7 @@ test.describe('Authentication', () => {
   })
 
   test('should logout successfully', async ({ page, request }) => {
-    await loginAsNewUser(page, request)
+    await loginAsNewUser(page)
 
     await page.getByRole('button', { name: '退出登录' }).click()
 
