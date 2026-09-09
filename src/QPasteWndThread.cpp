@@ -104,7 +104,7 @@ void CQPasteWndThread::OnLoadItems(void *param)
 		    {
 				firstLoad = (pasteWnd->m_loadItems.begin()->x == -1);
 		        loadItemsIndex = max(pasteWnd->m_loadItems.begin()->x, 0);
-		        loadItemsCount = pasteWnd->m_loadItems.begin()->y - pasteWnd->m_loadItems.begin()->x;
+		        loadItemsCount = pasteWnd->m_loadItems.begin()->y - loadItemsIndex + 1;
 		        pasteWnd->m_bStopQuery = false;
 				listSize = static_cast<int>(pasteWnd->m_listItems.size());
 		        clearFirstLoadItem = true;
