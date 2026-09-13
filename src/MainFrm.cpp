@@ -294,7 +294,7 @@ LRESULT CMainFrame::OnHotKey(WPARAM wParam, LPARAM lParam)
 		theApp.m_pDittoHotKey3 && wParam == theApp.m_pDittoHotKey3->m_Atom)
     {
         //If they still have the shift/ctrl keys down
-        if(m_keyStateModifiers != 0 && m_quickPaste.IsWindowVisibleEx())
+        if(m_keyStateModifiers != 0 && m_quickPaste.IsWindowTopLevel())
         {
             Log(_T("On Show Ditto HotKey, key state modifiers are still down, moving selection"));
 

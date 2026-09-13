@@ -308,7 +308,22 @@ void CQuickPaste::ShowQPasteWnd(CWnd *pParent, bool bAtPrevPos, bool bFromKeyboa
 	// Refresh scrollbar colors to match current theme
 	m_pwndPaste->RefreshScrollBarColors();
 	
-	m_pwndPaste->SetForegroundWindow();
+	if(m_pwndPaste->SetForegroundWindow() == FALSE)
+	{
+		//SetForegroundWindow can fail if this is a background process and the
+		//foreground window does not allow focus stealing. Attach to the foreground
+		//thread input and retry, this is the same technique used to give focus back
+		//to the paste target in ExternalWindowTracker::ActivateTarget.
+		DWORD foreGroundThreadId = ::GetWindowThreadProcessId(::GetForegroundWindow(), NULL);
+		DWORD currentThreadId = ::GetCurrentThreadId();
+		if(foreGroundThreadId != 0 && foreGroundThreadId != currentThreadId &&
+			::AttachThreadInput(foreGroundThreadId, currentThreadId, TRUE))
+		{
+			m_pwndPaste->BringWindowToTop();
+			m_pwndPaste->SetForegroundWindow();
+			::AttachThreadInput(foreGroundThreadId, currentThreadId, FALSE);
+		}
+	}
 
 	Log(StrF(_T("END of ShowQPasteWnd, AtPrevPos: %d, FromKeyboard: %d, RefillList: %d, Position, %d %d %d %d"), bAtPrevPos, bFromKeyboard, bReFillList, crRect.left, crRect.top, crRect.right, crRect.bottom));
 

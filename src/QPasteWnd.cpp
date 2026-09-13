@@ -906,6 +906,7 @@ BOOL CQPasteWnd::HideQPasteWindow(bool releaseFocus, BOOL clearSearchData)
 
 	Log(_T("Start of HideQPasteWindow"));
 	DWORD startTick = GetTickCount();
+	bool deferClear = false;
 
 	if (!theApp.m_bShowingQuickPaste)
 	{
@@ -962,13 +963,18 @@ BOOL CQPasteWnd::HideQPasteWindow(bool releaseFocus, BOOL clearSearchData)
 			}
 
 			//Wait for the thread to stop fill the cache so we can clear it
-			WaitForSingleObject(m_thread.m_SearchingEvent, 5000);
-
+			if (WaitForSingleObject(m_thread.m_SearchingEvent, 200) == WAIT_OBJECT_0)
 			{
 				ATL::CCritSecLock csLock(m_CritSection.m_sect);
 
 				m_listItems.clear();
 				m_lstHeader.SetItemCountEx(0);
+			}
+			else
+			{
+				//The thread is still filling the cache, clearing now would race with its
+				//writes, skip it and rebuild the list on the next show instead
+				deferClear = true;
 			}
 		}
 	}
@@ -984,6 +990,9 @@ BOOL CQPasteWnd::HideQPasteWindow(bool releaseFocus, BOOL clearSearchData)
 	}
 
 	m_pendingRefresh = false;
+
+	if (deferClear)
+		m_pendingRefresh = true;
 
 	DWORD endTick = GetTickCount();
 	if ((endTick - startTick) > 150)
@@ -1423,18 +1432,32 @@ LRESULT CQPasteWnd::OnRefreshView(WPARAM wParam, LPARAM lParam)
 	}
 	else
 	{
-		//Wait for the thread to stop fill the cache so we can clear it
-		WaitForSingleObject(m_thread.m_SearchingEvent, 5000);
-
 		{
 			ATL::CCritSecLock csLock(m_CritSection.m_sect);
-			m_listItems.clear();
+			m_bStopQuery = true;
 		}
 
-		m_lstHeader.SetItemCountEx(0);
-		UpdateStatus();
+		//Wait for the thread to stop fill the cache so we can clear it
+		if (WaitForSingleObject(m_thread.m_SearchingEvent, 200) == WAIT_OBJECT_0)
+		{
+			{
+				ATL::CCritSecLock csLock(m_CritSection.m_sect);
+				m_listItems.clear();
+			}
 
-		action = _T("Cleared Items");
+			m_lstHeader.SetItemCountEx(0);
+			UpdateStatus();
+
+			action = _T("Cleared Items");
+		}
+		else
+		{
+			//The thread is still filling the cache, clearing now would race with its
+			//writes, skip it and rebuild the list on the next show instead
+			m_pendingRefresh = true;
+
+			action = _T("Refresh Deferred");
+		}
 	}
 
 	Log(StrF(_T("OnRefreshView - End - Count: %d, Action: %s"), m_listItems.size(), action));
