@@ -546,6 +546,11 @@ void CModernScrollBar::ScrollToPosition(int thumbPos)
 		if (deltaPixels != 0)
 		{
 			m_pListCtrl->Scroll(CSize(deltaPixels, 0));
+			// Paint the exposed strip synchronously: WM_PAINT is the lowest
+			// priority message and gets starved by the WM_MOUSEMOVE flood
+			// during a drag, so async painting makes content visibly trail
+			// the thumb ("chasing").
+			m_pListCtrl->UpdateWindow();
 		}
 	}
 	
