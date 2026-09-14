@@ -431,18 +431,13 @@ void CModernScrollBar::OnLButtonDown(UINT nFlags, CPoint point)
 		}
 		else
 		{
-			// For horizontal, use Scroll with page width
-			CRect clientRect;
-			m_pListCtrl->GetClientRect(&clientRect);
-			int pageWidth = clientRect.Width();
-			
 			if (point.x < thumbRect.left)
 			{
-				m_pListCtrl->Scroll(CSize(-pageWidth, 0));
+				m_pListCtrl->SendMessage(WM_HSCROLL, MAKEWPARAM(SB_PAGELEFT, 0), 0);
 			}
 			else if (point.x > thumbRect.right)
 			{
-				m_pListCtrl->Scroll(CSize(pageWidth, 0));
+				m_pListCtrl->SendMessage(WM_HSCROLL, MAKEWPARAM(SB_PAGERIGHT, 0), 0);
 			}
 		}
 		
@@ -459,12 +454,20 @@ void CModernScrollBar::OnLButtonUp(UINT nFlags, CPoint point)
 		m_isDragging = false;
 		ReleaseCapture();
 		Invalidate();
+
+		// Commit the final horizontal position so the last sub-threshold
+		// pixels of the drag are not lost
+		if (m_orientation == ScrollBarOrientation::Horizontal && m_pListCtrl)
+		{
+			int delta = point.x - m_dragStartPos;
+			ScrollToPosition(m_dragStartScrollPos + delta, TRUE);
+		}
 	}
 
 	CWnd::OnLButtonUp(nFlags, point);
 }
 
-void CModernScrollBar::ScrollToPosition(int thumbPos)
+void CModernScrollBar::ScrollToPosition(int thumbPos, BOOL bCommit)
 {
 	if (!m_pListCtrl)
 		return;
@@ -533,13 +536,13 @@ void CModernScrollBar::ScrollToPosition(int thumbPos)
 	}
 	else
 	{
-		// Horizontal scrolling - use Scroll method for more reliable scrolling
-		int currentScrollPos = m_pListCtrl->GetScrollPos(SB_HORZ);
-		int deltaPixels = newPos - currentScrollPos;
-		
-		if (deltaPixels != 0)
+		// Horizontal scrolling - let the list view convert scroll units to
+		// pixels via WM_HSCROLL; Scroll(CSize) only bit-blits and the
+		// content snaps back on the next repaint
+		int nCode = bCommit ? SB_THUMBPOSITION : SB_THUMBTRACK;
+		if (scrollableTrack > 0)
 		{
-			m_pListCtrl->Scroll(CSize(deltaPixels, 0));
+			m_pListCtrl->SendMessage(WM_HSCROLL, MAKEWPARAM(nCode, newPos), 0);
 		}
 	}
 	

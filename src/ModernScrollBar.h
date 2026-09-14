@@ -67,7 +67,8 @@ protected:
 	void DrawRoundedRect(CDC* pDC, CRect rect, int radius, COLORREF color);
 	
 	// Scroll list to position based on thumb drag
-	void ScrollToPosition(int thumbPos);
+	// bCommit=TRUE finalizes the position (SB_THUMBPOSITION on release)
+	void ScrollToPosition(int thumbPos, BOOL bCommit = FALSE);
 
 private:
 	CListCtrl* m_pListCtrl;
