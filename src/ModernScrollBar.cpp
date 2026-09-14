@@ -22,7 +22,7 @@ CModernScrollBar::CModernScrollBar()
 	, m_scrollBarHoverWidth(12)
 	, m_cornerRadius(4)
 	, m_minThumbSize(30)
-	, m_throttleThreshold(8)
+	, m_throttleThreshold(2)
 	, m_isMouseOver(false)
 	, m_isDragging(false)
 	, m_dragStartPos(0)
@@ -81,7 +81,7 @@ void CModernScrollBar::SetColors(COLORREF trackColor, COLORREF thumbColor, COLOR
 void CModernScrollBar::SetDPI(CDPI* pDPI)
 {
 	m_pDPI = pDPI;
-	m_throttleThreshold = pDPI ? pDPI->Scale(8) : 8;
+	m_throttleThreshold = pDPI ? pDPI->Scale(2) : 2;
 }
 
 void CModernScrollBar::UpdateScrollBar()
@@ -536,12 +536,18 @@ void CModernScrollBar::ScrollToPosition(int thumbPos, BOOL bCommit)
 	}
 	else
 	{
-		// Horizontal scrolling - let the list view convert scroll units to
-		// pixels via WM_HSCROLL; Scroll(CSize) only bit-blits and the
-		// content snaps back on the next repaint
+		// Horizontal scrolling - WM_HSCROLL so the list view moves its own
+		// scroll origin (Scroll(CSize) only bit-blits and content snaps back).
+		// v6 comctl32 derives the thumb delta from SIF_TRACKPOS, not the
+		// message nPos, so seed the track position first; the packed nPos
+		// keeps older comctl32 (wParam-based) working too.
 		int nCode = bCommit ? SB_THUMBPOSITION : SB_THUMBTRACK;
 		if (scrollableTrack > 0)
 		{
+			SCROLLINFO trackInfo = { sizeof(SCROLLINFO) };
+			trackInfo.fMask = SIF_TRACKPOS;
+			trackInfo.nTrackPos = newPos;
+			m_pListCtrl->SetScrollInfo(SB_HORZ, &trackInfo, FALSE);
 			m_pListCtrl->SendMessage(WM_HSCROLL, MAKEWPARAM(nCode, newPos), 0);
 		}
 	}
