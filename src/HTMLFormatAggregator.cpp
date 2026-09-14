@@ -96,13 +96,14 @@ bool CHTMFormatStruct::GetData(LPCSTR HTML)
 			if (csParam.CompareNoCase("Version") == 0)
 				m_csVersion = csValue;
 			else if (csParam.CompareNoCase("StartHTML") == 0)
-				m_lStartHTML = atol(csValue);
+			else if (csParam.CompareNoCase("StartHTML") == 0)
+				m_lStartHTML = ATOL(csValue);
 			else if (csParam.CompareNoCase("EndHTML") == 0)
-				m_lEndHTML = atol(csValue);
+				m_lEndHTML = ATOL(csValue);
 			else if (csParam.CompareNoCase("StartFragment") == 0)
-				m_lStartFragment = atol(csValue);
+				m_lStartFragment = ATOL(csValue);
 			else if (csParam.CompareNoCase("EndFragment") == 0)
-				m_lEndFragment = atol(csValue);
+				m_lEndFragment = ATOL(csValue);
 			else if (csParam.CompareNoCase("SourceURL") == 0)
 			{
 				m_csSourceURL = csValue;
