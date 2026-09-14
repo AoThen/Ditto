@@ -460,14 +460,14 @@ void CModernScrollBar::OnLButtonUp(UINT nFlags, CPoint point)
 		if (m_orientation == ScrollBarOrientation::Horizontal && m_pListCtrl)
 		{
 			int delta = point.x - m_dragStartPos;
-			ScrollToPosition(m_dragStartScrollPos + delta, TRUE);
+			ScrollToPosition(m_dragStartScrollPos + delta);
 		}
 	}
 
 	CWnd::OnLButtonUp(nFlags, point);
 }
 
-void CModernScrollBar::ScrollToPosition(int thumbPos, BOOL bCommit)
+void CModernScrollBar::ScrollToPosition(int thumbPos)
 {
 	if (!m_pListCtrl)
 		return;
@@ -536,19 +536,16 @@ void CModernScrollBar::ScrollToPosition(int thumbPos, BOOL bCommit)
 	}
 	else
 	{
-		// Horizontal scrolling - WM_HSCROLL so the list view moves its own
-		// scroll origin (Scroll(CSize) only bit-blits and content snaps back).
-		// v6 comctl32 derives the thumb delta from SIF_TRACKPOS, not the
-		// message nPos, so seed the track position first; the packed nPos
-		// keeps older comctl32 (wParam-based) working too.
-		int nCode = bCommit ? SB_THUMBPOSITION : SB_THUMBTRACK;
-		if (scrollableTrack > 0)
+		// Horizontal scrolling: Scroll() sends LVM_SCROLL, which moves the
+		// list view's own scroll origin by pixel delta. Synthetic WM_HSCROLL
+		// thumb tracking is unusable here: comctl32 derives the thumb delta
+		// from SIF_TRACKPOS, which the public SetScrollInfo API cannot set.
+		int currentScrollPos = m_pListCtrl->GetScrollPos(SB_HORZ);
+		int deltaPixels = newPos - currentScrollPos;
+
+		if (deltaPixels != 0)
 		{
-			SCROLLINFO trackInfo = { sizeof(SCROLLINFO) };
-			trackInfo.fMask = SIF_TRACKPOS;
-			trackInfo.nTrackPos = newPos;
-			m_pListCtrl->SetScrollInfo(SB_HORZ, &trackInfo, FALSE);
-			m_pListCtrl->SendMessage(WM_HSCROLL, MAKEWPARAM(nCode, newPos), 0);
+			m_pListCtrl->Scroll(CSize(deltaPixels, 0));
 		}
 	}
 	
