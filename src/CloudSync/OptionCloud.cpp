@@ -809,7 +809,12 @@ void COptionCloud::OnRebuildPinyinIndex()
 
 			if (++processed % 500 == 0)
 			{
-				theApp.m_db.execDML(_T("COMMIT; BEGIN TRANSACTION;"));
+				// NOTE: execDML prepares only the first statement and discards
+				// the tail, so COMMIT and BEGIN must be separate calls — a
+				// combined "COMMIT; BEGIN TRANSACTION;" would silently skip
+				// the BEGIN and leave subsequent batches in autocommit mode.
+				theApp.m_db.execDML(_T("COMMIT;"));
+				theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
 			}
 		}
 		theApp.m_db.execDML(_T("COMMIT;"));
@@ -819,7 +824,15 @@ void COptionCloud::OnRebuildPinyinIndex()
 		CString errMsg;
 		errMsg.Format(_T("OnRebuildPinyinIndex: update failed (%d) %s"), e.errorCode(), e.errorMessage());
 		TRACE(_T("%s\n"), (LPCTSTR)errMsg);
-		theApp.m_db.execDML(_T("ROLLBACK;"));
+		try
+		{
+			theApp.m_db.execDML(_T("ROLLBACK;"));
+		}
+		catch (...)
+		{
+			// No active transaction (e.g. failure happened at a batch
+			// boundary) — nothing to roll back.
+		}
 		AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to rebuild pinyin index.")), MB_ICONERROR);
 		return;
 	}

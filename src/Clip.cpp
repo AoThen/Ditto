@@ -1141,12 +1141,27 @@ bool CClip::AddToDB(bool bCheckForDuplicates)
 	bResult = false;
 	bool bOwnTransaction = false;
 
+	// Hold the DB lock across the autocommit check and the whole transaction:
+	// otherwise another thread (e.g. SaveFormats' unguarded BEGIN) can slip in
+	// between InAutoCommit() and BEGIN IMMEDIATE, or interleave writes that get
+	// rolled back together with ours. Nesting is safe: m_csDb is a
+	// CCriticalSection (same-thread reentrant), so outer owners such as
+	// CClipIDs::CopyTo may hold it while calling AddToDB; the lock only
+	// serializes across threads.
+	CSingleLock lockDb(&theApp.m_csDb, TRUE);
+
 	try
 	{
 		if (theApp.m_db.InAutoCommit())
 		{
 			theApp.m_db.execDML(_T("BEGIN IMMEDIATE;"));
 			bOwnTransaction = true;
+		}
+		else
+		{
+			// Already inside an outer transaction (e.g. CClipIDs::CopyTo):
+			// join it instead of starting a nested one.
+			Log(_T("AddToDB: joining outer transaction"));
 		}
 
 		if(AddToMainTable())
@@ -2329,11 +2344,27 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 		AddFormat(CF_UNICODETEXT, unicode->GetBuffer(nLength), nLength, true);
 	}
 
+	// Serialize with AddToDB's transaction section (see its lock comment):
+	// without the lock another thread's BEGIN/COMMIT can interleave ours.
+	// If an outer transaction is already active, join it instead of
+	// starting a nested BEGIN (SQLite would reject it).
+	// (Declared before try so the catch handlers can see them.)
+	CSingleLock lockDb(&theApp.m_csDb, TRUE);
+	bool bOwnTransaction = false;
+
 	try
 	{
 		m_CRC = GenerateCRC();
 
-		theApp.m_db.execDML(_T("begin transaction;"));
+		bOwnTransaction = theApp.m_db.InAutoCommit() != FALSE;
+		if (bOwnTransaction)
+		{
+			theApp.m_db.execDML(_T("begin transaction;"));
+		}
+		else
+		{
+			Log(_T("SaveFormats: joining outer transaction"));
+		}
 
 		auto count = deletedData.GetSize();
 		for (int i = 0; i < count; i++)
@@ -2357,25 +2388,38 @@ BOOL CClip::SaveFormats(CString *unicode, CStringA *asci, CStringA *rtf, BOOL up
 
 		AddToDataTable();
 
-		theApp.m_db.execDML(_T("commit transaction;"));
+		// Only close the transaction we opened; an outer owner commits it.
+		if (bOwnTransaction)
+		{
+			theApp.m_db.execDML(_T("commit transaction;"));
+		}
 	}
 	catch (CppSQLite3Exception& e)
 	{
-		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		if (bOwnTransaction)
+		{
+			try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		}
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
 		ASSERT(FALSE);
 		return false;
 	}
 	catch (std::bad_alloc&)
 	{
-		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		if (bOwnTransaction)
+		{
+			try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		}
 		Log(_T("SaveFormats: std::bad_alloc"));
 		ASSERT(FALSE);
 		return false;
 	}
 	catch (...)
 	{
-		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		if (bOwnTransaction)
+		{
+			try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
+		}
 		Log(_T("SaveFormats: unknown exception"));
 		ASSERT(FALSE);
 		return false;

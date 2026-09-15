@@ -273,7 +273,14 @@ BOOL CClipIDs::CopyTo(int parentId)
 	INT_PTR count = GetSize();
 	if(count == 0)
 		return TRUE;
-		
+
+	// Hold the DB lock across the whole outer transaction so no other
+	// thread's BEGIN/COMMIT can interleave it. The per-item AddToDB calls
+	// below detect the active transaction via InAutoCommit() and join it
+	// instead of starting nested ones. Nesting the lock is safe: m_csDb is
+	// a CCriticalSection (same-thread reentrant).
+	CSingleLock lockDb(&theApp.m_csDb, TRUE);
+
 	try
 	{
 		theApp.m_db.execDML(_T("begin transaction;"));
@@ -306,7 +313,7 @@ BOOL CClipIDs::CopyTo(int parentId)
 	}
 	catch (CppSQLite3Exception& e)
 	{
-		theApp.m_db.execDML(_T("ROLLBACK;"));
+		try { theApp.m_db.execDML(_T("ROLLBACK;")); } catch (...) { }
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
 		ASSERT(FALSE);
 		return FALSE;
