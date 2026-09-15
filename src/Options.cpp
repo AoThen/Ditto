@@ -1586,9 +1586,25 @@ BOOL CGetSetOptions::GetFastThumbnailMode()
 	return GetProfileLong("FastThumbnailMode", TRUE);
 }
 
+// Writes a DPAPI-protected value to the registry. If DPAPI fails the value is
+// NOT overwritten (the previous value is preserved) and the user is notified —
+// a failed protection must never silently wipe a stored secret.
+static void WriteProtectedProfileString(LPCTSTR szKey, LPCTSTR szValue)
+{
+	bool bOk = false;
+	CString strProtected = CSecureStore::Protect(szValue, &bOk);
+	if (!bOk)
+	{
+		Log(StrF(_T("DPAPI protect failed for %s, keeping existing value"), szKey));
+		AfxMessageBox(StrF(_T("Unable to protect the value for %s. The existing value was left unchanged."), szKey), MB_OK | MB_ICONWARNING);
+		return;
+	}
+	CGetSetOptions::SetProfileString(szKey, strProtected);
+}
+
 void CGetSetOptions::SetExtraNetworkPassword(CString csPassword)
 {
-	SetProfileString("NetworkExtraPassword", CSecureStore::Protect(csPassword));
+	WriteProtectedProfileString(_T("NetworkExtraPassword"), csPassword);
 }
 
 CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
@@ -1628,7 +1644,7 @@ CString CGetSetOptions::GetExtraNetworkPassword(bool bFillArray)
 void CGetSetOptions::SetNetworkPassword(CString csPassword)
 {
 	m_csPassword = CTextConvert::UnicodeToUTF8(csPassword);
-	SetProfileString("NetworkStringPassword", CSecureStore::Protect(csPassword));
+	WriteProtectedProfileString(_T("NetworkStringPassword"), csPassword);
 }
 
 CStringA CGetSetOptions::GetNetworkPassword()
@@ -1660,7 +1676,7 @@ CStringA CGetSetOptions::GetCloudDeviceToken()
 void CGetSetOptions::SetCloudDeviceToken(LPCSTR lpszValue)
 {
 	CString wide(lpszValue);
-	SetProfileString("CloudDeviceToken", CSecureStore::Protect(wide));
+	WriteProtectedProfileString(_T("CloudDeviceToken"), wide);
 }
 
 CStringA CGetSetOptions::GetCloudDeviceId()
@@ -1686,7 +1702,7 @@ CStringA CGetSetOptions::GetCloudRefreshToken()
 void CGetSetOptions::SetCloudRefreshToken(LPCSTR lpszValue)
 {
 	CString wide(lpszValue);
-	SetProfileString("CloudRefreshToken", CSecureStore::Protect(wide));
+	WriteProtectedProfileString(_T("CloudRefreshToken"), wide);
 }
 
 // Per-install identifier sent on login so each machine gets its own device row.
@@ -1763,7 +1779,7 @@ CString CGetSetOptions::GetCloudEncryptionKey()
 
 void CGetSetOptions::SetCloudEncryptionKey(LPCTSTR lpszValue)
 {
-	SetProfileString("CloudEncryptionKey", CSecureStore::Protect(lpszValue));
+	WriteProtectedProfileString(_T("CloudEncryptionKey"), lpszValue);
 }
 
 // ---------------------------------------------------------------------------
@@ -1788,7 +1804,7 @@ CString CGetSetOptions::GetLocalDbEncryptionKey()
 
 void CGetSetOptions::SetLocalDbEncryptionKey(LPCTSTR lpszValue)
 {
-	SetProfileString("LocalDbEncryptionKey", CSecureStore::Protect(lpszValue));
+	WriteProtectedProfileString(_T("LocalDbEncryptionKey"), lpszValue);
 }
 
 CString CGetSetOptions::GenerateNewLocalDbEncryptionKey()

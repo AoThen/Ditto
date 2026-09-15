@@ -26,10 +26,15 @@ public:
 
 	// Encrypts plaintext with DPAPI (per-user scope).
 	// Returns "DPAPI:<base64>" or "" on empty input / failure.
-	static CString Protect(LPCTSTR plaintext)
+	// pOk is set to false ONLY when DPAPI failed (to distinguish from a
+	// legitimate empty input, which is a valid "clear the value" request).
+	static CString Protect(LPCTSTR plaintext, bool* pOk = nullptr)
 	{
 		if (plaintext == NULL || plaintext[0] == _T('\0'))
+		{
+			if (pOk) *pOk = true;
 			return _T("");
+		}
 
 		DATA_BLOB input;
 		input.pbData = (BYTE*)plaintext;
@@ -39,7 +44,10 @@ public:
 		::SecureZeroMemory(&output, sizeof(output));
 
 		if (!CryptProtectData(&input, L"Ditto.Credential", NULL, NULL, NULL, 0, &output))
+		{
+			if (pOk) *pOk = false;
 			return _T("");
+		}
 
 		// Base64-encode the blob so it stays a clean registry REG_SZ value.
 		int cchEncoded = ATL::Base64EncodeGetRequiredLength(output.cbData);
@@ -52,6 +60,7 @@ public:
 
 		CString result(_T("DPAPI:"));
 		result += CString(encodedA);
+		if (pOk) *pOk = true;
 		return result;
 	}
 
