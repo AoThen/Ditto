@@ -491,8 +491,11 @@ void CMainFrame::ShowQPasteWithActiveWindowCheck()
 		if (exeName != _T(""))
 		{
 			theApp.TryEnterOldGroupState();
-			CString query = StrF(_T("SELECT lID FROM Main WHERE bIsGroup = 1 AND mText = '%s' COLLATE NOCASE"), exeName);
-			CppSQLite3Query q = theApp.m_db.execQueryEx(query);
+			// Parameterized: exe names can contain quotes (e.g. "foo'bar.exe").
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+				_T("SELECT lID FROM Main WHERE bIsGroup = 1 AND mText = ? COLLATE NOCASE"));
+			stmt.bind(1, exeName);
+			CppSQLite3Query q = stmt.execQuery();
 			if (q.eof() == false)
 			{
 				int groupId = q.getIntField(_T("lID"));
@@ -1632,8 +1635,21 @@ LRESULT CMainFrame::OnCloudAuthRequired(WPARAM wParam, LPARAM lParam)
 	csLog.Format(_T("[CloudSync] auth required (status=%u)\n"), statusCode);
 	OutputDebugString(csLog);
 
-	// 401/999 类错误意味着凭据或加密状态已失效，同步已停摆；
-	// 尝试让同步管理器重启以恢复（若仍失败，用户可在设置页处理）。
+	// Route by status so a persistent failure can never re-trigger itself:
+	// - 997/998 (encryption key missing/salt changed): Initialize() re-posts
+	//   these on every failed init, so calling ReinitializeSync here would spin
+	//   a self-triggering loop in the UI message pump (stop -> init -> 997 ->
+	//   reinit ...). The background encryption-retry thread plus the recovery
+	//   flag already handle recovery; just log.
+	// - 999 (running unencrypted by user choice): notice only.
+	// - 401/403 (credentials rejected): restart sync; harmless no-op when the
+	//   poster already logged out (Initialize early-returns when logged out).
+	if (statusCode == 997 || statusCode == 998 || statusCode == 999)
+	{
+		Log(_T("CloudSync needs attention - see sync settings (no auto-restart)."));
+		return 0;
+	}
+
 	theApp.m_CloudSyncManager.ReinitializeSync();
 	return 0;
 }
