@@ -25,6 +25,7 @@ CProcessPaste::~CProcessPaste()
 BOOL CProcessPaste::DoPaste()
 {
 	BOOL ret = FALSE;
+	bool bClipboardTaken = false; // SetClipboard() hands ownership to the OLE clipboard
 
 	try
 	{
@@ -54,6 +55,7 @@ BOOL CProcessPaste::DoPaste()
 		}
 
 		m_pOle->SetClipboard(); // m_pOle is now managed by the OLE clipboard
+		bClipboardTaken = true;
 
 		if (m_bSendPaste)
 		{
@@ -75,16 +77,26 @@ BOOL CProcessPaste::DoPaste()
 		m_lastErrorMessage.Format(_T("Paste exception: %s"), szCause);
 		Log(m_lastErrorMessage);
 
-		delete m_pOle;
-		m_pOle = NULL;
+		// Only delete m_pOle if the OLE clipboard has not already taken
+		// ownership of it (SetClipboard succeeded). Deleting after a
+		// successful SetClipboard would free an object the clipboard still
+		// references, causing a use-after-free when the clipboard releases it.
+		if (!bClipboardTaken)
+		{
+			delete m_pOle;
+			m_pOle = NULL;
+		}
 	}
 	catch (...) 
 	{
 		m_lastErrorMessage = _T("Paste generic exception");
 		Log(m_lastErrorMessage);
 
-		delete m_pOle;
-		m_pOle = NULL;
+		if (!bClipboardTaken)
+		{
+			delete m_pOle;
+			m_pOle = NULL;
+		}
 	}
 
 	// The Clipboard now owns the allocated memory
