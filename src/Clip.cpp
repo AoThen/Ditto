@@ -605,7 +605,11 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 	}
 		
 	m_Desc = "[Ditto Error] BAD DESCRIPTION";
-	
+
+	// 延迟渲染敏感应用(powerpnt)：渲染失败时反复强渲会触发其稳定性报错，收敛重试次数
+	const bool guardApp = IsDelayedRenderGuardApp(activeApp);
+	const int maxDescTries = guardApp ? 2 : 10;
+		
 	// Get Description String
 	// NOTE: We make sure that the description always corresponds to the
 	//  data saved by using the exact same globalmem instance as the source
@@ -616,7 +620,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 	cfDesc.m_cfType = CF_UNICODETEXT;	
 	if(oleData.IsDataAvailable(cfDesc.m_cfType))
 	{
-		for (int i = 0; i < 10; i++)
+		for (int i = 0; i < maxDescTries; i++)
 		{
 			cfDesc.m_hgData = oleData.GetGlobalData(cfDesc.m_cfType);
 			if (cfDesc.m_hgData == NULL)
@@ -641,7 +645,7 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		cfDesc.m_cfType = CF_TEXT;	
 		if(oleData.IsDataAvailable(cfDesc.m_cfType))
 		{
-			for (int i = 0; i < 10; i++)
+			for (int i = 0; i < maxDescTries; i++)
 			{
 				cfDesc.m_hgData = oleData.GetGlobalData(cfDesc.m_cfType);
 				if (cfDesc.m_hgData == NULL)
@@ -708,6 +712,18 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 		{
 			Log(StrF(_T("Ignore CF_DIB from %s"), activeApp));
 			continue;
+		}
+
+		// 跳过 PowerPoint 私有格式（如 "PowerPoint 12 Slide Format"），读取它们会强制 PPT 同步序列化整张幻灯片
+		if (guardApp && cf.m_cfType >= 0xC000)
+		{
+			CString fmtName = GetFormatName(cf.m_cfType);
+			CString lowerName = fmtName;
+			if (lowerName.MakeLower().Find(_T("powerpoint ")) == 0)
+			{
+				Log(StrF(_T("Skipping PowerPoint private format \"%s\" to avoid forcing slide rendering"), fmtName));
+				continue;
+			}
 		}
 
 		BOOL bSuccess = false;

@@ -225,6 +225,9 @@ CString FolderPath(int folderId);
 
 CString TopLevelWindowText(DWORD pid);
 
+// 使用延迟渲染且对重复读取敏感的复制源应用（如 PowerPoint），需收敛剪贴板访问
+bool IsDelayedRenderGuardApp(CString activeApp);
+
 BOOL DarkAppWindows10Setting();
 DWORD Windows10AccentColor();
 

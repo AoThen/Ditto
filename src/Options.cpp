@@ -3478,7 +3478,7 @@ BOOL CGetSetOptions::GetSupportAllTypes()
 
 void CGetSetOptions::SetSupportAllTypes(BOOL val)
 {
-	m_refreshViewAfterPasting = val;
+	m_supportAllTypes = val;
 	SetProfileLong("SupportAllTypes", val);
 }
 

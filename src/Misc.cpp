@@ -958,6 +958,13 @@ CString GetProcessName(HWND hWnd, DWORD processId)
 	return strProcessName;
 }
 
+bool IsDelayedRenderGuardApp(CString activeApp)
+{
+	// 目前仅 PowerPoint：复制幻灯片时页面数据为延迟渲染，
+	// 复制事务完成前被重复 GetClipboardData 会触发其"可能导致不稳定"报错
+	return activeApp.MakeLower() == _T("powerpnt.exe");
+}
+
 BOOL IsVista()
 {
 	OSVERSIONINFOW osvi;

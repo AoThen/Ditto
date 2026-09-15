@@ -88,6 +88,13 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 		Sleep(200);
 	}
 
+	// PowerPoint 复制幻灯片是重量级延迟渲染事务，等其完成再访问剪贴板，避免触发其稳定性报错
+	if(IsDelayedRenderGuardApp(activeWindow))
+	{
+		Log(_T("PowerPoint detected, delaying 400ms before reading clipboard"));
+		Sleep(400);
+	}
+
 	int bResult = pClip->LoadFromClipboard(pSupportedTypes, true, activeWindow, activeWindowTitle);
 
 	// [OCR] Extract image pixel data for later OCR processing
@@ -105,7 +112,11 @@ void CCopyThread::OnClipboardChange(CString activeWindow, CString activeWindowTi
 		}
 	}
 
-	if(bResult == FALSE)
+	bool skipNoFormatsRetry = IsDelayedRenderGuardApp(activeWindow);
+	if(bResult == FALSE && skipNoFormatsRetry)
+		Log(_T("LoadFromClipboard found nothing to save for delayed-render guard app, not retrying to avoid hammering its renderer"));
+
+	if(bResult == FALSE && !skipNoFormatsRetry)
 	{
 		DWORD delay = CGetSetOptions::GetNoFormatsRetryDelay();
 		if(delay > 0)
