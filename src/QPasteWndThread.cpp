@@ -368,6 +368,14 @@ void CQPasteWndThread::OnLoadExtraData(void *param)
 						//the cache now owns the format data, set it to delete the data in the destructor
 						pasteWnd->m_cf_dibCache[it->m_parentId].m_autoDeleteData = true;
 
+						// The deep copy gave the cache its own copy, but the local `it`
+						// still holds the freshly converted thumbnail: GetDibFittingToHeight
+						// reset its autoDeleteData to false after installing the small DIB,
+						// so the local would otherwise leak one HGLOBAL per uncached image
+						// clip. Release the local copy now that the cache has its own.
+						it->m_autoDeleteData = true;
+						it->Free();
+
 						Log(StrF(_T("Loaded, extra data for clipId: %d, Row: %d image cache count: %d"), it->m_parentId, it->m_clipRow, pasteWnd->m_cf_dibCache.size()));
 					}
 				}
