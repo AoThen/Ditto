@@ -116,6 +116,7 @@ CCloudSyncManager::CCloudSyncManager()
 	, m_forceOverrideRemote(0)
 	, m_lastSyncSuccessTime(0)
 	, m_bStopCalled(false)
+	, m_bReinitializing(0)
 {
 	InitializeCriticalSection(&m_csSync);
 	InitializeCriticalSection(&m_csHttpClient);
@@ -241,17 +242,19 @@ BOOL CCloudSyncManager::Initialize()
 		}
 	}
 
-	// Create stop event
-	if (m_hStopEvent != nullptr)
-	{
-		CloseHandle(m_hStopEvent);
-		m_hStopEvent = nullptr;
-	}
-	m_hStopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	// Create stop event once for the manager lifetime. It is intentionally
+	// never closed/recreated by Reinitialize: detached worker threads may
+	// still hold this handle, and recreating it would turn their waits into
+	// WAIT_FAILED (which the old loop treated as "keep syncing", spawning a
+	// second concurrent sync thread). ReinitializeSync resets it instead.
 	if (m_hStopEvent == nullptr)
 	{
-		OutputDebugString(_T("[CloudSync] Failed to create stop event.\n"));
-		return FALSE;
+		m_hStopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+		if (m_hStopEvent == nullptr)
+		{
+			OutputDebugString(_T("[CloudSync] Failed to create stop event.\n"));
+			return FALSE;
+		}
 	}
 
 	// Create WS trigger event
@@ -259,8 +262,7 @@ BOOL CCloudSyncManager::Initialize()
 	if (m_hWsTrigger == nullptr)
 	{
 		OutputDebugString(_T("[CloudSync] Failed to create WS trigger event.\n"));
-		CloseHandle(m_hStopEvent);
-		m_hStopEvent = nullptr;
+		// NOTE: m_hStopEvent is lifetime-managed (never closed here).
 		return FALSE;
 	}
 
@@ -271,8 +273,7 @@ BOOL CCloudSyncManager::Initialize()
 		OutputDebugString(_T("[CloudSync] Failed to create sync thread.\n"));
 		CloseHandle(m_hWsTrigger);
 		m_hWsTrigger = nullptr;
-		CloseHandle(m_hStopEvent);
-		m_hStopEvent = nullptr;
+		// NOTE: m_hStopEvent is lifetime-managed (never closed here).
 		return FALSE;
 	}
 
@@ -288,18 +289,76 @@ BOOL CCloudSyncManager::Initialize()
 
 BOOL CCloudSyncManager::ReinitializeSync()
 {
+	// Guard against re-entrant/concurrent reinit (e.g. repeated 401 messages
+	// arriving while a previous reinit is still stopping threads).
+	if (InterlockedExchange(&m_bReinitializing, 1) == 1)
+	{
+		LogMessage(_T("ReinitializeSync: already in progress, skipping."));
+		return FALSE;
+	}
+
 	LogMessage(_T("ReinitializeSync: stopping and restarting sync..."));
 
+	BOOL bRet = FALSE;
+	try
+	{
 	// Stop cleans up events, sync thread, WS thread (safe even if nothing was created)
 	Stop();
 
-	// Reset crypto flag so InitializeEncryption re-reads from registry
-	EnterCriticalSection(&m_csSync);
-	m_cryptoInitialized = FALSE;
-	LeaveCriticalSection(&m_csSync);
+	// "停干净再重启": never start a new sync thread while the old one may
+	// still be running — two concurrent sync threads would interleave cursors.
+	// Stop() detached (rather than joined) threads that were stuck in HTTP;
+	// give them a bounded window to actually exit before restarting.
+	if (m_pSyncThread != nullptr)
+	{
+		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 5000);
+		if (dwWait == WAIT_OBJECT_0)
+		{
+			delete m_pSyncThread;
+			m_pSyncThread = nullptr;
+		}
+	}
+	if (m_pWsThread != nullptr)
+	{
+		DWORD dwWait = WaitForSingleObject(m_pWsThread->m_hThread, 5000);
+		if (dwWait == WAIT_OBJECT_0)
+		{
+			delete m_pWsThread;
+			m_pWsThread = nullptr;
+		}
+	}
+	if (m_pSyncThread != nullptr || m_pWsThread != nullptr)
+	{
+		// Old threads still alive: refuse to restart. The stop event stays
+		// signaled so they exit as soon as their current operation completes;
+		// the next sync trigger will retry the restart then.
+		LogMessage(_T("ReinitializeSync: old threads still running, restart deferred."));
+	}
+	else
+	{
+		// Old threads confirmed dead: reset the (lifetime-managed) stop event
+		// so the new thread starts unsignaled.
+		if (m_hStopEvent != nullptr)
+			ResetEvent(m_hStopEvent);
+		m_bStopCalled = false;
 
-	// Re-run full init — reads settings, creates events, thread, WS
-	return Initialize();
+		// Reset crypto flag so InitializeEncryption re-reads from registry
+		EnterCriticalSection(&m_csSync);
+		m_cryptoInitialized = FALSE;
+		LeaveCriticalSection(&m_csSync);
+
+		// Re-run full init — reads settings, creates events, thread, WS
+		bRet = Initialize();
+	}
+	}
+	catch (...)
+	{
+		LogMessage(_T("ReinitializeSync: exception, restart aborted"));
+		bRet = FALSE;
+	}
+
+	InterlockedExchange(&m_bReinitializing, 0);
+	return bRet;
 }
 
 // ---------------------------------------------------------------------------
@@ -877,6 +936,39 @@ std::unique_ptr<httplib::Client> CCloudSyncManager::CreateShortTimeoutHttpClient
 	return client;
 }
 
+httplib::Result CCloudSyncManager::PostShortTimeout(const char* path, const std::string& body)
+{
+	auto client = CreateShortTimeoutHttpClient();
+	httplib::Result res = client ? client->Post(path, body, "application/json") : httplib::Result();
+
+	// On 401/403 the access token (15min TTL) has likely expired: refresh it
+	// and retry once, mirroring the main sync paths (PushNewClips/PullChanges).
+	// Without this the delete/dont-sync notice is silently dropped while the
+	// cloud copy survives (and can later "resurrect" the clip on this device).
+	if (res && (res->status == 401 || res->status == 403))
+	{
+		if (CCloudAuth::TryRefreshToken())
+		{
+			LogMessage(_T("Cloud async action: token refreshed, retrying request"));
+			client = CreateShortTimeoutHttpClient();
+			if (client)
+				res = client->Post(path, body, "application/json");
+		}
+		else
+		{
+			LogMessage(_T("Cloud async action: token expired and refresh failed, logging out"));
+			CCloudAuth::Logout();
+			CWnd* pMainWnd = AfxGetMainWnd();
+			if (pMainWnd != nullptr)
+			{
+				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
+			}
+		}
+	}
+
+	return res;
+}
+
 void CCloudSyncManager::TriggerSync()
 {
 	PushGroups();
@@ -1179,10 +1271,13 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 
 	LogMessage(_T("Background sync thread started."));
 
-	HANDLE waitHandles[2] = { pThis->m_hStopEvent, pThis->m_hWsTrigger };
-
 	while (true)
 	{
+		// Snapshot the wait handles each iteration (not once at thread start):
+		// Stop()/Initialize() may close and recreate m_hWsTrigger, and a stale
+		// handle would otherwise turn the wait into WAIT_FAILED forever.
+		HANDLE waitHandles[2] = { pThis->m_hStopEvent, pThis->m_hWsTrigger };
+
 		// Read settings each iteration (allows live config change)
 		BOOL bPeriodicSync = CGetSetOptions::GetCloudPeriodicSync();
 		int nInterval = CGetSetOptions::GetCloudSyncInterval();
@@ -1190,9 +1285,12 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 
 		// Wait for stop event, WS trigger, or sync interval timeout
 		DWORD dwResult = WaitForMultipleObjects(2, waitHandles, FALSE, dwTimeout);
-		if (dwResult == WAIT_OBJECT_0)
+		if (dwResult == WAIT_OBJECT_0 || dwResult == WAIT_FAILED)
 		{
-			// Stop event was signaled
+			// Stop event was signaled, or the handles are gone because the
+			// manager tore down around us — either way, exit. (WAIT_FAILED
+			// must never fall through into a sync cycle: that was the dual
+			// sync-thread bug.)
 			break;
 		}
 
@@ -1712,11 +1810,18 @@ void CCloudSyncManager::PullChanges()
 		EnsureHttpClient();
 
 		bool hasMore = false;
+		int pullPage = 1; // server pages are 1-based; keep `since` fixed and page through
+		int pageCount = 0;
+		// Cursor is advanced only after ALL pages complete (see below): pages
+		// share one `since` snapshot, so persisting a per-page cursor and then
+		// aborting mid-cycle would skip the unfetched pages forever.
+		time_t lastPageTime = 0;
+		bool bAnyPageData = false;
 		do
 		{
-			// GET /api/v1/clips/changes?since=...
+			// GET /api/v1/clips/changes?since=...&page=...
 			CStringA path;
-		path.Format("/api/v1/clips/changes?since=%s", (LPCSTR)sinceStr);
+		path.Format("/api/v1/clips/changes?since=%s&page=%d", (LPCSTR)sinceStr, pullPage);
 		EnterCriticalSection(&m_csHttpClient);
 		auto res = m_httpClient ? m_httpClient->Get(path.GetString()) : httplib::Result();
 		LeaveCriticalSection(&m_csHttpClient);
@@ -1953,14 +2058,16 @@ void CCloudSyncManager::PullChanges()
 				}
 			}
 
-			// Advance cursor if any data was received this page, regardless of merge/decrypt outcome.
-			// This prevents infinite re-download when key mismatch causes all clips to fail decrypt.
+			// Remember the newest page time, but do NOT persist the cursor yet:
+			// it is written once the whole page cycle completes (after the
+			// loop). Persisting per page would lose unfetched pages if the
+			// cycle aborts early. Recording per page still prevents infinite
+			// re-download when key mismatch makes all clips fail decrypt,
+			// because a completed cycle always advances.
 			if (hasClips || hasDeletions)
 			{
-				EnterCriticalSection(&m_csSync);
-				m_lastSyncTime = newSyncTime;
-				LeaveCriticalSection(&m_csSync);
-				CGetSetOptions::SetCloudLastSyncTime((__int64)newSyncTime);
+				lastPageTime = newSyncTime;
+				bAnyPageData = true;
 			}
 
 			CString msg;
@@ -1981,12 +2088,27 @@ void CCloudSyncManager::PullChanges()
 			}
 			LogMessage(msg);
 
-			// Check has_more for pagination
+			// Check has_more/next_page for pagination.
+			// The server paginates by offset: keep `since` fixed and fetch the
+			// next page. Advancing `since` to server_time here would permanently
+			// skip the rest of a same-second tie group, because the server
+			// filters with updated_at > since.
 			hasMore = dataNode->value("has_more", false);
 			if (hasMore)
 			{
-				if (dataNode->contains("server_time"))
+				int nextPage = dataNode->value("next_page", 0);
+				if (nextPage > pullPage)
 				{
+					pullPage = nextPage;
+					if (++pageCount > 200)
+					{
+						LogMessage(_T("PullChanges: page cap reached, stopping pagination"));
+						hasMore = false;
+					}
+				}
+				else if (dataNode->contains("server_time"))
+				{
+					// Fallback for servers without next_page support
 					sinceStr = CStringA((*dataNode)["server_time"].get<std::string>().c_str());
 				}
 				else if (dataNode->contains("sync_time"))
@@ -2010,6 +2132,18 @@ void CCloudSyncManager::PullChanges()
 			hasMore = false;
 		}
 		} while (hasMore);
+
+		// All pages fetched: advance the cursor once. A mid-cycle abort
+		// (network error, auth failure, corrupt page) leaves the cursor
+		// untouched so the next cycle re-pulls from the old snapshot
+		// (merge is idempotent, so re-download is safe but loss is not).
+		if (bAnyPageData)
+		{
+			EnterCriticalSection(&m_csSync);
+			m_lastSyncTime = lastPageTime;
+			LeaveCriticalSection(&m_csSync);
+			CGetSetOptions::SetCloudLastSyncTime((__int64)lastPageTime);
+		}
 	}
 	catch (const std::exception& e)
 	{
@@ -3568,8 +3702,7 @@ void CCloudSyncManager::MarkClipsDontSyncInternal(const std::vector<int>& localC
 		nlohmann::json body;
 		body["ids"] = remoteIds;
 
-		auto client = CreateShortTimeoutHttpClient();
-		auto res = client ? client->Post("/api/v1/clips/batch-dont-sync", body.dump(), "application/json") : httplib::Result();
+		auto res = PostShortTimeout("/api/v1/clips/batch-dont-sync", body.dump());
 
 		{
 			CString msg;
@@ -3620,8 +3753,7 @@ void CCloudSyncManager::DeleteRemoteClipsInternal(const std::vector<int>& localC
 		nlohmann::json body;
 		body["ids"] = remoteIds;
 
-		auto client = CreateShortTimeoutHttpClient();
-		auto res = client ? client->Post("/api/v1/clips/batch-delete", body.dump(), "application/json") : httplib::Result();
+		auto res = PostShortTimeout("/api/v1/clips/batch-delete", body.dump());
 		if (res && (res->status == 200 || res->status == 404))
 		{
 			for (int localId : localClipIds)

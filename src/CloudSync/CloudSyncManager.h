@@ -122,6 +122,10 @@ private:
 	void MarkClipsDontSyncInternal(const std::vector<int>& localClipIds);
 	void OnGroupDeletedInternal(int localGroupId);
 	std::unique_ptr<httplib::Client> CreateShortTimeoutHttpClient();
+	// POST to a short-timeout endpoint with one retry after a token refresh.
+	// On 401/403: tries TryRefreshToken and retries once; if refresh fails,
+	// clears credentials and posts WM_CLOUD_AUTH_REQUIRED(401) for re-login.
+	httplib::Result PostShortTimeout(const char* path, const std::string& body);
 
 	// Check if user expects encryption (via registry setting)
 	BOOL IsEncryptionExpected();
@@ -149,6 +153,7 @@ private:
 	CWinThread* m_pEncRetryThread;  // Encryption retry thread (when DEK lost at startup)
 	HANDLE      m_hEncRetryStop;     // Stop event for retry thread
 	bool m_bStopCalled;         // Guard against double Stop()
+	LONG m_bReinitializing;     // Guard against re-entrant ReinitializeSync (InterlockedExchange)
 
 	// Atomic flags for one-shot force sync operations
 	LONG      m_forceOverrideLocal;  // Set before ForceDownload, read&reset in MergeRemoteClipToLocal
