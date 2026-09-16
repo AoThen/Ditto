@@ -380,10 +380,10 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 				continue;
 
 			CSingleLock lockDb(&theApp.m_csDb, TRUE);
-			CppSQLite3Query q = db.execQueryEx(_T("SELECT lId, bIsGroup FROM Main WHERE lId IN (%s)"), (LPCTSTR)inList);
+			CppSQLite3Query q = db.execQueryEx(_T("SELECT lID, bIsGroup FROM Main WHERE lID IN (%s)"), (LPCTSTR)inList);
 			while(q.eof() == false)
 			{
-				groupInfo[q.getIntField(_T("lId"))] = q.getIntField(_T("bIsGroup")) > 0;
+				groupInfo[q.getIntField(_T("lID"))] = q.getIntField(_T("bIsGroup")) > 0;
 				q.nextRow();
 			}
 		}
@@ -435,12 +435,15 @@ BOOL CClipIDs::DeleteIDs(bool fromClipWindow, CppSQLite3DB& db)
 				}
 				startIndex = index;
 
+				if(sqlIn.GetLength() > 0)
 				{
-					CSingleLock lockDb(&theApp.m_csDb, TRUE);
-					db.execDMLEx(sql + sqlIn + _T(")"));
+					{
+						CSingleLock lockDb(&theApp.m_csDb, TRUE);
+						db.execDMLEx(sql + sqlIn + _T(")"));
+					}
+					sqlIn = "";
+					bRet = TRUE;
 				}
-				sqlIn = "";
-				bRet = TRUE;
 
 				if(bAllowShow)
 				{
