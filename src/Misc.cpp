@@ -60,12 +60,18 @@ void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 	// Best-effort: if the rename fails (e.g. file locked by a scanner), logging
 	// continues on the oversized file rather than failing.
 	const DWORD LOG_MAX_SIZE = 5 * 1024 * 1024;
-	CFileStatus fs;
-	if(CFile::GetStatus(fn, fs) && fs.GetSize() >= LOG_MAX_SIZE)
+	WIN32_FIND_DATA wfd;
+	HANDLE hFind = FindFirstFile(fn, &wfd);
+	if(hFind != INVALID_HANDLE_VALUE)
 	{
-		CString csOld(fn);
-		csOld += _T(".old");
-		::MoveFileEx(fn, csOld, MOVEFILE_REPLACE_EXISTING);
+		const DWORD64 nFileSize = ((DWORD64)wfd.nFileSizeHigh << 32) | wfd.nFileSizeLow;
+		FindClose(hFind);
+		if(nFileSize >= LOG_MAX_SIZE)
+		{
+			CString csOld(fn);
+			csOld += _T(".old");
+			::MoveFileEx(fn, csOld, MOVEFILE_REPLACE_EXISTING);
+		}
 	}
 
 #ifdef _UNICODE
