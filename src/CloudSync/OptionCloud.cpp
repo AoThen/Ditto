@@ -1043,7 +1043,7 @@ LRESULT COptionCloud::OnReinitSync(WPARAM wParam, LPARAM lParam)
 
 	if (!theApp.m_CloudSyncManager.ReinitializeSync())
 	{
-		OutputDebugStringA("[OptionCloud] OnReinitSync: ReinitializeSync failed.\n");
+		LogCloudSync("[OptionCloud] OnReinitSync: ReinitializeSync failed.");
 
 		MessageBox(theApp.m_Language.GetString("CloudMsgEncryptionEnabledNoSync",
 			"Encryption has been enabled, but cloud sync could not be started.\n\n"

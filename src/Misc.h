@@ -112,6 +112,14 @@ double IdleSeconds();
 #define LogSendRecieveInfo(cs) logsendrecieveinfo(cs, __FILE__, __LINE__);
 void logsendrecieveinfo(CString cs, CString csFile = _T(""), long lLine = -1);
 
+// Cloud sync logging: routes through log() so it reaches both Ditto.log and OutputDebugString
+#define LogCloudSync(msg) logcloudsync(msg, __FILE__, __LINE__)
+void logcloudsync(const TCHAR* msg, CString csFile = _T(""), long lLine = -1);
+#ifdef _UNICODE
+// Narrow-string overload (Unicode-only; would collide with the TCHAR overload in an ANSI build)
+void logcloudsync(const char* msg, CString csFile = _T(""), long lLine = -1);
+#endif
+
 // Utility Functions
 CString StrF(const TCHAR * pszFormat, ...);
 

@@ -3,6 +3,11 @@
 #include "Misc.h"
 #include "shared\TextConvert.h"
 
+static void AddinLogCallback(const char* utf8Msg)
+{
+	Log(CA2W(utf8Msg, CP_UTF8));
+}
+
 CDittoAddin::CDittoAddin() :
 	m_hModule(NULL)
 {
@@ -27,6 +32,13 @@ bool CDittoAddin::DoLoad(LPCTSTR lpszDllName, CDittoInfo DittoInfo)
 
 		if( m_hModule )
 		{
+			// Register the host log callback before init so addin init errors reach Ditto.log
+			// Optional export: older addins without SetDittoLogCallback are unaffected.
+			typedef void (*SetLogCbFn)(DittoLogCallback);
+			SetLogCbFn setLogCb = (SetLogCbFn)GetProcAddress(m_hModule, "SetDittoLogCallback");
+			if(setLogCb)
+				setLogCb(AddinLogCallback);
+
 			bool (__cdecl *DittoAddin)(const CDittoInfo&, CDittoAddinInfo&);
 			DittoAddin = (bool(__cdecl*)(const CDittoInfo&, CDittoAddinInfo&))GetProcAddress(m_hModule, "DittoAddin");
 			if(DittoAddin)

@@ -13,4 +13,8 @@ extern "C"
 	bool __declspec(dllexport) ClearReadOnlyFlag(const CDittoInfo &DittoInfo, IClip *pClip);
 	bool __declspec(dllexport) SetReadOnlyFlag(const CDittoInfo &DittoInfo, IClip *pClip);
 	bool __declspec(dllexport) RemoveLineFeeds(const CDittoInfo &DittoInfo, IClip *pClip);
+	// Optional: host registers a log callback so addin messages reach Ditto.log
+	__declspec(dllexport) void SetDittoLogCallback(DittoLogCallback callback);
+	// Log helper: forwards to host callback when registered, falls back to DebugView otherwise
+	__declspec(dllexport) void DittoAddinLog(const char* utf8Msg);
 }

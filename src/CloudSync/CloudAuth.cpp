@@ -35,7 +35,7 @@ void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 	{
 		if (url.find("http://") == 0)
 		{
-			OutputDebugStringA("[CloudAuth] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			LogCloudSync("[CloudAuth] ERROR: HTTPS required, refusing to use plain HTTP.");
 			m_httpClient.reset();
 			m_httpClientUrl.Empty();
 			return;
@@ -494,13 +494,13 @@ BOOL CCloudAuth::TryRefreshTokenLocked()
 			}
 		}
 
-		OutputDebugStringA("[CloudAuth] access token refreshed\n");
+		LogCloudSync("[CloudAuth] access token refreshed");
 		return TRUE;
 	}
 	catch (const std::exception&)
 	{
 		// e.what() can quote part of the response body, which carries tokens.
-		OutputDebugStringA("[CloudAuth] refresh failed\n");
+		LogCloudSync("[CloudAuth] refresh failed");
 		return FALSE;
 	}
 }

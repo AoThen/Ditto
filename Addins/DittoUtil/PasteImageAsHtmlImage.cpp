@@ -1,5 +1,6 @@
 #include "StdAfx.h"
 #include ".\pasteimageashtmlimage.h"
+#include ".\exports.h"
 #include "../../src/shared/TextConvert.h"
 
 CString g_csDIBImagePath = _T("");
@@ -138,7 +139,7 @@ bool CPasteImageAsHtmlImage::WriteDataToFile(CString csPath, LPVOID data, ULONG 
 		ex.GetErrorMessage(exError, sizeof(exError));
 
 		csError.Format(_T("OutLookExpress Addin - Failed to write CF_DIB to file: %s, Error: %s"), csPath, exError);
-		OutputDebugString(csPath);
+		DittoAddinLog(CStringA(csError, CP_UTF8));
 	}
 
 	return bRet;

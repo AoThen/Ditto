@@ -42,6 +42,10 @@ BOOL CGetSetOptions::GetCloudEncryptionNeedsRecovery() { return FALSE; }
 // -------------------------------------------------------------------
 void log(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
 void logclip(const TCHAR* /*msg*/, bool /*bFromSendRecieve*/, CString /*csFile*/, long /*lLine*/) {}
+void logcloudsync(const TCHAR* /*msg*/, CString /*csFile*/, long /*lLine*/) {}
+#ifdef _UNICODE
+void logcloudsync(const char* /*msg*/, CString /*csFile*/, long /*lLine*/) {}
+#endif
 CString StrF(const TCHAR* /*pszFormat*/, ...) { return CString(); }
 
 // -------------------------------------------------------------------

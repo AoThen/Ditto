@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "CloudCrypto.h"
+#include "../Misc.h"
 #include <bcrypt.h>
 #include <wincrypt.h>
 #include <vector>
@@ -8,11 +9,7 @@
 
 #pragma comment(lib, "bcrypt.lib")
 
-#ifdef _DEBUG
-#define CLOUD_CRYPTO_TRACE(fmt, ...) do { CStringA _logMsg; _logMsg.Format(fmt, ##__VA_ARGS__); OutputDebugStringA(_logMsg); } while(0)
-#else
-#define CLOUD_CRYPTO_TRACE(fmt, ...) ((void)0)
-#endif
+#define CLOUD_CRYPTO_TRACE(fmt, ...) do { CStringA _logMsg; _logMsg.Format(fmt, ##__VA_ARGS__); logcloudsync((LPCSTR)_logMsg, __FILE__, __LINE__); } while(0)
 #pragma comment(lib, "crypt32.lib")
 
 // Static member definitions
@@ -39,7 +36,7 @@ BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)
 {
 	if (aesKey.size() != 32)
 	{
-		OutputDebugStringA("[CloudCrypto] Initialize: key must be 32 bytes for AES-256.\n");
+		LogCloudSync("[CloudCrypto] Initialize: key must be 32 bytes for AES-256.");
 		return FALSE;
 	}
 	try
@@ -50,7 +47,7 @@ BOOL CCloudCrypto::Initialize(const std::vector<BYTE>& aesKey)
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudCrypto] Initialize: exception.\n");
+		LogCloudSync("[CloudCrypto] Initialize: exception.");
 		return FALSE;
 	}
 }
@@ -597,7 +594,7 @@ CStringA CCloudCrypto::WrapKey(
 {
 	if (kek.size() != 32 || dek.size() != 32)
 	{
-		OutputDebugStringA("[CloudCrypto] WrapKey: KEK and DEK must be 32 bytes.\n");
+		LogCloudSync("[CloudCrypto] WrapKey: KEK and DEK must be 32 bytes.");
 		return CStringA("");
 	}
 
@@ -606,7 +603,7 @@ CStringA CCloudCrypto::WrapKey(
 	std::vector<BYTE> ct = AesGcmEncrypt(kek, iv, dek, tag);
 	if (ct.empty())
 	{
-		OutputDebugStringA("[CloudCrypto] WrapKey: AesGcmEncrypt failed.\n");
+		LogCloudSync("[CloudCrypto] WrapKey: AesGcmEncrypt failed.");
 		return CStringA("");
 	}
 
@@ -630,14 +627,14 @@ std::vector<BYTE> CCloudCrypto::UnwrapKey(
 {
 	if (kek.size() != 32)
 	{
-		OutputDebugStringA("[CloudCrypto] UnwrapKey: KEK must be 32 bytes.\n");
+		LogCloudSync("[CloudCrypto] UnwrapKey: KEK must be 32 bytes.");
 		return std::vector<BYTE>();
 	}
 
 	std::vector<BYTE> data = Base64Decode(wrappedBase64);
 	if (data.size() < 12 + 16)
 	{
-		OutputDebugStringA("[CloudCrypto] UnwrapKey: data too short.\n");
+		LogCloudSync("[CloudCrypto] UnwrapKey: data too short.");
 		return std::vector<BYTE>();
 	}
 
@@ -648,7 +645,7 @@ std::vector<BYTE> CCloudCrypto::UnwrapKey(
 	std::vector<BYTE> dek = AesGcmDecrypt(kek, iv, ct, tag);
 	if (dek.empty())
 	{
-		OutputDebugStringA("[CloudCrypto] UnwrapKey: AesGcmDecrypt failed (wrong KEK?).\n");
+		LogCloudSync("[CloudCrypto] UnwrapKey: AesGcmDecrypt failed (wrong KEK?).");
 		return std::vector<BYTE>();
 	}
 

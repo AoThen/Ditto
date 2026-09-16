@@ -30,23 +30,6 @@ static std::string CStringToStdString(const CString& str)
 	return std::string(utf8.m_psz);
 }
 
-static CString GetCurrentTimeStamp()
-{
-	CTime now = CTime::GetCurrentTime();
-	return now.Format(_T("%Y-%m-%d %H:%M:%S"));
-}
-
-static void LogMessage(const CString& msg)
-{
-#ifndef _DEBUG
-	if (!CGetSetOptions::m_bEnableDebugLogging)
-		return;
-#endif
-	CString logMsg;
-	logMsg.Format(_T("[CloudSync] %s %s\n"), GetCurrentTimeStamp(), msg.GetString());
-	OutputDebugString(logMsg);
-}
-
 void CCloudSyncManager::EnsureHttpClient()
 {
 	EnterCriticalSection(&m_csHttpClient);
@@ -58,7 +41,7 @@ void CCloudSyncManager::EnsureHttpClient()
 		// Enforce HTTPS: reject plain http for security (consistent with CloudAuth)
 		if (url.find("http://") == 0)
 		{
-			OutputDebugStringA("[CloudSync] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			LogCloudSync("ERROR: HTTPS required, refusing to use plain HTTP.");
 			m_httpClient.reset();
 			m_httpClientUrl.Empty();
 			LeaveCriticalSection(&m_csHttpClient);
@@ -147,7 +130,7 @@ CCloudSyncManager::~CCloudSyncManager()
 	}
 	else
 	{
-		LogMessage(_T("~CCloudSyncManager: threads still active, skipping CriticalSection cleanup"));
+		LogCloudSync(_T("~CCloudSyncManager: threads still active, skipping CriticalSection cleanup"));
 	}
 }
 
@@ -168,7 +151,7 @@ BOOL CCloudSyncManager::Initialize()
 		CString msg;
 		CTime lastSync(m_lastSyncTime);
 		msg.Format(_T("Restored lastSyncTime from registry: %s"), lastSync.Format(_T("%Y-%m-%d %H:%M:%S")));
-		LogMessage(msg);
+		LogCloudSync(msg);
 	}
 
 	// Restore lastPushTime from registry (separate push cursor)
@@ -197,7 +180,7 @@ BOOL CCloudSyncManager::Initialize()
 
 	if (!CCloudAuth::IsLoggedIn())
 	{
-		OutputDebugString(_T("[CloudSync] Not logged in, skipping sync initialization.\n"));
+		LogCloudSync(_T("Not logged in, skipping sync initialization."));
 		return FALSE;
 	}
 
@@ -210,7 +193,7 @@ BOOL CCloudSyncManager::Initialize()
 		if (IsEncryptionExpected())
 		{
 			// User has encryption enabled but initialization failed — abort
-			LogMessage(_T("CRITICAL: Encryption is enabled but failed to initialize. Aborting sync initialization."));
+			LogCloudSync(_T("CRITICAL: Encryption is enabled but failed to initialize. Aborting sync initialization."));
 
 			// Set persistent flag so OptionCloud can show recovery prompt even if 997 message is lost
 			CGetSetOptions::SetCloudEncryptionNeedsRecovery(TRUE);
@@ -228,7 +211,7 @@ BOOL CCloudSyncManager::Initialize()
 		else
 		{
 			// User did not enable encryption — continue without it (degraded mode)
-			OutputDebugString(_T("[CloudSync] WARNING: Encryption initialization failed, continuing without encryption.\n"));
+			LogCloudSync(_T("WARNING: Encryption initialization failed, continuing without encryption."));
 			
 			// Show user-friendly warning via main window
 			CWnd* pMainWnd = AfxGetMainWnd();
@@ -238,7 +221,7 @@ BOOL CCloudSyncManager::Initialize()
 				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 999, 0);
 			}
 			
-			LogMessage(_T("WARNING: Encryption not initialized, clips will sync unencrypted."));
+			LogCloudSync(_T("WARNING: Encryption not initialized, clips will sync unencrypted."));
 		}
 	}
 
@@ -252,7 +235,7 @@ BOOL CCloudSyncManager::Initialize()
 		m_hStopEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 		if (m_hStopEvent == nullptr)
 		{
-			OutputDebugString(_T("[CloudSync] Failed to create stop event.\n"));
+			LogCloudSync(_T("Failed to create stop event."));
 			return FALSE;
 		}
 	}
@@ -261,7 +244,7 @@ BOOL CCloudSyncManager::Initialize()
 	m_hWsTrigger = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (m_hWsTrigger == nullptr)
 	{
-		OutputDebugString(_T("[CloudSync] Failed to create WS trigger event.\n"));
+		LogCloudSync(_T("Failed to create WS trigger event."));
 		// NOTE: m_hStopEvent is lifetime-managed (never closed here).
 		return FALSE;
 	}
@@ -270,7 +253,7 @@ BOOL CCloudSyncManager::Initialize()
 	m_pSyncThread = AfxBeginThread(SyncThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
 	if (m_pSyncThread == nullptr)
 	{
-		OutputDebugString(_T("[CloudSync] Failed to create sync thread.\n"));
+		LogCloudSync(_T("Failed to create sync thread."));
 		CloseHandle(m_hWsTrigger);
 		m_hWsTrigger = nullptr;
 		// NOTE: m_hStopEvent is lifetime-managed (never closed here).
@@ -283,7 +266,7 @@ BOOL CCloudSyncManager::Initialize()
 	// Start WebSocket listener thread (H4)
 	StartWebSocket();
 
-	LogMessage(_T("Initialized successfully."));
+	LogCloudSync(_T("Initialized successfully."));
 	return TRUE;
 }
 
@@ -293,11 +276,11 @@ BOOL CCloudSyncManager::ReinitializeSync()
 	// arriving while a previous reinit is still stopping threads).
 	if (InterlockedExchange(&m_bReinitializing, 1) == 1)
 	{
-		LogMessage(_T("ReinitializeSync: already in progress, skipping."));
+		LogCloudSync(_T("ReinitializeSync: already in progress, skipping."));
 		return FALSE;
 	}
 
-	LogMessage(_T("ReinitializeSync: stopping and restarting sync..."));
+	LogCloudSync(_T("ReinitializeSync: stopping and restarting sync..."));
 
 	BOOL bRet = FALSE;
 	try
@@ -332,7 +315,7 @@ BOOL CCloudSyncManager::ReinitializeSync()
 		// Old threads still alive: refuse to restart. The stop event stays
 		// signaled so they exit as soon as their current operation completes;
 		// the next sync trigger will retry the restart then.
-		LogMessage(_T("ReinitializeSync: old threads still running, restart deferred."));
+		LogCloudSync(_T("ReinitializeSync: old threads still running, restart deferred."));
 	}
 	else
 	{
@@ -353,7 +336,7 @@ BOOL CCloudSyncManager::ReinitializeSync()
 	}
 	catch (...)
 	{
-		LogMessage(_T("ReinitializeSync: exception, restart aborted"));
+		LogCloudSync(_T("ReinitializeSync: exception, restart aborted"));
 		bRet = FALSE;
 	}
 
@@ -370,21 +353,21 @@ void CCloudSyncManager::StartEncryptionRetry()
 {
 	if (m_pEncRetryThread != nullptr)
 	{
-		LogMessage(_T("StartEncryptionRetry: retry thread already running, skipping"));
+		LogCloudSync(_T("StartEncryptionRetry: retry thread already running, skipping"));
 		return;
 	}
 
 	m_hEncRetryStop = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (m_hEncRetryStop == nullptr)
 	{
-		LogMessage(_T("StartEncryptionRetry: failed to create stop event"));
+		LogCloudSync(_T("StartEncryptionRetry: failed to create stop event"));
 		return;
 	}
 
 	m_pEncRetryThread = AfxBeginThread(EncryptionRetryThreadProc, this, THREAD_PRIORITY_BELOW_NORMAL, 0, CREATE_SUSPENDED);
 	if (m_pEncRetryThread == nullptr)
 	{
-		LogMessage(_T("StartEncryptionRetry: failed to create thread"));
+		LogCloudSync(_T("StartEncryptionRetry: failed to create thread"));
 		CloseHandle(m_hEncRetryStop);
 		m_hEncRetryStop = nullptr;
 		return;
@@ -392,7 +375,7 @@ void CCloudSyncManager::StartEncryptionRetry()
 
 	m_pEncRetryThread->m_bAutoDelete = FALSE;
 	m_pEncRetryThread->ResumeThread();
-	LogMessage(_T("StartEncryptionRetry: retry thread started"));
+	LogCloudSync(_T("StartEncryptionRetry: retry thread started"));
 }
 
 void CCloudSyncManager::StopEncryptionRetry()
@@ -407,13 +390,13 @@ void CCloudSyncManager::StopEncryptionRetry()
 		DWORD dwWait = WaitForSingleObject(m_pEncRetryThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
-			LogMessage(_T("StopEncryptionRetry: retry thread exited cleanly."));
+			LogCloudSync(_T("StopEncryptionRetry: retry thread exited cleanly."));
 			delete m_pEncRetryThread;
 			m_pEncRetryThread = nullptr;
 		}
 		else
 		{
-			LogMessage(_T("StopEncryptionRetry: retry thread did not exit within 1s, detaching."));
+			LogCloudSync(_T("StopEncryptionRetry: retry thread did not exit within 1s, detaching."));
 			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 		}
 	}
@@ -431,7 +414,7 @@ UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 	if (pThis == nullptr)
 		return 1;
 
-	LogMessage(_T("EncryptionRetryThreadProc: started"));
+	LogCloudSync(_T("EncryptionRetryThreadProc: started"));
 
 	// Exponential backoff: 30s, 60s, 120s, 240s, 480s, 600s (cap), ...
 	const DWORD baseDelay = 30 * 1000;
@@ -451,17 +434,17 @@ UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 		DWORD dwWait = WaitForSingleObject(pThis->m_hEncRetryStop, delay);
 		if (dwWait == WAIT_OBJECT_0)
 		{
-			LogMessage(_T("EncryptionRetryThreadProc: stop signaled, exiting"));
+			LogCloudSync(_T("EncryptionRetryThreadProc: stop signaled, exiting"));
 			return 0;
 		}
 
 		CString msg;
 		msg.Format(_T("EncryptionRetryThreadProc: attempt %d/%d"), attempt, maxRetries);
-		LogMessage(msg);
+		LogCloudSync(msg);
 
 		if (pThis->InitializeEncryption())
 		{
-			LogMessage(_T("EncryptionRetryThreadProc: encryption recovery succeeded"));
+			LogCloudSync(_T("EncryptionRetryThreadProc: encryption recovery succeeded"));
 
 			// Clear persistent recovery flag
 			CGetSetOptions::SetCloudEncryptionNeedsRecovery(FALSE);
@@ -476,12 +459,12 @@ UINT CCloudSyncManager::EncryptionRetryThreadProc(LPVOID pParam)
 			return 0;
 		}
 
-		LogMessage(_T("EncryptionRetryThreadProc: attempt failed, will retry"));
+		LogCloudSync(_T("EncryptionRetryThreadProc: attempt failed, will retry"));
 	}
 
 	CString msg;
 	msg.Format(_T("EncryptionRetryThreadProc: all %d attempts exhausted, giving up"), maxRetries);
-	LogMessage(msg);
+	LogCloudSync(msg);
 	return 1;
 }
 
@@ -499,13 +482,13 @@ void CCloudSyncManager::Stop()
 		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
-			OutputDebugString(_T("[CloudSync] Sync thread exited cleanly.\n"));
+			LogCloudSync(_T("Sync thread exited cleanly."));
 			delete m_pSyncThread;
 			m_pSyncThread = nullptr;
 		}
 		else
 		{
-			OutputDebugString(_T("[CloudSync] WARNING: Sync thread did not exit within 1s, detaching.\n"));
+			LogCloudSync(_T("WARNING: Sync thread did not exit within 1s, detaching."));
 			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 		}
 	}
@@ -517,13 +500,13 @@ void CCloudSyncManager::Stop()
 		Sleep(50);
 		if (GetTickCount() - waitStart > 1000)
 		{
-			OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads to complete.\n");
+			LogCloudSync("WARNING: Timeout waiting for quick-push threads to complete.");
 			break;
 		}
 	}
 	if (m_nActiveQuickSyncThreads == 0)
 	{
-		OutputDebugStringA("[CloudSync] All quick-push threads completed.\n");
+		LogCloudSync("All quick-push threads completed.");
 	}
 
 	// Stop WebSocket thread (H4)
@@ -582,12 +565,12 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 		DWORD dwWait = WaitForMultipleObjects(count, handles, TRUE, remaining);
 		if (dwWait == WAIT_TIMEOUT)
 		{
-			OutputDebugString(_T("[CloudSync] WARNING: Timeout waiting for CloudSync threads to exit.\n"));
+			LogCloudSync(_T("WARNING: Timeout waiting for CloudSync threads to exit."));
 			return FALSE;
 		}
 		if (dwWait == WAIT_FAILED)
 		{
-			OutputDebugString(_T("[CloudSync] ERROR: WaitForMultipleObjects failed in WaitForAllThreads.\n"));
+			LogCloudSync(_T("ERROR: WaitForMultipleObjects failed in WaitForAllThreads."));
 			return FALSE;
 		}
 
@@ -617,7 +600,7 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 			Sleep(50);
 			if (GetTickCount() > deadline)
 			{
-				OutputDebugStringA("[CloudSync] WARNING: Timeout waiting for quick-push threads in WaitForAllThreads.\n");
+				LogCloudSync("WARNING: Timeout waiting for quick-push threads in WaitForAllThreads.");
 				return FALSE;
 			}
 		}
@@ -649,7 +632,7 @@ void CCloudSyncManager::SignalStopEarly()
 		SetEvent(m_hStopEvent);
 	}
 
-	OutputDebugString(_T("[CloudSync] SignalStopEarly: stop events signaled, threads have head start.\n"));
+	LogCloudSync(_T("SignalStopEarly: stop events signaled, threads have head start."));
 }
 
 void CCloudSyncManager::OnClipAdded(void* pClip)
@@ -658,13 +641,13 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 
 	if (!CGetSetOptions::GetCloudPushOnCopy())
 	{
-		LogMessage(_T("Clip added - push on copy disabled, skipping quick sync."));
+		LogCloudSync(_T("Clip added - push on copy disabled, skipping quick sync."));
 		return;
 	}
 
 	// Trigger an immediate sync when a new clip is added
 	// This ensures the new clip is pushed to the cloud quickly
-	LogMessage(_T("Clip added - triggering cloud sync."));
+	LogCloudSync(_T("Clip added - triggering cloud sync."));
 
 	// SAFETY: Use a local copy of the pointer and add a guard flag
 	// to prevent use-after-free if the sync manager is destroyed
@@ -680,7 +663,7 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 
 	if (!bShouldSync)
 	{
-		OutputDebugStringA("[CloudSync] Skip quick-push: sync already stopping or not running.\n");
+		LogCloudSync("Skip quick-push: sync already stopping or not running.");
 		return;
 	}
 
@@ -693,7 +676,7 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 
 	if (AfxBeginThread(QuickSyncThreadProc, ctx) == nullptr)
 	{
-		OutputDebugStringA("[CloudSync] Failed to spawn quick-push thread.\n");
+		LogCloudSync("Failed to spawn quick-push thread.");
 		EnterCriticalSection(&m_csSync);
 		m_nActiveQuickSyncThreads--;
 		LeaveCriticalSection(&m_csSync);
@@ -701,7 +684,7 @@ void CCloudSyncManager::OnClipAdded(void* pClip)
 	}
 	else
 	{
-		OutputDebugStringA("[CloudSync] Spawned quick-push thread.\n");
+		LogCloudSync("Spawned quick-push thread.");
 	}
 }
 
@@ -729,7 +712,7 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 			// Check stop event before starting work
 			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
 			{
-				OutputDebugStringA("[CloudSync] Quick-push: stop signaled, exiting.\n");
+				LogCloudSync("Quick-push: stop signaled, exiting.");
 				EnterCriticalSection(ctx->pCS);
 				(*ctx->pCounter)--;
 				LeaveCriticalSection(ctx->pCS);
@@ -745,7 +728,7 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 			// Check stop event between PushGroups and PushNewClips
 			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
 			{
-				OutputDebugStringA("[CloudSync] Quick-push: stop signaled after PushGroups, exiting.\n");
+				LogCloudSync("Quick-push: stop signaled after PushGroups, exiting.");
 				// Rollback newly created groups from partial push
 				for (const auto& gid : newGroupIds)
 				{
@@ -782,12 +765,12 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 		else
 		{
 			LeaveCriticalSection(ctx->pCS);
-			OutputDebugStringA("[CloudSync] Quick-push skipped: manager shutting down.\n");
+			LogCloudSync("Quick-push skipped: manager shutting down.");
 		}
 	}
 	catch (...)
 	{
-		LogMessage(_T("QuickSyncThreadProc: exception caught, ensuring counter decrement."));
+		LogCloudSync(_T("QuickSyncThreadProc: exception caught, ensuring counter decrement."));
 	}
 
 	// Decrement the active thread counter
@@ -826,14 +809,14 @@ BOOL CCloudSyncManager::QueueDeleteSyncAction(int action, const std::vector<int>
 
 	if (!bShouldRun)
 	{
-		OutputDebugStringA("[CloudSync] Skip delete-sync: manager shutting down or not running.\n");
+		LogCloudSync("Skip delete-sync: manager shutting down or not running.");
 		delete ctx;
 		return FALSE;
 	}
 
 	if (AfxBeginThread(DeleteSyncThreadProc, ctx) == nullptr)
 	{
-		OutputDebugStringA("[CloudSync] Failed to spawn delete-sync thread.\n");
+		LogCloudSync("Failed to spawn delete-sync thread.");
 		EnterCriticalSection(&m_csSync);
 		m_nActiveQuickSyncThreads--;
 		LeaveCriticalSection(&m_csSync);
@@ -865,7 +848,7 @@ UINT CCloudSyncManager::DeleteSyncThreadProc(LPVOID pParam)
 
 			if (WaitForSingleObject(ctx->hStopEvent, 0) == WAIT_OBJECT_0)
 			{
-				OutputDebugStringA("[CloudSync] delete-sync: stop signaled, exiting.\n");
+				LogCloudSync("delete-sync: stop signaled, exiting.");
 				EnterCriticalSection(ctx->pCS);
 				(*ctx->pCounter)--;
 				LeaveCriticalSection(ctx->pCS);
@@ -891,12 +874,12 @@ UINT CCloudSyncManager::DeleteSyncThreadProc(LPVOID pParam)
 		else
 		{
 			LeaveCriticalSection(ctx->pCS);
-			OutputDebugStringA("[CloudSync] delete-sync skipped: manager shutting down.\n");
+			LogCloudSync("delete-sync skipped: manager shutting down.");
 		}
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteSyncThreadProc: exception caught, ensuring counter decrement."));
+		LogCloudSync(_T("DeleteSyncThreadProc: exception caught, ensuring counter decrement."));
 	}
 
 	EnterCriticalSection(ctx->pCS);
@@ -920,7 +903,7 @@ std::unique_ptr<httplib::Client> CCloudSyncManager::CreateShortTimeoutHttpClient
 		// Enforce HTTPS: reject plain http for security (consistent with CloudAuth)
 		if (url.find("http://") == 0)
 		{
-			OutputDebugStringA("[CloudSync] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			LogCloudSync("ERROR: HTTPS required, refusing to use plain HTTP.");
 			return nullptr;
 		}
 		url = "https://" + url;
@@ -949,14 +932,14 @@ httplib::Result CCloudSyncManager::PostShortTimeout(const char* path, const std:
 	{
 		if (CCloudAuth::TryRefreshToken())
 		{
-			LogMessage(_T("Cloud async action: token refreshed, retrying request"));
+			LogCloudSync(_T("Cloud async action: token refreshed, retrying request"));
 			client = CreateShortTimeoutHttpClient();
 			if (client)
 				res = client->Post(path, body, "application/json");
 		}
 		else
 		{
-			LogMessage(_T("Cloud async action: token expired and refresh failed, logging out"));
+			LogCloudSync(_T("Cloud async action: token expired and refresh failed, logging out"));
 			CCloudAuth::Logout();
 			CWnd* pMainWnd = AfxGetMainWnd();
 			if (pMainWnd != nullptr)
@@ -978,7 +961,7 @@ void CCloudSyncManager::TriggerSync()
 
 void CCloudSyncManager::ForceDownloadAll()
 {
-	LogMessage(_T("ForceDownloadAll: starting forced download from cloud..."));
+	LogCloudSync(_T("ForceDownloadAll: starting forced download from cloud..."));
 
 	// Track in active thread counter so Stop() waits for completion
 	EnterCriticalSection(&m_csSync);
@@ -988,7 +971,7 @@ void CCloudSyncManager::ForceDownloadAll()
 	InterlockedExchange(&m_forceOverrideLocal, 1);
 	if (AfxBeginThread(ForceSyncThreadProc, this) == nullptr)
 	{
-		LogMessage(_T("ForceDownloadAll: failed to create thread"));
+		LogCloudSync(_T("ForceDownloadAll: failed to create thread"));
 		EnterCriticalSection(&m_csSync);
 		m_nActiveQuickSyncThreads--;
 		LeaveCriticalSection(&m_csSync);
@@ -997,7 +980,7 @@ void CCloudSyncManager::ForceDownloadAll()
 
 void CCloudSyncManager::ForceUploadAll()
 {
-	LogMessage(_T("ForceUploadAll: starting forced upload to cloud..."));
+	LogCloudSync(_T("ForceUploadAll: starting forced upload to cloud..."));
 	InterlockedExchange(&m_forceOverrideRemote, 1);
 	TriggerQuickSync();
 }
@@ -1010,10 +993,10 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 
 	try
 	{
-		LogMessage(_T("ForceSyncThreadProc: running pull changes with override..."));
+		LogCloudSync(_T("ForceSyncThreadProc: running pull changes with override..."));
 		pThis->PullGroups();
 		pThis->PullChanges();
-		LogMessage(_T("ForceSyncThreadProc: force download complete."));
+		LogCloudSync(_T("ForceSyncThreadProc: force download complete."));
 
 		EnterCriticalSection(&pThis->m_csStatus);
 		pThis->m_csSyncStatus = _T("");
@@ -1023,7 +1006,7 @@ UINT CCloudSyncManager::ForceSyncThreadProc(LPVOID pParam)
 	}
 	catch (...)
 	{
-		LogMessage(_T("ForceSyncThreadProc: exception caught, ensuring counter decrement."));
+		LogCloudSync(_T("ForceSyncThreadProc: exception caught, ensuring counter decrement."));
 	}
 
 	// Decrement active thread counter so Stop() can complete
@@ -1090,7 +1073,7 @@ BOOL CCloudSyncManager::InitializeEncryption()
 		CString csKeyB64 = CGetSetOptions::GetCloudEncryptionKey();
 		if (csKeyB64.IsEmpty())
 		{
-			OutputDebugString(_T("[CloudSync] No encryption key found in settings.\n"));
+			LogCloudSync(_T("No encryption key found in settings."));
 			return FALSE;
 		}
 
@@ -1099,7 +1082,7 @@ BOOL CCloudSyncManager::InitializeEncryption()
 		std::vector<BYTE> key = CCloudCrypto::Base64Decode(CStringA(keyB64A));
 		if (key.size() != 32)
 		{
-			OutputDebugString(_T("[CloudSync] Invalid encryption key size.\n"));
+			LogCloudSync(_T("Invalid encryption key size."));
 			return FALSE;
 		}
 
@@ -1108,16 +1091,16 @@ BOOL CCloudSyncManager::InitializeEncryption()
 			EnterCriticalSection(&m_csSync);
 			m_cryptoInitialized = TRUE;
 			LeaveCriticalSection(&m_csSync);
-			OutputDebugString(_T("[CloudSync] Encryption initialized successfully.\n"));
+			LogCloudSync(_T("Encryption initialized successfully."));
 			return TRUE;
 		}
 
-		OutputDebugString(_T("[CloudSync] CCloudCrypto::Initialize failed.\n"));
+		LogCloudSync(_T("CCloudCrypto::Initialize failed."));
 		return FALSE;
 	}
 	catch (...)
 	{
-		OutputDebugString(_T("[CloudSync] Exception in InitializeEncryption.\n"));
+		LogCloudSync(_T("Exception in InitializeEncryption."));
 		return FALSE;
 	}
 }
@@ -1155,7 +1138,7 @@ BOOL CCloudSyncManager::EncryptClipFormats(nlohmann::json& formats)
 				CStringA encrypted = CCloudCrypto::Encrypt(plain);
 				if (encrypted.IsEmpty())
 				{
-					OutputDebugStringA("[CloudSync] Failed to encrypt format data.\n");
+					LogCloudSync("Failed to encrypt format data.");
 					return FALSE;
 				}
 				format["data"] = encrypted.GetString();
@@ -1166,7 +1149,7 @@ BOOL CCloudSyncManager::EncryptClipFormats(nlohmann::json& formats)
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudSync] Exception in EncryptClipFormats.\n");
+		LogCloudSync("Exception in EncryptClipFormats.");
 		return FALSE;
 	}
 }
@@ -1204,7 +1187,7 @@ BOOL CCloudSyncManager::DecryptClipFormats(nlohmann::json& formats)
 					CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
 					if (decrypted.IsEmpty())
 					{
-						OutputDebugStringA("[CloudSync] Failed to decrypt format data.\n");
+						LogCloudSync("Failed to decrypt format data.");
 						return FALSE;
 					}
 					format["data"] = decrypted.GetString();
@@ -1216,7 +1199,7 @@ BOOL CCloudSyncManager::DecryptClipFormats(nlohmann::json& formats)
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudSync] Exception in DecryptClipFormats.\n");
+		LogCloudSync("Exception in DecryptClipFormats.");
 		return FALSE;
 	}
 }
@@ -1245,7 +1228,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 
 		if (serverSalt != localSalt)
 		{
-			LogMessage(_T("CheckAndNotifyEncryptionChange: salt changed, notifying user."));
+			LogCloudSync(_T("CheckAndNotifyEncryptionChange: salt changed, notifying user."));
 			CWnd* pMainWnd = AfxGetMainWnd();
 			if (pMainWnd != nullptr)
 			{
@@ -1256,7 +1239,7 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	}
 	catch (...)
 	{
-		LogMessage(_T("CheckAndNotifyEncryptionChange: unexpected error"));
+		LogCloudSync(_T("CheckAndNotifyEncryptionChange: unexpected error"));
 	}
 	return FALSE;
 }
@@ -1269,7 +1252,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		return 1;
 	}
 
-	LogMessage(_T("Background sync thread started."));
+	LogCloudSync(_T("Background sync thread started."));
 
 	while (true)
 	{
@@ -1298,7 +1281,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		{
 			// WS trigger was signaled — reset for next time
 			ResetEvent(pThis->m_hWsTrigger);
-			LogMessage(_T("Sync triggered by WebSocket event."));
+			LogCloudSync(_T("Sync triggered by WebSocket event."));
 		}
 
 		// If periodic sync is off and this was a timeout (not WS trigger), skip
@@ -1326,7 +1309,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 				// Push failed (e.g. auth expired / network error).
 				// Skip pull this cycle: pulling with a stale/invalid credential is
 				// pointless and would spam an error dialog every cycle.
-				LogMessage(_T("Sync: push failed, skipping pull this cycle"));
+				LogCloudSync(_T("Sync: push failed, skipping pull this cycle"));
 				EnterCriticalSection(&pThis->m_csStatus);
 				pThis->m_csSyncStatus = _T("Error");
 				pThis->m_csLastError = _T("Push failed - skipping pull this cycle");
@@ -1357,7 +1340,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		{
 			CString err;
 			err.Format(_T("Sync error: %hs"), e.what());
-			LogMessage(err);
+			LogCloudSync(err);
 			EnterCriticalSection(&pThis->m_csStatus);
 			pThis->m_csSyncStatus = _T("Error");
 			pThis->m_csLastError = err;
@@ -1365,7 +1348,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		}
 		catch (...)
 		{
-			LogMessage(_T("Sync unknown error"));
+			LogCloudSync(_T("Sync unknown error"));
 			EnterCriticalSection(&pThis->m_csStatus);
 			pThis->m_csSyncStatus = _T("Error");
 			pThis->m_csLastError = _T("Unknown sync error");
@@ -1373,7 +1356,7 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 		}
 	}
 
-	LogMessage(_T("Background sync thread exiting."));
+	LogCloudSync(_T("Background sync thread exiting."));
 	return 0;
 }
 
@@ -1386,7 +1369,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 	{
 		if (InterlockedExchange(&m_bFirstPushInProgress, 1) == 1)
 		{
-			LogMessage(_T("PushNewClips: first push already in progress, skipping concurrent attempt"));
+			LogCloudSync(_T("PushNewClips: first push already in progress, skipping concurrent attempt"));
 			return TRUE;
 		}
 	}
@@ -1395,9 +1378,9 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 	try
 	{
 		if (bForce)
-			LogMessage(_T("PushNewClips: FORCE mode - pushing ALL local clips..."));
+			LogCloudSync(_T("PushNewClips: FORCE mode - pushing ALL local clips..."));
 		else
-			LogMessage(_T("PushNewClips: checking for new/modified clips since last sync..."));
+			LogCloudSync(_T("PushNewClips: checking for new/modified clips since last sync..."));
 
 		time_t lastPush;
 		time_t lastSync;
@@ -1441,7 +1424,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			bool pageHasMore = false;
 			if (!GetLocalClipsSince(sinceTime, upperBound, offset, CLOUD_PUSH_BATCH_SIZE, page, pageHasMore))
 			{
-				LogMessage(_T("PushNewClips: failed to enumerate local clips."));
+				LogCloudSync(_T("PushNewClips: failed to enumerate local clips."));
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = _T("Push: failed to enumerate local clips");
 				LeaveCriticalSection(&m_csStatus);
@@ -1489,7 +1472,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			LeaveCriticalSection(&m_csHttpClient);
 			if (!res)
 			{
-				LogMessage(_T("PushNewClips: failed to connect to server"));
+				LogCloudSync(_T("PushNewClips: failed to connect to server"));
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = _T("Push: failed to connect to server");
 				LeaveCriticalSection(&m_csStatus);
@@ -1503,14 +1486,14 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				// so EnsureHttpClient rebuilds the client with it on the next cycle.
 				if (CCloudAuth::TryRefreshToken())
 				{
-					LogMessage(_T("PushNewClips: access token refreshed, resuming on next sync."));
+					LogCloudSync(_T("PushNewClips: access token refreshed, resuming on next sync."));
 					EnterCriticalSection(&m_csStatus);
 					m_csLastError = _T("Push: token refreshed");
 					LeaveCriticalSection(&m_csStatus);
 					bResult = FALSE; goto cleanup;
 				}
 
-				LogMessage(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
+				LogCloudSync(_T("PushNewClips: token expired or invalid, clearing token for re-auth."));
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = _T("Push: authentication failed");
 				LeaveCriticalSection(&m_csStatus);
@@ -1518,7 +1501,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				CWnd* pMainWnd = AfxGetMainWnd();
 				if (pMainWnd != nullptr)
 					::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
-				LogMessage(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
+				LogCloudSync(_T("PushNewClips: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
 				bResult = FALSE; goto cleanup;
 			}
 
@@ -1526,7 +1509,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			{
 				CString err;
 				err.Format(_T("PushNewClips: server returned HTTP %d"), res->status);
-				LogMessage(err);
+				LogCloudSync(err);
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = err;
 				LeaveCriticalSection(&m_csStatus);
@@ -1540,7 +1523,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				{
 					CString msg;
 					msg.Format(_T("PushNewClips: server error code %d"), responseJson["code"].get<int>());
-					LogMessage(msg);
+					LogCloudSync(msg);
 					EnterCriticalSection(&m_csStatus);
 					m_csLastError = msg;
 					LeaveCriticalSection(&m_csStatus);
@@ -1555,13 +1538,13 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 				int skippedCount = dataNode->value("skipped_count", 0);
 				CString msg;
 				msg.Format(_T("PushNewClips: %d clips synced, %d skipped (CRC duplicates)"), syncedCount, skippedCount);
-				LogMessage(msg);
+				LogCloudSync(msg);
 			}
 			catch (const json::parse_error& e)
 			{
 				CString err;
 				err.Format(_T("PushNewClips: JSON parse error: %hs"), e.what());
-				LogMessage(err);
+				LogCloudSync(err);
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = err;
 				LeaveCriticalSection(&m_csStatus);
@@ -1598,7 +1581,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 	{
 		CString err;
 		err.Format(_T("PushNewClips error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		EnterCriticalSection(&m_csStatus);
 		m_csLastError = err;
 		LeaveCriticalSection(&m_csStatus);
@@ -1606,7 +1589,7 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 	}
 	catch (...)
 	{
-		LogMessage(_T("PushNewClips: unknown error"));
+		LogCloudSync(_T("PushNewClips: unknown error"));
 		EnterCriticalSection(&m_csStatus);
 		m_csLastError = _T("Push: unknown error");
 		LeaveCriticalSection(&m_csStatus);
@@ -1653,7 +1636,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 		//   DWORD pFiles (offset->first file path), POINT pt, BOOL fNC, BOOL fWide
 		if (raw.size() < 20)
 		{
-			LogMessage(_T("ExtractFilePathsFromHDROP: data too small to be a DROPFILES structure"));
+			LogCloudSync(_T("ExtractFilePathsFromHDROP: data too small to be a DROPFILES structure"));
 			return paths;
 		}
 
@@ -1664,7 +1647,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 
 		if (offset < 20 || offset >= raw.size())
 		{
-			LogMessage(_T("ExtractFilePathsFromHDROP: invalid file list offset"));
+			LogCloudSync(_T("ExtractFilePathsFromHDROP: invalid file list offset"));
 			return paths;
 		}
 
@@ -1724,7 +1707,7 @@ nlohmann::json CCloudSyncManager::ExtractFilePathsFromHDROP(const nlohmann::json
 	}
 	catch (...)
 	{
-		LogMessage(_T("ExtractFilePathsFromHDROP: unexpected error"));
+		LogCloudSync(_T("ExtractFilePathsFromHDROP: unexpected error"));
 	}
 	return paths;
 }
@@ -1759,7 +1742,7 @@ BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 
 				CString msg;
 				msg.Format(_T("CF_HDROP filtered: %d file paths (contents NOT synced)"), (int)filePaths.size());
-				LogMessage(msg);
+				LogCloudSync(msg);
 
 				bFound = TRUE;
 				break;
@@ -1770,11 +1753,11 @@ BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 	{
 		CString err;
 		err.Format(_T("FilterHDROPForSync error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("FilterHDROPForSync: unknown error"));
+		LogCloudSync(_T("FilterHDROPForSync: unknown error"));
 	}
 
 	return bFound;
@@ -1784,7 +1767,7 @@ void CCloudSyncManager::PullChanges()
 {
 	try
 	{
-		LogMessage(_T("PullChanges: checking for changes from other devices..."));
+		LogCloudSync(_T("PullChanges: checking for changes from other devices..."));
 
 		// Build since timestamp as RFC3339 (thread-safe read)
 		time_t lastSync;
@@ -1827,7 +1810,7 @@ void CCloudSyncManager::PullChanges()
 		LeaveCriticalSection(&m_csHttpClient);
 		if (!res)
 		{
-			LogMessage(_T("PullChanges: failed to connect to server"));
+			LogCloudSync(_T("PullChanges: failed to connect to server"));
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = _T("Pull: failed to connect to server");
 			LeaveCriticalSection(&m_csStatus);
@@ -1841,14 +1824,14 @@ void CCloudSyncManager::PullChanges()
 			// so this is the normal path rather than an error worth showing.
 			if (CCloudAuth::TryRefreshToken())
 			{
-				LogMessage(_T("PullChanges: access token refreshed, resuming on next sync."));
+				LogCloudSync(_T("PullChanges: access token refreshed, resuming on next sync."));
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = _T("Pull: token refreshed");
 				LeaveCriticalSection(&m_csStatus);
 				return;
 			}
 
-			LogMessage(_T("PullChanges: token expired or invalid, clearing token for re-auth."));
+			LogCloudSync(_T("PullChanges: token expired or invalid, clearing token for re-auth."));
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = _T("Pull: authentication failed");
 			LeaveCriticalSection(&m_csStatus);
@@ -1864,7 +1847,7 @@ void CCloudSyncManager::PullChanges()
 				::PostMessage(pMainWnd->GetSafeHwnd(), WM_CLOUD_AUTH_REQUIRED, 401, 0);
 			}
 			
-			LogMessage(_T("PullChanges: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
+			LogCloudSync(_T("PullChanges: posted WM_CLOUD_AUTH_REQUIRED message to main window"));
 			return;
 		}
 
@@ -1872,7 +1855,7 @@ void CCloudSyncManager::PullChanges()
 		{
 			CString err;
 			err.Format(_T("PullChanges: server returned HTTP %d"), res->status);
-			LogMessage(err);
+			LogCloudSync(err);
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = err;
 			LeaveCriticalSection(&m_csStatus);
@@ -1889,7 +1872,7 @@ void CCloudSyncManager::PullChanges()
 			{
 				CString msg;
 				msg.Format(_T("PullChanges: server error code %d"), responseJson["code"].get<int>());
-				LogMessage(msg);
+				LogCloudSync(msg);
 				EnterCriticalSection(&m_csStatus);
 				m_csLastError = msg;
 				LeaveCriticalSection(&m_csStatus);
@@ -1929,7 +1912,7 @@ void CCloudSyncManager::PullChanges()
 
 			if (!hasClips && !hasDeletions)
 			{
-				LogMessage(_T("PullChanges: no new clips or deletions from other devices"));
+				LogCloudSync(_T("PullChanges: no new clips or deletions from other devices"));
 				hasMore = false;
 			}
 
@@ -1955,7 +1938,7 @@ void CCloudSyncManager::PullChanges()
 						{
 							CString msg;
 							msg.Format(_T("PullChanges: decryption failed for clip, skipping"));
-							LogMessage(msg);
+							LogCloudSync(msg);
 							decryptFailedCount++;
 							continue;
 						}
@@ -1990,14 +1973,14 @@ void CCloudSyncManager::PullChanges()
 							deletedCount++;
 							CString msg;
 							msg.Format(_T("PullChanges: deleted local clip %d (remote %hs)"), localId, idStr.c_str());
-							LogMessage(msg);
+							LogCloudSync(msg);
 						}
 					}
 					else
 					{
 						CString msg;
 						msg.Format(_T("PullChanges: clip %hs not found in mapping table, skip delete"), idStr.c_str());
-						LogMessage(msg);
+						LogCloudSync(msg);
 					}
 				}
 			}
@@ -2018,7 +2001,7 @@ void CCloudSyncManager::PullChanges()
 						theApp.m_db.execDML(csSQL);
 						CString msg;
 						msg.Format(_T("PullChanges: marked clip as dont_sync (local %d, remote %hs)"), localId, idStr.c_str());
-						LogMessage(msg);
+						LogCloudSync(msg);
 					}
 				}
 			}
@@ -2086,7 +2069,7 @@ void CCloudSyncManager::PullChanges()
 				msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"),
 					hasClips ? clipsNode->size() : 0, mergedCount);
 			}
-			LogMessage(msg);
+			LogCloudSync(msg);
 
 			// Check has_more/next_page for pagination.
 			// The server paginates by offset: keep `since` fixed and fetch the
@@ -2102,7 +2085,7 @@ void CCloudSyncManager::PullChanges()
 					pullPage = nextPage;
 					if (++pageCount > 200)
 					{
-						LogMessage(_T("PullChanges: page cap reached, stopping pagination"));
+						LogCloudSync(_T("PullChanges: page cap reached, stopping pagination"));
 						hasMore = false;
 					}
 				}
@@ -2125,7 +2108,7 @@ void CCloudSyncManager::PullChanges()
 		{
 			CString err;
 			err.Format(_T("PullChanges: JSON parse error: %hs"), e.what());
-			LogMessage(err);
+			LogCloudSync(err);
 			EnterCriticalSection(&m_csStatus);
 			m_csLastError = err;
 			LeaveCriticalSection(&m_csStatus);
@@ -2149,14 +2132,14 @@ void CCloudSyncManager::PullChanges()
 	{
 		CString err;
 		err.Format(_T("PullChanges error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		EnterCriticalSection(&m_csStatus);
 		m_csLastError = err;
 		LeaveCriticalSection(&m_csStatus);
 	}
 	catch (...)
 	{
-		LogMessage(_T("PullChanges: unknown error"));
+		LogCloudSync(_T("PullChanges: unknown error"));
 		EnterCriticalSection(&m_csStatus);
 		m_csLastError = _T("Pull: unknown error");
 		LeaveCriticalSection(&m_csStatus);
@@ -2312,7 +2295,7 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 					{
 						CString msg;
 						msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
-						LogMessage(msg);
+						LogCloudSync(msg);
 						q.nextRow();
 						continue;
 					}
@@ -2334,7 +2317,7 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 
 		CString msg;
 		msg.Format(_T("GetLocalClipsSince: page offset=%d, got %d clips"), offset, pageCount);
-		LogMessage(msg);
+		LogCloudSync(msg);
 
 		return TRUE;
 	}
@@ -2342,19 +2325,19 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 	{
 		CString err;
 		err.Format(_T("GetLocalClipsSince SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("GetLocalClipsSince error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (...)
 	{
-		LogMessage(_T("GetLocalClipsSince: unknown error"));
+		LogCloudSync(_T("GetLocalClipsSince: unknown error"));
 		return FALSE;
 	}
 }
@@ -2453,19 +2436,19 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 	{
 		CString err;
 		err.Format(_T("LoadClipFormats SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("LoadClipFormats error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (...)
 	{
-		LogMessage(_T("LoadClipFormats: unknown error"));
+		LogCloudSync(_T("LoadClipFormats: unknown error"));
 		return FALSE;
 	}
 }
@@ -2546,7 +2529,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 					// Local is newer: skip, keep mapping
 					CString msg;
 					msg.Format(_T("MergeRemoteClipToLocal: clip %hs exists locally (LWW: local wins)"), serverIdStr.c_str());
-					LogMessage(msg);
+					LogCloudSync(msg);
 					return existingId;
 				}
 			}
@@ -2577,7 +2560,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				// Compare full content to detect CRC-32 collisions
 				if (localText != remoteDesc)
 				{
-					LogMessage(_T("MergeRemoteClipToLocal: CRC collision detected (mText differs), treating as new clip"));
+					LogCloudSync(_T("MergeRemoteClipToLocal: CRC collision detected (mText differs), treating as new clip"));
 					existingId = -1;
 				}
 			}
@@ -2585,7 +2568,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 		}
 		catch (...)
 		{
-			LogMessage(_T("MergeRemoteClipToLocal: CRC query failed, will create new clip"));
+			LogCloudSync(_T("MergeRemoteClipToLocal: CRC query failed, will create new clip"));
 		}
 		}
 
@@ -2600,7 +2583,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				existingId = -1;
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: force override, deleting clip %d to replace with remote"), deletedId);
-				LogMessage(msg);
+				LogCloudSync(msg);
 				// Do NOT return - fall through to create new clip with remote content
 			}
 			else if (remoteUpdatedAt > localModDate)
@@ -2615,7 +2598,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: clip %d exists, remote newer (CRC match), updated timestamp"), existingId);
-				LogMessage(msg);
+				LogCloudSync(msg);
 				SaveRemoteIdMapping(existingId, serverIdStr);
 				return existingId;
 			}
@@ -2625,7 +2608,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 				CString msg;
 				msg.Format(_T("MergeRemoteClipToLocal: duplicate clip (CRC=%d, local=%lld, remote=%lld), skipping (LWW: local wins)"),
 				           crc, (long long)localModDate, (long long)remoteUpdatedAt);
-				LogMessage(msg);
+				LogCloudSync(msg);
 				SaveRemoteIdMapping(existingId, serverIdStr);
 				return existingId;
 			}
@@ -2668,14 +2651,14 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 							CString msg;
 							msg.Format(_T("MergeRemoteClipToLocal: CONFLICT (same desc, different CRC, local=%lld, remote=%lld, diff=%llds), saving remote as new clip"),
 							           (long long)localModDate, (long long)remoteUpdatedAt, (long long)timeDiff);
-							LogMessage(msg);
+							LogCloudSync(msg);
 						}
 						else
 						{
 							CString msg;
 							msg.Format(_T("MergeRemoteClipToLocal: same description, different CRC, local is newer (local=%lld, remote=%lld), skipping"),
 							           (long long)localModDate, (long long)remoteUpdatedAt);
-							LogMessage(msg);
+							LogCloudSync(msg);
 							SaveRemoteIdMapping(descMatchId, serverIdStr);
 							return descMatchId;
 						}
@@ -2689,7 +2672,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			}
 			catch (...)
 			{
-				LogMessage(_T("MergeRemoteClipToLocal: description match query failed, will create new clip"));
+				LogCloudSync(_T("MergeRemoteClipToLocal: description match query failed, will create new clip"));
 			}
 		}
 
@@ -2983,13 +2966,13 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 					CString msg;
 					msg.Format(_T("MergeRemoteClipToLocal: clip added (ID=%d, CRC=%d, desc='%s')"),
 					           newClip.m_id, crc, newClip.m_Desc.Left(50).GetString());
-					LogMessage(msg);
+					LogCloudSync(msg);
 				}
 				return newClip.m_id;
 			}
 			else
 			{
-				LogMessage(_T("MergeRemoteClipToLocal: AddToDB failed"));
+				LogCloudSync(_T("MergeRemoteClipToLocal: AddToDB failed"));
 			}
 		}
 
@@ -2999,19 +2982,19 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 	{
 		CString err;
 		err.Format(_T("MergeRemoteClipToLocal SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 		return -1;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("MergeRemoteClipToLocal error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		return -1;
 	}
 	catch (...)
 	{
-		LogMessage(_T("MergeRemoteClipToLocal: unknown error"));
+		LogCloudSync(_T("MergeRemoteClipToLocal: unknown error"));
 		return -1;
 	}
 }
@@ -3052,7 +3035,7 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 		}
 		CString msg;
 		msg.Format(_T("DeleteLocalClip: clip %d deleted from local DB"), clipId);
-		LogMessage(msg);
+		LogCloudSync(msg);
 
 		return TRUE;
 	}
@@ -3060,19 +3043,19 @@ BOOL CCloudSyncManager::DeleteLocalClip(int clipId)
 	{
 		CString err;
 		err.Format(_T("DeleteLocalClip SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("DeleteLocalClip error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteLocalClip: unknown error"));
+		LogCloudSync(_T("DeleteLocalClip: unknown error"));
 		return FALSE;
 	}
 }
@@ -3093,17 +3076,17 @@ void CCloudSyncManager::EnsureMappingTable()
 		             _T("created_at INTEGER DEFAULT (strftime('%%s','now'))")
 		             _T(")"));
 		theApp.m_db.execDML(csSQL);
-		LogMessage(_T("EnsureMappingTable: CloudClipMap table ready."));
+		LogCloudSync(_T("EnsureMappingTable: CloudClipMap table ready."));
 	}
 	catch (const CppSQLite3Exception& e)
 	{
 		CString err;
 		err.Format(_T("EnsureMappingTable SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("EnsureMappingTable: unknown error"));
+		LogCloudSync(_T("EnsureMappingTable: unknown error"));
 	}
 }
 
@@ -3128,11 +3111,11 @@ void CCloudSyncManager::SaveRemoteIdMapping(int localId, const std::string& remo
 	{
 		CString err;
 		err.Format(_T("SaveRemoteIdMapping SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("SaveRemoteIdMapping: unknown error"));
+		LogCloudSync(_T("SaveRemoteIdMapping: unknown error"));
 	}
 }
 
@@ -3161,11 +3144,11 @@ int CCloudSyncManager::GetLocalIdByRemoteId(const std::string& remoteId)
 	{
 		CString err;
 		err.Format(_T("GetLocalIdByRemoteId SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("GetLocalIdByRemoteId: unknown error"));
+		LogCloudSync(_T("GetLocalIdByRemoteId: unknown error"));
 	}
 	return -1;
 }
@@ -3195,11 +3178,11 @@ std::string CCloudSyncManager::GetRemoteIdByLocalId(int localId)
 	{
 		CString err;
 		err.Format(_T("GetRemoteIdByLocalId SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("GetRemoteIdByLocalId: unknown error"));
+		LogCloudSync(_T("GetRemoteIdByLocalId: unknown error"));
 	}
 	return std::string();
 }
@@ -3218,17 +3201,17 @@ void CCloudSyncManager::EnsureGroupMappingTable()
 		             _T("remote_id TEXT NOT NULL UNIQUE")
 		             _T(")"));
 		theApp.m_db.execDML(csSQL);
-		LogMessage(_T("EnsureGroupMappingTable: CloudGroupMap table ready."));
+		LogCloudSync(_T("EnsureGroupMappingTable: CloudGroupMap table ready."));
 	}
 	catch (const CppSQLite3Exception& e)
 	{
 		CString err;
 		err.Format(_T("EnsureGroupMappingTable SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("EnsureGroupMappingTable: unknown error"));
+		LogCloudSync(_T("EnsureGroupMappingTable: unknown error"));
 	}
 }
 
@@ -3253,11 +3236,11 @@ void CCloudSyncManager::SaveRemoteGroupIdMapping(int localId, const std::string&
 	{
 		CString err;
 		err.Format(_T("SaveRemoteGroupIdMapping SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("SaveRemoteGroupIdMapping: unknown error"));
+		LogCloudSync(_T("SaveRemoteGroupIdMapping: unknown error"));
 	}
 }
 
@@ -3286,11 +3269,11 @@ int CCloudSyncManager::GetLocalGroupIdByRemoteId(const std::string& remoteId)
 	{
 		CString err;
 		err.Format(_T("GetLocalGroupIdByRemoteId SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("GetLocalGroupIdByRemoteId: unknown error"));
+		LogCloudSync(_T("GetLocalGroupIdByRemoteId: unknown error"));
 	}
 	return -1;
 }
@@ -3320,11 +3303,11 @@ std::string CCloudSyncManager::GetRemoteGroupIdByLocalId(int localId)
 	{
 		CString err;
 		err.Format(_T("GetRemoteGroupIdByLocalId SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("GetRemoteGroupIdByLocalId: unknown error"));
+		LogCloudSync(_T("GetRemoteGroupIdByLocalId: unknown error"));
 	}
 	return std::string();
 }
@@ -3348,11 +3331,11 @@ void CCloudSyncManager::DeleteRemoteGroupIdMapping(int localId)
 	{
 		CString err;
 		err.Format(_T("DeleteRemoteGroupIdMapping SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteRemoteGroupIdMapping: unknown error"));
+		LogCloudSync(_T("DeleteRemoteGroupIdMapping: unknown error"));
 	}
 }
 
@@ -3376,11 +3359,11 @@ void CCloudSyncManager::DeleteRemoteGroupIdMappingByRemote(const std::string& re
 	{
 		CString err;
 		err.Format(_T("DeleteRemoteGroupIdMappingByRemote SQLite error: %hs"), e.errorMessage());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteRemoteGroupIdMappingByRemote: unknown error"));
+		LogCloudSync(_T("DeleteRemoteGroupIdMappingByRemote: unknown error"));
 	}
 }
 
@@ -3458,7 +3441,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 					}
 					catch (...)
 					{
-						LogMessage(_T("PushGroups: failed to process group response"));
+						LogCloudSync(_T("PushGroups: failed to process group response"));
 					}
 				}
 			}
@@ -3472,7 +3455,7 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 				{
 					CString err;
 					err.Format(_T("PushGroups: failed to update group %hs (HTTP %d)"), gi.remoteId.c_str(), res ? res->status : 0);
-					LogMessage(err);
+					LogCloudSync(err);
 				}
 			}
 		}
@@ -3481,13 +3464,13 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 	{
 		CString err;
 		err.Format(_T("PushGroups error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
 		// CppSQLite3Exception does not derive from std::exception; a guard is
 		// required here so m_csGroupsPush is always released (no deadlock).
-		LogMessage(_T("PushGroups error: unknown exception"));
+		LogCloudSync(_T("PushGroups error: unknown exception"));
 	}
 	LeaveCriticalSection(&m_csGroupsPush);
 	return newGroupIds;
@@ -3605,7 +3588,7 @@ void CCloudSyncManager::PullGroups()
 			}
 			catch (...)
 			{
-				LogMessage(_T("PullGroups: failed to parse page, breaking pagination"));
+				LogCloudSync(_T("PullGroups: failed to parse page, breaking pagination"));
 				bAllPagesOk = false;
 				break;
 			}
@@ -3637,7 +3620,7 @@ void CCloudSyncManager::PullGroups()
 	}
 	catch (...)
 	{
-		LogMessage(_T("PullGroups: unknown error in cleanup"));
+		LogCloudSync(_T("PullGroups: unknown error in cleanup"));
 	}
 }
 
@@ -3660,11 +3643,11 @@ void CCloudSyncManager::DeleteRemoteGroup(const std::string& remoteGroupId)
 	{
 		CString err;
 		err.Format(_T("DeleteRemoteGroup error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteRemoteGroup: unknown error"));
+		LogCloudSync(_T("DeleteRemoteGroup: unknown error"));
 	}
 }
 
@@ -3696,7 +3679,7 @@ void CCloudSyncManager::MarkClipsDontSyncInternal(const std::vector<int>& localC
 		{
 			CString msg;
 			msg.Format(_T("MarkClipsDontSync: sending %d remote IDs to server"), remoteIds.size());
-			LogMessage(msg);
+			LogCloudSync(msg);
 		}
 
 		nlohmann::json body;
@@ -3710,18 +3693,18 @@ void CCloudSyncManager::MarkClipsDontSyncInternal(const std::vector<int>& localC
 				msg.Format(_T("MarkClipsDontSync: server notified for %d local clips"), localClipIds.size());
 			else
 				msg.Format(_T("MarkClipsDontSync: server response status=%d"), res ? res->status : -1);
-			LogMessage(msg);
+			LogCloudSync(msg);
 		}
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("MarkClipsDontSync error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("MarkClipsDontSync: unknown error"));
+		LogCloudSync(_T("MarkClipsDontSync: unknown error"));
 	}
 }
 
@@ -3767,7 +3750,7 @@ void CCloudSyncManager::DeleteRemoteClipsInternal(const std::vector<int>& localC
 				}
 				catch (...)
 				{
-					LogMessage(_T("DeleteRemoteClips: failed to delete mapping"));
+					LogCloudSync(_T("DeleteRemoteClips: failed to delete mapping"));
 				}
 			}
 		}
@@ -3776,11 +3759,11 @@ void CCloudSyncManager::DeleteRemoteClipsInternal(const std::vector<int>& localC
 	{
 		CString err;
 		err.Format(_T("DeleteRemoteClips error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("DeleteRemoteClips: unknown error"));
+		LogCloudSync(_T("DeleteRemoteClips: unknown error"));
 	}
 }
 
@@ -3806,7 +3789,7 @@ void CCloudSyncManager::StartWebSocket()
 {
 	if (m_pWsThread != nullptr)
 	{
-		LogMessage(_T("StartWebSocket: WS thread already running."));
+		LogCloudSync(_T("StartWebSocket: WS thread already running."));
 		return;
 	}
 
@@ -3815,20 +3798,20 @@ void CCloudSyncManager::StartWebSocket()
 	LeaveCriticalSection(&m_csHttpClient);
 	if (!hasToken)
 	{
-		LogMessage(_T("StartWebSocket: no device token, skipping."));
+		LogCloudSync(_T("StartWebSocket: no device token, skipping."));
 		return;
 	}
 
 	m_pWsThread = AfxBeginThread(WsThreadProc, this, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED);
 	if (m_pWsThread == nullptr)
 	{
-		LogMessage(_T("StartWebSocket: failed to create WS thread."));
+		LogCloudSync(_T("StartWebSocket: failed to create WS thread."));
 		return;
 	}
 
 	m_pWsThread->m_bAutoDelete = FALSE;
 	m_pWsThread->ResumeThread();
-	LogMessage(_T("StartWebSocket: WS listener thread started."));
+	LogCloudSync(_T("StartWebSocket: WS listener thread started."));
 }
 
 // ---------------------------------------------------------------------------
@@ -3859,7 +3842,7 @@ void CCloudSyncManager::StopWebSocket()
 		DWORD dwWait = WaitForSingleObject(m_pWsThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
-			LogMessage(_T("StopWebSocket: WS thread exited cleanly."));
+			LogCloudSync(_T("StopWebSocket: WS thread exited cleanly."));
 
 			// Thread confirmed dead, safely clean up WS client
 			EnterCriticalSection(&m_csWsClient);
@@ -3876,7 +3859,7 @@ void CCloudSyncManager::StopWebSocket()
 		}
 		else
 		{
-			LogMessage(_T("StopWebSocket: WS thread did not exit within 1s, detaching."));
+			LogCloudSync(_T("StopWebSocket: WS thread did not exit within 1s, detaching."));
 			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
 			// Not deleting m_pWsClient — WS thread may still be accessing it
 			// OS will reclaim the memory on process exit
@@ -3909,7 +3892,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 	if (pThis == nullptr)
 		return 1;
 
-	LogMessage(_T("WsThreadProc: WebSocket listener started."));
+	LogCloudSync(_T("WsThreadProc: WebSocket listener started."));
 
 	while (true)
 	{
@@ -3938,7 +3921,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 
 		if (!wsClient->is_valid())
 		{
-			LogMessage(_T("WsThreadProc: invalid WS URL, retrying later."));
+			LogCloudSync(_T("WsThreadProc: invalid WS URL, retrying later."));
 			EnterCriticalSection(&pThis->m_csWsClient);
 			bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 			pThis->m_pWsClient = nullptr;
@@ -3958,11 +3941,11 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		{
 			CString msg;
 			msg.Format(_T("WsThreadProc: connection failed, retrying in %d ms"), pThis->m_wsReconnectDelay);
-			LogMessage(msg);
+			LogCloudSync(msg);
 			// A rejected handshake is usually an expired access token: try the
 			// refresh token so the next attempt carries a live credential.
 			if (CCloudAuth::TryRefreshToken())
-				LogMessage(_T("WsThreadProc: access token refreshed for reconnect."));
+				LogCloudSync(_T("WsThreadProc: access token refreshed for reconnect."));
 			EnterCriticalSection(&pThis->m_csWsClient);
 			bool bAlreadyCleanedUp = (pThis->m_pWsClient == nullptr);
 			pThis->m_pWsClient = nullptr;
@@ -3979,7 +3962,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 
 		// Connected successfully — reset backoff
 		InterlockedExchange(&pThis->m_wsReconnectDelay, 1000);
-		LogMessage(_T("WsThreadProc: connected to WebSocket server."));
+		LogCloudSync(_T("WsThreadProc: connected to WebSocket server."));
 
 		// Read loop
 		while (true)
@@ -3987,7 +3970,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			// Non-blocking check for stop event
 			if (WaitForSingleObject(pThis->m_hStopEvent, 0) == WAIT_OBJECT_0)
 			{
-				LogMessage(_T("WsThreadProc: stop event received, exiting."));
+				LogCloudSync(_T("WsThreadProc: stop event received, exiting."));
 				break;
 			}
 
@@ -4000,7 +3983,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 			}
 			else if (result == httplib::ws::ReadResult::Fail)
 			{
-				LogMessage(_T("WsThreadProc: connection lost, will reconnect."));
+				LogCloudSync(_T("WsThreadProc: connection lost, will reconnect."));
 				break;
 			}
 			// Binary messages are ignored
@@ -4025,7 +4008,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		// Exponential backoff before reconnection
 		CString msg;
 		msg.Format(_T("WsThreadProc: reconnecting in %d ms"), pThis->m_wsReconnectDelay);
-		LogMessage(msg);
+		LogCloudSync(msg);
 		LONG curDelay = pThis->m_wsReconnectDelay;
 		if (WaitForSingleObject(pThis->m_hStopEvent, curDelay) == WAIT_OBJECT_0)
 			return 0;
@@ -4033,7 +4016,7 @@ UINT CCloudSyncManager::WsThreadProc(LPVOID pParam)
 		InterlockedCompareExchange(&pThis->m_wsReconnectDelay, newDelay, curDelay);
 	}
 
-	LogMessage(_T("WsThreadProc: WebSocket listener exiting."));
+	LogCloudSync(_T("WsThreadProc: WebSocket listener exiting."));
 	return 0;
 }
 
@@ -4079,18 +4062,18 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 			}
 			if (bOwnBroadcast)
 			{
-				LogMessage(_T("OnWsMessage: ignoring broadcast from this device."));
+				LogCloudSync(_T("OnWsMessage: ignoring broadcast from this device."));
 				return;
 			}
 
 			// P0-C FIX: deletions are now also broadcast; any remote change
 			// (added, updated or deleted) triggers a sync so local state stays fresh.
-			LogMessage(_T("OnWsMessage: clip/clips_added/clips_deleted received, triggering sync."));
+			LogCloudSync(_T("OnWsMessage: clip/clips_added/clips_deleted received, triggering sync."));
 			SetEvent(m_hWsTrigger);
 		}
 		else if (type == "connected")
 		{
-			LogMessage(_T("OnWsMessage: connected to server (initial handshake)."));
+			LogCloudSync(_T("OnWsMessage: connected to server (initial handshake)."));
 		}
 		else if (type == "ping")
 		{
@@ -4098,24 +4081,24 @@ void CCloudSyncManager::OnWsMessage(const std::string& msg)
 		}
 		else if (type == "goaway")
 		{
-			LogMessage(_T("OnWsMessage: server requested disconnect (goaway)."));
+			LogCloudSync(_T("OnWsMessage: server requested disconnect (goaway)."));
 		}
 		else
 		{
 			CString msg;
 			msg.Format(_T("OnWsMessage: unhandled message type '%hs'"), type.c_str());
-			LogMessage(msg);
+			LogCloudSync(msg);
 		}
 	}
 	catch (const json::parse_error& e)
 	{
 		CString err;
 		err.Format(_T("OnWsMessage: JSON parse error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("OnWsMessage: unknown error"));
+		LogCloudSync(_T("OnWsMessage: unknown error"));
 	}
 }
 
@@ -4131,7 +4114,7 @@ void CCloudSyncManager::TriggerQuickSync()
 
 	if (!bShouldSync)
 	{
-		OutputDebugStringA("[CloudSync] TriggerQuickSync: sync not running.\n");
+		LogCloudSync("TriggerQuickSync: sync not running.");
 		return;
 	}
 
@@ -4143,7 +4126,7 @@ void CCloudSyncManager::TriggerQuickSync()
 
 	if (AfxBeginThread(QuickSyncThreadProc, ctx) == nullptr)
 	{
-		OutputDebugStringA("[CloudSync] TriggerQuickSync: failed to spawn quick-push thread.\n");
+		LogCloudSync("TriggerQuickSync: failed to spawn quick-push thread.");
 		EnterCriticalSection(&m_csSync);
 		m_nActiveQuickSyncThreads--;
 		LeaveCriticalSection(&m_csSync);
@@ -4151,7 +4134,7 @@ void CCloudSyncManager::TriggerQuickSync()
 	}
 	else
 	{
-		OutputDebugStringA("[CloudSync] TriggerQuickSync: spawned quick-push thread.\n");
+		LogCloudSync("TriggerQuickSync: spawned quick-push thread.");
 	}
 }
 
@@ -4163,7 +4146,7 @@ void CCloudSyncManager::OnGroupDeleted(int localGroupId)
 
 void CCloudSyncManager::OnGroupDeletedInternal(int localGroupId)
 {
-	LogMessage(_T("OnGroupDeleted: notifying server and removing group mapping."));
+	LogCloudSync(_T("OnGroupDeleted: notifying server and removing group mapping."));
 	try
 	{
 		// Notify server about the deletion
@@ -4179,10 +4162,10 @@ void CCloudSyncManager::OnGroupDeletedInternal(int localGroupId)
 	{
 		CString err;
 		err.Format(_T("OnGroupDeleted error: %hs"), e.what());
-		LogMessage(err);
+		LogCloudSync(err);
 	}
 	catch (...)
 	{
-		LogMessage(_T("OnGroupDeleted: unknown error"));
+		LogCloudSync(_T("OnGroupDeleted: unknown error"));
 	}
 }

@@ -4,6 +4,9 @@
 
 #define DITTO_ADD_IN_VERSION 1
 
+// Optional log callback addins can register so their messages reach Ditto.log
+typedef void (*DittoLogCallback)(const char* utf8Msg);
+
 typedef enum
 {
 	eFuncType_PRE_PASTE

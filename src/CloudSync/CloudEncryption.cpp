@@ -3,6 +3,7 @@
 #include "../httplib.h"
 #include "../json.hpp"
 #include "../Options.h"
+#include "../Misc.h"
 
 using json = nlohmann::json;
 
@@ -32,7 +33,7 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 	{
 		if (url.find("http://") == 0)
 		{
-			OutputDebugStringA("[CloudEncryption] ERROR: HTTPS required, refusing to use plain HTTP.\n");
+			LogCloudSync("[CloudEncryption] ERROR: HTTPS required, refusing to use plain HTTP.");
 			m_httpClient.reset();
 			m_httpClientUrl.Empty();
 			return;
@@ -546,38 +547,38 @@ BOOL CCloudEncryption::InitializeCryptoFromStoredKey()
 		BOOL enabled = CGetSetOptions::GetCloudSyncEncryptionEnabled();
 		if (!enabled)
 		{
-			OutputDebugStringA("[CloudEncryption] Encryption not enabled.\n");
+			LogCloudSync("[CloudEncryption] Encryption not enabled.");
 			return FALSE;
 		}
 
 		CStringA dekB64 = CGetSetOptions::GetCloudEncryptionKey();
 		if (dekB64.IsEmpty())
 		{
-			OutputDebugStringA("[CloudEncryption] No stored key found.\n");
+			LogCloudSync("[CloudEncryption] No stored key found.");
 			return FALSE;
 		}
 
 		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(dekB64);
 		if (keyBytes.empty() || keyBytes.size() != 32)
 		{
-			OutputDebugStringA("[CloudEncryption] Invalid key size.\n");
+			LogCloudSync("[CloudEncryption] Invalid key size.");
 			return FALSE;
 		}
 
 		BOOL ok = CCloudCrypto::Initialize(keyBytes);
 		if (ok)
 		{
-			OutputDebugStringA("[CloudEncryption] Crypto initialized from stored DEK.\n");
+			LogCloudSync("[CloudEncryption] Crypto initialized from stored DEK.");
 		}
 		else
 		{
-			OutputDebugStringA("[CloudEncryption] Failed to initialize crypto.\n");
+			LogCloudSync("[CloudEncryption] Failed to initialize crypto.");
 		}
 		return ok;
 	}
 	catch (...)
 	{
-		OutputDebugStringA("[CloudEncryption] Exception in InitializeCryptoFromStoredKey.\n");
+		LogCloudSync("[CloudEncryption] Exception in InitializeCryptoFromStoredKey.");
 		return FALSE;
 	}
 }
@@ -586,7 +587,7 @@ CStringA CCloudEncryption::EncryptClipData(const CStringA& plaintext)
 {
 	if (!IsEncryptionReady())
 	{
-		OutputDebugStringA("[CloudEncryption] EncryptClipData: encryption not ready, skipping encryption.\n");
+		LogCloudSync("[CloudEncryption] EncryptClipData: encryption not ready, skipping encryption.");
 		return CStringA("");
 	}
 	return CCloudCrypto::Encrypt(plaintext);
@@ -599,7 +600,7 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 
 	if (!IsEncryptionReady())
 	{
-		OutputDebugStringA("[CloudEncryption] DecryptClipData: encryption not ready, returning empty.\n");
+		LogCloudSync("[CloudEncryption] DecryptClipData: encryption not ready, returning empty.");
 		return CStringA("");
 	}
 

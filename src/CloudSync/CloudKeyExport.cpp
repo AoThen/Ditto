@@ -3,6 +3,7 @@
 #include "CloudCrypto.h"
 #include "../httplib.h"
 #include "../json.hpp"
+#include "../Misc.h"
 
 // Use mock CGetSetOptions for tests, real implementation for main project
 #ifdef CLOUDSYNC_TEST
@@ -52,7 +53,7 @@ BOOL CCloudKeyExport::ExportKey(
 
 		if (keyBase64.IsEmpty() || saltBase64.IsEmpty())
 		{
-			OutputDebugStringA("[KeyExport] No encryption key found.\n");
+			LogCloudSync("[KeyExport] No encryption key found.");
 			if (psError) *psError = _T("No encryption key is configured.");
 			return FALSE;
 		}
@@ -61,7 +62,7 @@ BOOL CCloudKeyExport::ExportKey(
 		std::vector<BYTE> keyBytes = CCloudCrypto::Base64Decode(keyBase64);
 		if (keyBytes.size() != 32)
 		{
-			OutputDebugStringA("[KeyExport] Invalid key size.\n");
+			LogCloudSync("[KeyExport] Invalid key size.");
 			if (psError) *psError = _T("Stored encryption key has an invalid size.");
 			return FALSE;
 		}
@@ -111,7 +112,7 @@ BOOL CCloudKeyExport::ExportKey(
 		CFile file;
 		if (!file.Open(filePath, CFile::modeCreate | CFile::modeWrite | CFile::typeBinary))
 		{
-			OutputDebugString(_T("[KeyExport] Failed to open file for writing.\n"));
+			LogCloudSync(_T("[KeyExport] Failed to open file for writing."));
 			if (psError) *psError = _T("Cannot open the file for writing. Check the path and permissions.");
 			return FALSE;
 		}
@@ -119,14 +120,14 @@ BOOL CCloudKeyExport::ExportKey(
 		file.Write(keyStrA.GetString(), keyStrA.GetLength());
 		file.Close();
 
-		OutputDebugString(_T("[KeyExport] Key exported successfully.\n"));
+		LogCloudSync(_T("[KeyExport] Key exported successfully."));
 		return TRUE;
 	}
 	catch (const std::exception& e)
 	{
 		CString err;
 		err.Format(_T("[KeyExport] Export error: %hs"), e.what());
-		OutputDebugString(err);
+		LogCloudSync(err);
 		if (psError)
 		{
 			psError->Format(_T("Export failed: %hs"), e.what());
@@ -135,7 +136,7 @@ BOOL CCloudKeyExport::ExportKey(
 	}
 	catch (...)
 	{
-		OutputDebugString(_T("[KeyExport] Export exception.\n"));
+		LogCloudSync(_T("[KeyExport] Export exception."));
 		if (psError) *psError = _T("Export failed due to an unexpected error.");
 		return FALSE;
 	}
@@ -156,7 +157,7 @@ BOOL CCloudKeyExport::ImportKey(
 		CFile file;
 		if (!file.Open(filePath, CFile::modeRead | CFile::typeBinary))
 		{
-			OutputDebugString(_T("[KeyExport] Failed to open key file.\n"));
+			LogCloudSync(_T("[KeyExport] Failed to open key file."));
 			if (psError) *psError = _T("Cannot read the key file. Check the path and permissions.");
 			return FALSE;
 		}
@@ -164,7 +165,7 @@ BOOL CCloudKeyExport::ImportKey(
 		ULONGLONG fileSize = file.GetLength();
 		if (fileSize > 64 * 1024) // Max 64KB
 		{
-			OutputDebugString(_T("[KeyExport] Key file too large.\n"));
+			LogCloudSync(_T("[KeyExport] Key file too large."));
 			file.Close();
 			if (psError) *psError = _T("The key file is too large and cannot be a valid key file.");
 			return FALSE;
@@ -182,7 +183,7 @@ BOOL CCloudKeyExport::ImportKey(
 		// Validate version
 		if (!keyJson.contains("version") || keyJson["version"].get<int>() != 1)
 		{
-			OutputDebugStringA("[KeyExport] Unsupported key file version.\n");
+			LogCloudSync("[KeyExport] Unsupported key file version.");
 			if (psError) *psError = _T("Unsupported key file version.");
 			return FALSE;
 		}
@@ -199,7 +200,7 @@ BOOL CCloudKeyExport::ImportKey(
 		std::vector<BYTE> encryptedPayload = CCloudCrypto::Base64Decode(CStringA(outKeyData.encryptedKey));
 		if (encryptedPayload.size() < 12 + 16)
 		{
-			OutputDebugStringA("[KeyExport] Encrypted key too short.\n");
+			LogCloudSync("[KeyExport] Encrypted key too short.");
 			if (psError) *psError = _T("The key file data is truncated or corrupted.");
 			return FALSE;
 		}
@@ -219,7 +220,7 @@ BOOL CCloudKeyExport::ImportKey(
 			exportKey, iv, ciphertext, tag);
 		if (decryptedKey.empty())
 		{
-			OutputDebugStringA("[KeyExport] Decryption failed (wrong password?).\n");
+			LogCloudSync("[KeyExport] Decryption failed (wrong password?).");
 			if (psError) *psError = _T("Decryption failed. The password is most likely incorrect.");
 			return FALSE;
 		}
@@ -229,7 +230,7 @@ BOOL CCloudKeyExport::ImportKey(
 		std::vector<BYTE> actualChecksum = CCloudCrypto::Sha256(decryptedKey);
 		if (expectedChecksum != actualChecksum)
 		{
-			OutputDebugStringA("[KeyExport] Checksum mismatch (key corrupted).\n");
+			LogCloudSync("[KeyExport] Checksum mismatch (key corrupted).");
 			if (psError) *psError = _T("Checksum mismatch: the key file is corrupted.");
 			return FALSE;
 		}
@@ -247,12 +248,12 @@ BOOL CCloudKeyExport::ImportKey(
 	{
 		CString err;
 		err.Format(_T("[KeyExport] Import error: %hs"), e.what());
-		OutputDebugString(err);
+		LogCloudSync(err);
 		return FALSE;
 	}
 	catch (...)
 	{
-		OutputDebugString(_T("[KeyExport] Import exception.\n"));
+		LogCloudSync(_T("[KeyExport] Import exception."));
 		return FALSE;
 	}
 }

@@ -5,14 +5,30 @@
 #include "ReadOnlyFlag.h"
 #include "RemoveLineFeeds.h"
 
+static DittoLogCallback g_pLogCallback = nullptr;
+
+void SetDittoLogCallback(DittoLogCallback callback)
+{
+	g_pLogCallback = callback;
+}
+
+void DittoAddinLog(const char* utf8Msg)
+{
+	if (!utf8Msg)
+		return;
+	if (g_pLogCallback)
+		g_pLogCallback(utf8Msg);
+	else
+		OutputDebugStringA(utf8Msg);
+}
 
 bool DittoAddin(const CDittoInfo &DittoInfo, CDittoAddinInfo &info)
 {
 	if(DittoInfo.ValidateSize() == false || info.ValidateSize() == false)
 	{
-		CString csError;
-		csError.Format(_T("PasteAnyAsText Addin - Passed in structures are of different size, DittoInfo Passed: %d, Local: %d, DittoAddinInfo Passed: %d, Local: %d"), DittoInfo.m_nSizeOfThis, sizeof(CDittoInfo), info.m_nSizeOfThis, sizeof(CDittoAddinInfo));
-		OutputDebugString(csError);
+		CStringA csError;
+		csError.Format("PasteAnyAsText Addin - Passed in structures are of different size, DittoInfo Passed: %d, Local: %d, DittoAddinInfo Passed: %d, Local: %d", DittoInfo.m_nSizeOfThis, (int)sizeof(CDittoInfo), info.m_nSizeOfThis, (int)sizeof(CDittoAddinInfo));
+		DittoAddinLog(csError);
 		return false;
 	}
 

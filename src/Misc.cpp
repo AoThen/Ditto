@@ -56,6 +56,18 @@ void AppendToFile(const TCHAR* fn, const TCHAR* msg)
 {
 	CSingleLock lock(&g_csLog, TRUE);
 
+	// Rotate when the log grows past 5MB; keep one older generation (.old).
+	// Best-effort: if the rename fails (e.g. file locked by a scanner), logging
+	// continues on the oversized file rather than failing.
+	const DWORD LOG_MAX_SIZE = 5 * 1024 * 1024;
+	CFileStatus fs;
+	if(CFile::GetStatus(fn, fs) && fs.GetSize() >= LOG_MAX_SIZE)
+	{
+		CString csOld(fn);
+		csOld += _T(".old");
+		::MoveFileEx(fn, csOld, MOVEFILE_REPLACE_EXISTING);
+	}
+
 #ifdef _UNICODE
 	FILE *file = _wfopen(fn, L"ab");
 #else
@@ -128,6 +140,20 @@ void logsendrecieveinfo(CString cs, CString csFile, long lLine)
 	if(CGetSetOptions::m_bLogSendReceiveErrors)
 		log(cs, true, csFile, lLine);
 }
+
+void logcloudsync(const TCHAR* msg, CString csFile, long lLine)
+{
+	CString csPrefixed;
+	csPrefixed.Format(_T("[CloudSync] %s"), msg);
+	log(csPrefixed, false, csFile, lLine);
+}
+
+#ifdef _UNICODE
+void logcloudsync(const char* msg, CString csFile, long lLine)
+{
+	logcloudsync(CA2W(msg, CP_UTF8), csFile, lLine);
+}
+#endif
 
 int g_funnyGetTickCountAdjustment = -1;
 
