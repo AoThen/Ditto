@@ -412,10 +412,23 @@ void CClipboardViewer::OnTimer(UINT_PTR nIDEvent)
 	case TIMER_DRAW_CLIPBOARD:
 		{
 			KillTimer(nIDEvent);
-		
-			DWORD dwNow = GetTickCount();
 
-			if(dwNow - m_dwLastCopy > CGetSetOptions::m_dwSaveClipDelay || m_dwLastCopy > dwNow)
+			DWORD dwNow = GetTickCount();
+			DWORD dwDelay = CGetSetOptions::m_dwSaveClipDelay;
+
+			// 距上次保存不足保护期时不丢弃，延后到保护期结束再处理，
+			// 避免快速连续复制时第二次复制的内容丢失
+			// (SaveClipDelay 默认 500ms，见 Options.cpp GetSaveClipDelay)
+			if(dwDelay > 0 &&
+				dwNow > m_dwLastCopy &&
+				(dwNow - m_dwLastCopy) < dwDelay)
+			{
+				Log(StrF(_T("Clip copy to fast, deferring (difference from last copy = %d)"), (dwNow - m_dwLastCopy)));
+
+				// 保留 m_activeWindow / m_activeWindowTitle 供延迟后处理
+				SetTimer(TIMER_DRAW_CLIPBOARD, dwDelay - (dwNow - m_dwLastCopy), NULL);
+			}
+			else
 			{
 				if (GetIgnoreClipboardChange() == false)
 				{
@@ -423,14 +436,10 @@ void CClipboardViewer::OnTimer(UINT_PTR nIDEvent)
 
 					m_dwLastCopy = dwNow;
 				}
-			}
-			else
-			{
-				Log(StrF(_T("Clip copy to fast difference from last copy = %d"), (dwNow - m_dwLastCopy)));
-			}
 
-			m_activeWindow = _T("");
-			m_activeWindowTitle = _T("");
+				m_activeWindow = _T("");
+				m_activeWindowTitle = _T("");
+			}
 		}
 		break;
 
