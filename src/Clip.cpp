@@ -763,6 +763,14 @@ int CClip::LoadFromClipboard(CClipTypes* pClipTypes, bool checkClipboardIgnore, 
 					cs.Format(_T("Maximum clip size reached max size = %d, clip size = %d"), CGetSetOptions::m_lMaxClipSizeInBytes, nSize);
 					Log(cs);
 
+					// Free the description handle before returning: handles created
+					// from IStream (rich data) are not owned by oleData and would
+					// otherwise leak (mirrors the release done on the normal path).
+					if(cfDesc.m_hgData)
+					{
+						cfDesc.Free();
+					}
+
 					oleData.Release();
 					return -1;
 				}
@@ -1057,7 +1065,7 @@ HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
 		
 		for(int nFile = 0; nFile < nNumFiles; nFile++)
 		{
-			if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
+			if(DragQueryFile(drop, nFile, file, MAX_PATH) > 0)
 			{
 				CPath path(file);
 				m_Desc += path.GetName();
@@ -1520,6 +1528,12 @@ bool CClip::AddToDataTable()
 			{
 				clipSize = (int)GlobalSize(pCF->m_hgData);
 				stmt.bind(3, Data, clipSize);
+			}
+			else
+			{
+				// stmt.reset() does not clear previous binds: without this the
+				// next format would re-insert the previous format's blob.
+				stmt.bindNull(3);
 			}
 			GlobalUnlock(pCF->m_hgData);
 			
@@ -2552,7 +2566,9 @@ bool CClip::AddFileDataToData(CString &errorMessage)
 	if (!addedFileData)
 		return false;
 
-	for (int i = 0; i < size; i++)
+	// Remove from the end so indexes remain valid as the array shrinks;
+	// a forward RemoveAt(i) walk would run past the array end (size >= 2).
+	for (INT_PTR i = size - 1; i >= 0; i--)
 	{
 		this->m_Formats.RemoveAt(i, 1);
 	}
