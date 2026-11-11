@@ -117,8 +117,9 @@ bool CAutoSendToClientThread::SendToClient(CClipList *pClipList)
 				{
 					CString cs;
 					cs.Format(_T("Error opening connection to %s"), CGetSetOptions::m_SendClients[nClient].csIP);
-					::SendMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)cs.GetBuffer(cs.GetLength()), 0);
-					cs.ReleaseBuffer();
+					// Cross-thread: post a heap copy the handler deletes;
+					// blocking SendMessage can deadlock against shutdown.
+					::PostMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)new CString(cs), 0);
 
 					CGetSetOptions::m_SendClients[nClient].bShownFirstError = TRUE;
 				}
@@ -148,8 +149,7 @@ bool CAutoSendToClientThread::SendToClient(CClipList *pClipList)
 				{
 					CString cs;
 					cs.Format(_T("Error sending clip to %s"), CGetSetOptions::m_SendClients[nClient].csIP);
-					::SendMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)cs.GetBuffer(cs.GetLength()), 0);
-					cs.ReleaseBuffer();
+					::PostMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)new CString(cs), 0);
 					break;
 				}
 			}

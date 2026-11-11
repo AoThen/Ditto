@@ -59,7 +59,8 @@ protected:
 
 	CSendSocket m_SendSocket;
 
-	BOOL SendClipFormat(CClipFormat* pCF);
+	// 1 = format sent, 0 = skipped (nothing sent), -1 = failed mid-stream
+	int SendClipFormat(CClipFormat* pCF);
 	
 protected:
 	

@@ -131,7 +131,7 @@ int CMainFrame::OnCreate(LPCREATESTRUCT lpCreateStruct)
     ////Center the main window so message boxes are in the center
     CRect rcScreen = DefaultMonitorRect();
     CPoint cpCenter = rcScreen.CenterPoint();
-    MoveWindow(cpCenter.x, cpCenter.x,  1,  1);
+    MoveWindow(cpCenter.x, cpCenter.y, 1, 1);
 
 	m_startupScreenWidth = GetScreenWidth();
 	m_startupScreenHeight = GetScreenHeight();
@@ -1104,11 +1104,15 @@ LRESULT CMainFrame::OnAddToDatabaseFromSocket(WPARAM wParam, LPARAM lParam)
 
 LRESULT CMainFrame::OnErrorOnSendRecieve(WPARAM wParam, LPARAM lParam)
 {
-    CString csNewText = (TCHAR*)wParam;
+	// Senders (worker threads) post a heap CString; this handler owns it.
+	CString* csNewText = (CString*)wParam;
+	if(csNewText != NULL)
+	{
+		ShowErrorMessage(_T("Ditto - Send/Receive Error"), *csNewText);
+		delete csNewText;
+	}
 
-    ShowErrorMessage(_T("Ditto - Send/Receive Error"), csNewText);
-
-    return TRUE;
+	return TRUE;
 }
 
 LRESULT CMainFrame::OnErrorMsg(WPARAM wParam, LPARAM lParam)

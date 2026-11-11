@@ -238,40 +238,68 @@ BOOL CClient::SendItem(CClip *pClip, bool manualSend)
 	
 	INT_PTR count = pClip->m_Formats.GetSize();
 
+	bool bSentAny = false;
+
 	//For each data type
 	for(int i=0; i < count; i++)
 	{
 		pCF = &pClip->m_Formats.GetData()[i];
 		
-		SendClipFormat(pCF);
+		// 1 = format sent, 0 = skipped without sending bytes, -1 = wire
+		// broken (bytes for this format were partially sent)
+		int nRet = SendClipFormat(pCF);
+		if(nRet == 1)
+		{
+			bSentAny = true;
+		}
+		if(nRet < 0)
+		{
+			// The remote side is mid-format; ending the item would leave it
+			// waiting for data that never comes, so abort without an END.
+			LogSendRecieveInfo(_T("CClient::SendItem - aborting, format send failed mid-stream"));
+			return FALSE;
+		}
 	}
 	
-	if(m_SendSocket.SendCSendData(Info, MyEnums::END) == FALSE)
+	if(bSentAny)
 	{
-		LogSendRecieveInfo(_T("CClient::SendItem - Send END failed"));
-		return FALSE;
+		if(m_SendSocket.SendCSendData(Info, MyEnums::END) == FALSE)
+		{
+			LogSendRecieveInfo(_T("CClient::SendItem - Send END failed"));
+			return FALSE;
+		}
+
+		theApp.m_lClipsSent++;
+	}
+	else
+	{
+		// No format made it over the wire. An END would make the remote store
+		// an empty clip, and leaving the connection open would leave the
+		// remote's server thread blocked waiting for the next frame. Closing
+		// (with the EXIT frame it sends) lets the remote finalize cleanly.
+		LogSendRecieveInfo(_T("CClient::SendItem - no formats sent, closing connection"));
+		CloseConnection();
 	}
 
-	theApp.m_lClipsSent++;
-	
 	LogSendRecieveInfo(_T("CClient::SendItem - end"));
 	
 	return TRUE;
 }
 
-BOOL CClient::SendClipFormat(CClipFormat* pCF)
+// Returns: 1 = format fully sent, 0 = skipped before anything went on the
+// wire (caller may continue), -1 = failed mid-stream (caller must abort).
+int CClient::SendClipFormat(CClipFormat* pCF)
 {
 	CSendInfo Info;
 	LPVOID pvData = GlobalLock(pCF->m_hgData);
 	if (pvData == NULL)
 	{
 		LogSendRecieveInfo(StrF(_T("CClient::SendClipFormat - GlobalLock failed, hGlobal: %p"), pCF->m_hgData));
-		return FALSE;
+		return 0;
 	}
 	INT_PTR length = GlobalSize(pCF->m_hgData);
 	UCHAR* pOutput = NULL;
 	int nLenOutput = 0;
-	BOOL bRet = FALSE;
 
 	LogSendRecieveInfo(StrF(_T("BEFORE Encrypt clip data %d"), length));
 
@@ -290,8 +318,11 @@ BOOL CClient::SendClipFormat(CClipFormat* pCF)
 			
 			if(m_SendSocket.SendCSendData(Info, MyEnums::DATA_START) == FALSE)
 			{
+				// The connection broke: the remote side saw the item START
+				// but will not get a complete format, so the item is over.
+				m_SendSocket.m_pEncryptor->FreeBuffer(pOutput);
 				GlobalUnlock(pCF->m_hgData);
-				return FALSE;
+				return -1;
 			}
 
 			if (m_SendSocket.SendExactSize((char*)pOutput, nLenOutput, false) == FALSE)
@@ -299,32 +330,36 @@ BOOL CClient::SendClipFormat(CClipFormat* pCF)
 				LogSendRecieveInfo(StrF(_T("CClient::SendClipFormat - SendExactSize failed for format %s"), GetFormatName(pCF->m_cfType)));
 				m_SendSocket.m_pEncryptor->FreeBuffer(pOutput);
 				GlobalUnlock(pCF->m_hgData);
-				return FALSE;
+				return -1;
 			}
 
 			m_SendSocket.m_pEncryptor->FreeBuffer(pOutput);
 
-			bRet = TRUE;
+			GlobalUnlock(pCF->m_hgData);
 		}
 		else
 		{
 			LogSendRecieveInfo("Failed to encrypt data");
 			GlobalUnlock(pCF->m_hgData);
-			return FALSE;
+			return 0;
 		}
 	}
 	else
 	{
+		// No encryptor means nothing can be sent; skip this format instead of
+		// emitting a DATA_END that has no matching DATA_START.
 		ASSERT(!"SendItem::Encryption not initialized");
-		LogSendRecieveInfo("SendItem::Encryption not initialized");	
+		LogSendRecieveInfo("SendItem::Encryption not initialized");
+		GlobalUnlock(pCF->m_hgData);
+		return 0;
 	}
 
-	GlobalUnlock(pCF->m_hgData);
-	
 	if(m_SendSocket.SendCSendData(Info, MyEnums::DATA_END) == FALSE)
-		return FALSE;
+	{
+		return -1;
+	}
 
-	return bRet;
+	return 1;
 }
 
 HGLOBAL CClient::RequestCopiedFiles(CClipFormat &HDropFormat, CString csIP, CString csComputerName)
@@ -373,7 +408,7 @@ HGLOBAL CClient::RequestCopiedFiles(CClipFormat &HDropFormat, CString csIP, CStr
 			break;
 		}
 
-		if(SendClipFormat(&HDropFormat) == FALSE)
+		if(SendClipFormat(&HDropFormat) <= 0)
 		{
 			csErrorString = _T("Error sending data request.");
 			LogSendRecieveInfo(StrF(_T("RequestCopiedFiles: SendClipFormat failed to %s"), csIP));
@@ -424,7 +459,11 @@ HGLOBAL CClient::RequestCopiedFiles(CClipFormat &HDropFormat, CString csIP, CStr
 
 	if(hReturn == NULL && csErrorString.IsEmpty() == FALSE)
 	{
-		::SendMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)csErrorString.GetBuffer(csErrorString.GetLength()), 0);
+		// Cross-thread: post a heap copy the handler owns (deletes it) instead
+		// of blocking on SendMessage while the main thread may be shutting
+		// down, and instead of passing a GetBuffer pointer out of scope.
+		CString* pMsg = new CString(csErrorString);
+		::PostMessage(theApp.m_MainhWnd, WM_SEND_RECIEVE_ERROR, (WPARAM)pMsg, 0);
 	}
 
 	pProgress->DestroyWindow();
