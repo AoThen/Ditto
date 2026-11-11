@@ -65,12 +65,16 @@ UINT  MTServerThread(LPVOID pParam)
 	if(::bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(bind(theApp.m_sSocket,(sockaddr*)&local,sizeof(local))!=0)");
+		closesocket(theApp.m_sSocket);
+		theApp.m_sSocket = INVALID_SOCKET;
 		bRunning = false;
 		return 0;
 	}
 	if(::listen(theApp.m_sSocket,10)!=0)
 	{
 		LogSendRecieveInfo("ERROR - if(listen(theApp.m_sSocket,10)!=0)");
+		closesocket(theApp.m_sSocket);
+		theApp.m_sSocket = INVALID_SOCKET;
 		bRunning = false;
 		return 0;
 	}
@@ -368,6 +372,14 @@ void CServer::OnDataEnd(CSendInfo &info)
 void CServer::OnEnd(CSendInfo &info)
 {				
 	LogSendRecieveInfo("::END");
+
+	// An END without a preceding START (malformed or hostile peer) leaves
+	// m_pClip NULL; adding it would crash AddToDB on the main thread later.
+	if(m_pClip == NULL)
+	{
+		LogSendRecieveInfo("::END Error: clip is NULL (no START received), ignoring");
+		return;
+	}
 
 	if(m_pClipList == NULL)
 		m_pClipList = new CClipList;

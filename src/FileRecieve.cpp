@@ -258,15 +258,18 @@ long CFileRecieve::RecieveFileData(ULONG lFileSize, CString csFileName, CString 
 			nPercent = (int)((lBytesRead / (double)lFileSize) * 100);
 			if((nPercent - nPrevPercent) > 5)
 			{
-				m_pProgress->SetSingleFilePos(nPercent);
-				m_pProgress->PumpMessages();
-				if(m_pProgress->Cancelled())
+				if(m_pProgress != NULL)
 				{
-					bRet = USER_CANCELED;
-					break;
-				}
+					m_pProgress->SetSingleFilePos(nPercent);
+					m_pProgress->PumpMessages();
+					if(m_pProgress->Cancelled())
+					{
+						bRet = USER_CANCELED;
+						break;
+					}
 
-				nPrevPercent = nPercent;
+					nPrevPercent = nPercent;
+				}
 			}
 		}
 	}

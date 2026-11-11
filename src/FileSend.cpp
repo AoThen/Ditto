@@ -57,7 +57,9 @@ BOOL CFileSend::SendClientFiles(SOCKET sock, CClipList *pClipList)
 
 			for(int nFile = 0; nFile < nNumFiles; nFile++)
 			{
-				if(DragQueryFile(drop, nFile, file, sizeof(file)) > 0)
+				// DragQueryFile's 4th arg is a character count, not bytes;
+				// sizeof(file) would double the buffer size in Unicode builds.
+				if(DragQueryFile(drop, nFile, file, MAX_PATH) > 0)
 				{
 					if(PathIsDirectory(file) == FALSE)
 					{

@@ -249,7 +249,12 @@ BOOL CRecieveSocket::RecieveExactSize(char *pData, long lSize)
 	return TRUE;
 }
 
-#define ENCRYPTED_SIZE_CSENDINFO 508
+// CEncryption (shared/Encryption.h) prepends a 16-byte IV to PKCS7-padded
+// AES ciphertext. PKCS7 always adds at least one byte, so the padded length
+// for n bytes of plaintext is (n/16 + 1) * 16 - it must NOT use the
+// "round up only when not a multiple" form, which undercounts by 16 when the
+// plaintext size is exactly a multiple of 16.
+#define ENCRYPTED_SIZE_CSENDINFO (16 + ((sizeof(CSendInfo) / 16) + 1) * 16)
 
 BOOL CRecieveSocket::RecieveCSendInfo(CSendInfo *pInfo)
 {
