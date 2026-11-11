@@ -28,8 +28,23 @@ CCopyThread::CCopyThread():
 
 CCopyThread::~CCopyThread()
 {
-	// unique_ptr in m_LocalConfig/m_SharedConfig auto-releases CClipTypes
-	delete m_pClipboardViewer;
+	// The viewer is normally deleted in ExitInstance (the owning copy thread).
+	// If it is still set here, the thread either never started (m_hThread NULL)
+	// or has fully exited, so deleting is safe. If the thread is STILL running,
+	// deleting a window it owns would be a use-after-free - leak it instead
+	// (the OS reclaims the memory on process exit).
+	if(m_pClipboardViewer != NULL)
+	{
+		if(m_hThread == NULL || WaitForSingleObject(m_hThread, 0) == WAIT_OBJECT_0)
+		{
+			delete m_pClipboardViewer;
+			m_pClipboardViewer = NULL;
+		}
+		else
+		{
+			Log(_T("~CCopyThread: copy thread still running, leaking clipboard viewer"));
+		}
+	}
 }
 
 BOOL CCopyThread::InitInstance()
@@ -45,7 +60,15 @@ BOOL CCopyThread::InitInstance()
 
 int CCopyThread::ExitInstance()
 {
-	m_pClipboardViewer->Disconnect(false);
+	// The viewer window was created by and belongs to this thread, so it must
+	// be deleted here (owning thread), not in ~CCopyThread which runs on the
+	// main thread and could race with a still-running copy thread.
+	if(m_pClipboardViewer != NULL)
+	{
+		m_pClipboardViewer->Disconnect(false);
+		delete m_pClipboardViewer;
+		m_pClipboardViewer = NULL;
+	}
 
 	return CWinThread::ExitInstance();
 }

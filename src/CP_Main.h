@@ -104,7 +104,9 @@ public:
 	// Cloud Sync Manager
 	CCloudSyncManager m_CloudSyncManager;
 	// for posting messages
-	HWND GetClipboardViewer() { return m_CopyThread.m_pClipboardViewer->m_hWnd; }
+	// Returns the clipboard viewer HWND, or NULL if the viewer is not
+	// available (e.g. after the copy thread has exited and deleted it).
+	HWND GetClipboardViewer() { return m_CopyThread.m_pClipboardViewer != NULL ? m_CopyThread.m_pClipboardViewer->m_hWnd : NULL; }
 	bool EnableCbCopy(bool bState) { return m_CopyThread.SetCopyOnChange(bState); }
 	bool IsClipboardViewerConnected() { return m_CopyThread.IsClipboardViewerConnected(); }
 	bool GetConnectCV() { return m_CopyThread.GetConnectCV(); }

@@ -413,13 +413,28 @@ void CClipboardViewer::OnTimer(UINT_PTR nIDEvent)
 		{
 			KillTimer(nIDEvent);
 
+			// Monitoring may have been disconnected while the deferred timer
+			// was pending (Disconnect does not kill this timer): drop the
+			// deferred copy instead of saving it while disconnected.
+			if (m_bIsConnected == false)
+			{
+				m_activeWindow = _T("");
+				m_activeWindowTitle = _T("");
+				break;
+			}
+
 			DWORD dwNow = GetTickCount();
 			DWORD dwDelay = CGetSetOptions::m_dwSaveClipDelay;
 
 			// 距上次保存不足保护期时不丢弃，延后到保护期结束再处理，
 			// 避免快速连续复制时第二次复制的内容丢失
 			// (SaveClipDelay 默认 500ms，见 Options.cpp GetSaveClipDelay)
+			// m_dwLastCopy == 0 is the "no copy saved yet" sentinel: deferring
+			// against it would hold the first copy hostage for SaveClipDelay
+			// milliseconds after startup (longer when the OS uptime is small
+			// and SaveClipDelay is user-configured larger than that).
 			if(dwDelay > 0 &&
+				m_dwLastCopy != 0 &&
 				dwNow > m_dwLastCopy &&
 				(dwNow - m_dwLastCopy) < dwDelay)
 			{
