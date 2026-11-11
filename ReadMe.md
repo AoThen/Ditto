@@ -74,9 +74,8 @@ docker-compose -f docker-compose.prod.yml up -d
 ```
 
 📖 **完整文档：**
-- [云端部署指南](docs/DEPLOYMENT.md)
+- [云端部署指南](docs/DEPLOYMENT_GUIDE.md)
 - [云端服务器架构](docs/PROJECT_PLAN.md)
-- [快速部署指南](DEPLOYMENT_GUIDE.md)
 - [云端部署详解](docs/CLOUD_DEPLOYMENT.md)
 
 ### 技术栈
@@ -103,13 +102,50 @@ Ditto 内置 OCR（光学字符识别）插件，可从剪贴板图片中提取�
 
 📖 **构建详情：** 参见 `scripts/build-onnxruntime.bat`、`scripts/download-ocr-deps.bat`
 
+## 🚀 相对上游新增功能
+
+本分支在 [sabrogden/Ditto](https://github.com/sabrogden/Ditto) 基础上新增以下能力：
+
+### 🖥️ OCR 命令行工具 (OcrCli)
+独立命令行工具，经 `OcrDll.dll` 调用 PP-OCRv6 引擎识别图片文字，便于脚本与 CI 集成。
+
+```bash
+OcrCli.exe <image1> [image2 ...] [-m <dir>] [-o <file>] [-d <path>] [-j|--json] [-q|--quiet]
+```
+
+- `-j/--json` — JSON 数组输出（`file/text/success/error` 字段），供程序化调用
+- `-q/--quiet` — 抑制 stderr 诊断输出
+- 环境变量 `OCR_CLI_MODELS_DIR`、`OCR_CLI_DLL_PATH` 可覆盖默认路径
+- 返回值 `0` 全部成功 / `1` 部分或全部失败
+- 源码 `tools/OcrCli/`，使用说明 `tools/OcrCli/README.txt`
+
+### 🔐 凭据 DPAPI 保护
+云令牌、加密密钥与网络密码经 Windows DPAPI 加密后落盘（`src/shared/SecureStore.h`）；旧明文凭据下次写入时自动升级为 `DPAPI:` 前缀密文。
+
+### 🗄️ 本地数据库加密（可选）
+基于 `sqlite3_key` 的本地库加密基础设施，默认关闭；注册表开启，随机密钥由 DPAPI 保护。
+
+### 🔄 云同步令牌自动刷新
+服务端 access token 缩至 15 分钟后，客户端自动调 `/auth/refresh` 无感续期（`CloudAuth::TryRefreshToken`），不再频繁弹出重新登录提示。
+
+### 💻 按安装设备标识
+登录时上报本机安装标识，每台安装对应服务端独立设备行，多设备可区分管理。
+
+### ⌨️ 粘贴为图像快捷键
+新增默认快捷键 `Shift + \`（`VK_OEM_5 + HOTKEYF_SHIFT`），并修复 PowerPoint 等场景优先取 OCR 文本的问题。
+
+### 🤖 GitHub Actions CI/CD
+`.github/workflows/` 提供多套工作流：`ci`、`build-onnxruntime`、`build-opencv`、`build-ocr-cli`（云编译 OcrCli）、`client-build-portable-legacy`、`publish-image`（容器镜像发布）。
+
 ## 📁 项目结构
 
 ```
 Ditto/
+├── .github/workflows/      # GitHub Actions CI/CD (ci, onnxruntime, opencv, ocr-cli, portable, publish-image)
 ├── src/                    # Ditto 主程序 (C++/MFC)
 │   ├── CloudSync/          # 云端同步客户端模块
 │   ├── ClipboardOCR.cpp    # OCR 集成入口
+│   ├── shared/             # 共享头文件 (SecureStore.h DPAPI 凭据保护)
 │   └── ...                 # 核心模块 (Clip, Options, QListCtrl 等)
 ├── Addins/
 │   ├── DittoOCR/           # OCR 插件 (ONNX Runtime + OpenCV)
@@ -128,6 +164,7 @@ Ditto/
 └── tools/                  # 辅助工具
     ├── CloudSync_Test/     # C++ 云端同步单元测试
     ├── EncryptDecrypt/     # 加密解密工具
+    ├── OcrCli/             # OCR 命令行工具
     ├── FocusHighlight/     # 焦点高亮工具
     ├── ICU_Loader/         # ICU 加载器
     ├── U3Stop/             # U3 停止工具
@@ -165,174 +202,5 @@ Windows 二进制文件的免费代码签名由 SignPath.io 提供，证书由 S
 
 Ditto 是 Windows 标准剪贴板的扩展。它会保存每次放置到剪贴板上的内容，允许您随后访问这些内容。Ditto 可以保存任何可以放置到剪贴板上的信息类型，包括文本、图片、HTML、自定义格式等。
 
-## 下载
-
-1. [安装程序](https://github.com/sabrogden/Ditto/releases/download/3.25.113.0/DittoSetup_3_25_113_0.exe)
-2. [便携版](https://github.com/sabrogden/Ditto/releases/download/3.25.113.0/DittoPortable_3_25_113_0.zip)
-3. [Chocolatey](https://chocolatey.org/packages/ditto/3.23.124.0) `choco install ditto`
-4. [Chocolatey 便携版](https://chocolatey.org/packages/ditto.portable/3.23.124.0) `choco install ditto.portable`
-5. [Winget](https://winget.run/pkg/Ditto/Ditto) `winget install -e --id Ditto.Ditto`
-6. [Windows 应用商店](https://www.microsoft.com/en-us/store/p/ditto-cp/9nblggh3zbjq)
-
-
-
-[Help/Wiki](https://github.com/sabrogden/Ditto/wiki)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;[Forums](https://github.com/sabrogden/Ditto/issues)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;[Donate](https://www.paypal.com/donate/?item_name=Donation+to+Ditto&cmd=_donations&business=sabrogden%40gmail.com&Z3JncnB0=)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;[Beta](https://ditto-cp.sourceforge.io/beta/)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;[Source](https://github.com/sabrogden/Ditto)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;[History](https://github.com/sabrogden/Ditto/releases)
-
 Ditto is an extension to the standard windows clipboard. It saves each item placed on the clipboard allowing you access to any of those items at a later time. Ditto allows you to save any type of information that can be put on the clipboard, text, images, html, custom formats.
-
-## Download
-
-1. [Installer](https://github.com/sabrogden/Ditto/releases/download/3.25.113.0/DittoSetup_3_25_113_0.exe)
-2. [Portable](https://github.com/sabrogden/Ditto/releases/download/3.25.113.0/DittoPortable_3_25_113_0.zip)
-3. [Chocolatey](https://chocolatey.org/packages/ditto/3.23.124.0) choco install ditto
-4. [Chocolatey Portable](https://chocolatey.org/packages/ditto.portable/3.23.124.0) choco install ditto.portable
-5. [Winget](https://winget.run/pkg/Ditto/Ditto) winget install -e --id Ditto.Ditto
-6. [Windows Store App](https://www.microsoft.com/en-us/store/p/ditto-cp/9nblggh3zbjq)
-
-
-## Basic Usage
-
-1. Run Ditto
-2. Copy things to the clipboard, e.g. using Ctrl-C with text selected in a text editor.
-3. Open Ditto by clicking its icon in the system tray or by pressing its Hot Key which defaults to Ctrl + ` – i.e. hold down Ctrl and press the back-quote (tilde ~) key.
-4. Double click or press enter on the item to paste it to the previous window.
-
-## Local First
-- No login
-- No cloud
-- No telemetry
-
-## ☁️ Cloud Sync & Web Panel (New!)
-
-Ditto now supports **cloud synchronization** and a **web-based management panel** for cross-device clipboard management!
-
-### Features
-- ✅ **Multi-device sync** - Seamlessly sync clips across devices
-- ✅ **Web management panel** - View, search, and manage clips from any browser
-- ✅ **End-to-end encryption** - Your data stays private with AES-256-GCM encryption
-- ✅ **Real-time sync** - WebSocket-based instant sync between devices
-- ✅ **Self-hosted** - Full control over your data with Docker deployment
-
-### Quick Start Cloud Deployment
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/sabrogden/Ditto.git
-cd Ditto
-
-# 2. Configure environment
-cp .env.example .env
-JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
-
-# 3. Start backend service
-docker-compose up -d
-
-# 4. Start frontend (development mode)
-cd web && npm install && npm run dev
-
-# 5. Access services
-# Frontend: http://localhost:5173 (Vite default port)
-# Backend API: http://localhost:8080
-# Health check: http://localhost:8080/health
-```
-
-For production deployment with HTTPS:
-```bash
-# Generate SSL certificates
-./generate-certs.sh "your-domain.com"
-
-# Configure JWT secret
-echo "JWT_SECRET=$(openssl rand -base64 32)" > .env
-
-# Start backend (production mode, single container serves API + static files)
-docker-compose -f docker-compose.prod.yml up -d
-
-# Access services: https://localhost
-```
-
-📖 **Full documentation:**
-- [Cloud Deployment Guide](docs/DEPLOYMENT.md)
-- [Cloud Server Architecture](docs/PROJECT_PLAN.md)
-- [Quick Deployment Guide](DEPLOYMENT_GUIDE.md)
-
-### Tech Stack
-- **Backend:** Go + SQLite3/PostgreSQL + WebSocket
-- **Frontend:** Vue 3 + Vite + Pinia
-- **Encryption:** AES-256-GCM end-to-end encryption
-- **Deployment:** Docker Compose + Nginx (TLS)
-- **Monitoring:** Prometheus + Grafana + ELK
-
-## 🔍 OCR Addin
-
-Ditto includes an OCR (Optical Character Recognition) plugin to extract text from clipboard images.
-
-### Features
-- ✅ **Image text recognition** - Automatically detect images in clipboard and extract text
-- ✅ **Layout preservation** - Sort results in reading order with automatic line breaks and spaces
-- ✅ **Plain text paste** - OCR results written to data table, paste as plain text to get recognized content
-- ✅ **Local inference** - Based on ONNX Runtime 1.27.1 + OpenCV 4.14.0, no internet required
-
-### Dependencies
-- ONNX Runtime: v1.27.1 (static library build)
-- OpenCV: v4.14.0
-- Models auto-downloaded via GitHub Releases
-
-📖 **Build details:** See `scripts/build-onnxruntime.bat`, `scripts/download-ocr-deps.bat`
-
-## 📁 Project Structure
-
-```
-Ditto/
-├── src/                    # Ditto main app (C++/MFC)
-│   ├── CloudSync/          # Cloud sync client modules
-│   ├── ClipboardOCR.cpp    # OCR integration entry
-│   └── ...                 # Core modules (Clip, Options, QListCtrl, etc.)
-├── Addins/
-│   ├── DittoOCR/           # OCR addin (ONNX Runtime + OpenCV)
-│   └── DittoUtil/          # Utility addin
-├── server/                 # Cloud backend (Go)
-│   ├── cmd/                # Entry points (server, cli)
-│   ├── internal/           # handler, service, model, hub, middleware
-│   ├── pkg/crypto/         # Crypto library
-│   └── migrations/         # Database migrations
-├── web/                    # Web management panel (Vue 3 + Vite)
-│   └── src/views/          # admin, Clips, Dashboard, DashboardHome, Devices,
-│                           # Groups, Login, NotFound, Settings, SyncLogs
-├── docker/                 # Docker Compose configs
-├── scripts/                # Build scripts (ONNX, OCR deps, cert gen, E2E tests)
-├── docs/                   # Documentation (deployment, architecture, test reports)
-└── tools/                  # Auxiliary tools
-    ├── CloudSync_Test/     # C++ cloud sync unit tests
-    ├── EncryptDecrypt/     # Encryption/decryption tool
-    ├── FocusHighlight/     # Focus highlight tool
-    ├── ICU_Loader/         # ICU loader
-    ├── U3Stop/             # U3 stop tool
-    └── focusdll/           # Focus DLL
-```
-
-## 🧪 Testing
-
-| Test Project | Language | Coverage |
-|--------------|----------|----------|
-| CloudSync_Test | C++ | Encryption, auth, sync, CRC32, MD5, SHA2, regex, pinyin conversion |
-| server/tests/ | Go | Auth, clip CRUD, devices, encryption, groups, stats, WebSocket, rate limiting |
-| web/tests/ | JavaScript | E2E (auth, clips, groups, sync logs, navigation) |
-| web/src/ | JavaScript | Unit tests (components, stores, API, composables) |
-
-Run tests:
-```bash
-# Go server tests
-cd server && go test ./...
-
-# Web unit tests + E2E
-cd web && npm run test:unit && npm run test:e2e
-```
-
-## Windows Code-Signing Policy
-Free code signing on Windows binaries provided by SignPath.io, certificate by SignPath Foundation.
-<br>
-<br>
-
-<img src="docs/ditto.gif">
 
