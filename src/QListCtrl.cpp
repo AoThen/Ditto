@@ -1330,7 +1330,7 @@ INT_PTR CQListCtrl::OnToolHitTest(CPoint point, TOOLINFO* pTI) const
 			int nTopIndex = GetTopIndex();
 			int nBottomIndex = nTopIndex + GetCountPerPage();
 			if (nBottomIndex > GetItemCount()) nBottomIndex = GetItemCount();
-			for (int nIndex = nTopIndex; nIndex <= nBottomIndex; nIndex++)
+			for (int nIndex = nTopIndex; nIndex < nBottomIndex; nIndex++)
 			{
 				GetItemRect(nIndex, rect, LVIR_BOUNDS);
 				if (rect.PtInRect(point))
@@ -2311,8 +2311,8 @@ void CQListCtrl::SetDpiInfo(CDPI* dpi)
 	m_stickyImage.Reset();
 	m_stickyImage.LoadStdImageDPI(m_windowDpi->GetDPI(), IDB_STICKY_16_16, IDB_STICKY_20_20, IDB_STICKY_24_24, IDB_STICKY_24_24, IDB_STICKY_32_32, _T("PNG"));
 
-	DeleteObject(m_SmallFont);
-
+	// CreateSmallFont now deletes any previous font itself; do not delete here
+	// or the stale handle may be deleted twice.
 	CreateSmallFont();
 }
 
@@ -2334,6 +2334,14 @@ void CQListCtrl::CreateSmallFont()
 	lf.lfQuality = DEFAULT_QUALITY;
 	lf.lfPitchAndFamily = VARIABLE_PITCH | FF_DONTCARE;
 	_tcsncpy_s(lf.lfFaceName, LF_FACESIZE, _T("Small Font"), _TRUNCATE);
+
+	// Free any previous font before creating the new one; without this a
+	// font is leaked every time the size/DPI changes.
+	if (m_SmallFont != NULL)
+	{
+		::DeleteObject(m_SmallFont);
+		m_SmallFont = NULL;
+	}
 
 	m_SmallFont = ::CreateFontIndirect(&lf);
 }

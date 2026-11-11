@@ -30,7 +30,6 @@
 #include <string>
 	#include <vector>
 
-	#include <signal.h>
 #include "CreateQRCodeImage.h"
 #include "QRCodeViewer.h"
 
@@ -1640,46 +1639,45 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 		CFormatSQL fullTextFormat;
 		CString fullTextSql;
 
+		// Strip the /q or /f search prefix once, up front, so the description,
+		// quickpaste and fulltext predicates (and SetSearchText below) all use
+		// the same user text. The description predicate used to be parsed
+		// before the strip, making "/f abc" search the literal "/f abc" in
+		// descriptions while fulltext/highlight searched "abc".
+		bool bQuickPrefix = (csSQLSearch.Left(3) == _T("/q ") || csSQLSearch.Left(3) == _T("\\q "));
+		bool bFullPrefix = (csSQLSearch.Left(3) == _T("/f ") || csSQLSearch.Left(3) == _T("\\f "));
+		CString csSearchText = csSQLSearch;
+		if (bQuickPrefix || bFullPrefix)
+		{
+			csSearchText = csSearchText.Mid(3);
+		}
+
 		//If other are off then always search the description
 		if (CGetSetOptions::GetSearchDescription() ||
 			(CGetSetOptions::GetSearchFullText() == FALSE && CGetSetOptions::GetSearchQuickPaste() == FALSE))
 		{
 			descriptionFormat.SetVariable("Main.mText");
 
-			descriptionFormat.Parse(csSQLSearch);
+			descriptionFormat.Parse(csSearchText);
 			descriptionSql = descriptionFormat.GetSQLString();
 		}
 
-		if (csSQLSearch.Left(3) == _T("/q ") ||
-			csSQLSearch.Left(3) == _T("\\q ") ||
+		if (bQuickPrefix ||
 			CGetSetOptions::GetSearchQuickPaste())
 		{
 			quickPasteFormat.SetVariable("Main.QuickPasteText");
 
-			if (csSQLSearch.Left(3) == _T("/q ") ||
-				csSQLSearch.Left(3) == _T("\\q "))
-			{
-				csSQLSearch = csSQLSearch.Mid(3);
-			}
-
-			quickPasteFormat.Parse(csSQLSearch);
+			quickPasteFormat.Parse(csSearchText);
 			quickPasteSql = quickPasteFormat.GetSQLString();
 		}
 
-		if (csSQLSearch.Left(3) == _T("/f ") ||
-			csSQLSearch.Left(3) == _T("\\f ") ||
+		if (bFullPrefix ||
 			CGetSetOptions::GetSearchFullText())
 		{
 			dataJoin = _T("INNER JOIN Data on Data.lParentID = Main.lID");
 
-			if (csSQLSearch.Left(3) == _T("/f ") ||
-				csSQLSearch.Left(3) == _T("\\f "))
-			{
-				csSQLSearch = csSQLSearch.Mid(3);
-			}
-
 			fullTextFormat.SetVariable("Data.ooData");
-			fullTextFormat.Parse(csSQLSearch);
+			fullTextFormat.Parse(csSearchText);
 			fullTextSql = fullTextFormat.GetSQLString();
 
 			fullTextSql.Insert(1, _T("Data.strClipBoardFormat = 'CF_UNICODETEXT' AND "));
@@ -1705,10 +1703,10 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 		if (fullTextSql != _T("") && fullTextSql != _T("()"))
 			preds.push_back(fullTextSql);
 
-		if (csSQLSearch != _T(""))
+		if (csSearchText != _T(""))
 		{
 			CPinyinConvert pinyinConv;
-			CString alphaOnly = pinyinConv.ExtractAlpha(csSQLSearch);
+			CString alphaOnly = pinyinConv.ExtractAlpha(csSearchText);
 			if (alphaOnly.IsEmpty() == FALSE)
 			{
 				m_lstHeader.SetPinyinSearch(true);
@@ -1759,8 +1757,8 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 		}
 
 		m_strSQLSearch = strFilter;
-		m_strSearch = csSQLSearch;
-		m_lstHeader.SetSearchText(csSQLSearch);
+		m_strSearch = csSearchText;
+		m_lstHeader.SetSearchText(csSearchText);
 	}
 
 	CString sql;
@@ -2944,8 +2942,6 @@ BOOL CQPasteWnd::SendToFriendbyPos(int nPos, CString override_IP_Host)
 
 	CWaitCursor wait;
 
-	m_bHideWnd = false;
-
 	CClipIDs IDs;
 	INT_PTR count = m_lstHeader.GetSelectedCount();
 	if (count <= 0)
@@ -2959,6 +2955,10 @@ BOOL CQPasteWnd::SendToFriendbyPos(int nPos, CString override_IP_Host)
 	{
 		return FALSE;
 	}
+
+	// Only suppress auto-hide once the action actually proceeds; early
+	// returns above must leave m_bHideWnd alone or the window stops hiding.
+	m_bHideWnd = false;
 
 	CSendToFriendInfo Info;
 
@@ -4320,8 +4320,6 @@ bool CQPasteWnd::DoActionClipProperties()
 
 	if (::GetFocus() == m_lstHeader.GetSafeHwnd())
 	{
-		m_bHideWnd = false;
-
 		ARRAY IDs, Indexes;
 		m_lstHeader.GetSelectionItemData(IDs);
 		m_lstHeader.GetSelectionIndexes(Indexes);
@@ -4340,6 +4338,9 @@ bool CQPasteWnd::DoActionClipProperties()
 			return ret;
 		}
 
+		// Only suppress auto-hide once the action actually proceeds
+		m_bHideWnd = false;
+
 		m_lstHeader.RemoveAllSelection();
 		m_lstHeader.SetSelection(row);
 
@@ -4348,7 +4349,7 @@ bool CQPasteWnd::DoActionClipProperties()
 		m_lstHeader.SetListPos(row);
 	}
 
-	return false;
+	return ret;
 }
 
 bool CQPasteWnd::ShowProperties(int id, int row)
@@ -5503,6 +5504,13 @@ bool CQPasteWnd::OnImportClip()
 
 bool CQPasteWnd::DoActionReplaceTopStickyClip()
 {
+	// GetItemData(0) on an empty list sends a spurious owner-data request;
+	// guard before indexing.
+	if (m_lstHeader.GetItemCount() == 0)
+	{
+		return true;
+	}
+
 	ARRAY IDs;
 	IDs.Add(m_lstHeader.GetItemData(0));
 
@@ -5673,7 +5681,7 @@ bool CQPasteWnd::DoExportToBitMapFile()
 	ofn.hwndOwner = m_hWnd;
 	ofn.lpstrFile = szFile;
 	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = _T("PNG (*.png)\0*.png\0BMP (*.bmp)\0*.bmp\0JPEG (*.jpeg)\0*.jpeg");
+	ofn.lpstrFilter = _T("PNG (*.png)\0*.png\0BMP (*.bmp)\0*.bmp\0JPEG (*.jpeg)\0*.jpeg\0");
 	ofn.nFilterIndex = 1;
 	ofn.lpstrFileTitle = NULL;
 	ofn.nMaxFileTitle = 0;
@@ -6210,7 +6218,10 @@ void CQPasteWnd::OnGetToolTipText(NMHDR* pNMHDR, LRESULT* pResult)
 			}
 		}
 
-		cs = cs.Left(pInfo->cchTextMax - clipData.GetLength());
+		// clipData (description, quickpaste text, shortcut, folder path...)
+		// can exceed the tooltip budget; Left() with a negative count is UB.
+		int nKeep = pInfo->cchTextMax - clipData.GetLength();
+		cs = cs.Left(nKeep > 0 ? nKeep : 0);
 
 		cs += "\r\n\r\n";
 		cs += clipData;
@@ -7564,19 +7575,6 @@ void CQPasteWnd::OnUpdateSpecialpasteTypoglycemia(CCmdUI* pCmdUI)
 
 void CQPasteWnd::OnNMClickList1(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	CString csText;
-	m_search.GetWindowText(csText);
-	if (csText == _T("crash"))
-	{
-		if (CONTROL_PRESSED)
-		{
-			if (GetKeyState(VK_SHIFT) & 0x8000)
-			{
-				raise(SIGSEGV);
-			}
-		}
-	}
-
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	MSG msg;
 	msg.lParam = 0;
@@ -8171,9 +8169,15 @@ bool CQPasteWnd::DoActionEmailTo()
 			}
 		}
 	}
-	else
+	else if (IDs.GetCount() == 1)
 	{
 		clip.LoadFormats(IDs[0], false, false);
+	}
+	else
+	{
+		// nothing selected: bailing out here instead of indexing into an
+		// empty array (IDs[0] would read out of bounds)
+		return true;
 	}
 
 	CString path = CGetSetOptions::GetPath(PATH_DRAG_FILES);
@@ -8289,9 +8293,15 @@ bool CQPasteWnd::DoActionGmail()
 			}
 		}
 	}
-	else
+	else if (IDs.GetCount() == 1)
 	{
 		clip.LoadFormats(IDs[0], true, false);
+	}
+	else
+	{
+		// nothing selected: bailing out here instead of indexing into an
+		// empty array (IDs[0] would read out of bounds)
+		return true;
 	}
 
 	CString text = clip.GetUnicodeTextFormat();
