@@ -312,8 +312,10 @@ jobs:
           retention-days: 30
 
   # ── Playwright E2E ─────────────────────────────────────────
+  # 钉 ubuntu-24.04：ubuntu-latest 已滚动到 26.04，
+  # Playwright 1.59.1 尚不支持 ubuntu26.04-x64（chromium 安装失败）
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
