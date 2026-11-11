@@ -105,8 +105,10 @@ CStringA CCloudCrypto::Encrypt(const CStringA& plaintext)
 // ---------------------------------------------------------------------------
 // Decrypt: base64(IV[12] + ciphertext + tag[16]) -> plaintext
 // ---------------------------------------------------------------------------
-CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
+CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64, bool* pOk)
 {
+	if(pOk)
+		*pOk = false;
 	try
 	{
 		// Copy key under lock for thread safety
@@ -146,6 +148,8 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64)
 			return CStringA("");
 		}
 
+		if(pOk)
+			*pOk = true;
 		return CStringA(reinterpret_cast<const char*>(pt.data()), static_cast<int>(pt.size()));
 	}
 	catch (...)

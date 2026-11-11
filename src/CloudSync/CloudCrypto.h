@@ -13,7 +13,7 @@ public:
 
 	static CStringA Encrypt(const CStringA& plaintext);
 
-	static CStringA Decrypt(const CStringA& encryptedBase64);
+	static CStringA Decrypt(const CStringA& encryptedBase64, bool* pOk = nullptr);
 
 	static std::vector<BYTE> DeriveKey(
 		const CStringA& password,

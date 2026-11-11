@@ -1184,8 +1184,9 @@ BOOL CCloudSyncManager::DecryptClipFormats(nlohmann::json& formats)
 				{
 					std::string encryptedData = format["data"].get<std::string>();
 					CStringA encrypted(encryptedData.c_str());
-					CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
-					if (decrypted.IsEmpty())
+					bool bDecryptOk = false;
+					CStringA decrypted = CCloudCrypto::Decrypt(encrypted, &bDecryptOk);
+					if (!bDecryptOk)
 					{
 						LogCloudSync("Failed to decrypt format data.");
 						return FALSE;

@@ -321,8 +321,10 @@ BOOL COptionCloud::OnApply()
 	// Re-initialize sync if settings changed
 	if (m_bEnabled)
 	{
-		// ReinitializeSync handles Stop + Initialize (safe when already running)
-		theApp.m_CloudSyncManager.ReinitializeSync();
+		// Defer ReinitializeSync via PostMessage (same pattern as
+		// OnBtnEnableEncryption): it can block the UI thread for seconds
+		// waiting for the sync threads to stop.
+		PostMessage(WM_CLOUD_REINIT_SYNC, 0, 0);
 	}
 	else
 	{
@@ -566,8 +568,9 @@ void COptionCloud::OnBtnTestEncryption()
 			return;
 		}
 
-		CStringA decrypted = CCloudCrypto::Decrypt(encrypted);
-		if (decrypted == testPlain)
+		bool bDecryptOk = false;
+		CStringA decrypted = CCloudCrypto::Decrypt(encrypted, &bDecryptOk);
+		if (bDecryptOk && decrypted == testPlain)
 		{
 			m_csEncryptionStatus = theApp.m_Language.GetString("CloudEncTestSuccess", "Encryption test succeeded");
 			MessageBox(theApp.m_Language.GetString("CloudMsgEncTestSuccess", "Encryption test succeeded!\nEncryption is working correctly."),
@@ -861,17 +864,22 @@ void COptionCloud::OnForceReOcr()
         return;
     }
 
-CppSQLite3Query q = theApp.m_db.execQuery(
-		_T("SELECT DISTINCT d.lParentID FROM Data d ")
-		_T("WHERE (d.strClipBoardFormat = 'CF_DIB' OR d.strClipBoardFormat = 'PNG') ")
-		_T("AND d.lParentID NOT IN (SELECT lParentID FROM Data ")
-		_T("WHERE strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"));
-
     std::vector<int> ids;
-    while (!q.eof())
     {
-        ids.push_back(q.getIntField(0));
-        q.nextRow();
+        // The sync/delete-sync threads also access theApp.m_db; run the whole
+        // query (including row iteration) under the shared DB lock.
+        CSingleLock lockDb(&theApp.m_csDb, TRUE);
+        CppSQLite3Query q = theApp.m_db.execQuery(
+			_T("SELECT DISTINCT d.lParentID FROM Data d ")
+			_T("WHERE (d.strClipBoardFormat = 'CF_DIB' OR d.strClipBoardFormat = 'PNG') ")
+			_T("AND d.lParentID NOT IN (SELECT lParentID FROM Data ")
+			_T("WHERE strClipBoardFormat = 'CF_UNICODETEXT' OR strClipBoardFormat = 'CF_TEXT')"));
+
+        while (!q.eof())
+        {
+            ids.push_back(q.getIntField(0));
+            q.nextRow();
+        }
     }
 
     if (ids.empty())

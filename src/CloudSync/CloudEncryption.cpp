@@ -604,7 +604,8 @@ CStringA CCloudEncryption::DecryptClipData(const CStringA& encryptedBase64)
 		return CStringA("");
 	}
 
-	CStringA result = CCloudCrypto::Decrypt(encryptedBase64);
+	bool bDecryptOk = false;
+	CStringA result = CCloudCrypto::Decrypt(encryptedBase64, &bDecryptOk);
 	return result;
 }
 

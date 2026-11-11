@@ -13,6 +13,7 @@ using json = nlohmann::json;
 std::unique_ptr<httplib::Client> CCloudAuth::m_httpClient;
 CString CCloudAuth::m_httpClientUrl;
 std::shared_ptr<IHttpClient> CCloudAuth::m_testClient;
+CCriticalSection CCloudAuth::m_csHttpClient;
 
 // Helper: convert CString to std::string (with null safety)
 static std::string CStringToStdString(const CString& str)
@@ -27,6 +28,7 @@ static std::string CStringToStdString(const CString& str)
 
 void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
 {
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
 	if (m_testClient) return;
 
 	std::string url = CStringToStdString(serverUrl);
@@ -102,6 +104,7 @@ std::string HttplibClientAdapter::GetBaseUrl() const
 
 HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, const std::string& contentType)
 {
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
 	if (m_testClient)
 	{
 		return m_testClient->Post(path, body, contentType);
@@ -123,6 +126,7 @@ HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, 
 HttpResult CCloudAuth::DoPostWithBearer(const std::string& path, const std::string& body,
                                         const std::string& contentType, const std::string& bearerToken)
 {
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
 	if (m_testClient)
 	{
 		return m_testClient->PostWithBearer(path, body, contentType, bearerToken);
@@ -507,10 +511,12 @@ BOOL CCloudAuth::TryRefreshTokenLocked()
 
 void CCloudAuth::SetHttpClientForTest(std::shared_ptr<IHttpClient> mockClient)
 {
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
 	m_testClient = std::move(mockClient);
 }
 
 void CCloudAuth::ResetHttpClientForTest()
 {
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
 	m_testClient.reset();
 }
