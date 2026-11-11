@@ -160,6 +160,7 @@ CCP_MainApp::CCP_MainApp()
 
 	m_bAsynchronousRefreshView = true;
 	m_lClipsSent = 0;
+	m_sSocket = INVALID_SOCKET;
 	m_lClipsRecieved = 0;
 	m_oldtStartUp = COleDateTime::GetCurrentTime();
 
@@ -624,14 +625,23 @@ void CCP_MainApp::StartStopServerThread()
 	else
 	{
 		m_bExitServerThread = true;
-		closesocket(theApp.m_sSocket);
+		// m_sSocket may never have been created; never close an uninitialized value
+		if(theApp.m_sSocket != INVALID_SOCKET)
+		{
+			closesocket(theApp.m_sSocket);
+			theApp.m_sSocket = INVALID_SOCKET;
+		}
 	}
 }
 
 void CCP_MainApp::StopServerThread()
 {
 	m_bExitServerThread = true;
-	closesocket(theApp.m_sSocket);
+	if(theApp.m_sSocket != INVALID_SOCKET)
+	{
+		closesocket(theApp.m_sSocket);
+		theApp.m_sSocket = INVALID_SOCKET;
+	}
 }
 
 void CCP_MainApp::BeforeMainClose()
@@ -676,6 +686,21 @@ void CCP_MainApp::StopCopyThread()
 {
 	EnableCbCopy(false);
 	m_CopyThread.Quit();
+
+	// Give the copy thread a chance to exit (its ExitInstance deletes the
+	// clipboard viewer). The process-exit watchdog still catches a hang.
+	if(m_CopyThread.m_hThread != NULL)
+	{
+		DWORD dwWait = WaitForSingleObject(m_CopyThread.m_hThread, 3000);
+		if(dwWait == WAIT_TIMEOUT)
+		{
+			// The copy thread is still running; do NOT terminate it (MFC
+			// threads are unsafe to force-kill). The destructor will leak the
+			// viewer to avoid a use-after-free, and the exit watchdog bounds
+			// the process. Observability: keep a loud log so it is not silent.
+			Log(_T("StopCopyThread: copy thread still running after 3s; viewer will be leaked, thread may exit during teardown"));
+		}
+	}
 }
 
 // returns the current Clipboard Viewer Connect state (though it might not yet
@@ -1124,7 +1149,7 @@ bool CCP_MainApp::ImportClips(HWND hWnd)
 			CString cs;
 			
 			cs.Format(_T("%s %d "), theApp.m_Language.GetString("Import_Successfully", "Successfully imported"), clip.m_importCount);
-			if(clip.m_importCount = 1)
+			if(clip.m_importCount == 1)
 				cs += theApp.m_Language.GetString("Clip", "clip");
 			else
 				cs += theApp.m_Language.GetString("Clips", "clips");
