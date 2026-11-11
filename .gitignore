@@ -106,3 +106,6 @@ QWEN.md
 !/Debug/Language/**
 !/Debug/Themes/
 !/Debug/Themes/**
+
+# opencode tooling local state
+/.opencode/
