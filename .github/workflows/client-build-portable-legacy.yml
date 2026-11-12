@@ -24,6 +24,13 @@ jobs:
       BUILD_DIR: ${{ matrix.config == 'Debug' && 'Debug64' || 'Release64' }}
       RUNTIME_SUFFIX: ${{ matrix.config == 'Debug' && 'd' || '' }}
     steps:
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 7
+          keep_minimum_runs: 3
       - uses: actions/checkout@v5
 
       - name: Cache NuGet packages
@@ -119,4 +126,4 @@ jobs:
         with:
           name: ditto-portable-legacy-${{ env.SHORT_SHA }}-${{ matrix.config }}-x64
           path: DittoPortable_legacy_${{ env.SHORT_SHA }}_${{ matrix.config }}_x64.zip
-          retention-days: 30
+          retention-days: 7

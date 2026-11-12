@@ -24,7 +24,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          retain_days: 1
+          retain_days: 7
           keep_minimum_runs: 1
           delete_workflow_pattern: ${{ github.workflow }}
 

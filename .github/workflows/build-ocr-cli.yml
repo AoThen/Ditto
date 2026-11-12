@@ -18,6 +18,13 @@ jobs:
     env:
       OCR_VERSION: legacy
     steps:
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 7
+          keep_minimum_runs: 3
       - uses: actions/checkout@v5
 
       - name: Cache OCR dependencies
@@ -94,4 +101,4 @@ jobs:
         with:
           name: ocr-cli-legacy-${{ env.SHORT_SHA }}-x64
           path: OcrCli_legacy_${{ env.SHORT_SHA }}_x64.zip
-          retention-days: 30
+          retention-days: 7

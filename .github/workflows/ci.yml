@@ -42,7 +42,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          retain_days: 1
+          retain_days: 7
           keep_minimum_runs: 1
           delete_workflow_pattern: ${{ github.workflow }}
 
@@ -87,7 +87,7 @@ jobs:
         with:
           name: server-bin
           path: server/server
-          retention-days: 1
+          retention-days: 7
 
   # ── Web Frontend ───────────────────────────────────────────
   web-build:
@@ -309,7 +309,7 @@ jobs:
         with:
           name: ditto-portable-${{ matrix.config }}-x64
           path: DittoPortable_${{ matrix.config }}_x64.zip
-          retention-days: 30
+          retention-days: 7
 
   # ── Playwright E2E ─────────────────────────────────────────
   # 钉 ubuntu-24.04：ubuntu-latest 已滚动到 26.04，
@@ -360,7 +360,7 @@ jobs:
         with:
           name: playwright-report
           path: web/playwright-report/
-          retention-days: 30
+          retention-days: 7
 
   # ── Shell E2E ──────────────────────────────────────────────
   shell-e2e:
