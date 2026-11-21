@@ -114,10 +114,10 @@ func (h *ClipHandler) Sync(c *gin.Context) {
 		return
 	}
 
-	// Use device_id from JWT if not provided in request body
-	if req.DeviceID == "" {
-		req.DeviceID = deviceID
-	}
+	// Always use the device identity from the verified JWT. Trusting a
+	// client-supplied value would let one device forge another's identity,
+	// polluting last-writer attribution and pull filtering.
+	req.DeviceID = deviceID
 
 	result, err := h.service.Sync(userID, &req, deviceID)
 	if err != nil {
