@@ -1174,11 +1174,13 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 	}
 
 	if action == "accept" {
-		// Prefer WinClipID if set (P0 fix), fall back to CRC match for legacy data
+		// Prefer WinClipID if set (P0 fix), fall back to CRC match for legacy data.
+		// Both lookups exclude the copy itself so stale WinClipID data cannot
+		// make the copy its own winner.
 		var winningClip model.Clip
 		var winErr error
 		if conflictClip.WinClipID != "" {
-			winErr = database.DB.Where("id = ? AND user_id = ?", conflictClip.WinClipID, userID).
+			winErr = database.DB.Where("id = ? AND user_id = ? AND id != ?", conflictClip.WinClipID, userID, conflictClipID).
 				First(&winningClip).Error
 		}
 		if winErr != nil || conflictClip.WinClipID == "" {
@@ -1187,18 +1189,42 @@ func (s *ClipService) ResolveConflictClip(userID uint, conflictClipID string, ac
 				Order("updated_at DESC").First(&winningClip).Error
 		}
 		if winErr == nil {
-			// Replace winning clip's content with conflict clip's content
-			if err := database.DB.Model(&winningClip).Updates(map[string]interface{}{
-				"description": conflictClip.Description,
-				"pinyin":      utils.ConvertToPinyin(conflictClip.Description),
-				"updated_at":  conflictClip.UpdatedAt,
-			}).Error; err != nil {
-				return err
-			}
+			// Replace the winning clip's content with the conflict clip's content.
+			// Formats must move over too, otherwise accepting a conflict with
+			// image/file data keeps only the text metadata and destroys the
+			// payload when the copy is deleted.
+			//
+			// Everything runs in ONE transaction: moving the formats first and
+			// deleting the copy later (separate transactions) would leave a
+			// window where a crash makes a retry wipe the formats the winner
+			// just received while the copy has none left to give back.
+			return database.DB.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Where("clip_id = ?", winningClip.ID).Delete(&model.ClipFormat{}).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&model.ClipFormat{}).
+					Where("clip_id = ?", conflictClipID).
+					Update("clip_id", winningClip.ID).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&winningClip).Updates(map[string]interface{}{
+					"description": conflictClip.Description,
+					"pinyin":      utils.ConvertToPinyin(conflictClip.Description),
+					"updated_at":  conflictClip.UpdatedAt,
+					"crc":         conflictClip.CRC,
+				}).Error; err != nil {
+					return err
+				}
+				if err := tx.Where("clip_id = ?", conflictClipID).Delete(&model.ClipFormat{}).Error; err != nil {
+					return err
+				}
+				return tx.Delete(&conflictClip).Error
+			})
 		}
 	}
 
-	// Delete the conflict clip and its formats
+	// Discard path (or accept without a resolvable winner): delete the conflict
+	// clip and its formats.
 	if err := database.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("clip_id = ?", conflictClipID).Delete(&model.ClipFormat{}).Error; err != nil {
 			return err
