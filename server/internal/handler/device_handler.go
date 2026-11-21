@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -40,6 +41,10 @@ func (h *DeviceHandler) RemoveDevice(c *gin.Context) {
 	deviceID := c.Param("id")
 
 	if err := h.service.RemoveDevice(userID, deviceID); err != nil {
+		if errors.Is(err, service.ErrDeviceNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "设备不存在")
+			return
+		}
 		log.Printf("[RemoveDevice] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "移除设备失败")
 		return
@@ -62,6 +67,10 @@ func (h *DeviceHandler) UpdateDevice(c *gin.Context) {
 	}
 
 	if err := h.service.RenameDevice(userID, deviceID, req.DeviceName); err != nil {
+		if errors.Is(err, service.ErrDeviceNotFound) {
+			response.Error(c, http.StatusNotFound, 40400, "设备不存在")
+			return
+		}
 		log.Printf("[UpdateDevice] error: %v", err)
 		response.Error(c, http.StatusInternalServerError, 50000, "更新设备名称失败")
 		return

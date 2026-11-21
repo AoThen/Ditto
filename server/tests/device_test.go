@@ -162,5 +162,13 @@ func TestDevice_Rename_NotFound(t *testing.T) {
 
 	body := map[string]string{"device_name": "Nonexistent"}
 	statusCode, _ := testutil.AuthPatch(t, server, "/api/v1/devices/nonexistent-device-id", user.Token, body)
-	assert.Equal(t, http.StatusInternalServerError, statusCode)
+	assert.Equal(t, http.StatusNotFound, statusCode)
+}
+
+func TestDevice_Remove_NotFound(t *testing.T) {
+	server, _ := testutil.SetupTestServer(t)
+	user := testutil.CreateTestUser(t, server)
+
+	statusCode, _ := testutil.AuthDelete(t, server, "/api/v1/devices/nonexistent-device-id", user.Token)
+	assert.Equal(t, http.StatusNotFound, statusCode)
 }

@@ -161,8 +161,8 @@ func TestDeviceService_RemoveDevice_NotFound(t *testing.T) {
 
 	// Try to remove non-existent device
 	err := svc.RemoveDevice(userID, "non-existent-device")
-	// GORM Delete doesn't return error if record not found
-	assert.NoError(t, err)
+	// A missing device is reported instead of silently succeeding
+	assert.ErrorIs(t, err, ErrDeviceNotFound)
 }
 
 func TestDeviceService_RemoveDevice_WrongUser(t *testing.T) {
@@ -188,8 +188,8 @@ func TestDeviceService_RemoveDevice_WrongUser(t *testing.T) {
 
 	// Try to remove user2's device as user1
 	err := svc.RemoveDevice(userID, device.ID)
-	// Should not remove the device
-	assert.NoError(t, err)
+	// Foreign devices are reported as missing, never removed
+	assert.ErrorIs(t, err, ErrDeviceNotFound)
 
 	// Verify device still exists
 	var count int64

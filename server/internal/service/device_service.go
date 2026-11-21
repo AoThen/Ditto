@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"ditto-cloud-server/internal/database"
 	"ditto-cloud-server/internal/model"
 	"ditto-cloud-server/internal/response"
@@ -66,7 +65,16 @@ func (s *DeviceService) RemoveDevice(userID uint, deviceID string) error {
 		if err := tx.Where("device_id = ? AND user_id = ?", deviceID, userID).Delete(&model.SyncLog{}).Error; err != nil {
 			return err
 		}
-		return tx.Where("id = ? AND user_id = ?", deviceID, userID).Delete(&model.Device{}).Error
+		result := tx.Where("id = ? AND user_id = ?", deviceID, userID).Delete(&model.Device{})
+		if result.Error != nil {
+			return result.Error
+		}
+		// Distinguish a wrong/foreign device id from a successful delete
+		// instead of reporting success for both.
+		if result.RowsAffected == 0 {
+			return ErrDeviceNotFound
+		}
+		return nil
 	})
 }
 
@@ -82,7 +90,7 @@ func (s *DeviceService) RenameDevice(userID uint, deviceID string, newName strin
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("设备不存在")
+		return ErrDeviceNotFound
 	}
 	return nil
 }

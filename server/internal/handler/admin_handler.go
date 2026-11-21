@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -40,7 +41,8 @@ type ResetPasswordRequest struct {
 func (h *AdminHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Admin] CreateUser invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -125,7 +127,8 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Admin] UpdateUser invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
@@ -202,7 +205,8 @@ func (h *AdminHandler) ResetPassword(c *gin.Context) {
 
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误: "+err.Error())
+		log.Printf("[Admin] ResetPassword invalid request: %v", err)
+		response.Error(c, http.StatusBadRequest, 40000, "请求参数错误")
 		return
 	}
 
