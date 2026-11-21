@@ -28,14 +28,16 @@ describe('user store', () => {
     expect(store.username).toBe('')
   })
 
-  it('checkAuthState detects device_id cookie', () => {
-    document.cookie = 'device_id=dev-123'
+  it('checkAuthState restores the cached session from localStorage', () => {
+    localStorage.setItem('userInfo', JSON.stringify({ device_id: 'dev-123', username: 'alice', role: 'admin' }))
     store.checkAuthState()
     expect(store.isLoggedIn).toBe(true)
     expect(store.deviceId).toBe('dev-123')
+    expect(store.username).toBe('alice')
+    expect(store.role).toBe('admin')
   })
 
-  it('checkAuthState returns false when no cookie', () => {
+  it('checkAuthState keeps the user logged out without cached state', () => {
     store.checkAuthState()
     expect(store.isLoggedIn).toBe(false)
     expect(store.deviceId).toBe('')

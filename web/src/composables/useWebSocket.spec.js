@@ -31,7 +31,9 @@ describe('useWebSocket', () => {
     // them set makes earlier tests trigger the reconnect catch-up path.
     localStorage.clear()
     vi.clearAllMocks()
-    document.cookie = 'device_id=test-device'
+    // The store restores the session from localStorage: the device_id cookie is
+    // HttpOnly in production, so client code can never read it back.
+    localStorage.setItem('userInfo', JSON.stringify({ device_id: 'test-device', username: 'tester', role: 'user' }))
 
     mockWs = createMockWs()
     const mockWsConstructor = vi.fn(function() { return mockWs })

@@ -11,11 +11,6 @@ export const useUserStore = defineStore('user', () => {
   // the router guard and the WebSocket connector can rely on it, but it cannot
   // tell whether the HttpOnly access cookie is still valid — verifySession does.
   function checkAuthState() {
-    const deviceIdCookie = getCookie('device_id')
-    if (deviceIdCookie) {
-      isLoggedIn.value = true
-      deviceId.value = deviceIdCookie
-    }
     const storedUser = localStorage.getItem('userInfo')
     if (storedUser) {
       try {
@@ -80,11 +75,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('userInfo')
     document.cookie = 'device_id=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
     window.dispatchEvent(new CustomEvent('ws-disconnect'))
-  }
-
-  function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
-    return match ? decodeURIComponent(match[2]) : ''
   }
 
   return {
