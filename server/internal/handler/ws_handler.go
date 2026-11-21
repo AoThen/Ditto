@@ -3,6 +3,8 @@ package handler
 import (
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"ditto-cloud-server/internal/config"
 	"ditto-cloud-server/internal/hub"
@@ -30,6 +32,13 @@ var upgrader = websocket.Upgrader{
 			if origin == allowed {
 				return true
 			}
+		}
+		// Same-origin browser handshakes always carry an Origin that matches the
+		// Host the page was served from. Allow them even when no explicit origin
+		// list is configured, otherwise same-origin deployments (the default)
+		// would reject every browser WebSocket connection.
+		if u, err := url.Parse(origin); err == nil && u.Host != "" && strings.EqualFold(u.Host, r.Host) {
+			return true
 		}
 		log.Printf("[ws] blocked origin: %s", origin)
 		return false

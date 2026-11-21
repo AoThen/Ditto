@@ -97,32 +97,25 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			data, err := json.Marshal(message)
-			if err != nil {
-				log.Printf("[ws] failed to marshal message for user_id=%d: %v", c.userID, err)
-				continue
-			}
-
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			// Write each message as its own frame: both the web panel and the
+			// desktop client parse every websocket frame as exactly one JSON
+			// document, so batching queued messages into a single frame would
+			// break their parsers and drop real-time events.
+			if err := c.writeJSON(message); err != nil {
 				return
 			}
-			w.Write(data)
 
-			// Send any queued messages in the same websocket frame batch
+			// Drain any queued messages as separate frames too
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
 				msg, ok := <-c.send
 				if !ok {
-					break
+					c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+					return
 				}
-				data, _ := json.Marshal(msg)
-				w.Write(data)
-			}
-
-			if err := w.Close(); err != nil {
-				return
+				if err := c.writeJSON(msg); err != nil {
+					return
+				}
 			}
 
 		case <-ticker.C:
@@ -132,6 +125,18 @@ func (c *Client) WritePump() {
 			}
 		}
 	}
+}
+
+// writeJSON marshals and writes a single message as one text frame.
+// A marshal failure only skips the message; a write failure is fatal to the
+// connection and reported to the caller.
+func (c *Client) writeJSON(msg map[string]interface{}) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("[ws] failed to marshal message for user_id=%d: %v", c.userID, err)
+		return nil
+	}
+	return c.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Send queues a message for sending to this client.

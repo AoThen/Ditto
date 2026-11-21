@@ -105,7 +105,7 @@ func TestHandleWebSocket_Success(t *testing.T) {
 	require.NoError(t, err)
 	conn.Close()
 
-require.Eventually(t, func() bool { return connected.Load() }, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return connected.Load() }, time.Second, 10*time.Millisecond)
 }
 
 func TestHandleWebSocket_RegisterCalled(t *testing.T) {
@@ -150,4 +150,31 @@ func TestSetAllowedOrigins_UnknownOrigin(t *testing.T) {
 	r := &http.Request{Header: http.Header{"Origin": []string{"https://evil.com"}}}
 	allowed := upgrader.CheckOrigin(r)
 	assert.False(t, allowed)
+}
+
+func TestSetAllowedOrigins_SameOriginAllowed(t *testing.T) {
+	SetAllowedOrigins(nil)
+	r := &http.Request{
+		Host:   "ditto.example.com",
+		Header: http.Header{"Origin": []string{"https://ditto.example.com"}},
+	}
+	assert.True(t, upgrader.CheckOrigin(r))
+}
+
+func TestSetAllowedOrigins_SameOriginWithPortAllowed(t *testing.T) {
+	SetAllowedOrigins(nil)
+	r := &http.Request{
+		Host:   "localhost:5173",
+		Header: http.Header{"Origin": []string{"http://localhost:5173"}},
+	}
+	assert.True(t, upgrader.CheckOrigin(r))
+}
+
+func TestSetAllowedOrigins_CrossOriginStillBlocked(t *testing.T) {
+	SetAllowedOrigins(nil)
+	r := &http.Request{
+		Host:   "ditto.example.com",
+		Header: http.Header{"Origin": []string{"https://evil.com"}},
+	}
+	assert.False(t, upgrader.CheckOrigin(r))
 }
