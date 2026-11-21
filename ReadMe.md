@@ -45,7 +45,7 @@ cd Ditto
 # 2. 配置环境
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 3. 启动后端服务
 docker-compose up -d
@@ -79,7 +79,7 @@ docker-compose -f docker-compose.prod.yml up -d
 - [云端部署详解](docs/CLOUD_DEPLOYMENT.md)
 
 ### 技术栈
-- **后端:** Go + SQLite3/PostgreSQL + WebSocket
+- **后端:** Go + SQLite3 + WebSocket
 - **前端:** Vue 3 + Vite + Pinia
 - **加密:** AES-256-GCM 端到端加密
 - **部署:** Docker Compose + Nginx (TLS)
