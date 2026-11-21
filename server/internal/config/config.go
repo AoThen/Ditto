@@ -22,29 +22,34 @@ const (
 )
 
 type Config struct {
-	Port               string
-	DatabasePath       string
-	JWTSecret          string
-	StartTime          time.Time
-	CleanupInterval    time.Duration // How often to run cleanup
-	MaxClipAge         time.Duration // Maximum age of clips before removal
-	MaxClipsPerUser    int           // Maximum clips per user
-	SoftDeleteRetention time.Duration // How long to keep soft-deleted records before hard-delete
-	AllowedOrigins     []string      // CORS + WebSocket allowed origins
-	CookieSecure       bool          // Whether to set Secure flag on cookies
-	TokenExpiryAccess  time.Duration
-	TokenExpiryRefresh time.Duration
-	MaxPushLimit       int           // Maximum clips per push sync request
-	DefaultSyncPullLimit int         // Default pull limit per sync
-	MaxSyncPullLimit   int           // Maximum pull limit per sync
-	SlowThreshold      time.Duration // GORM slow query threshold
-	StorageQuotaMB     int           // Per-user storage quota in MB (default 100)
+	Port                 string
+	DatabasePath         string
+	JWTSecret            string
+	StartTime            time.Time
+	CleanupInterval      time.Duration // How often to run cleanup
+	MaxClipAge           time.Duration // Maximum age of clips before removal
+	MaxClipsPerUser      int           // Maximum clips per user
+	SoftDeleteRetention  time.Duration // How long to keep soft-deleted records before hard-delete
+	AllowedOrigins       []string      // CORS + WebSocket allowed origins
+	CookieSecure         bool          // Whether to set Secure flag on cookies
+	TokenExpiryAccess    time.Duration
+	TokenExpiryRefresh   time.Duration
+	MaxPushLimit         int           // Maximum clips per push sync request
+	DefaultSyncPullLimit int           // Default pull limit per sync
+	MaxSyncPullLimit     int           // Maximum pull limit per sync
+	SlowThreshold        time.Duration // GORM slow query threshold
+	StorageQuotaMB       int           // Per-user storage quota in MB (default 100)
 }
 
 // loadOrGenerateJWTSecret handles JWT secret loading with secure auto-generation
 func loadOrGenerateJWTSecret() string {
 	// Priority 1: Explicit environment variable
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
+		// The placeholder from .env.example is public knowledge; running with it
+		// would let anyone forge tokens. Refuse to start instead.
+		if strings.Contains(secret, "change-me") {
+			log.Fatalf("[FATAL] JWT_SECRET is still set to the placeholder value. Generate a real one with: openssl rand -hex 32")
+		}
 		return secret
 	}
 
@@ -210,22 +215,22 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:               port,
-		DatabasePath:       dbPath,
-		JWTSecret:          jwtSecret,
-		StartTime:          time.Now(),
-		CleanupInterval:    cleanupInterval,
-		MaxClipAge:         maxClipAge,
-		MaxClipsPerUser:    maxClipsPerUser,
-		AllowedOrigins:     allowedOrigins,
-		CookieSecure:       cookieSecure,
-		TokenExpiryAccess:  loadTokenExpiry("JWT_ACCESS_TOKEN_EXPIRY", DefaultTokenExpiryAccess),
-		TokenExpiryRefresh: loadTokenExpiry("JWT_REFRESH_TOKEN_EXPIRY", DefaultTokenExpiryRefresh),
-		MaxPushLimit:        maxPushLimit,
-		DefaultSyncPullLimit:  defaultSyncPullLimit,
-		MaxSyncPullLimit:      maxSyncPullLimit,
-		SlowThreshold:         slowThreshold,
-		SoftDeleteRetention:   softDeleteRetention,
-		StorageQuotaMB:        storageQuotaMB,
+		Port:                 port,
+		DatabasePath:         dbPath,
+		JWTSecret:            jwtSecret,
+		StartTime:            time.Now(),
+		CleanupInterval:      cleanupInterval,
+		MaxClipAge:           maxClipAge,
+		MaxClipsPerUser:      maxClipsPerUser,
+		AllowedOrigins:       allowedOrigins,
+		CookieSecure:         cookieSecure,
+		TokenExpiryAccess:    loadTokenExpiry("JWT_ACCESS_TOKEN_EXPIRY", DefaultTokenExpiryAccess),
+		TokenExpiryRefresh:   loadTokenExpiry("JWT_REFRESH_TOKEN_EXPIRY", DefaultTokenExpiryRefresh),
+		MaxPushLimit:         maxPushLimit,
+		DefaultSyncPullLimit: defaultSyncPullLimit,
+		MaxSyncPullLimit:     maxSyncPullLimit,
+		SlowThreshold:        slowThreshold,
+		SoftDeleteRetention:  softDeleteRetention,
+		StorageQuotaMB:       storageQuotaMB,
 	}
 }

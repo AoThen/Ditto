@@ -42,6 +42,12 @@ func SeedDefaultAdmin() {
 		return
 	}
 
+	// The .env.example placeholder is public knowledge; seeding an admin with
+	// it would leave the account open to anyone. Fail loudly instead.
+	if strings.Contains(password, "change-me") {
+		log.Fatalf("[FATAL] ADMIN_PASSWORD is still the placeholder value. Set a strong password before the first start")
+	}
+
 	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
 		log.Printf("[WARN] Failed to hash admin password: %v", err)
