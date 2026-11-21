@@ -71,13 +71,13 @@ type LoginResponse struct {
 }
 
 var (
-	ErrUsernameExists      = errors.New("用户名已存在")
-	ErrEmailExists         = errors.New("邮箱已被注册")
-	ErrInvalidCreds        = errors.New("用户名或密码错误")
-	ErrUserLocked          = errors.New("账号已锁定")
-	ErrTooManyAttempts     = errors.New("尝试次数过多")
-	ErrRegistrationClosed  = errors.New("注册已关闭，请联系管理员")
-	ErrInvalidDeviceID     = errors.New("device_id 格式无效")
+	ErrUsernameExists     = errors.New("用户名已存在")
+	ErrEmailExists        = errors.New("邮箱已被注册")
+	ErrInvalidCreds       = errors.New("用户名或密码错误")
+	ErrUserLocked         = errors.New("账号已锁定")
+	ErrTooManyAttempts    = errors.New("尝试次数过多")
+	ErrRegistrationClosed = errors.New("注册已关闭，请联系管理员")
+	ErrInvalidDeviceID    = errors.New("device_id 格式无效")
 )
 
 func (s *AuthService) Register(req *RegisterRequest) (*RegisterResponse, error) {
@@ -165,12 +165,16 @@ func (s *AuthService) Login(req *LoginRequest, deviceName string) (*LoginRespons
 		return nil, err
 	}
 
-	// Generate JWT token (access token + refresh token)
-	accessToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryAccess, "access")
+	// Generate JWT token (access token + refresh token).
+	// Sign with the device's current token version so a device that logged out
+	// (version bumped) can log back in immediately: the middleware compares the
+	// token version against the device row, and a fresh version-0 token would
+	// otherwise be rejected until the version is reset.
+	accessToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryAccess, "access", device.TokenVersion)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryRefresh, "refresh")
+	refreshToken, err := s.generateToken(user.ID, deviceID, s.cfg.TokenExpiryRefresh, "refresh", device.TokenVersion)
 	if err != nil {
 		return nil, err
 	}
