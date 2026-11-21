@@ -25,20 +25,23 @@
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# 2. 配置环境
-cp .env.example .env
+# 2. 配置环境（compose 变量替换读取 docker/.env）
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+# 可选：提供容器内应用配置，避免 Docker 自动创建空目录
+cp server/.env.example server/.env
 
-# 3. 启动开发环境
-docker-compose up -d
+# 3. 启动开发环境（compose 文件位于 docker/ 目录，后续 compose 命令均在 docker/ 下执行）
+cd docker
+docker compose up -d
 
 # 4. 访问服务
 echo "Web 面板 + API: http://localhost:8080"
 echo "健康检查: http://localhost:8080/health"
 
 # 5. 查看日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
 **完成！** 您现在已在本地运行 Ditto 云端服务。
@@ -49,7 +52,7 @@ docker-compose logs -f
 
 **方式一：环境变量自动创建（推荐）**
 
-在 `.env` 文件中设置管理员信息，首次启动时自动创建：
+在 `docker/.env` 文件中设置管理员信息，首次启动时自动创建：
 ```bash
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your-secure-password
@@ -74,13 +77,13 @@ docker exec -it ditto-backend /app/cli create-admin
 **适用于**: 开发、测试、本地访问
 
 ```bash
-# 启动服务
-docker-compose up -d
+# 启动服务（在 docker/ 目录执行，参见"5 分钟快速开始"）
+docker compose up -d
 
 # 验证部署
 curl http://localhost:8080/health
 
-# 预期响应: {"status":"ok","timestamp":"..."}
+# 预期响应: {"status":"ok","uptime":"..."}
 
 # 访问 Web 管理面板: http://localhost:8080
 ```
@@ -90,12 +93,12 @@ curl http://localhost:8080/health
 
 **停止服务:**
 ```bash
-docker-compose down
+docker compose down
 ```
 
 **重置数据（⚠️ 将删除所有数据）:**
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ## 生产环境部署（单服务器 HTTPS）
@@ -120,15 +123,18 @@ newgrp docker
 ```bash
 cd /opt
 sudo git clone https://github.com/sabrogden/Ditto.git
+sudo chown -R $USER /opt/Ditto
 cd Ditto
 
-# 配置环境
-cp .env.example .env
+# 配置环境（compose 变量替换读取 docker/.env）
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+# 可选：提供容器内应用配置，避免 Docker 自动创建空目录
+cp server/.env.example server/.env
 
 # 验证配置
-cat .env | grep JWT_SECRET
+cat docker/.env | grep JWT_SECRET
 ```
 
 ### 步骤 3: 生成 SSL 证书
@@ -136,8 +142,7 @@ cat .env | grep JWT_SECRET
 **选项 A: 自签名证书（仅测试用）**
 
 ```bash
-chmod +x generate-certs.sh
-./generate-certs.sh "ditto.local"
+./scripts/generate-certs.sh "ditto.local"
 ```
 
 **选项 B: Let's Encrypt 证书（生产环境）**
@@ -163,11 +168,12 @@ sudo chmod 600 certs/server.key
 ### 步骤 4: 启动 HTTPS 服务
 
 ```bash
-# 启动生产环境（单容器，Go 统一输出 API + 前端静态文件）
-docker-compose -f docker-compose.prod.yml up -d
+# 启动生产环境（单容器，Go 统一输出 API + 前端静态文件；在 docker/ 目录执行）
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 
 # 验证部署
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 # 测试 HTTPS 端点
 curl -k https://localhost/health
@@ -201,7 +207,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/Ditto
+WorkingDirectory=/opt/Ditto/docker
 ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
 ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
 TimeoutStartSec=0
@@ -239,9 +245,9 @@ sudo usermod -aG docker $USER
 
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
-cp .env.example .env
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
 
 # 5. 获取 Let's Encrypt 证书
 sudo apt install -y certbot
@@ -252,7 +258,8 @@ sudo cp /etc/letsencrypt/live/ditto.your-domain.com/fullchain.pem certs/server.c
 sudo cp /etc/letsencrypt/live/ditto.your-domain.com/privkey.pem certs/server.key
 
 # 6. 启动服务
-docker-compose -f docker-compose.prod.yml up -d
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### DigitalOcean Droplet
@@ -318,7 +325,8 @@ AutoDeleteDays=90
 # - 自签名或 Let's Encrypt 证书
 # - 单个后端实例
 
-docker-compose -f docker-compose.prod.yml up -d
+cd /opt/Ditto/docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 **推荐基础设施:**
@@ -343,8 +351,9 @@ docker-compose -f docker-compose.prod.yml up -d
 > 多实例部署前先实现 `hub.Backend`（如 Redis pub/sub）。
 
 ```bash
-# 完整堆栈，包含负载均衡
-docker-compose -f docker-compose.prod.yml up -d
+# 完整堆栈，包含负载均衡（在 docker/ 目录执行）
+cd /opt/Ditto/docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 **推荐基础设施:**
@@ -365,12 +374,12 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### ✅ 应用程序
 
-- [ ] 环境变量已配置（`.env` 文件）
+- [ ] 环境变量已配置（`docker/.env` 文件）
 - [ ] JWT 密钥唯一且安全
 - [ ] 管理员账号已初始化（环境变量 / CLI / 首用户注册）
-- [ ] 服务正在运行（`docker-compose ps`）
+- [ ] 服务正在运行（`docker compose ps`）
 - [ ] 健康检查通过（`curl https://localhost/health`）
-- [ ] 日志可访问且无错误（`docker-compose logs`）
+- [ ] 日志可访问且无错误（`docker compose logs`）
 - [ ] Web 面板可通过 HTTPS 访问
 
 ### ✅ 安全
@@ -393,17 +402,20 @@ docker-compose -f docker-compose.prod.yml up -d
 ## 有用的命令参考
 
 ```bash
+# 以下命令均在 docker/ 目录执行
+cd /opt/Ditto/docker
+
 # 启动服务
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # 停止服务
-docker-compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 
 # 重启特定服务
-docker-compose -f docker-compose.prod.yml restart backend
+docker compose -f docker-compose.prod.yml restart backend
 
 # 查看日志
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # 查看资源使用情况
 docker stats
@@ -421,7 +433,8 @@ docker cp ditto-backend:/tmp/backup.db ./backup-$(date +%Y%m%d).db
 # 更新服务
 cd /opt/Ditto
 git pull
-docker-compose -f docker-compose.prod.yml up -d --build
+cd docker
+docker compose -f docker-compose.prod.yml up -d --build
 
 # 清理未使用的镜像
 docker image prune -f
@@ -459,20 +472,23 @@ docker system prune -a
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# 2. Configure environment
-cp .env.example .env
+# 2. Configure environment (compose variable substitution reads docker/.env)
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+# Optional: provide in-container app config, avoids Docker auto-creating an empty dir
+cp server/.env.example server/.env
 
-# 3. Start development environment
-docker-compose up -d
+# 3. Start development environment (compose files live in docker/, run compose there)
+cd docker
+docker compose up -d
 
 # 4. Access services
 echo "Web panel + API: http://localhost:8080"
 echo "Health Check: http://localhost:8080/health"
 
 # 5. View logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 **That's it!** You now have Ditto Cloud running locally.
@@ -486,13 +502,13 @@ docker-compose logs -f
 **Best for**: Development, testing, local access
 
 ```bash
-# Start services
-docker-compose up -d
+# Start services (run inside docker/, see "5-Minute Quick Start")
+docker compose up -d
 
 # Verify deployment
 curl http://localhost:8080/health
 
-# Expected response: {"status":"ok","timestamp":"..."}
+# Expected response: {"status":"ok","uptime":"..."}
 
 # Access web panel: http://localhost:8080
 ```
@@ -502,12 +518,12 @@ curl http://localhost:8080/health
 
 **Stop Services:**
 ```bash
-docker-compose down
+docker compose down
 ```
 
 **Reset Data (⚠️ Deletes all data):**
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ---
@@ -539,15 +555,18 @@ docker compose version
 ```bash
 cd /opt
 sudo git clone https://github.com/sabrogden/Ditto.git
+sudo chown -R $USER /opt/Ditto
 cd Ditto
 
-# Configure environment
-cp .env.example .env
+# Configure environment (compose variable substitution reads docker/.env)
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+# Optional: provide in-container app config, avoids Docker auto-creating an empty dir
+cp server/.env.example server/.env
 
 # Verify configuration
-cat .env | grep JWT_SECRET
+cat docker/.env | grep JWT_SECRET
 ```
 
 #### Step 3: Generate SSL Certificates
@@ -555,8 +574,7 @@ cat .env | grep JWT_SECRET
 **Option A: Self-Signed (Testing Only)**
 
 ```bash
-chmod +x generate-certs.sh
-./generate-certs.sh "ditto.local"
+./scripts/generate-certs.sh "ditto.local"
 ```
 
 **Option B: Let's Encrypt (Production)**
@@ -582,11 +600,12 @@ sudo chmod 600 certs/server.key
 #### Step 4: Deploy with HTTPS
 
 ```bash
-# Start production environment
-docker-compose -f docker-compose.prod.yml up -d
+# Start production environment (single container, Go serves API + static frontend; run inside docker/)
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 
 # Verify deployment
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 # Test HTTPS endpoint
 curl -k https://localhost/health
@@ -620,7 +639,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/Ditto
+WorkingDirectory=/opt/Ditto/docker
 ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
 ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
 TimeoutStartSec=0
@@ -677,11 +696,11 @@ curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
 sudo usermod -aG docker $USER
 
-git clone https://github.com/sabrogten/Ditto.git
+git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
-cp .env.example .env
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
 
 # 5. Get Let's Encrypt certificate
 sudo apt install -y certbot
@@ -692,7 +711,8 @@ sudo cp /etc/letsencrypt/live/ditto.your-domain.com/fullchain.pem certs/server.c
 sudo cp /etc/letsencrypt/live/ditto.your-domain.com/privkey.pem certs/server.key
 
 # 6. Start services
-docker-compose -f docker-compose.prod.yml up -d
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### DigitalOcean Droplet
@@ -804,7 +824,8 @@ Authentication:
 # - Self-signed or Let's Encrypt certificate
 # - Single backend instance
 
-docker-compose -f docker-compose.prod.yml up -d
+cd /opt/Ditto/docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 **Recommended Infrastructure:**
@@ -832,8 +853,9 @@ docker-compose -f docker-compose.prod.yml up -d
 > Redis pub/sub) before running more than one app instance.
 
 ```bash
-# Full stack with load balancing
-docker-compose -f docker-compose.prod.yml up -d
+# Full stack with load balancing (run inside docker/)
+cd /opt/Ditto/docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 **Recommended Infrastructure:**
@@ -855,7 +877,8 @@ scp backend.tar user@air-gapped-server:/opt/ditto/
 docker load < backend.tar
 
 # 4. Deploy
-docker-compose -f docker-compose.prod.yml up -d
+cd /opt/Ditto/docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Scenario 5: CI/CD Auto-Deployment
@@ -884,7 +907,8 @@ jobs:
         script: |
           cd /opt/Ditto
           git pull
-          docker-compose -f docker-compose.prod.yml up -d --build
+          cd docker
+          docker compose -f docker-compose.prod.yml up -d --build
           docker image prune -f
 ```
 
@@ -903,12 +927,12 @@ jobs:
 
 ### ✅ Application
 
-- [ ] Environment variables configured (`.env` file)
+- [ ] Environment variables configured (`docker/.env` file)
 - [ ] JWT secret is unique and secure
 - [ ] Admin account initialized (env vars / CLI / first-user registration)
-- [ ] Services running (`docker-compose ps`)
+- [ ] Services running (`docker compose ps`)
 - [ ] Health check passing (`curl https://localhost/health`)
-- [ ] Logs accessible and clean (`docker-compose logs`)
+- [ ] Logs accessible and clean (`docker compose logs`)
 - [ ] Web panel accessible via HTTPS
 
 ### ✅ Security
@@ -955,7 +979,7 @@ After deployment, run these commands to verify everything is working:
 docker info
 
 # 2. Check services running
-docker-compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 # 3. Check backend health
 curl -k https://localhost/health
@@ -964,7 +988,7 @@ curl -k https://localhost/health
 curl -k https://localhost/
 
 # 5. Check logs for errors
-docker-compose logs backend | grep -i error
+docker compose logs backend | grep -i error
 
 # 6. Check database
 docker exec ditto-backend ls -la /app/data/
@@ -989,17 +1013,20 @@ ls -lh test-backup.db
 ## Useful Commands Reference
 
 ```bash
+# All commands below run inside the docker/ directory
+cd /opt/Ditto/docker
+
 # Start services
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Stop services
-docker-compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 
 # Restart specific service
-docker-compose -f docker-compose.prod.yml restart backend
+docker compose -f docker-compose.prod.yml restart backend
 
 # View logs
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # View resource usage
 docker stats
@@ -1017,7 +1044,8 @@ docker cp ditto-backend:/tmp/backup.db ./backup-$(date +%Y%m%d).db
 # Update services
 cd /opt/Ditto
 git pull
-docker-compose -f docker-compose.prod.yml up -d --build
+cd docker
+docker compose -f docker-compose.prod.yml up -d --build
 
 # Clean up unused images
 docker image prune -f
@@ -1032,13 +1060,13 @@ docker system prune -a
 
 If you encounter issues during deployment:
 
-1. **Check Logs**: `docker-compose logs -f`
-2. **Verify Configuration**: `cat .env`
+1. **Check Logs**: `docker compose logs -f`
+2. **Verify Configuration**: `cat docker/.env`
 3. **Check Ports**: `sudo lsof -i :80 -i :443 -i :8080`
 4. **Test Connectivity**: `curl -k https://localhost/health`
 5. **Review Documentation**:
-   - [Full Deployment Guide](docs/DEPLOYMENT.md)
    - [Cloud Deployment Guide](docs/CLOUD_DEPLOYMENT.md)
+   - [User Manual](docs/USER_MANUAL.md)
    - [Project Plan](docs/PROJECT_PLAN.md)
 6. **GitHub Issues**: https://github.com/sabrogden/Ditto/issues
 7. **Community Forum**: https://github.com/sabrogden/Ditto/discussions

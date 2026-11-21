@@ -50,7 +50,7 @@ scripts/test-e2e.sh  # 启动 Go 后端 -> 健康检查 -> 注册 -> 登录 -> A
 - **C++ 代码无法在此环境编译**（Linux，无 MSVC/MFC）
 - 修改 `src/` 或 `Addins/` 中的 C++ 代码时，仅做不影响编译的改动（如注释、文档、轻量重构）
 - 所有 `docker/` 内的 Compose 文件已更新内部路径，勿回退到根目录
-- 首次部署需 `cp .env.example .env` 并设置 `JWT_SECRET`
+- 首次部署需 `cp .env.example docker/.env` 并设置 `JWT_SECRET`（compose 变量替换读取 `docker/.env`）
 
 ## 目录结构
 
@@ -69,7 +69,7 @@ docs/         — 文档 (部署指南, 架构设计, 用户手册)
 ## 测试须知
 
 - Go 测试无需外部依赖，直接 `go test ./...` 即可
-- Web E2E 测试需要先启动 Go 后端（`make run` 或 `docker-compose up -d`）
+- Web E2E 测试需要先启动 Go 后端（`make run` 或在 `docker/` 目录 `docker compose up -d`）
 - E2E 集成测试脚本会自行启动/停止 Go 后端
 - 测试管理员账号通过环境变量 `ADMIN_USERNAME`/`ADMIN_PASSWORD` 首次自动创建
 

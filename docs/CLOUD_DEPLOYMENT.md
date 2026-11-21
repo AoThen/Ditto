@@ -82,23 +82,25 @@ cd Ditto
 ### 步骤 4: 配置环境
 
 ```bash
-# 复制示例环境文件
-cp .env.example .env
+# 复制示例环境文件（compose 变量替换读取 docker/.env）
+cp .env.example docker/.env
 
 # 生成 JWT 密钥
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+
+# 可选：提供容器内应用配置，避免 Docker 自动创建空目录
+cp server/.env.example server/.env
 
 # 查看配置
-cat .env
+cat docker/.env
 ```
 
 ### 步骤 5: 生成 SSL 证书
 
 ```bash
 # 生成自签名证书（仅测试用）
-chmod +x generate-certs.sh
-./generate-certs.sh "ditto.local"
+./scripts/generate-certs.sh "ditto.local"
 
 # 生产环境请使用 Let's Encrypt（见下方 SSL/TLS 章节）
 ```
@@ -106,14 +108,15 @@ chmod +x generate-certs.sh
 ### 步骤 6: 启动服务
 
 ```bash
-# 使用 HTTPS 的生产环境部署
-sudo docker-compose -f docker-compose.prod.yml up -d
+# 使用 HTTPS 的生产环境部署（compose 文件位于 docker/ 目录）
+cd docker
+sudo docker compose -f docker-compose.prod.yml up -d
 
 # 检查状态
-sudo docker-compose -f docker-compose.prod.yml ps
+sudo docker compose -f docker-compose.prod.yml ps
 
 # 查看日志
-sudo docker-compose -f docker-compose.prod.yml logs -f
+sudo docker compose -f docker-compose.prod.yml logs -f
 ```
 
 ### 步骤 7: 配置防火墙
@@ -318,8 +321,9 @@ openssl x509 -in certs/server.crt -noout -dates
 openssl x509 -in certs/server.crt -noout -text | grep "Subject:"
 
 # 重新生成证书
-./generate-certs.sh "your-domain.com"
-docker-compose -f docker-compose.prod.yml restart
+./scripts/generate-certs.sh "your-domain.com"
+cd docker
+docker compose -f docker-compose.prod.yml restart
 ```
 
 ---
@@ -437,23 +441,25 @@ cd Ditto
 #### Step 4: Configure Environment
 
 ```bash
-# Copy example environment file
-cp .env.example .env
+# Copy example environment file (compose variable substitution reads docker/.env)
+cp .env.example docker/.env
 
 # Generate JWT secret
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+
+# Optional: provide in-container app config, avoids Docker auto-creating an empty dir
+cp server/.env.example server/.env
 
 # Review configuration
-cat .env
+cat docker/.env
 ```
 
 #### Step 5: Generate SSL Certificates
 
 ```bash
 # For self-signed certificates (testing only)
-chmod +x generate-certs.sh
-./generate-certs.sh "ditto.local"
+./scripts/generate-certs.sh "ditto.local"
 
 # For production, use Let's Encrypt (see SSL/TLS section below)
 ```
@@ -461,14 +467,15 @@ chmod +x generate-certs.sh
 #### Step 6: Start Services
 
 ```bash
-# Production deployment with HTTPS
-sudo docker-compose -f docker-compose.prod.yml up -d
+# Production deployment with HTTPS (compose files live in docker/)
+cd docker
+sudo docker compose -f docker-compose.prod.yml up -d
 
 # Check status
-sudo docker-compose -f docker-compose.prod.yml ps
+sudo docker compose -f docker-compose.prod.yml ps
 
 # View logs
-sudo docker-compose -f docker-compose.prod.yml logs -f
+sudo docker compose -f docker-compose.prod.yml logs -f
 ```
 
 #### Step 7: Configure Firewall
@@ -505,7 +512,7 @@ After=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/Ditto
+WorkingDirectory=/opt/Ditto/docker
 ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d
 ExecStop=/usr/bin/docker compose -f docker-compose.prod.yml down
 TimeoutStartSec=0
@@ -532,9 +539,8 @@ sudo yum install -y docker-ce docker-ce-cli containerd.io
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# Install Docker Compose (v2 plugin)
+sudo yum install -y docker-compose-plugin
 
 # Continue with steps from Ubuntu section (Step 3 onwards)
 ```
@@ -561,13 +567,13 @@ cd C:\
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# Copy environment file
-Copy-Item .env.example .env
+# Copy environment file (compose variable substitution reads docker/.env)
+Copy-Item .env.example docker/.env
 
 # Generate JWT secret (requires OpenSSL)
 # Download OpenSSL for Windows or use WSL
 $JWT_SECRET = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | ForEach-Object {[char]$_})
-(Get-Content .env) -replace '^JWT_SECRET=.*', "JWT_SECRET=$JWT_SECRET" | Set-Content .env
+(Get-Content docker/.env) -replace '^JWT_SECRET=.*', "JWT_SECRET=$JWT_SECRET" | Set-Content docker/.env
 ```
 
 #### Step 4: Generate Certificates
@@ -578,10 +584,14 @@ $cert = New-SelfSignedCertificate -DnsName "ditto.local" -CertStoreLocation "cer
 Export-PfxCertificate -Cert $cert -FilePath certs\server.pfx -Password (ConvertTo-SecureString -String "password" -Force -AsPlainText)
 ```
 
+> ⚠️ 服务端读取的是 PEM 格式的 `certs/server.crt` + `certs/server.key`（见 `docker-compose.prod.yml`）。
+> PFX 需转换为 PEM（例如在 WSL 中执行 `openssl pkcs12 -in certs/server.pfx -nodes -out certs/server.pem && openssl rsa -in certs/server.pem -out certs/server.key && openssl x509 -in certs/server.pem -out certs/server.crt`），或直接在 WSL 中运行 `./scripts/generate-certs.sh`。
+
 #### Step 5: Start Services
 
 ```powershell
-docker-compose -f docker-compose.prod.yml up -d
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ---
@@ -671,17 +681,17 @@ sudo apt install -y docker-compose-plugin
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# Configure
-cp .env.example .env
+# Configure (compose variable substitution reads docker/.env)
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
 
 # Generate certificates (replace with your domain)
-chmod +x generate-certs.sh
-./generate-certs.sh "ditto.your-domain.com"
+./scripts/generate-certs.sh "ditto.your-domain.com"
 
-# Start services
-docker-compose -f docker-compose.prod.yml up -d
+# Start services (compose files live in docker/)
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 #### Step 4: Configure Route 53 (Optional)
@@ -704,12 +714,14 @@ sudo apt install -y certbot
 # Obtain certificate (stop nginx temporarily if running)
 sudo certbot certonly --standalone -d ditto.your-domain.com
 
-# Copy certificates
+# Copy certificates (switch back to repo root where certs/ lives)
+cd /opt/Ditto
 sudo cp /etc/letsencrypt/live/ditto.your-domain.com/fullchain.pem certs/server.crt
 sudo cp /etc/letsencrypt/live/ditto.your-domain.com/privkey.pem certs/server.key
 
 # Restart services
-docker-compose -f docker-compose.prod.yml restart
+cd docker
+docker compose -f docker-compose.prod.yml restart
 ```
 
 #### Step 6: Set Up CloudWatch Monitoring
@@ -1296,7 +1308,7 @@ scrape_configs:
 #### Step 3: Start Monitoring Stack
 
 ```bash
-docker-compose up -d
+docker compose up -d
 # Access Grafana at http://localhost:3000
 ```
 
@@ -1492,7 +1504,7 @@ docker cp ditto-backend:/tmp/backup.db $BACKUP_DIR/ditto-db-$DATE.db
 tar czf $BACKUP_DIR/ditto-certs-$DATE.tar.gz -C /opt/Ditto/certs .
 
 # Backup configuration
-cp /opt/Ditto/.env $BACKUP_DIR/ditto-env-$DATE.bak
+cp /opt/Ditto/docker/.env $BACKUP_DIR/ditto-env-$DATE.bak
 
 # Compress database backup
 gzip $BACKUP_DIR/ditto-db-$DATE.db
@@ -1516,7 +1528,7 @@ chmod +x /opt/ditto-backup/backup.sh
 
 ```bash
 # 1. Stop all services
-docker-compose down
+docker compose down
 
 # 2. Restore database backup
 gunzip -c /opt/ditto-backups/ditto-db-20231201.db.gz > /tmp/ditto.db
@@ -1526,13 +1538,13 @@ docker cp /tmp/ditto.db ditto-backend:/app/data/ditto_cloud.db
 tar xzf /opt/ditto-backups/ditto-certs-20231201.tar.gz -C /opt/Ditto/
 
 # 4. Restore configuration
-cp /opt/ditto-backups/ditto-env-20231201.bak /opt/Ditto/.env
+cp /opt/ditto-backups/ditto-env-20231201.bak /opt/Ditto/docker/.env
 
 # 5. Restart services
-docker-compose up -d
+docker compose up -d
 
 # 6. Verify services
-docker-compose ps
+docker compose ps
 curl -k https://localhost/health
 ```
 
@@ -1558,7 +1570,7 @@ sudo lsof -i :8080
 sudo fuser -k 8080/tcp
 
 # 3. Invalid JWT secret
-cat .env | grep JWT_SECRET
+cat docker/.env | grep JWT_SECRET
 ```
 
 #### WebSocket Connection Fails
@@ -1581,8 +1593,9 @@ openssl x509 -in certs/server.crt -noout -dates
 openssl x509 -in certs/server.crt -noout -text | grep "Subject:"
 
 # Regenerate certificates
-./generate-certs.sh "your-domain.com"
-docker-compose -f docker-compose.prod.yml restart
+./scripts/generate-certs.sh "your-domain.com"
+cd docker
+docker compose -f docker-compose.prod.yml restart
 ```
 
 #### Database Lock Issues
@@ -1622,7 +1635,7 @@ docker exec ditto-backend sqlite3 /app/data/ditto_cloud.db "VACUUM; ANALYZE;"
 docker logs --tail 100 ditto-backend | grep -i error
 
 # Follow specific service logs
-docker-compose logs -f backend | grep -i "sync\|websocket\|database"
+docker compose logs -f backend | grep -i "sync\|websocket\|database"
 
 # Export logs for analysis
 docker logs ditto-backend > backend-$(date +%Y%m%d).log 2>&1

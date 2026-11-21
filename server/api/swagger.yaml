@@ -1,0 +1,697 @@
+openapi: 3.0.3
+info:
+  title: Ditto Cloud Server API
+  description: |
+    Ditto 剪贴板云端同步服务 REST API。
+
+    - 认证：JWT Access Token（Authorization: Bearer）+ Refresh Token
+    - 实时推送：WebSocket `GET /api/v1/ws?token=<JWT>`
+    - 端到端加密：剪贴板数据以 AES-256-GCM 密文存储，服务端不可解密
+    - 错误码规范见 `docs/PROJECT_PLAN.md` 6.3 节
+  version: 1.0.0
+servers:
+  - url: /
+    description: 同源部署（Go 单容器统一输出 API 与 Web 面板）
+tags:
+  - name: auth
+    description: 认证与账号
+  - name: clips
+    description: 剪贴板与同步
+  - name: groups
+    description: 分组管理
+  - name: devices
+    description: 设备管理
+  - name: encryption
+    description: 端到端加密
+  - name: stats
+    description: 统计与日志
+  - name: admin
+    description: 管理员（需 admin 角色）
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: 存活探针（无需认证，位于根路径）
+      security: []
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  uptime: { type: string, example: 1h2m3s }
+
+  # ---------------- 认证 ----------------
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: 用户注册
+      description: 数据库为空时首个注册用户自动成为管理员，之后注册关闭（返回 40302）。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '200': { description: 注册成功，返回用户信息与 JWT 令牌 }
+        '400': { description: 参数错误（40000）/ 用户名已存在（40001）/ 邮箱已被注册（40002） }
+        '403': { description: 注册已关闭（40302） }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: 登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: 登录成功，返回用户信息、access_token 与 refresh_token }
+        '401': { description: 用户名或密码错误（40101） }
+        '403': { description: 账号已被禁用（40301） }
+        '423': { description: 账号已锁定（42301） }
+        '429': { description: 尝试次数过多（42901） }
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: 刷新 Access Token
+      responses:
+        '200': { description: 返回新的 JWT 令牌对 }
+        '401': { description: Token 刷新失败（40101） }
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: 登出
+      responses:
+        '200': { description: 已登出 }
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: 当前登录用户信息
+      responses:
+        '200': { description: 用户信息 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ---------------- 设备 ----------------
+  /api/v1/devices:
+    get:
+      tags: [devices]
+      summary: 设备列表
+      responses:
+        '200': { description: 当前用户的设备列表 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/devices/{id}:
+    patch:
+      tags: [devices]
+      summary: 更新设备名称
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_name]
+              properties:
+                device_name: { type: string }
+      responses:
+        '200': { description: 更新成功 }
+        '404': { description: 设备不存在（40400） }
+    delete:
+      tags: [devices]
+      summary: 移除设备
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 移除成功 }
+        '404': { description: 设备不存在（40400） }
+
+  # ---------------- 剪贴板 ----------------
+  /api/v1/clips:
+    get:
+      tags: [clips]
+      summary: 剪贴板列表（分页）
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 20 } }
+        - { name: search, in: query, schema: { type: string }, description: 按内容/拼音模糊搜索 }
+        - { name: group_id, in: query, schema: { type: string } }
+        - { name: sort_by, in: query, schema: { type: string, enum: [updated_at, created_at, clip_order] } }
+        - { name: sort_order, in: query, schema: { type: string, enum: [asc, desc] } }
+      responses:
+        '200':
+          description: 分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PaginatedClips' }
+        '400': { description: 无效的排序参数（40000） }
+  /api/v1/clips/{id}:
+    get:
+      tags: [clips]
+      summary: 剪贴板详情（含各格式数据）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 剪贴板详情 }
+        '404': { description: 剪贴板不存在（40400） }
+    delete:
+      tags: [clips]
+      summary: 删除剪贴板（软删除，全局生效）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 删除成功 }
+        '404': { description: 剪贴板不存在（40400） }
+  /api/v1/clips/{id}/download:
+    get:
+      tags: [clips]
+      summary: 下载指定格式数据
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: format_type, in: query, schema: { type: integer, default: 13 }, description: 13 = CF_UNICODETEXT }
+      responses:
+        '200': { description: 格式数据（base64） }
+        '404': { description: 剪贴板或格式不存在（40400/40401） }
+  /api/v1/clips/changes:
+    get:
+      tags: [clips]
+      summary: 增量拉取变更
+      parameters:
+        - { name: since, in: query, schema: { type: string, format: date-time }, description: 上次同步时间（RFC3339） }
+        - { name: limit, in: query, schema: { type: integer, default: 1000, maximum: 5000 } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+      responses:
+        '200':
+          description: 变更集
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/ChangesResponse' }
+        '400': { description: 无效的 since 参数（40000） }
+  /api/v1/clips/sync:
+    post:
+      tags: [clips]
+      summary: 批量推送 + 拉取
+      description: |
+        一次请求完成双向同步：推送 `push_clips`（服务端按 CRC 去重、按 LWW 解决冲突），
+        并返回 `since` 之后的远端变更。`device_id` 首次出现时自动注册设备。
+        请求体过大返回 413（41300），需分批提交。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncRequest' }
+      responses:
+        '200':
+          description: 同步结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/SyncResponse' }
+        '413': { description: 同步数据量过大（41300） }
+        '429': { description: 同步请求过于频繁（42902） }
+  /api/v1/clips/conflicts:
+    get:
+      tags: [clips]
+      summary: 冲突副本列表（分页）
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: 冲突副本分页列表 }
+  /api/v1/clips/conflicts/{id}/resolve:
+    post:
+      tags: [clips]
+      summary: 解决冲突
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [accept, discard], description: accept=采用冲突副本，discard=丢弃 }
+      responses:
+        '200': { description: 处理成功 }
+        '400': { description: 无效的操作类型（40000） }
+        '404': { description: 冲突剪贴板不存在（40400） }
+  /api/v1/clips/remove-from-group:
+    post:
+      tags: [clips]
+      summary: 从分组移除剪贴板
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clip_ids]
+              properties:
+                clip_ids: { type: array, items: { type: string } }
+      responses:
+        '200': { description: 移除成功 }
+  /api/v1/clips/batch-delete:
+    post:
+      tags: [clips]
+      summary: 批量删除
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: string } }
+      responses:
+        '200': { description: 返回实际删除数量 }
+  /api/v1/clips/batch-dont-sync:
+    post:
+      tags: [clips]
+      summary: 批量标记"不同步"（本地保留，云端数据清空）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: string } }
+      responses:
+        '200': { description: 返回实际标记数量 }
+
+  # ---------------- 分组 ----------------
+  /api/v1/groups:
+    get:
+      tags: [groups]
+      summary: 分组列表（分页）
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50 } }
+      responses:
+        '200': { description: 分组分页列表 }
+    post:
+      tags: [groups]
+      summary: 创建分组
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateGroupRequest' }
+      responses:
+        '200': { description: 分组创建成功 }
+        '400': { description: 请求参数错误（40000） }
+  /api/v1/groups/{id}:
+    get:
+      tags: [groups]
+      summary: 分组详情
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 分组信息 }
+        '404': { description: 分组不存在（40400） }
+    put:
+      tags: [groups]
+      summary: 更新分组
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateGroupRequest' }
+      responses:
+        '200': { description: 更新成功 }
+        '404': { description: 分组不存在（40400） }
+    delete:
+      tags: [groups]
+      summary: 删除分组
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 删除成功 }
+        '404': { description: 分组不存在（40400） }
+  /api/v1/groups/{id}/move-clips:
+    post:
+      tags: [groups]
+      summary: 移动剪贴板到分组
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clip_ids]
+              properties:
+                clip_ids: { type: array, items: { type: string } }
+      responses:
+        '200': { description: 移动成功 }
+        '404': { description: 分组不存在（40400） }
+
+  # ---------------- 端到端加密 ----------------
+  /api/v1/encryption/setup:
+    post:
+      tags: [encryption]
+      summary: 首次启用端到端加密
+      description: 服务端生成并存储 salt；客户端用 PBKDF2(密码, salt) 派生密钥后上传 wrapped_dek 与 verification_hash。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetupEncryptionRequest' }
+      responses:
+        '200': { description: 加密已启用 }
+        '400': { description: 请求参数错误（40000） }
+  /api/v1/encryption/salt:
+    get:
+      tags: [encryption]
+      summary: 获取当前用户的加密 salt
+      responses:
+        '200': { description: salt（base64） }
+  /api/v1/encryption/key-material:
+    get:
+      tags: [encryption]
+      summary: 获取密钥材料（用于 .dittokey 密钥文件导入）
+      responses:
+        '200': { description: 密钥材料 }
+        '404': { description: 尚未启用加密 }
+  /api/v1/encryption/disable:
+    post:
+      tags: [encryption]
+      summary: 关闭端到端加密
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verification_hash]
+              properties:
+                verification_hash: { type: string }
+      responses:
+        '200': { description: 已关闭 }
+  /api/v1/encryption/change-password:
+    post:
+      tags: [encryption]
+      summary: 修改加密密码（轮换 salt 与 wrapped_dek）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200': { description: 密码已修改 }
+
+  # ---------------- 统计 ----------------
+  /api/v1/stats/overview:
+    get:
+      tags: [stats]
+      summary: 统计概览（剪贴板数、存储占用、设备数等）
+      responses:
+        '200': { description: 统计数据 }
+  /api/v1/stats/sync-logs:
+    get:
+      tags: [stats]
+      summary: 同步日志查询
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: 同步日志分页列表 }
+
+  # ---------------- WebSocket ----------------
+  /api/v1/ws:
+    get:
+      tags: [clips]
+      summary: WebSocket 实时同步推送
+      description: |
+        升级为 WebSocket 连接；握手时通过 `?token=<JWT>` 认证。
+        事件：clips_added / clips_updated / clips_deleted / groups_changed 等；
+        其他设备产生变更时即时推送，客户端据此触发增量拉取。
+      parameters:
+        - { name: token, in: query, required: true, schema: { type: string }, description: JWT Access Token }
+      responses:
+        '101': { description: 切换为 WebSocket 连接 }
+        '401': { description: 认证失败（40100/40102） }
+
+  # ---------------- 管理员 ----------------
+  /api/v1/admin/users:
+    get:
+      tags: [admin]
+      summary: 用户列表
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: 用户分页列表 }
+        '403': { description: 需要管理员权限（40301） }
+    post:
+      tags: [admin]
+      summary: 创建用户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserRequest' }
+      responses:
+        '200': { description: 创建成功 }
+        '400': { description: 参数错误 / 用户名已存在 / 邮箱已被注册（40000/40001/40002） }
+        '403': { description: 需要管理员权限（40301） }
+  /api/v1/admin/users/{id}:
+    get:
+      tags: [admin]
+      summary: 用户详情
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: 用户信息 }
+        '404': { description: 用户不存在（40400） }
+    put:
+      tags: [admin]
+      summary: 更新用户（邮箱/密码/启用状态/角色）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserRequest' }
+      responses:
+        '200': { description: 更新成功 }
+        '404': { description: 用户不存在（40400） }
+    delete:
+      tags: [admin]
+      summary: 删除用户
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200': { description: 删除成功 }
+        '404': { description: 用户不存在（40400） }
+  /api/v1/admin/users/{id}/reset-password:
+    post:
+      tags: [admin]
+      summary: 重置用户密码
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, minLength: 6, maxLength: 64 }
+      responses:
+        '200': { description: 重置成功 }
+        '404': { description: 用户不存在（40400） }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: 未认证（40100）/ 令牌无效或已过期（40102）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+    ServerError:
+      description: 服务器内部错误（50000）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+  schemas:
+    ApiResponse:
+      type: object
+      description: 统一响应包装；code=0 成功，非 0 为业务错误码
+      properties:
+        code: { type: integer, example: 0 }
+        message: { type: string, example: '' }
+        data: { description: 业务数据 }
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 32 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6, maxLength: 64 }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+        device_id: { type: string, description: 可选；提供时登录并绑定设备 }
+    PaginatedClips:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ClipDetail' }
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+        has_more: { type: boolean }
+    ClipDetail:
+      type: object
+      description: 剪贴板条目；字段以服务端返回为准（含 id、description、formats、group、排序与时间戳等）
+      properties:
+        id: { type: string }
+        description: { type: string }
+        formats:
+          type: array
+          items:
+            type: object
+            properties:
+              format_type: { type: integer, example: 13 }
+              data: { type: string, description: base64 编码数据 }
+    ChangesResponse:
+      type: object
+      properties:
+        clips:
+          type: array
+          items: { $ref: '#/components/schemas/ClipDetail' }
+        server_time: { type: string, format: date-time }
+        has_more: { type: boolean }
+        next_page: { type: integer }
+        deleted_ids: { type: array, items: { type: string } }
+        dont_sync_ids: { type: array, items: { type: string } }
+    SyncRequest:
+      type: object
+      properties:
+        device_id: { type: string }
+        since: { type: string, format: date-time }
+        limit: { type: integer, default: 1000, maximum: 5000 }
+        page: { type: integer, default: 1 }
+        force: { type: boolean, description: 强制推送：跳过去重/LWW，本地内容优先 }
+        push_clips:
+          type: array
+          items: { $ref: '#/components/schemas/PushClipItem' }
+    PushClipItem:
+      type: object
+      properties:
+        id: { type: string }
+        description: { type: string }
+        crc: { type: integer, format: int64 }
+        group_id: { type: string }
+        short_cut: { type: integer }
+        updated_at: { type: string, format: date-time, description: 用于 LWW 冲突解决 }
+        clip_order: { type: number }
+        clip_group_order: { type: number }
+        formats:
+          type: array
+          items: { $ref: '#/components/schemas/PushFormatItem' }
+    PushFormatItem:
+      type: object
+      properties:
+        format_type: { type: integer, example: 13 }
+        data: { type: string, description: base64 编码数据 }
+        encrypted: { type: boolean, description: true 表示数据已端到端加密 }
+    SyncResponse:
+      type: object
+      properties:
+        new_clips:
+          type: array
+          items: { $ref: '#/components/schemas/ClipDetail' }
+        deleted_ids: { type: array, items: { type: string } }
+        updated_count: { type: integer }
+        skipped_count: { type: integer, description: LWW 冲突跳过数 }
+        sync_time: { type: string, format: date-time }
+        has_more: { type: boolean }
+        next_page: { type: integer }
+        dont_sync_ids: { type: array, items: { type: string } }
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        parent_id: { type: string, nullable: true }
+        clip_order: { type: number }
+    UpdateGroupRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        parent_id: { type: string, nullable: true }
+        clip_order: { type: number }
+    CreateUserRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 32 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6, maxLength: 64 }
+    UpdateUserRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6, maxLength: 64 }
+        is_active: { type: boolean }
+        role: { type: string, enum: [admin, user] }
+    SetupEncryptionRequest:
+      type: object
+      required: [wrapped_dek, verification_hash]
+      properties:
+        wrapped_dek: { type: string, description: 用密码派生密钥包裹的数据密钥（base64） }
+        verification_hash: { type: string, description: 密码校验哈希 }
+        password_hint: { type: string, description: 密码提示（可选） }
+    ChangePasswordRequest:
+      type: object
+      required: [old_verification_hash, new_salt, new_wrapped_dek, new_verification_hash]
+      properties:
+        old_verification_hash: { type: string }
+        new_salt: { type: string }
+        new_wrapped_dek: { type: string }
+        new_verification_hash: { type: string }
+        new_password_hint: { type: string }

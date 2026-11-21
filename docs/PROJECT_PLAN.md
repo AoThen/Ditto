@@ -333,59 +333,90 @@ CREATE TABLE user_settings (
 
 ### 6.1 接口总览
 
+> 以下为 `server/cmd/server/main.go` 实际注册的路由。
+
 ```
 Base URL: /api/v1
 
-认证相关
-  POST   /auth/register              # 用户注册
+认证
+  POST   /auth/register              # 用户注册（首个用户自动成为管理员，之后关闭注册）
   POST   /auth/login                 # 登录
   POST   /auth/refresh               # 刷新 Token
-  POST   /auth/device/register       # 设备注册
   POST   /auth/logout                # 登出
+  GET    /auth/me                    # 当前用户信息
 
 剪贴板
-  GET    /clips                      # 列表（分页/搜索/过滤）
+  GET    /clips                      # 列表（?page=&per_page=&search=&group_id=&sort_by=&sort_order=）
   GET    /clips/:id                  # 详情
-  GET    /clips/:id/download         # 下载格式数据
-  POST   /clips/sync                 # 批量推送
-  GET    /clips/changes              # 增量同步 (?since=timestamp)
-  DELETE /clips/:id                  # 删除
-  POST   /clips/batch                # 批量操作
-  DELETE /clips/clear                # 清空（可筛选）
+  GET    /clips/:id/download         # 下载格式数据（?format_type=）
+  POST   /clips/sync                 # 批量推送 + 拉取（CRC 去重 + LWW 冲突解决）
+  GET    /clips/changes              # 增量拉取（?since=&limit=&page=）
+  DELETE /clips/:id                  # 删除（软删除，全局生效）
+  GET    /clips/conflicts            # 冲突副本列表
+  POST   /clips/conflicts/:id/resolve # 解决冲突（action: accept | discard）
+  POST   /clips/remove-from-group    # 从分组移除
+  POST   /clips/batch-delete         # 批量删除
+  POST   /clips/batch-dont-sync      # 批量标记"不同步"
 
 分组
-  GET    /groups                     # 分组列表
+  GET    /groups                     # 分组列表（分页）
   POST   /groups                     # 创建分组
+  GET    /groups/:id                 # 分组详情
   PUT    /groups/:id                 # 更新分组
   DELETE /groups/:id                 # 删除分组
+  POST   /groups/:id/move-clips      # 移动剪贴板到分组
 
 设备管理
   GET    /devices                    # 设备列表
+  PATCH  /devices/:id                # 更新设备名称
   DELETE /devices/:id                # 移除设备
 
+端到端加密
+  POST   /encryption/setup           # 首次设置加密密码（服务端生成 salt）
+  GET    /encryption/salt            # 获取 salt
+  GET    /encryption/key-material    # 获取密钥材料（用于密钥文件导入）
+  POST   /encryption/disable         # 关闭加密
+  POST   /encryption/change-password # 修改加密密码
+
 统计
-  GET    /stats/overview             # 总览（剪贴板数、存储、趋势）
+  GET    /stats/overview             # 总览（剪贴板数、存储、设备数）
   GET    /stats/sync-logs            # 同步日志查询
 
+管理员（需 admin 角色）
+  POST   /admin/users                # 创建用户
+  GET    /admin/users                # 用户列表
+  GET    /admin/users/:id            # 用户详情
+  PUT    /admin/users/:id            # 更新用户
+  DELETE /admin/users/:id            # 删除用户
+  POST   /admin/users/:id/reset-password # 重置密码
+
 WebSocket
-  WS     /ws/sync                    # 实时同步推送
-  WS     /ws/notifications           # 系统通知
+  WS     /ws                         # 实时同步推送（?token=<JWT> 握手认证）
+
+健康检查（v1 之外）
+  GET    /health                     # 存活探针
 ```
+
+> 设备无需单独注册接口：`/clips/sync` 携带 `device_id` 时自动注册并绑定当前用户。
 
 ### 6.2 核心接口示例
 
-#### 增量同步（Pull）
+> 响应均为统一包装：`{"code": 0, "message": "...", "data": {...}}`，以下省略包装直接展示 `data`。
+
+#### 增量拉取（Pull）
 
 ```
-GET /clips/changes?since=2024-04-07T10:30:00Z&device_id=xxx
+GET /clips/changes?since=2024-04-07T10:30:00Z&limit=1000&page=1
 Authorization: Bearer <JWT>
 
 Response 200:
 {
-  "clips": [...],           // 自 since 以来变更的剪贴板
+  "clips": [...],            // 自 since 以来变更的剪贴板
   "server_time": "2024-04-07T10:35:00Z",
   "has_more": false,
-  "deleted_ids": [123, 456] // 已删除的 ID
+  "next_page": 0,
+  "deleted_ids": ["123", "456"],   // 其他设备已删除的 ID
+  "dont_sync_ids": ["789"]         // 其他设备标记"不同步"的 ID
 }
 ```
 
@@ -394,77 +425,93 @@ Response 200:
 ```
 POST /clips/sync
 Authorization: Bearer <JWT>
-X-Device-Id: xxx
 
 {
-  "clips": [
+  "device_id": "device-xxx",
+  "since": "2024-04-07T10:30:00Z",
+  "limit": 1000,
+  "page": 1,
+  "force": false,
+  "push_clips": [
     {
-      "remote_clip_id": "abc123",
+      "id": "abc123",
       "description": "复制的代码片段",
       "crc": 1234567890,
+      "group_id": "",
+      "updated_at": "2024-04-07T10:31:00Z",
+      "clip_order": 0,
+      "clip_group_order": 0,
       "formats": [
         {
-          "format_name": "CF_UNICODETEXT",
-          "data": "base64编码数据",
-          "data_size": 1024
+          "format_type": 13,          // 13 = CF_UNICODETEXT
+          "data": "<base64 编码数据>",
+          "encrypted": true           // 端到端加密时为 true
         }
       ]
     }
-  ],
-  "since": "2024-04-07T10:30:00Z"
+  ]
 }
 
 Response 200:
 {
-  "synced_count": 1,
-  "skipped_count": 0,    // 因 CRC 重复跳过
-  "server_time": "2024-04-07T10:35:00Z"
+  "new_clips": [...],          // 服务端远端变更（结构同 changes.clips）
+  "deleted_ids": [],
+  "updated_count": 1,
+  "skipped_count": 0,          // LWW 冲突跳过数
+  "sync_time": "2024-04-07T10:35:00Z",
+  "has_more": false,
+  "next_page": 0,
+  "dont_sync_ids": []
 }
 ```
 
 #### 获取剪贴板列表
 
 ```
-GET /clips?page=1&page_size=20&keyword=搜索&type=text&group_id=5
+GET /clips?page=1&per_page=20&search=搜索&group_id=5&sort_by=updated_at&sort_order=desc
 Authorization: Bearer <JWT>
 
 Response 200:
 {
-  "total": 156,
-  "clips": [
+  "items": [
     {
       "id": 1,
       "description": "复制的代码片段",
-      "formats": [
-        {"format_name": "CF_UNICODETEXT", "data_size": 1024}
-      ],
-      "is_group": false,
-      "created_at": "2024-04-07T10:00:00Z",
-      "source_device": "DESKTOP-IT0LKM8"
+      "formats": [ ... ],
+      "...": "其余字段见 GET /clips/:id"
     }
-  ]
+  ],
+  "total": 156,
+  "page": 1,
+  "per_page": 20,
+  "has_more": true
 }
 ```
 
 ### 6.3 错误码规范
 
-```json
-{
-  "code": 40001,
-  "message": "Token 已过期",
-  "details": null
-}
-```
+统一响应：`{"code": 0, "message": "...", "data": {...}}`；`code = 0` 成功，非 0 为业务错误码。
 
-| 错误码 | 含义 |
-|--------|------|
-| 40001 | Token 无效/过期 |
-| 40002 | 设备未注册 |
-| 40003 | 存储空间不足 |
-| 40004 | 剪贴板数据过大 |
-| 40005 | CRC 重复（客户端错误） |
-| 50001 | 数据库错误 |
-| 50002 | 对象存储错误 |
+| 错误码 | HTTP 状态 | 含义 |
+|--------|-----------|------|
+| 40000 | 400 | 请求参数错误 |
+| 40001 | 400 | 用户名已存在 |
+| 40002 | 400 | 邮箱已被注册 |
+| 40003 | 400 | 无法删除最后一个管理员账号 |
+| 40100 | 401 | 未提供认证令牌/设备令牌 |
+| 40101 | 401 | 用户名或密码错误 / Token 刷新失败 |
+| 40102 | 401 | 令牌无效或已过期 |
+| 40300 | 403 | 用户不存在 |
+| 40301 | 403 | 账号已被禁用 / 需要管理员权限 |
+| 40302 | 403 | 注册已关闭，请联系管理员 |
+| 40400 | 404 | 资源不存在（剪贴板/分组/设备/用户） |
+| 40401 | 404 | 指定格式不存在 |
+| 40901 | 409 | 冲突 |
+| 41300 | 413 | 同步数据量过大，请分批提交 |
+| 42301 | 423 | 账号已锁定（连续失败触发保护） |
+| 42901 | 429 | 尝试次数过多（登录限流） |
+| 42902 | 429 | 同步请求过于频繁 |
+| 50000 | 500 | 服务器内部错误 |
 
 ---
 
@@ -1061,7 +1108,7 @@ services:
 
 | 任务 | 产出 | 优先级 |
 |------|------|--------|
-| WebSocket 实时推送 | `/ws/sync`（Go channel 广播） | P0 |
+| WebSocket 实时推送 | `/api/v1/ws`（Go channel 广播） | P0 |
 | 端到端加密支持 | Salt 管理 + AES-256-GCM 工具包 | P0 |
 | 内存限流中间件 | 每 IP 5 次/分 + 持久化到 SQLite | P0 |
 | 请求日志中间件 | zap 结构化日志 | P1 |

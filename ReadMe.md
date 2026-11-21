@@ -1,6 +1,6 @@
 # [Ditto - 剪贴板管理器](https://github.com/sabrogden/Ditto/releases/download/3.25.113.0/DittoSetup_3_25_113_0.exe)
 
-![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/sabrogden/Ditto/latest/total) ![GitHub commits since latest release](https://img.shields.io/github/commits-since/sabrogden/Ditto/latest) ![GitHub contributors](https://img.shields.io/github/contributors/sabrogten/Ditto)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/sabrogden/Ditto/latest/total) ![GitHub commits since latest release](https://img.shields.io/github/commits-since/sabrogden/Ditto/latest) ![GitHub contributors](https://img.shields.io/github/contributors/sabrogden/Ditto)
 
 ---
 
@@ -42,13 +42,17 @@ Ditto 现在支持**云端同步**和基于 Web 的管理面板，实现跨设�
 git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 
-# 2. 配置环境
-cp .env.example .env
+# 2. 配置环境（compose 变量替换读取 docker/.env）
+cp .env.example docker/.env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" docker/.env
+# 可选：提供容器内应用配置，避免 Docker 自动创建空目录
+cp server/.env.example server/.env
 
-# 3. 启动后端服务
-docker-compose up -d
+# 3. 启动后端服务（compose 文件位于 docker/ 目录）
+cd docker
+docker compose up -d
+cd ..
 
 # 4. 启动前端（开发模式）
 cd web && npm install && npm run dev
@@ -62,13 +66,15 @@ cd web && npm install && npm run dev
 生产环境部署（HTTPS）：
 ```bash
 # 生成 SSL 证书
-./generate-certs.sh "your-domain.com"
+./scripts/generate-certs.sh "your-domain.com"
 
 # 配置 JWT 密钥
-echo "JWT_SECRET=$(openssl rand -base64 32)" > .env
+echo "JWT_SECRET=$(openssl rand -base64 32)" > docker/.env
 
 # 启动后端（生产模式，单容器统一输出 API + 前端静态文件）
-docker-compose -f docker-compose.prod.yml up -d
+cd docker
+docker compose -f docker-compose.prod.yml up -d
+cd ..
 
 # 访问服务: https://localhost
 ```
@@ -82,7 +88,7 @@ docker-compose -f docker-compose.prod.yml up -d
 - **后端:** Go + SQLite3 + WebSocket
 - **前端:** Vue 3 + Vite + Pinia
 - **加密:** AES-256-GCM 端到端加密
-- **部署:** Docker Compose + Nginx (TLS)
+- **部署:** Docker Compose（Go 单容器统一输出 API + 前端，内置 TLS）
 - **监控:** Prometheus + Grafana + ELK
 
 ## 🔍 OCR 文字识别插件

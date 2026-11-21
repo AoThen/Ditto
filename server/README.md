@@ -47,8 +47,11 @@ docker run -d -p 8080:8080 \
 
 ### 生产环境（Docker Compose + TLS）
 
+compose 文件位于仓库 `docker/` 目录（变量替换读取 `docker/.env`）：
+
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+cd docker
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ## 项目结构
@@ -74,7 +77,7 @@ server/
 
 ## API 文档
 
-启动服务后访问：`http://localhost:8080/swagger/index.html`
+OpenAPI 规范见 [`api/swagger.yaml`](api/swagger.yaml)（与 `cmd/server/main.go` 中注册的路由一致）。
 
 ### 核心接口
 
@@ -89,7 +92,7 @@ server/
 | GET | `/api/v1/devices` | 设备列表 |
 | DELETE | `/api/v1/devices/:id` | 移除设备 |
 | GET | `/api/v1/stats/overview` | 统计概览 |
-| WS | `/ws/sync` | 实时同步推送 |
+| WS | `/api/v1/ws` | 实时同步推送 |
 
 ## 配置说明
 
@@ -158,7 +161,7 @@ go test ./internal/hub -v
 | ORM | GORM |
 | WebSocket | gorilla/websocket |
 | JWT | golang-jwt/jwt |
-| 数据库 | SQLite3（PostgreSQL 尚未接入） |
+| 数据库 | SQLite3（PostgreSQL 支持已移除） |
 | 加密 | crypto/aes + golang.org/x/crypto/pbkdf2 |
 | 日志 | zap |
 | 配置 | viper |
