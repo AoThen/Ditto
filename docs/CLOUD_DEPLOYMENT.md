@@ -27,7 +27,6 @@
 - **Go** 1.21+（从源代码构建）
 - **Node.js** 18+（从源代码构建前端）
 - **Nginx** 1.20+（反向代理，如不使用 Docker）
-- **PostgreSQL** 15+（可选，多用户场景）
 - **Certbot**（Let's Encrypt SSL 证书）
 
 ## 端口要求
@@ -88,7 +87,7 @@ cp .env.example .env
 
 # 生成 JWT 密钥
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 查看配置
 cat .env
@@ -197,15 +196,8 @@ DATABASE_PATH=/app/data/ditto_cloud.db
 docker exec ditto-backend sqlite3 /app/data/ditto_cloud.db "PRAGMA journal_mode=WAL;"
 ```
 
-### PostgreSQL（多用户）
-
-对于较大的并发用户部署：
-
-**优势:**
-- 更好的并发性
-- 水平扩展支持
-- 高级备份/复制功能
-- 支持数千用户
+> ℹ️ **PostgreSQL 支持已移除**：服务端当前仅支持 SQLite。此前文档中的
+> `docker-compose.postgres.yml` 与 `DATABASE_URL` 配置已一并删除。
 
 ## 安全加固
 
@@ -353,7 +345,6 @@ docker-compose -f docker-compose.prod.yml restart
   - [Manual Kubernetes Configuration](#manual-kubernetes-configuration)
 - [Database Configuration](#database-configuration)
   - [SQLite (Default)](#sqlite-default)
-  - [PostgreSQL (Multi-User)](#postgresql-multi-user)
 - [Load Balancing & High Availability](#load-balancing--high-availability)
 - [Monitoring & Observability](#monitoring--observability)
 - [Security Hardening](#security-hardening)
@@ -382,7 +373,6 @@ docker-compose -f docker-compose.prod.yml restart
 - **Go** 1.21+ (for building from source)
 - **Node.js** 18+ (for building frontend from source)
 - **Nginx** 1.20+ (for reverse proxy, if not using Docker)
-- **PostgreSQL** 15+ (optional, for multi-user scenarios)
 - **Certbot** (for Let's Encrypt SSL certificates)
 
 ### Network Requirements
@@ -393,7 +383,6 @@ docker-compose -f docker-compose.prod.yml restart
 | 443 | TCP | HTTPS (web panel & API) | Yes |
 | 8080 | TCP | Backend API (internal) | No |
 | 8443 | TCP | Backend API with TLS | Yes (if not using reverse proxy) |
-| 5432 | TCP | PostgreSQL (if used) | No (internal only) |
 
 ---
 
@@ -453,7 +442,7 @@ cp .env.example .env
 
 # Generate JWT secret
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # Review configuration
 cat .env
@@ -578,7 +567,7 @@ Copy-Item .env.example .env
 # Generate JWT secret (requires OpenSSL)
 # Download OpenSSL for Windows or use WSL
 $JWT_SECRET = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | ForEach-Object {[char]$_})
-(Get-Content .env) -replace 'change-me-in-production', $JWT_SECRET | Set-Content .env
+(Get-Content .env) -replace '^JWT_SECRET=.*', "JWT_SECRET=$JWT_SECRET" | Set-Content .env
 ```
 
 #### Step 4: Generate Certificates
@@ -685,7 +674,7 @@ cd Ditto
 # Configure
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # Generate certificates (replace with your domain)
 chmod +x generate-certs.sh
@@ -911,7 +900,6 @@ helm install ditto ditto/ditto-cloud \
   --set jwtSecret=$(openssl rand -base64 32) \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=ditto.your-domain.com \
-  --set postgresql.enabled=true \
   --values custom-values.yaml
 ```
 
@@ -1189,77 +1177,15 @@ sqlite3 /app/data/ditto_cloud.db <<EOF
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
 PRAGMA cache_size=-64000;  -- 64MB cache
-PRAGMA temp_store=MEMORY;
-PRAGMA mmap_size=268435456;  -- 256MB memory mapping
-EOF
-```
+ PRAGMA temp_store=MEMORY;
+ PRAGMA mmap_size=268435456;  -- 256MB memory mapping
+ EOF
+ ```
 
-### PostgreSQL (Multi-User)
-
-For larger deployments with many concurrent users:
-
-**Advantages:**
-- Better concurrency
-- Horizontal scaling support
-- Advanced backup/replication
-- Supports thousands of users
-
-#### Step 1: Add PostgreSQL to Docker Compose
-
-Create `docker-compose.postgres.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  backend:
-    environment:
-      - DATABASE_URL=postgresql://ditto:password@postgres:5432/ditto_db
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: ditto-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ditto_db
-      POSTGRES_USER: ditto
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ditto"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres-data:
-```
-
-#### Step 2: Deploy with PostgreSQL
-
-```bash
-docker-compose -f docker-compose.prod.yml -f docker-compose.postgres.yml up -d
-```
-
-#### Step 3: Migrate from SQLite to PostgreSQL (Optional)
-
-```bash
-# Export SQLite data
-docker exec ditto-backend sqlite3 /app/data/ditto_cloud.db ".dump" > dump.sql
-
-# Import to PostgreSQL
-docker exec -i ditto-postgres psql -U ditto -d ditto_db < dump.sql
-
-# Update backend configuration to use PostgreSQL
-# Restart backend service
-docker-compose -f docker-compose.prod.yml -f docker-compose.postgres.yml restart backend
-```
+> ℹ️ **PostgreSQL (Multi-User) has been removed**: the server supports SQLite
+> only. The previous `docker-compose.postgres.yml` instructions and
+> `DATABASE_URL` settings were removed together with the deprecated compose
+> file.
 
 ---
 
@@ -1312,30 +1238,6 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 }
-```
-
-### PostgreSQL Replication
-
-For database high availability:
-
-```yaml
-# Use PostgreSQL with streaming replication
-services:
-  postgres-master:
-    image: bitnami/postgresql:15
-    environment:
-      POSTGRESQL_REPLICATION_MODE: master
-      POSTGRESQL_REPLICATION_USER: repl_user
-      POSTGRESQL_REPLICATION_PASSWORD: repl_password
-      # ... other configuration
-
-  postgres-slave:
-    image: bitnami/postgresql:15
-    environment:
-      POSTGRESQL_REPLICATION_MODE: slave
-      POSTGRESQL_MASTER_HOST: postgres-master
-      POSTGRESQL_MASTER_PORT_NUMBER: 5432
-      # ... other configuration
 ```
 
 ---

@@ -11,7 +11,7 @@ Go 后端服务，为 Ditto 剪贴板管理器提供云端同步功能。
 - ✅ 端到端加密（AES-256-GCM）
 - ✅ 暴力破解防护（IP + 用户维度限流）
 - ✅ SQLite3 持久化（默认）
-- ⚠️ PostgreSQL 尚未接入：`DATABASE_DRIVER=postgres` 会直接报错退出，需先在 go.mod 引入 `gorm.io/driver/postgres` 并实现 `InitPostgres`
+- ⚠️ PostgreSQL 支持已移除：服务端仅支持 SQLite3；设置 `DB_DRIVER=postgres` 会在启动时直接报错退出
 
 ## 快速启动
 
@@ -100,7 +100,7 @@ server/
 PORT=8080
 DATABASE_PATH=/app/data/ditto_cloud.db
 # 至少 32 字节，否则服务启动即退出：openssl rand -hex 32
-JWT_SECRET=change-me-to-openssl-rand-hex-32-output
+JWT_SECRET=change-me  # placeholder - server refuses to start until replaced (min 32 bytes)
 JWT_ACCESS_TOKEN_EXPIRY=15
 JWT_REFRESH_TOKEN_EXPIRY=10080
 

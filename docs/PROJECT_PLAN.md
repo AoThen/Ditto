@@ -1175,6 +1175,8 @@ Week 1    Week 2    Week 3    Week 4    Week 5    Week 6    Week 7    Week 8
 
 ### ADR-002: 数据库选型
 
+**状态**: 2026-11 更新 — PostgreSQL 支持已移除，服务端仅支持 SQLite3（原计划的可选 PostgreSQL 从未接入，相关部署配置已删除）
+
 **决策**: SQLite3 为主数据库
 
 **理由**:

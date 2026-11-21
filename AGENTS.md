@@ -37,12 +37,12 @@ scripts/test-e2e.sh  # 启动 Go 后端 -> 健康检查 -> 注册 -> 登录 -> A
 | 桌面客户端 | `src/` | C++/MFC, Unicode, Visual Studio 2022 |
 | 云端后端 | `server/` | Go 1.22, Gin, GORM, gorilla/websocket |
 | 管理面板 | `web/` | Vue 3, Element Plus, Pinia, Axios |
-| 部署 | `docker/` | Docker Compose (dev/prod/postgres) |
+| 部署 | `docker/` | Docker Compose (dev/prod) |
 
 - **认证**: JWT (Access Token 15min + Refresh Token 7天), HttpOnly cookie
 - **加密**: AES-256-GCM + PBKDF2 10万轮, 密钥文件 `.dittokey`
 - **同步**: WebSocket 实时推送, CRC 去重, LWW 冲突解决
-- **数据库**: 默认 SQLite, 可选 PostgreSQL (docker-compose.postgres.yml)
+- **数据库**: SQLite (WAL 模式，唯一支持的后端；PostgreSQL 支持已移除)
 - **测试**: Go 端 29 个测试用例, 使用 httptest; C++ 端 Google Test
 
 ## 关键约束

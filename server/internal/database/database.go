@@ -61,16 +61,14 @@ func SetDB(db *gorm.DB) {
 }
 
 func Init(dbPath string, slowThreshold time.Duration) error {
-	driver := os.Getenv("DB_DRIVER")
-	if driver == "" {
-		driver = "sqlite"
+	// SQLite is the only supported backend; PostgreSQL support was removed
+	// because it was never wired up (no driver in go.mod). Keep the env var
+	// reserved so old deployment scripts fail loudly instead of silently
+	// running on SQLite when they expected Postgres.
+	if driver := strings.ToLower(os.Getenv("DB_DRIVER")); driver != "" && driver != "sqlite" {
+		return fmt.Errorf("unsupported DB_DRIVER %q: only \"sqlite\" is supported", driver)
 	}
-	switch driver {
-	case "postgres", "postgresql":
-		return InitPostgres(dbPath, slowThreshold)
-	default:
-		return InitSQLite(dbPath, slowThreshold)
-	}
+	return InitSQLite(dbPath, slowThreshold)
 }
 
 func InitSQLite(dbPath string, slowThreshold time.Duration) error {
@@ -144,10 +142,6 @@ func InitSQLite(dbPath string, slowThreshold time.Duration) error {
 	BackfillPinyin()
 
 	return nil
-}
-
-func InitPostgres(dsn string, slowThreshold time.Duration) error {
-	return fmt.Errorf("PostgreSQL 驱动需要在 go.mod 中添加 gorm.io/driver/postgres")
 }
 
 // dropLegacyIndexes removes constraints that AutoMigrate never drops on its own.

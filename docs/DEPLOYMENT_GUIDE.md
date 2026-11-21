@@ -28,7 +28,7 @@ cd Ditto
 # 2. 配置环境
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 3. 启动开发环境
 docker-compose up -d
@@ -125,7 +125,7 @@ cd Ditto
 # 配置环境
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 验证配置
 cat .env | grep JWT_SECRET
@@ -241,7 +241,7 @@ git clone https://github.com/sabrogden/Ditto.git
 cd Ditto
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 5. 获取 Let's Encrypt 证书
 sudo apt install -y certbot
@@ -328,17 +328,8 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### 场景 2: 小团队（5-20 用户）
 
-> ⚠️ **PostgreSQL 尚未接入**：服务端 `InitPostgres` 目前直接返回错误，叠加
-> `docker-compose.postgres.yml` 会在启动时退出。20 用户规模下 SQLite 单文件足够；
-> 确实需要 PostgreSQL 时，先在 `server/go.mod` 引入 `gorm.io/driver/postgres`
-> 并实现 `internal/database.InitPostgres`。
-
-```bash
-# 添加 PostgreSQL 以获得更好的并发性能（当前不可用，见上方说明）
-docker-compose -f docker-compose.prod.yml \
-  -f docker-compose.postgres.yml \
-  up -d
-```
+> ℹ️ **PostgreSQL 支持已移除**：服务端仅支持 SQLite。20 用户规模下 SQLite
+> 单文件（WAL 模式）足够；请直接使用 `docker-compose.prod.yml` 部署。
 
 **推荐基础设施:**
 - DigitalOcean Droplet: $18/月（2 GB 内存，2 CPU）
@@ -352,16 +343,14 @@ docker-compose -f docker-compose.prod.yml \
 > 多实例部署前先实现 `hub.Backend`（如 Redis pub/sub）。
 
 ```bash
-# 完整堆栈，包含负载均衡、PostgreSQL
-docker-compose -f docker-compose.prod.yml \
-  -f docker-compose.postgres.yml \
-  up -d
+# 完整堆栈，包含负载均衡
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 **推荐基础设施:**
-- AWS: 2x t3.medium（$30/月 每台）+ RDS PostgreSQL（$50/月）
+- AWS: 2x t3.medium（$30/月 每台）
 - Application Load Balancer（$20/月）
-- **总计: ~$130/月**
+- **总计: ~$80/月**
 
 ## 部署后检查清单
 
@@ -473,7 +462,7 @@ cd Ditto
 # 2. Configure environment
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 3. Start development environment
 docker-compose up -d
@@ -555,7 +544,7 @@ cd Ditto
 # Configure environment
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # Verify configuration
 cat .env | grep JWT_SECRET
@@ -692,7 +681,7 @@ git clone https://github.com/sabrogten/Ditto.git
 cd Ditto
 cp .env.example .env
 JWT_SECRET=$(openssl rand -base64 32)
-sed -i "s/change-me-in-production/$JWT_SECRET/" .env
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" .env
 
 # 5. Get Let's Encrypt certificate
 sudo apt install -y certbot
@@ -825,18 +814,9 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Scenario 2: Small Team (5-20 Users)
 
-> ⚠️ **PostgreSQL is not wired up yet**: the server's `InitPostgres` returns an
-> error immediately, so layering `docker-compose.postgres.yml` exits at startup.
-> SQLite handles 20 users fine; to actually use PostgreSQL, add
-> `gorm.io/driver/postgres` to `server/go.mod` and implement
-> `internal/database.InitPostgres`.
-
-```bash
-# Add PostgreSQL for better concurrency (currently unavailable, see note above)
-docker-compose -f docker-compose.prod.yml \
-  -f docker-compose.postgres.yml \
-  up -d
-```
+> ℹ️ **PostgreSQL support has been removed**: the server ships with SQLite only.
+> SQLite (WAL mode) handles 20 users fine; deploy with `docker-compose.prod.yml`
+> directly.
 
 **Recommended Infrastructure:**
 - DigitalOcean Droplet: $18/month (2 GB RAM, 2 CPU)
@@ -852,16 +832,14 @@ docker-compose -f docker-compose.prod.yml \
 > Redis pub/sub) before running more than one app instance.
 
 ```bash
-# Full stack with load balancing, PostgreSQL
-docker-compose -f docker-compose.prod.yml \
-  -f docker-compose.postgres.yml \
-  up -d
+# Full stack with load balancing
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 **Recommended Infrastructure:**
-- AWS: 2x t3.medium ($30/month each) + RDS PostgreSQL ($50/month)
+- AWS: 2x t3.medium ($30/month each)
 - Application Load Balancer ($20/month)
-- **Total: ~$130/month**
+- **Total: ~$80/month**
 
 ### Scenario 4: Air-Gapped/On-Premises
 
