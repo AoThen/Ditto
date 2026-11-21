@@ -37,9 +37,16 @@ info() {
     echo -e "${YELLOW}ℹ INFO:${NC} $1"
 }
 
-# Test 1: Check Go backend binary exists
+# Test 1: Check Go backend binary exists (Makefile builds to bin/server)
 info "Test 1: Checking Go backend binary..."
-if [ -f "$SERVER_DIR/server" ]; then
+if [ -f "$SERVER_DIR/bin/server" ]; then
+    SERVER_BIN="$SERVER_DIR/bin/server"
+elif [ -f "$SERVER_DIR/server" ]; then
+    SERVER_BIN="$SERVER_DIR/server"
+else
+    SERVER_BIN=""
+fi
+if [ -n "$SERVER_BIN" ]; then
     pass "Go backend binary exists"
 else
     fail "Go backend binary not found"
@@ -71,7 +78,7 @@ fi
 # Test 4: Start Go backend in background
 info "Test 4: Starting Go backend server..."
 cd "$SERVER_DIR"
-./server > /tmp/ditto-server.log 2>&1 &
+"$SERVER_BIN" > /tmp/ditto-server.log 2>&1 &
 SERVER_PID=$!
 
 # Wait for server to be ready with retry logic
