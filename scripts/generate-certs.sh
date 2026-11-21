@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate self-signed SSL certificates for Ditto Cloud
-# Usage: ./generate-certs.sh [domain]
+# Usage: ./scripts/generate-certs.sh [domain]  (run from the repository root)
 
 DOMAIN=${1:-"localhost"}
 CERTS_DIR="./certs"
