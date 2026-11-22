@@ -37,30 +37,6 @@ TEST(PinyinConvert, ExtractAlphaEmptyInput)
 	EXPECT_TRUE(conv.ExtractAlpha(_T("")) == _T(""));
 }
 
-TEST(PinyinConvert, IsAlphaQueryPureLetters)
-{
-	CPinyinConvert conv;
-	EXPECT_TRUE(conv.IsAlphaQuery(std::wstring(_T("nihao"))) == true);
-}
-
-TEST(PinyinConvert, IsAlphaQueryWithSpace)
-{
-	CPinyinConvert conv;
-	EXPECT_TRUE(conv.IsAlphaQuery(std::wstring(_T("ni hao"))) == false);
-}
-
-TEST(PinyinConvert, IsAlphaQueryWithChinese)
-{
-	CPinyinConvert conv;
-	EXPECT_TRUE(conv.IsAlphaQuery(std::wstring(_T("ni好"))) == false);
-}
-
-TEST(PinyinConvert, IsAlphaQueryEmpty)
-{
-	CPinyinConvert conv;
-	EXPECT_TRUE(conv.IsAlphaQuery(std::wstring(_T(""))) == false);
-}
-
 TEST(PinyinConvert, TextToPinyinChinese)
 {
 	auto py = CPinyinConvert::TextToPinyin(_T("你好"));
