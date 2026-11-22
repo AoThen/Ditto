@@ -731,10 +731,10 @@ static HANDLE s_hExitWatchdogStop = NULL;
 
 static DWORD WINAPI ExitWatchdogThreadProc(LPVOID)
 {
-	if(WaitForSingleObject(s_hExitWatchdogStop, EXIT_WATCHDOG_TIMEOUT_MS) == WAIT_TIMEOUT)
+	if(::WaitForSingleObject(s_hExitWatchdogStop, EXIT_WATCHDOG_TIMEOUT_MS) == WAIT_TIMEOUT)
 	{
 		Log(StrF(_T("Exit watchdog: shutdown did not complete within %d ms, forcing termination"), EXIT_WATCHDOG_TIMEOUT_MS));
-		TerminateProcess(GetCurrentProcess(), 1);
+		::TerminateProcess(GetCurrentProcess(), 1);
 	}
 	return 0;
 }
@@ -742,13 +742,13 @@ static DWORD WINAPI ExitWatchdogThreadProc(LPVOID)
 void CCP_MainApp::StartExitWatchdog()
 {
 	if(s_hExitWatchdogStop == NULL)
-		s_hExitWatchdogStop = CreateEvent(NULL, TRUE, FALSE, NULL);
+		s_hExitWatchdogStop = ::CreateEvent(NULL, TRUE, FALSE, NULL);
 	if(s_hExitWatchdogStop != NULL)
-		ResetEvent(s_hExitWatchdogStop);
+		::ResetEvent(s_hExitWatchdogStop);
 
 	if(s_hExitWatchdogThread == NULL)
 	{
-		s_hExitWatchdogThread = CreateThread(NULL, 0, ExitWatchdogThreadProc, NULL, 0, NULL);
+		s_hExitWatchdogThread = ::CreateThread(NULL, 0, ExitWatchdogThreadProc, NULL, 0, NULL);
 		if(s_hExitWatchdogThread == NULL)
 			Log(_T("ERROR: failed to create exit watchdog thread"));
 	}
@@ -757,21 +757,21 @@ void CCP_MainApp::StartExitWatchdog()
 void CCP_MainApp::StopExitWatchdog()
 {
 	if(s_hExitWatchdogStop != NULL)
-		SetEvent(s_hExitWatchdogStop);
+		::SetEvent(s_hExitWatchdogStop);
 
 	if(s_hExitWatchdogThread != NULL)
 	{
 		// The watchdog exits immediately once signaled; only reclaim its
 		// handle when the thread has really exited, otherwise leak it (the
 		// process is on its way out anyway and the OS reclaims handles).
-		if(WaitForSingleObject(s_hExitWatchdogThread, 2000) == WAIT_OBJECT_0)
-			CloseHandle(s_hExitWatchdogThread);
+		if(::WaitForSingleObject(s_hExitWatchdogThread, 2000) == WAIT_OBJECT_0)
+			::CloseHandle(s_hExitWatchdogThread);
 		s_hExitWatchdogThread = NULL;
 	}
 
 	if(s_hExitWatchdogStop != NULL)
 	{
-		CloseHandle(s_hExitWatchdogStop);
+		::CloseHandle(s_hExitWatchdogStop);
 		s_hExitWatchdogStop = NULL;
 	}
 }
