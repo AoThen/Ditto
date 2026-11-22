@@ -101,6 +101,14 @@
     <ClCompile Include="TestSlugify.cpp" />
     <ClCompile Include="TestPinyinConvert.cpp" />
     <ClCompile Include="TestConvertRTFToText.cpp" />
+    <ClCompile Include="TestSecureStore.cpp" />
+    <ClCompile Include="TestSqliteEncryption.cpp" />
+    <ClCompile Include="TestOcrCliUtil.cpp" />
+    <ClCompile Include="..\..\src\sqlite\sqlite3mc_amalgamation.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles></ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="CloudCryptoTest.cpp" />
     <ClCompile Include="CloudEncryptionTest.cpp" />
     <ClCompile Include="CloudKeyExportTest.cpp" />
@@ -176,6 +184,8 @@
     <ClInclude Include="..\..\src\CloudSync\CloudEncryption.h" />
     <ClInclude Include="..\..\src\CloudSync\CloudKeyExport.h" />
     <ClInclude Include="..\..\src\CloudSync\CloudSyncManager.h" />
+    <ClInclude Include="..\..\src\shared\SecureStore.h" />
+    <ClInclude Include="..\OcrCli\OcrCliUtil.h" />
     <ClInclude Include="GetSetOptionsMock.h" />
     <ClInclude Include="IClipMock.h" />
     <ClInclude Include="stdafx.h" />
