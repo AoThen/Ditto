@@ -118,25 +118,34 @@ TEST(SecureStore, DiagnosticDpapiSteps)
 		protectOk, protectOk ? encrypted.cbData : -1, protectOk ? 0 : GetLastError());
 	ASSERT_TRUE(protectOk);
 
-	int cchEncoded = ATL::Base64EncodeGetRequiredLength(encrypted.cbData);
+	DWORD cchEncoded = 0;
+	ASSERT_TRUE(::CryptBinaryToStringA(encrypted.pbData, encrypted.cbData,
+		CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, NULL, &cchEncoded));
 	CStringA encodedA;
-	int cchActual = cchEncoded;
-	ATL::Base64Encode(encrypted.pbData, encrypted.cbData, encodedA.GetBuffer(cchEncoded), &cchActual, ATL_BASE64_FLAG_NOCRLF);
-	encodedA.ReleaseBuffer(cchActual);
-	printf("DIAG encode cch=%d\n", cchActual);
+	ATLVERIFY(::CryptBinaryToStringA(encrypted.pbData, encrypted.cbData,
+		CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encodedA.GetBuffer(cchEncoded), &cchEncoded));
+	encodedA.ReleaseBuffer(-1);
+	printf("DIAG encode cch=%d\n", (int)cchEncoded);
 
-	std::vector<BYTE> decoded(ATL::Base64DecodeGetRequiredLength(cchActual));
-	int cbActual = 0;
-	BOOL decodeOk = ATL::Base64Decode(encodedA, encodedA.GetLength(), &decoded[0], &cbActual);
+	std::vector<BYTE> decoded;
+	DWORD cbDecoded = 0;
+	BOOL decodeOk = ::CryptStringToBinaryA(encodedA, encodedA.GetLength(), CRYPT_STRING_BASE64,
+		NULL, &cbDecoded, NULL, NULL);
+	if (decodeOk)
+	{
+		decoded.resize(cbDecoded);
+		decodeOk = ::CryptStringToBinaryA(encodedA, encodedA.GetLength(), CRYPT_STRING_BASE64,
+			&decoded[0], &cbDecoded, NULL, NULL);
+	}
 	printf("DIAG decode ok=%d cbActual=%d expected=%d gle=%lu\n",
-		decodeOk, decodeOk ? cbActual : -1, encrypted.cbData, decodeOk ? 0 : GetLastError());
+		decodeOk, decodeOk ? (int)cbDecoded : -1, encrypted.cbData, decodeOk ? 0 : GetLastError());
 	ASSERT_TRUE(decodeOk);
-	ASSERT_EQ((int)encrypted.cbData, cbActual);
+	ASSERT_EQ((int)encrypted.cbData, (int)cbDecoded);
 	EXPECT_EQ(0, memcmp(encrypted.pbData, &decoded[0], encrypted.cbData));
 
 	DATA_BLOB cipher;
 	cipher.pbData = &decoded[0];
-	cipher.cbData = cbActual;
+	cipher.cbData = (DWORD)cbDecoded;
 	DATA_BLOB plain;
 	::SecureZeroMemory(&plain, sizeof(plain));
 	BOOL unprotectOk = ::CryptUnprotectData(&cipher, NULL, NULL, NULL, NULL, 0, &plain);

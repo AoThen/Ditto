@@ -11,7 +11,6 @@
 #include <windows.h>
 #include <wincrypt.h>
 #include <atlstr.h>
-#include <atlenc.h>
 #include <vector>
 
 #pragma comment(lib, "crypt32.lib")
@@ -50,12 +49,23 @@ public:
 		}
 
 		// Base64-encode the blob so it stays a clean registry REG_SZ value.
-		// NOCRLF: ATL inserts line breaks by default, which Base64Decode
-		// cannot handle on the way back.
-		int cchEncoded = ATL::Base64EncodeGetRequiredLength(output.cbData);
+		// crypt32 base64 is used because ATL::Base64Decode rejects the
+		// output ATL::Base64Encode produces (see TestSecureStore diagnostics).
+		// NOCRLF keeps the registry value on a single line.
+		DWORD cchEncoded = 0;
+		if (!::CryptBinaryToStringA(output.pbData, output.cbData,
+			CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, NULL, &cchEncoded) || cchEncoded == 0)
+		{
+			::SecureZeroMemory(output.pbData, output.cbData);
+			LocalFree(output.pbData);
+			if (pOk) *pOk = false;
+			return _T("");
+		}
+
 		CStringA encodedA;
-		ATL::Base64Encode(output.pbData, output.cbData, encodedA.GetBuffer(cchEncoded), &cchEncoded, ATL_BASE64_FLAG_NOCRLF);
-		encodedA.ReleaseBuffer(cchEncoded);
+		::CryptBinaryToStringA(output.pbData, output.cbData,
+			CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encodedA.GetBuffer(cchEncoded), &cchEncoded);
+		encodedA.ReleaseBuffer(-1);
 
 		::SecureZeroMemory(output.pbData, output.cbData);
 		LocalFree(output.pbData);
@@ -82,18 +92,19 @@ public:
 		encodedA.Remove('\r');
 		encodedA.Remove('\n');
 
-		int cbDecoded = ATL::Base64DecodeGetRequiredLength(encodedA.GetLength());
-		if (cbDecoded <= 0)
+		DWORD cbDecoded = 0;
+		if (!::CryptStringToBinaryA(encodedA, encodedA.GetLength(), CRYPT_STRING_BASE64,
+			NULL, &cbDecoded, NULL, NULL) || cbDecoded == 0)
 			return _T("");
 
 		std::vector<BYTE> decoded(cbDecoded);
-		int cbActual = 0;
-		if (!ATL::Base64Decode(encodedA, encodedA.GetLength(), &decoded[0], &cbActual) || cbActual <= 0)
+		if (!::CryptStringToBinaryA(encodedA, encodedA.GetLength(), CRYPT_STRING_BASE64,
+			&decoded[0], &cbDecoded, NULL, NULL) || cbDecoded <= 0)
 			return _T("");
 
 		DATA_BLOB input;
 		input.pbData = &decoded[0];
-		input.cbData = cbActual;
+		input.cbData = (int)cbDecoded;
 
 		DATA_BLOB output;
 		::SecureZeroMemory(&output, sizeof(output));
@@ -101,7 +112,7 @@ public:
 		if (!CryptUnprotectData(&input, NULL, NULL, NULL, NULL, 0, &output))
 			return _T("");
 
-		::SecureZeroMemory(&decoded[0], cbActual);
+		::SecureZeroMemory(&decoded[0], cbDecoded);
 
 		CString plain((TCHAR*)output.pbData, output.cbData / sizeof(TCHAR));
 		::SecureZeroMemory(output.pbData, output.cbData);
