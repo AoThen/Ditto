@@ -186,7 +186,9 @@ func (s *UserService) DeleteUser(id uint) error {
 			if err := tx.Where("clip_id IN ?", clipIDs).Delete(&model.ClipFormat{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Delete(&model.Clip{}, clipIDs).Error; err != nil {
+			// Hard-delete clips: a soft-deleted row would still reference the
+			// user and break the FK constraint when the user row is removed.
+			if err := tx.Unscoped().Delete(&model.Clip{}, clipIDs).Error; err != nil {
 				return err
 			}
 		}
