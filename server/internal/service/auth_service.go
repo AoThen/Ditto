@@ -199,14 +199,23 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 		return "", "", errors.New("用户不存在")
 	}
 
-	var device model.Device
-	if err := database.DB.Where("id = ? AND user_id = ?", deviceID, userID).First(&device).Error; err != nil {
+	// Atomically bump the token version so concurrent refreshes cannot
+	// interleave read-modify-write cycles. SQLite serializes writers, so a
+	// single UPDATE is effectively transactional; the previous First+Save
+	// pair was not.
+	res := database.DB.Model(&model.Device{}).
+		Where("id = ? AND user_id = ?", deviceID, userID).
+		UpdateColumn("token_version", gorm.Expr("token_version + 1"))
+	if res.Error != nil {
+		return "", "", errors.New("刷新令牌失败")
+	}
+	if res.RowsAffected == 0 {
 		return "", "", ErrDeviceNotFound
 	}
 
-	device.TokenVersion++
-	if err := database.DB.Save(&device).Error; err != nil {
-		return "", "", errors.New("刷新令牌失败")
+	var device model.Device
+	if err := database.DB.Where("id = ? AND user_id = ?", deviceID, userID).First(&device).Error; err != nil {
+		return "", "", ErrDeviceNotFound
 	}
 
 	// Generate new tokens
@@ -223,12 +232,11 @@ func (s *AuthService) RefreshDeviceToken(userID uint, deviceID string) (string, 
 }
 
 func (s *AuthService) Logout(userID uint, deviceID string) error {
-	var device model.Device
-	if err := database.DB.Where("id = ? AND user_id = ?", deviceID, userID).First(&device).Error; err != nil {
-		return err
-	}
-	device.TokenVersion++
-	return database.DB.Save(&device).Error
+	// Atomic version bump: invalidates all previously issued tokens for this
+	// device in one statement, with no read-modify-write window.
+	return database.DB.Model(&model.Device{}).
+		Where("id = ? AND user_id = ?", deviceID, userID).
+		UpdateColumn("token_version", gorm.Expr("token_version + 1")).Error
 }
 
 func (s *AuthService) generateToken(userID uint, deviceID string, expiry time.Duration, tokenType string, tokenVersion ...int) (string, error) {

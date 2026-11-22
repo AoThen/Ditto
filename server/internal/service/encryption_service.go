@@ -164,8 +164,15 @@ func (s *EncryptionService) ensureSaltRecord(userID uint) (*model.EncryptionSett
 		settings.WrappedDEK = make([]byte, 0)
 		settings.VerificationHash = make([]byte, 0)
 
+		// Two concurrent setups may both observe an empty record here; the
+		// unique index on user_id makes the second insert fail. Re-read the
+		// winner's record instead of surfacing an error to the client.
 		if err := database.DB.Create(&settings).Error; err != nil {
-			return nil, err
+			var existing model.EncryptionSettings
+			if err := database.DB.Where(model.EncryptionSettings{UserID: userID}).First(&existing).Error; err != nil {
+				return nil, err
+			}
+			return &existing, nil
 		}
 	}
 

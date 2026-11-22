@@ -87,7 +87,7 @@ func New(backend ...Backend) *Hub {
 	return &Hub{
 		clients:    make(map[int64]map[*Client]bool),
 		register:   make(chan *Client),
-		unregister: make(chan *Client),
+		unregister: make(chan *Client, 256),
 		done:       make(chan struct{}),
 		backend:    b,
 		ctx:        ctx,
@@ -125,6 +125,7 @@ func (h *Hub) runLoop() {
 					select {
 					case client.send <- msg:
 					default:
+						dropSlowClient(client, userID, "backend fan-out")
 					}
 				}
 			}
@@ -185,7 +186,20 @@ func (h *Hub) Unregister(client *Client) {
 	select {
 	case h.unregister <- client:
 	default:
-		// If runLoop is not consuming (shutting down), skip to avoid blocking
+		// Buffered channel should absorb bursts; if even that is full the
+		// runLoop is not consuming (shutting down) — drop and log instead of
+		// blocking the caller.
+		log.Printf("[ws] unregister queue full, dropping unregister request")
+	}
+}
+
+// dropSlowClient closes the connection of a client whose send queue is full,
+// so it reconnects and catches up via its periodic sync pull instead of
+// silently missing events. conn may be nil (tests); treat that as a no-op.
+func dropSlowClient(client *Client, userID int64, reason string) {
+	log.Printf("[ws] send channel full for user_id=%d (%s), closing slow client", userID, reason)
+	if client.conn != nil {
+		client.conn.Close()
 	}
 }
 
@@ -196,20 +210,27 @@ func (h *Hub) Broadcast(userID int64, msgType string, data map[string]interface{
 		"data": data,
 	}
 
+	// Snapshot the targets under the lock: dropping a slow client closes its
+	// connection, which makes its pumps fail and triggers Unregister — that
+	// mutates h.clients[userID], so we must not iterate the live map after
+	// releasing the read lock.
 	h.mu.RLock()
-	conns, ok := h.clients[userID]
+	targets := make([]*Client, 0, len(h.clients[userID]))
+	for client := range h.clients[userID] {
+		targets = append(targets, client)
+	}
 	h.mu.RUnlock()
 
-	if !ok {
-		return
-	}
-
-	for client := range conns {
+	for _, client := range targets {
 		select {
 		case client.send <- msg:
 		default:
-			// If send channel is full, skip this client (likely slow/unresponsive)
-			log.Printf("[ws] send channel full for user_id=%d, skipping", userID)
+			// The send queue is full: this peer is too slow to keep up and has
+			// already missed events. Close the connection so the client
+			// reconnects and catches up instead of silently staying out of
+			// sync. websocket.Conn.Close is safe to call concurrently; the
+			// failed pumps trigger Unregister.
+			dropSlowClient(client, userID, "broadcast")
 		}
 	}
 }
@@ -222,22 +243,23 @@ func (h *Hub) BroadcastToOthers(userID int64, excludeConn interface{}, msgType s
 		"data": data,
 	}
 
+	// Snapshot the targets under the lock (see Broadcast): closing a slow
+	// client triggers Unregister, which mutates the map we would iterate.
 	h.mu.RLock()
-	conns, ok := h.clients[userID]
-	h.mu.RUnlock()
-
-	if !ok {
-		return
-	}
-
-	for client := range conns {
+	targets := make([]*Client, 0, len(h.clients[userID]))
+	for client := range h.clients[userID] {
 		if excludeConn != nil && client.conn == excludeConn {
 			continue
 		}
+		targets = append(targets, client)
+	}
+	h.mu.RUnlock()
+
+	for _, client := range targets {
 		select {
 		case client.send <- msg:
 		default:
-			log.Printf("[ws] send channel full for user_id=%d (broadcast to others), skipping", userID)
+			dropSlowClient(client, userID, "broadcast to others")
 		}
 	}
 

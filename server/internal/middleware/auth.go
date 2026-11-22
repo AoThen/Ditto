@@ -39,9 +39,14 @@ func Auth(cfg *config.Config) gin.HandlerFunc {
 			}
 		}
 
-		// Last fallback: Sec-WebSocket-Protocol header (for WebSocket clients that don't support cookies)
+		// Last fallback: Sec-WebSocket-Protocol header (for WebSocket clients that don't support cookies).
+		// Only accept values shaped like a JWT (three dot-separated segments).
+		// Browsers send the agreed subprotocol name (e.g. "cookie-auth") in
+		// this header, which must never be treated as a credential.
 		if tokenStr == "" {
-			tokenStr = c.GetHeader("Sec-WebSocket-Protocol")
+			if swp := c.GetHeader("Sec-WebSocket-Protocol"); strings.Count(swp, ".") == 2 {
+				tokenStr = swp
+			}
 		}
 
 		// The access cookie is short-lived: once it lapses the browser stops

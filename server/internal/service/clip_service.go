@@ -1091,7 +1091,7 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 
 // LogSyncOperation records a sync operation to the sync_logs table
 func LogSyncOperation(userID uint, deviceID, action string, clipCount int, status string, errMsg string) {
-	log := model.SyncLog{
+	syncLog := model.SyncLog{
 		UserID:    userID,
 		DeviceID:  deviceID,
 		Action:    action,
@@ -1100,7 +1100,12 @@ func LogSyncOperation(userID uint, deviceID, action string, clipCount int, statu
 		Error:     errMsg,
 		SyncedAt:  time.Now(),
 	}
-	database.DB.Create(&log)
+	if err := database.DB.Create(&syncLog).Error; err != nil {
+		// Audit logging must never break the sync path, but silent data loss
+		// would hide sync-history gaps; surface it in the server log instead.
+		log.Printf("[sync] failed to record sync log for user_id=%d device=%s action=%s: %v",
+			userID, deviceID, action, err)
+	}
 }
 
 // ListConflictClips returns paginated conflict clips for a user
