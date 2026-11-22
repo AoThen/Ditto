@@ -27,8 +27,9 @@ describe('useWebSocket', () => {
     vi.restoreAllMocks()
     setActivePinia(createPinia())
     vi.stubEnv('VITE_WS_URL', '')
-    // The reconnect flag and the sync watermark live in localStorage: leaving
-    // them set makes earlier tests trigger the reconnect catch-up path.
+    // The sync watermark lives in localStorage: leaving it set makes earlier
+    // tests trigger the reconnect catch-up path. (The reconnect flag itself is
+    // per-tab module state since the cross-tab localStorage flag was removed.)
     localStorage.clear()
     vi.clearAllMocks()
     // The store restores the session from localStorage: the device_id cookie is
@@ -252,7 +253,11 @@ describe('useWebSocket', () => {
       ? { code: 0, data: { clips: [], deleted_ids: [], has_more: true, server_time: '2024-02-01T00:00:00Z' } }
       : { code: 0, data: { clips: [], deleted_ids: [], has_more: false, server_time: '2024-02-02T00:00:00Z' } })
 
-    localStorage.setItem('ditto_ws_reconnecting', '1')
+    // Simulate first connect, a clean drop, then a reconnect: the catch-up
+    // fetch must run on the second onopen (per-tab module flag).
+    mod.useWebSocket().connect()
+    mockWs.onopen()
+    mockWs.onclose({ code: 1000, reason: '' })
     mod.useWebSocket().connect()
     mockWs.onopen()
 
@@ -270,7 +275,11 @@ describe('useWebSocket', () => {
       ? { code: 0, data: { clips: [], deleted_ids: [], has_more: true, server_time: '2024-02-01T00:00:00Z' } }
       : { code: 50000, message: 'boom' })
 
-    localStorage.setItem('ditto_ws_reconnecting', '1')
+    // Simulate first connect, a clean drop, then a reconnect: the catch-up
+    // fetch must run on the second onopen (per-tab module flag).
+    mod.useWebSocket().connect()
+    mockWs.onopen()
+    mockWs.onclose({ code: 1000, reason: '' })
     mod.useWebSocket().connect()
     mockWs.onopen()
 

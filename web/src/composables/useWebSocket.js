@@ -12,6 +12,10 @@ let sharedIsConnected = ref(false)
 let sharedReconnectTimer = null
 let sharedPingTimer = null
 let sharedReconnectAttempts = 0
+// Whether this tab has completed at least one WS connection. Kept per-tab in
+// module scope (NOT localStorage): a shared flag would let one tab's reconnect
+// be misread as another tab's first connect and skip the catch-up fetch.
+let sharedHasConnectedBefore = false
 const MAX_RECONNECT_DELAY = 30000
 const MAX_RECONNECT_ATTEMPTS = 20
 
@@ -162,14 +166,10 @@ function connect() {
       sharedReconnectAttempts = 0
       startPingTimer()
       // P2 FIX: On reconnect, fetch incremental changes to catch up missed data.
-      // Only catch up on initial connect or after a reconnection (not on every ping).
-      const wasReconnecting = localStorage.getItem('ditto_ws_reconnecting') === '1'
-      if (!wasReconnecting) {
-        // First connection — just set the flag, no catch-up needed (page load handles it)
-        localStorage.setItem('ditto_ws_reconnecting', '1')
+      // Only catch up on reconnection (the first connect relies on page load).
+      if (!sharedHasConnectedBefore) {
+        sharedHasConnectedBefore = true
       } else {
-        // Reconnected — fetch catch-up
-        localStorage.removeItem('ditto_ws_reconnecting')
         fetchSyncCatchUp()
       }
     }
