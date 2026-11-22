@@ -50,9 +50,11 @@ public:
 		}
 
 		// Base64-encode the blob so it stays a clean registry REG_SZ value.
+		// NOCRLF: ATL inserts line breaks by default, which Base64Decode
+		// cannot handle on the way back.
 		int cchEncoded = ATL::Base64EncodeGetRequiredLength(output.cbData);
 		CStringA encodedA;
-		ATL::Base64Encode(output.pbData, output.cbData, encodedA.GetBuffer(cchEncoded), &cchEncoded);
+		ATL::Base64Encode(output.pbData, output.cbData, encodedA.GetBuffer(cchEncoded), &cchEncoded, ATL_BASE64_FLAG_NOCRLF);
 		encodedA.ReleaseBuffer(cchEncoded);
 
 		::SecureZeroMemory(output.pbData, output.cbData);
@@ -76,6 +78,9 @@ public:
 			return stored; // legacy plain-text value
 
 		CStringA encodedA = CT2A(stored + 6, CP_UTF8);
+		// Tolerate legacy values that were encoded with line breaks.
+		encodedA.Remove('\r');
+		encodedA.Remove('\n');
 
 		int cbDecoded = ATL::Base64DecodeGetRequiredLength(encodedA.GetLength());
 		if (cbDecoded <= 0)

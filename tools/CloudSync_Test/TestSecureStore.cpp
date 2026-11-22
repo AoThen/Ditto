@@ -64,7 +64,7 @@ TEST(SecureStore, ProtectUnprotectRoundTrip)
 		_T("x"),
 		_T("simple"),
 		_T("with spaces and !@#$%^&*()"),
-		_T("中文密码测试"),
+		_T("\x4E2D\x6587\x5BC6\x7801\x6D4B\x8BD5"), // Chinese text, encoding-independent
 	};
 	for (auto sample : samples)
 	{
