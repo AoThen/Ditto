@@ -860,12 +860,6 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 			theApp.CloseNoDbWindow();
 			break;
 
-		case EXIT_TIMEOUT_TIMER:
-			KillTimer(nIDEvent);
-			Log(_T("Exit timeout reached — forcing process termination"));
-			TerminateProcess(GetCurrentProcess(), 0);
-			break;
-
     }
 
     CFrameWnd::OnTimer(nIDEvent);
@@ -954,7 +948,11 @@ void CMainFrame::OnClose()
 	// before ExitInstance waits for them
 	theApp.m_CloudSyncManager.SignalStopEarly();
 
-	SetTimer(EXIT_TIMEOUT_TIMER, 5000, NULL);
+	// Arm the exit watchdog: an independent thread that force-terminates the
+	// process if the whole shutdown (OnClose through MFC teardown) does not
+	// complete within its budget. Unlike a window timer it also covers the
+	// post-message-loop stages and stays armed if the UI thread hangs here.
+	theApp.StartExitWatchdog();
 
 	if (m_pEditFrameWnd)
 		m_pEditFrameWnd->CloseAll(true);
@@ -962,14 +960,16 @@ void CMainFrame::OnClose()
 	CloseAllOpenDialogs();
 
 	Log(_T("OnClose - before stop MainFrm thread"));
-	m_thread.Stop(3000);
+	m_thread.Stop(2000);
+	// Record for the ExitInstance database-close gate (m_thread belongs to
+	// this window, which may already be gone when ExitInstance runs)
+	theApp.m_bMainThreadStopped = !m_thread.IsRunning();
 	Log(_T("OnClose - after stop MainFrm thread"));
 
 	theApp.BeforeMainClose();
 
 	m_PowerManager.Close();
 
-	KillTimer(EXIT_TIMEOUT_TIMER);
 	CFrameWnd::OnClose();
 	PostQuitMessage(0);
 }

@@ -101,6 +101,23 @@ public:
 	void StartCopyThread();
 	void StopCopyThread();
 
+	// Exit watchdog: independent thread that force-terminates the process if
+	// the whole shutdown does not complete within its budget. It covers the
+	// entire exit path (OnClose through MFC/DLL teardown), including stages
+	// where the UI message loop is no longer running and a window timer would
+	// never fire, and stays armed even if the UI thread hangs inside OnClose.
+	void StartExitWatchdog();
+	void StopExitWatchdog();
+
+	// Shutdown state of every background thread that touches m_db, recorded
+	// as each one is stopped. The database is only closed in ExitInstance
+	// when all of them are confirmed stopped; otherwise it is left open and
+	// the OS reclaims everything at process exit (WAL recovers on next start).
+	bool m_bMainThreadStopped;
+	bool m_bCopyThreadStopped;
+	bool m_bEditThreadStopped;
+	bool m_bQuickPasteThreadsStopped;
+
 	// Cloud Sync Manager
 	CCloudSyncManager m_CloudSyncManager;
 	// for posting messages

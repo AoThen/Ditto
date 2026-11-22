@@ -6802,6 +6802,10 @@ void CQPasteWnd::OnDestroy()
 	m_thread.Stop();
 	m_extraDataThread.Stop();
 
+	// Record for the ExitInstance database-close gate: both threads query
+	// m_db, so ExitInstance must know whether they really stopped.
+	theApp.m_bQuickPasteThreadsStopped = (!m_thread.IsRunning() && !m_extraDataThread.IsRunning());
+
 	CWndEx::OnDestroy();
 }
 

@@ -131,6 +131,10 @@ CCloudSyncManager::~CCloudSyncManager()
 	else
 	{
 		LogCloudSync(_T("~CCloudSyncManager: threads still active, skipping CriticalSection cleanup"));
+		// Detached threads may still be running and can hold a reference to
+		// the shared HTTP client. Give up ownership instead of deleting it
+		// under them; the OS reclaims the memory at process exit.
+		m_httpClient.release();
 	}
 }
 

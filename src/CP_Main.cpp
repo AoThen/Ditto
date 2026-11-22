@@ -143,6 +143,10 @@ CCP_MainApp::CCP_MainApp()
 	m_pUacPasteThread = NULL;
 	m_bAppRunning = false;
 	m_bAppExiting = false;
+	m_bMainThreadStopped = false;
+	m_bCopyThreadStopped = false;
+	m_bEditThreadStopped = false;
+	m_bQuickPasteThreadsStopped = false;
 	m_connectOnStartup = -1;
 	m_MainhWnd = NULL;
 	m_pMainFrame = NULL;
@@ -653,6 +657,9 @@ void CCP_MainApp::BeforeMainClose()
 	StopServerThread();
 	StopCopyThread();
 	m_editThread.Close();
+	// Record for the ExitInstance database-close gate: the edit-tracking
+	// thread writes clips back to m_db, so it must be confirmed stopped.
+	m_bEditThreadStopped = !m_editThread.IsRunning();
 }
 
 void CCP_MainApp::StartCopyThread()
@@ -688,18 +695,84 @@ void CCP_MainApp::StopCopyThread()
 	m_CopyThread.Quit();
 
 	// Give the copy thread a chance to exit (its ExitInstance deletes the
-	// clipboard viewer). The process-exit watchdog still catches a hang.
+	// clipboard viewer). Bounded wait - the exit watchdog terminates the
+	// process if the overall shutdown stalls.
+	m_bCopyThreadStopped = false;
 	if(m_CopyThread.m_hThread != NULL)
 	{
-		DWORD dwWait = WaitForSingleObject(m_CopyThread.m_hThread, 3000);
-		if(dwWait == WAIT_TIMEOUT)
+		DWORD dwWait = WaitForSingleObject(m_CopyThread.m_hThread, 1000);
+		m_bCopyThreadStopped = (dwWait == WAIT_OBJECT_0);
+		if(!m_bCopyThreadStopped)
 		{
 			// The copy thread is still running; do NOT terminate it (MFC
 			// threads are unsafe to force-kill). The destructor will leak the
 			// viewer to avoid a use-after-free, and the exit watchdog bounds
-			// the process. Observability: keep a loud log so it is not silent.
-			Log(_T("StopCopyThread: copy thread still running after 3s; viewer will be leaked, thread may exit during teardown"));
+			// the process.
+			Log(_T("StopCopyThread: copy thread still running after 1s; viewer will be leaked, thread may exit during teardown"));
 		}
+	}
+	else
+	{
+		m_bCopyThreadStopped = true; // thread was never started
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Exit watchdog: bounds the entire shutdown to EXIT_WATCHDOG_TIMEOUT_MS.
+// It runs on its own thread because the last shutdown stages (m_db.close,
+// GdiplusShutdown, MFC/DLL teardown) happen after the UI message loop has
+// ended - a window timer would never fire there, and if the UI thread hangs
+// inside OnClose a window timer would never be dispatched either (the
+// historical "Ditto would not exit" failure mode).
+// ---------------------------------------------------------------------------
+static const int EXIT_WATCHDOG_TIMEOUT_MS = 6000;
+static HANDLE s_hExitWatchdogThread = NULL;
+static HANDLE s_hExitWatchdogStop = NULL;
+
+static DWORD WINAPI ExitWatchdogThreadProc(LPVOID)
+{
+	if(WaitForSingleObject(s_hExitWatchdogStop, EXIT_WATCHDOG_TIMEOUT_MS) == WAIT_TIMEOUT)
+	{
+		Log(StrF(_T("Exit watchdog: shutdown did not complete within %d ms, forcing termination"), EXIT_WATCHDOG_TIMEOUT_MS));
+		TerminateProcess(GetCurrentProcess(), 1);
+	}
+	return 0;
+}
+
+void CCP_MainApp::StartExitWatchdog()
+{
+	if(s_hExitWatchdogStop == NULL)
+		s_hExitWatchdogStop = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(s_hExitWatchdogStop != NULL)
+		ResetEvent(s_hExitWatchdogStop);
+
+	if(s_hExitWatchdogThread == NULL)
+	{
+		s_hExitWatchdogThread = CreateThread(NULL, 0, ExitWatchdogThreadProc, NULL, 0, NULL);
+		if(s_hExitWatchdogThread == NULL)
+			Log(_T("ERROR: failed to create exit watchdog thread"));
+	}
+}
+
+void CCP_MainApp::StopExitWatchdog()
+{
+	if(s_hExitWatchdogStop != NULL)
+		SetEvent(s_hExitWatchdogStop);
+
+	if(s_hExitWatchdogThread != NULL)
+	{
+		// The watchdog exits immediately once signaled; only reclaim its
+		// handle when the thread has really exited, otherwise leak it (the
+		// process is on its way out anyway and the OS reclaims handles).
+		if(WaitForSingleObject(s_hExitWatchdogThread, 2000) == WAIT_OBJECT_0)
+			CloseHandle(s_hExitWatchdogThread);
+		s_hExitWatchdogThread = NULL;
+	}
+
+	if(s_hExitWatchdogStop != NULL)
+	{
+		CloseHandle(s_hExitWatchdogStop);
+		s_hExitWatchdogStop = NULL;
 	}
 }
 
@@ -994,21 +1067,25 @@ int CCP_MainApp::ExitInstance()
 {
 	Log(StrF(_T("ExitInstance - PID: %d"), GetCurrentProcessId()));
 
-	// Signal Cloud Sync to stop (bounded wait, threads were signaled in OnClose)
+	// Signal Cloud Sync to stop (bounded waits inside; the exit watchdog
+	// terminates the process if any shutdown stage stalls past its budget)
 	m_CloudSyncManager.Stop();
 
 	// Wait for CloudSync threads to fully exit before MFC cleanup.
 	// This ensures MFC thread state is properly cleaned up before DLL detach,
-	// preventing mtex.cpp:90 debug assertion.
-	if (!m_CloudSyncManager.WaitForAllThreads(3000))
+	// preventing mtex.cpp:90 debug assertion. The result also feeds the
+	// database close gate below.
+	BOOL bCloudDone = m_CloudSyncManager.WaitForAllThreads(3000);
+	if (!bCloudDone)
 	{
 		Log(_T("WARNING: CloudSync threads did not exit within timeout"));
 	}
 
-	// Quick wait for OCR threads to finish before DLL unload
+	// Bounded wait for OCR threads before DLL unload. OCR threads do not
+	// touch m_db, so a timeout here only skips the DLL/handle cleanup.
 	{
 		int ocrWait = 0;
-		while (g_ocrThreadCount > 0 && ocrWait < 60)
+		while (g_ocrThreadCount > 0 && ocrWait < 1000)
 		{
 			Sleep(50);
 			ocrWait += 50;
@@ -1018,31 +1095,60 @@ int CCP_MainApp::ExitInstance()
 	{
 		CleanupOCR();
 	}
+	else
+	{
+		Log(_T("WARNING: OCR threads still active, skipping OCR cleanup"));
+	}
 
 	// Stop the pinyin backfill thread before closing the database: it uses
-	// m_db on a worker thread and has no other shutdown hook. Bounded wait —
+	// m_db on a worker thread and has no other shutdown hook. Bounded wait -
 	// the thread checks the stop event between batches.
-	if (!StopPinyinBackfillAndWait(8000))
+	BOOL bPinyinDone = StopPinyinBackfillAndWait(3000);
+	if (!bPinyinDone)
 	{
-		// Thread is stuck in a long batch (should not happen — batches are
-		// small with 100ms yields). Leave the DB open instead of pulling the
-		// handle out from under the running thread; the OS reclaims everything
-		// at process exit.
 		Log(_T("WARNING: pinyin backfill thread did not exit, skipping m_db.close()"));
 	}
-	else
+
+	// Close the database only when EVERY thread that touches it has been
+	// confirmed stopped (cloud sync, pinyin backfill, main save thread,
+	// copy thread, edit-tracking thread, quick-paste list threads).
+	// Otherwise leave it open - the OS reclaims everything at process exit
+	// and the WAL journal recovers on the next start - rather than pulling
+	// the handle out from under a running thread.
+	if (bCloudDone && bPinyinDone && m_bMainThreadStopped && m_bCopyThreadStopped && m_bEditThreadStopped && m_bQuickPasteThreadsStopped)
 	{
 		DeleteDittoTempFiles(FALSE);
 
 		m_db.close();
 		Log(_T("m_db.close completed"));
 	}
+	else
+	{
+		Log(StrF(_T("WARNING: skipping m_db.close(), threads still active (cloud:%d pinyin:%d main:%d copy:%d edit:%d qpaste:%d)"),
+			(int)bCloudDone, (int)bPinyinDone, (int)m_bMainThreadStopped, (int)m_bCopyThreadStopped, (int)m_bEditThreadStopped, (int)m_bQuickPasteThreadsStopped));
+	}
 
+	// UAC thread: ask it to exit (bounded wait) and only delete the object
+	// once it has actually stopped. If it is stuck inside a paste/copy
+	// operation, leak the object instead of deleting it under the running
+	// thread - the OS reclaims the memory at process exit.
 	if(m_pUacPasteThread != NULL)
 	{
+		// FireExit signals the named cross-process UAC_EXIT event so the
+		// elevated helper process (started with /uacpaste) exits immediately
+		// too; Stop() below only signals our in-process exit event.
 		m_pUacPasteThread->FireExit();
-		delete m_pUacPasteThread;
-		Log(_T("UAC cleanup completed"));
+		m_pUacPasteThread->Stop(1000);
+		if (!m_pUacPasteThread->IsRunning())
+		{
+			delete m_pUacPasteThread;
+			Log(_T("UAC cleanup completed"));
+		}
+		else
+		{
+			Log(_T("WARNING: UAC thread still running after 1s, leaking object"));
+		}
+		m_pUacPasteThread = NULL;
 	}
 	else
 	{
@@ -1071,6 +1177,12 @@ int CCP_MainApp::ExitInstance()
 	// now safe because AfxOleInit() is moved after the mutex check.
 	int ret = CWinApp::ExitInstance();
 	Log(StrF(_T("CWinApp::ExitInstance returned %d"), ret));
+
+	// Disarm the watchdog only after ALL shutdown stages (including MFC/DLL
+	// teardown) have completed - it is the last-resort terminator for a
+	// hung exit and must cover this entire tail.
+	StopExitWatchdog();
+
 	return ret;
 }
 
