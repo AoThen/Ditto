@@ -8,7 +8,7 @@
 using json = nlohmann::json;
 
 // Static member definitions
-std::unique_ptr<httplib::Client> CCloudEncryption::m_httpClient;
+std::shared_ptr<httplib::Client> CCloudEncryption::m_httpClient;
 CString CCloudEncryption::m_httpClientUrl;
 CCriticalSection CCloudEncryption::m_csHttpClient;
 CStringA CCloudEncryption::m_lastHttpToken;
@@ -53,7 +53,7 @@ void CCloudEncryption::EnsureHttpClient(const CString& serverUrl, const CString&
 	}
 	if (!m_httpClient || m_httpClientUrl != serverUrl)
 	{
-		m_httpClient = std::make_unique<httplib::Client>(url);
+		m_httpClient = std::make_shared<httplib::Client>(url);
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
@@ -92,13 +92,19 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 	try
 	{
 		EnsureHttpClient(serverUrl, deviceToken);
-		if (!m_httpClient)
+		// Copy the client under the lock, then perform network I/O without it.
+		std::shared_ptr<httplib::Client> client;
+		{
+			CSingleLock lock(&m_csHttpClient, TRUE);
+			client = m_httpClient;
+		}
+		if (!client)
 		{
 			result.error = _T("Failed to create HTTP client");
 			return result;
 		}
 
-		auto saltRes = m_httpClient->Get("/api/v1/encryption/salt");
+		auto saltRes = client->Get("/api/v1/encryption/salt");
 		if (!saltRes || saltRes->status != 200)
 		{
 			result.error = _T("Failed to get encryption salt from server");
@@ -140,7 +146,7 @@ EncryptionSetupResult CCloudEncryption::SetupEncryption(
 		body["verification_hash"] = verificationHash.GetString();
 		body["password_hint"] = "";
 
-		auto setupRes = m_httpClient->Post("/api/v1/encryption/setup", body.dump(), "application/json");
+		auto setupRes = client->Post("/api/v1/encryption/setup", body.dump(), "application/json");
 		if (!setupRes)
 		{
 			result.error = _T("Failed to connect to server (network error)");
@@ -219,13 +225,19 @@ EncryptionSetupResult CCloudEncryption::ReVerifyPassword(
 	try
 	{
 		EnsureHttpClient(serverUrl, deviceToken);
-		if (!m_httpClient)
+		// Copy the client under the lock, then perform network I/O without it.
+		std::shared_ptr<httplib::Client> client;
+		{
+			CSingleLock lock(&m_csHttpClient, TRUE);
+			client = m_httpClient;
+		}
+		if (!client)
 		{
 			result.error = _T("Failed to create HTTP client");
 			return result;
 		}
 
-		auto keyRes = m_httpClient->Get("/api/v1/encryption/key-material");
+		auto keyRes = client->Get("/api/v1/encryption/key-material");
 		if (!keyRes)
 		{
 			result.error = _T("Failed to connect to server (network error)");

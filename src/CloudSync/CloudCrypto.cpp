@@ -150,6 +150,11 @@ CStringA CCloudCrypto::Decrypt(const CStringA& encryptedBase64, bool* pOk)
 
 		if(pOk)
 			*pOk = true;
+		// Contract: callers base64-encode binary payloads BEFORE encryption, so
+		// the decrypted plaintext is always base64 text (no embedded NULs).
+		// The two-arg CStringA ctor copies by length (no NUL truncation here),
+		// but downstream code must keep treating the result as byte-counted,
+		// not as a NUL-terminated C string, if that contract ever changes.
 		return CStringA(reinterpret_cast<const char*>(pt.data()), static_cast<int>(pt.size()));
 	}
 	catch (...)

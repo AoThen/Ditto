@@ -171,8 +171,11 @@ private:
 	LONG      m_forceOverrideLocal;  // Set before ForceDownload, read&reset in MergeRemoteClipToLocal
 	LONG      m_forceOverrideRemote; // Set before ForceUpload, read&reset in QuickSyncThreadProc
 
-	// Reusable HTTP client (httplib::Client) for all REST API calls
-	std::unique_ptr<httplib::Client> m_httpClient;
+	// Reusable HTTP client (httplib::Client) for all REST API calls.
+	// shared_ptr so request threads can copy it under the lock and perform
+	// network I/O without holding the lock (the old client stays alive until
+	// the last user releases it).
+	std::shared_ptr<httplib::Client> m_httpClient;
 	CString   m_httpClientUrl; // Cached URL to detect server URL changes
 	CStringA  m_lastHttpToken; // Last token used for HTTP client auth headers
 

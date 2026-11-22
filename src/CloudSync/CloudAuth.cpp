@@ -493,7 +493,13 @@ BOOL CCloudAuth::TryRefreshTokenLocked()
 
 		CString serverUrl = CGetSetOptions::GetCloudServerUrl();
 		if (serverUrl.IsEmpty())
+		{
+			// Read the shared URL under its lock: EnsureHttpClient may rewrite
+			// it concurrently. Lock order is refreshMutex -> m_csHttpClient
+			// (documented in CloudAuth.h), so this cannot deadlock.
+			CSingleLock lockClient(&m_csHttpClient, TRUE);
 			serverUrl = m_httpClientUrl;	// reuse whatever the last login used
+		}
 		if (serverUrl.IsEmpty())
 			return FALSE;
 

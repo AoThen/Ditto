@@ -39,9 +39,9 @@ private:
 	// Reusable HTTP client for encryption API calls.
 	// Concurrency note: these methods are only called from the UI thread
 	// (options page). m_csHttpClient serializes client creation/reset only;
-	// do NOT call the request methods from background threads without adding
-	// proper locking first.
-	static std::unique_ptr<httplib::Client> m_httpClient;
+	// request code copies the shared_ptr under the lock and performs network
+	// I/O without holding it.
+	static std::shared_ptr<httplib::Client> m_httpClient;
 	static CString m_httpClientUrl;
 	static CCriticalSection m_csHttpClient;
 	static CStringA m_lastHttpToken;

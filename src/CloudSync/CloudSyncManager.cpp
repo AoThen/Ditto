@@ -62,7 +62,7 @@ void CCloudSyncManager::EnsureHttpClient()
 	}
 	if (!m_httpClient || m_httpClientUrl != m_serverUrl)
 	{
-		m_httpClient = std::make_unique<httplib::Client>(url);
+		m_httpClient = std::make_shared<httplib::Client>(url);
 		m_httpClient->set_connection_timeout(10, 0);
 		m_httpClient->set_read_timeout(30, 0);
 		m_httpClient->set_write_timeout(30, 0);
@@ -114,12 +114,21 @@ CCloudSyncManager::~CCloudSyncManager()
 		Stop();
 	}
 
-	// Only delete critical sections if all threads have exited cleanly.
-	// If Stop() timed out, threads may still be running — skip cleanup
-	// to avoid use-after-free. OS reclaims CRITICAL_SECTION on process exit.
-	// Check ALL thread sources, including quick-sync pool and encryption retry.
+	// Last line of defense against use-after-free: if Stop() timed out, give
+	// detached worker threads one final bounded chance to finish before this
+	// object's memory (including its CRITICAL_SECTIONs) disappears. Threads
+	// poll the stop event between network calls, so they exit as soon as the
+	// in-flight request returns.
 	BOOL bAllThreadsDead = (m_pSyncThread == nullptr && m_pWsThread == nullptr &&
 		m_pEncRetryThread == nullptr && m_nActiveQuickSyncThreads == 0);
+	if (!bAllThreadsDead)
+	{
+		LogCloudSync(_T("~CCloudSyncManager: threads still active, waiting up to 30s for them to exit"));
+		WaitForAllThreads(30000);
+		bAllThreadsDead = (m_pSyncThread == nullptr && m_pWsThread == nullptr &&
+			m_pEncRetryThread == nullptr && m_nActiveQuickSyncThreads == 0);
+	}
+
 	if (bAllThreadsDead)
 	{
 		DeleteCriticalSection(&m_csSync);
@@ -130,11 +139,12 @@ CCloudSyncManager::~CCloudSyncManager()
 	}
 	else
 	{
-		LogCloudSync(_T("~CCloudSyncManager: threads still active, skipping CriticalSection cleanup"));
-		// Detached threads may still be running and can hold a reference to
-		// the shared HTTP client. Give up ownership instead of deleting it
-		// under them; the OS reclaims the memory at process exit.
-		m_httpClient.release();
+		LogCloudSync(_T("~CCloudSyncManager: threads STILL active after final wait, skipping CriticalSection cleanup"));
+		// Threads may still touch the shared HTTP client. reset() drops our
+		// reference: if a thread already copied the shared_ptr the client
+		// object outlives this manager, otherwise it is freed here. The OS
+		// reclaims the remaining memory at process exit.
+		m_httpClient.reset();
 	}
 }
 
@@ -303,13 +313,27 @@ BOOL CCloudSyncManager::ReinitializeSync()
 	// still be running — two concurrent sync threads would interleave cursors.
 	// Stop() detached (rather than joined) threads that were stuck in HTTP;
 	// give them a bounded window to actually exit before restarting.
+	CWinThread* pSyncThread = nullptr;
+	EnterCriticalSection(&m_csSync);
 	if (m_pSyncThread != nullptr)
 	{
-		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 5000);
+		pSyncThread = m_pSyncThread;
+	}
+	LeaveCriticalSection(&m_csSync);
+
+	if (pSyncThread != nullptr)
+	{
+		DWORD dwWait = WaitForSingleObject(pSyncThread->m_hThread, 5000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
-			delete m_pSyncThread;
-			m_pSyncThread = nullptr;
+			// Unpublish the pointer under the readers' lock before deleting
+			// the object, so async workers polling m_pSyncThread never see a
+			// dangling pointer.
+			EnterCriticalSection(&m_csSync);
+			if (m_pSyncThread == pSyncThread)
+				m_pSyncThread = nullptr;
+			LeaveCriticalSection(&m_csSync);
+			delete pSyncThread;
 		}
 	}
 	if (m_pWsThread != nullptr)
@@ -488,19 +512,35 @@ void CCloudSyncManager::Stop()
 		SetEvent(m_hStopEvent);
 	}
 
+	// Wait for the sync thread outside the lock (SyncThreadProc itself uses
+	// m_csSync, so holding the lock while waiting could deadlock), then
+	// unpublish and delete the CWinThread under the lock so async workers
+	// polling m_pSyncThread never observe a dangling pointer.
+	CWinThread* pSyncThread = nullptr;
+	EnterCriticalSection(&m_csSync);
 	if (m_pSyncThread != nullptr)
 	{
-		DWORD dwWait = WaitForSingleObject(m_pSyncThread->m_hThread, 1000);
+		pSyncThread = m_pSyncThread;
+	}
+	LeaveCriticalSection(&m_csSync);
+
+	if (pSyncThread != nullptr)
+	{
+		DWORD dwWait = WaitForSingleObject(pSyncThread->m_hThread, 1000);
 		if (dwWait == WAIT_OBJECT_0)
 		{
 			LogCloudSync(_T("Sync thread exited cleanly."));
-			delete m_pSyncThread;
-			m_pSyncThread = nullptr;
+			EnterCriticalSection(&m_csSync);
+			if (m_pSyncThread == pSyncThread)
+				m_pSyncThread = nullptr;
+			LeaveCriticalSection(&m_csSync);
+			delete pSyncThread;
 		}
 		else
 		{
 			LogCloudSync(_T("WARNING: Sync thread did not exit within 1s, detaching."));
-			// Leave CWinThread alive — WaitForAllThreads will wait again and delete it
+			// Leave CWinThread alive and the member pointer set —
+			// WaitForAllThreads (destructor) will wait again and delete it.
 		}
 	}
 
@@ -584,11 +624,15 @@ BOOL CCloudSyncManager::WaitForAllThreads(DWORD timeoutMs)
 			return FALSE;
 		}
 
-		// All threads exited - delete CWinThread objects
-		if (m_pSyncThread != nullptr)
+		// All threads exited - delete CWinThread objects. Unpublish the sync
+		// thread pointer under the readers' lock before deleting the object.
+		EnterCriticalSection(&m_csSync);
+		CWinThread* pSyncThread = m_pSyncThread;
+		m_pSyncThread = nullptr;
+		LeaveCriticalSection(&m_csSync);
+		if (pSyncThread != nullptr)
 		{
-			delete m_pSyncThread;
-			m_pSyncThread = nullptr;
+			delete pSyncThread;
 		}
 		if (m_pWsThread != nullptr)
 		{
@@ -1238,9 +1282,13 @@ BOOL CCloudSyncManager::CheckAndNotifyEncryptionChange()
 	{
 		EnsureHttpClient();
 
+		// Copy the client under the lock, then perform network I/O without
+		// holding it (a slow request must not block other sync operations).
+		std::shared_ptr<httplib::Client> client;
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Get("/api/v1/encryption/salt") : httplib::Result();
+		client = m_httpClient;
 		LeaveCriticalSection(&m_csHttpClient);
+		auto res = client ? client->Get("/api/v1/encryption/salt") : httplib::Result();
 		if (!res || res->status != 200)
 			return FALSE;
 
@@ -1493,9 +1541,13 @@ BOOL CCloudSyncManager::PushNewClips(BOOL bForce)
 			EnsureHttpClient();
 
 			std::string bodyStr = syncReq.dump();
+			// Copy the client under the lock, then perform network I/O without
+			// holding it (a slow request must not block other sync operations).
+			std::shared_ptr<httplib::Client> client;
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient ? m_httpClient->Post("/api/v1/clips/sync", bodyStr, "application/json") : httplib::Result();
+			client = m_httpClient;
 			LeaveCriticalSection(&m_csHttpClient);
+			auto res = client ? client->Post("/api/v1/clips/sync", bodyStr, "application/json") : httplib::Result();
 			if (!res)
 			{
 				LogCloudSync(_T("PushNewClips: failed to connect to server"));
@@ -1834,9 +1886,13 @@ void CCloudSyncManager::PullChanges()
 			// GET /api/v1/clips/changes?since=...&page=...
 			CStringA path;
 		path.Format("/api/v1/clips/changes?since=%s&page=%d", (LPCSTR)sinceStr, pullPage);
+		// Copy the client under the lock, then perform network I/O without
+		// holding it (a slow request must not block other sync operations).
+		std::shared_ptr<httplib::Client> client;
 		EnterCriticalSection(&m_csHttpClient);
-		auto res = m_httpClient ? m_httpClient->Get(path.GetString()) : httplib::Result();
+		client = m_httpClient;
 		LeaveCriticalSection(&m_csHttpClient);
+		auto res = client ? client->Get(path.GetString()) : httplib::Result();
 		if (!res)
 		{
 			LogCloudSync(_T("PullChanges: failed to connect to server"));
@@ -3471,9 +3527,14 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			if (gi.remoteId.empty())
 			{
 				// Create new group
+				// Copy the client under the lock, then perform network I/O
+				// without holding it (a slow request must not block other
+				// sync operations).
+				std::shared_ptr<httplib::Client> client;
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient ? m_httpClient->Post("/api/v1/groups", body.dump(), "application/json") : httplib::Result();
+				client = m_httpClient;
 				LeaveCriticalSection(&m_csHttpClient);
+				auto res = client ? client->Post("/api/v1/groups", body.dump(), "application/json") : httplib::Result();
 				if (res && res->status == 200)
 				{
 					try
@@ -3495,9 +3556,14 @@ std::vector<std::string> CCloudSyncManager::PushGroups()
 			else
 			{
 				// Update existing group
+				// Copy the client under the lock, then perform network I/O
+				// without holding it (a slow request must not block other
+				// sync operations).
+				std::shared_ptr<httplib::Client> client;
 				EnterCriticalSection(&m_csHttpClient);
-				auto res = m_httpClient ? m_httpClient->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json") : httplib::Result();
+				client = m_httpClient;
 				LeaveCriticalSection(&m_csHttpClient);
+				auto res = client ? client->Put(("/api/v1/groups/" + gi.remoteId).c_str(), body.dump(), "application/json") : httplib::Result();
 				if (!res || res->status != 200)
 				{
 					CString err;
@@ -3541,9 +3607,13 @@ void CCloudSyncManager::PullGroups()
 		while (hasMore)
 		{
 			std::string url = "/api/v1/groups?page=" + std::to_string(page) + "&per_page=200";
+			// Copy the client under the lock, then perform network I/O without
+			// holding it (a slow request must not block other sync operations).
+			std::shared_ptr<httplib::Client> client;
 			EnterCriticalSection(&m_csHttpClient);
-			auto res = m_httpClient ? m_httpClient->Get(url.c_str()) : httplib::Result();
+			client = m_httpClient;
 			LeaveCriticalSection(&m_csHttpClient);
+			auto res = client ? client->Get(url.c_str()) : httplib::Result();
 			if (!res || res->status != 200)
 			{
 				bAllPagesOk = false;
