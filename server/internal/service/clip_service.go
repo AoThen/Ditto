@@ -131,6 +131,8 @@ type ClipDetail struct {
 // ClipFormatFull represents format with base64-encoded data
 type ClipFormatFull struct {
 	FormatType int    `json:"format_type"`
+	FormatName string `json:"format_name,omitempty"`
+	Encoding   string `json:"encoding,omitempty"`
 	Data       string `json:"data,omitempty"`
 	DataSize   int    `json:"data_size"`
 	Encrypted  bool   `json:"encrypted"` // true if data is E2E encrypted
@@ -297,6 +299,8 @@ func (s *ClipService) GetClip(userID uint, clipID string) (*ClipDetail, error) {
 	for _, f := range clip.Formats {
 		formatFulls = append(formatFulls, ClipFormatFull{
 			FormatType: f.FormatType,
+			FormatName: f.FormatName,
+			Encoding:   f.Encoding,
 			Data:       base64.StdEncoding.EncodeToString(f.Data),
 			DataSize:   len(f.Data),
 			Encrypted:  f.Encrypted,
@@ -505,8 +509,10 @@ type PushClipItem struct {
 // PushFormatItem represents a format being pushed from client
 type PushFormatItem struct {
 	FormatType int    `json:"format_type"`
-	Data       string `json:"data"`      // base64-encoded
-	Encrypted  bool   `json:"encrypted"` // true if data is E2E encrypted
+	FormatName string `json:"format_name"` // clipboard format name (registered formats)
+	Encoding   string `json:"encoding"`    // "text" | "base64"; empty = legacy
+	Data       string `json:"data"`        // base64-encoded
+	Encrypted  bool   `json:"encrypted"`   // true if data is E2E encrypted
 }
 
 // SyncResponse represents the sync API response
@@ -574,6 +580,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		// Pre-decode all format base64 data OUTSIDE any transaction
 		type preparedFormat struct {
 			FormatType int
+			FormatName string
+			Encoding   string
 			Data       []byte
 			Encrypted  bool
 		}
@@ -592,6 +600,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 				}
 				formats = append(formats, preparedFormat{
 					FormatType: pf.FormatType,
+					FormatName: pf.FormatName,
+					Encoding:   pf.Encoding,
 					Data:       data,
 					Encrypted:  pf.Encrypted,
 				})
@@ -739,6 +749,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							batchFormats = append(batchFormats, model.ClipFormat{
 								ClipID:     pc.ID,
 								FormatType: pf.FormatType,
+								FormatName: pf.FormatName,
+								Encoding:   pf.Encoding,
 								Data:       pf.Data,
 								Encrypted:  pf.Encrypted,
 								CreatedAt:  syncTime,
@@ -795,6 +807,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							batchFormats = append(batchFormats, model.ClipFormat{
 								ClipID:     clip.ID,
 								FormatType: pf.FormatType,
+								FormatName: pf.FormatName,
+								Encoding:   pf.Encoding,
 								Data:       pf.Data,
 								Encrypted:  pf.Encrypted,
 								CreatedAt:  clipUpdatedAt,
@@ -835,6 +849,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 							batchFormats = append(batchFormats, model.ClipFormat{
 								ClipID:     conflictID,
 								FormatType: pf.FormatType,
+								FormatName: pf.FormatName,
+								Encoding:   pf.Encoding,
 								Data:       pf.Data,
 								Encrypted:  pf.Encrypted,
 								CreatedAt:  syncTime,
@@ -875,6 +891,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 								batchFormats = append(batchFormats, model.ClipFormat{
 									ClipID:     existing.ID,
 									FormatType: pf.FormatType,
+									FormatName: pf.FormatName,
+									Encoding:   pf.Encoding,
 									Data:       pf.Data,
 									Encrypted:  pf.Encrypted,
 									CreatedAt:  syncTime,
@@ -1003,6 +1021,8 @@ func (s *ClipService) Sync(userID uint, req *SyncRequest, deviceID string) (*Syn
 		for _, f := range formats {
 			formatFulls = append(formatFulls, ClipFormatFull{
 				FormatType: f.FormatType,
+				FormatName: f.FormatName,
+				Encoding:   f.Encoding,
 				Data:       base64.StdEncoding.EncodeToString(f.Data),
 				DataSize:   len(f.Data),
 				Encrypted:  f.Encrypted,

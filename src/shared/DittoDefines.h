@@ -188,8 +188,9 @@ public:
 			if (cbType != 0)
 			{
 				TCHAR szFormat[256];
-				GetClipboardFormatName(cbType, szFormat, 256);
-				return szFormat;
+				szFormat[0] = 0; // GetClipboardFormatName leaves the buffer untouched on failure
+				if (GetClipboardFormatName(cbType, szFormat, 255) > 0)
+					return szFormat;
 			}
 			break;
 		}

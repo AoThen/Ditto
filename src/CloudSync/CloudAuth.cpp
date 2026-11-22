@@ -26,24 +26,36 @@ static std::string CStringToStdString(const CString& str)
 	return std::string(utf8.m_psz);
 }
 
-void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
+// Normalize a server URL for the auth client: enforce HTTPS (plain http is
+// rejected), default a missing scheme to https.
+static bool BuildAuthUrl(const CString& serverUrl, std::string& outUrl)
 {
-	CSingleLock lockClient(&m_csHttpClient, TRUE);
-	if (m_testClient) return;
-
 	std::string url = CStringToStdString(serverUrl);
-	// Enforce HTTPS: reject plain http for security
 	if (url.find("https://") != 0)
 	{
 		if (url.find("http://") == 0)
 		{
 			LogCloudSync("[CloudAuth] ERROR: HTTPS required, refusing to use plain HTTP.");
-			m_httpClient.reset();
-			m_httpClientUrl.Empty();
-			return;
+			return false;
 		}
 		// No scheme - default to https
 		url = "https://" + url;
+	}
+	outUrl = url;
+	return true;
+}
+
+void CCloudAuth::EnsureHttpClient(const CString& serverUrl)
+{
+	CSingleLock lockClient(&m_csHttpClient, TRUE);
+	if (m_testClient) return;
+
+	std::string url;
+	if (!BuildAuthUrl(serverUrl, url))
+	{
+		m_httpClient.reset();
+		m_httpClientUrl.Empty();
+		return;
 	}
 	if (!m_httpClient || m_httpClientUrl != serverUrl)
 	{
@@ -104,16 +116,29 @@ std::string HttplibClientAdapter::GetBaseUrl() const
 
 HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, const std::string& contentType)
 {
-	CSingleLock lockClient(&m_csHttpClient, TRUE);
-	if (m_testClient)
+	CString serverUrl;
 	{
-		return m_testClient->Post(path, body, contentType);
+		CSingleLock lockClient(&m_csHttpClient, TRUE);
+		if (m_testClient)
+		{
+			return m_testClient->Post(path, body, contentType);
+		}
+		serverUrl = m_httpClientUrl;
 	}
-	if (!m_httpClient)
+	// The lock must never span network I/O: a slow sync-thread request would
+	// otherwise freeze the UI thread's login for the whole read timeout. Auth
+	// calls are lightweight, so a short-lived client with tight timeouts is
+	// both safer and cheaper than sharing the long-lived client.
+	std::string url;
+	if (!BuildAuthUrl(serverUrl, url))
 	{
 		return HttpResult{};
 	}
-	auto res = m_httpClient->Post(path, body, contentType);
+	httplib::Client client(url);
+	client.set_connection_timeout(5, 0);
+	client.set_read_timeout(15, 0);
+	client.set_write_timeout(15, 0);
+	auto res = client.Post(path, body, contentType);
 	if (!res)
 	{
 		return HttpResult{};
@@ -126,19 +151,28 @@ HttpResult CCloudAuth::DoPost(const std::string& path, const std::string& body, 
 HttpResult CCloudAuth::DoPostWithBearer(const std::string& path, const std::string& body,
                                         const std::string& contentType, const std::string& bearerToken)
 {
-	CSingleLock lockClient(&m_csHttpClient, TRUE);
-	if (m_testClient)
+	CString serverUrl;
 	{
-		return m_testClient->PostWithBearer(path, body, contentType, bearerToken);
+		CSingleLock lockClient(&m_csHttpClient, TRUE);
+		if (m_testClient)
+		{
+			return m_testClient->PostWithBearer(path, body, contentType, bearerToken);
+		}
+		serverUrl = m_httpClientUrl;
 	}
-	if (!m_httpClient)
+	std::string url;
+	if (!BuildAuthUrl(serverUrl, url))
 	{
 		return HttpResult{};
 	}
+	httplib::Client client(url);
+	client.set_connection_timeout(5, 0);
+	client.set_read_timeout(15, 0);
+	client.set_write_timeout(15, 0);
 	httplib::Headers headers = {
 		{ "Authorization", "Bearer " + bearerToken }
 	};
-	auto res = m_httpClient->Post(path, headers, body, contentType);
+	auto res = client.Post(path, headers, body, contentType);
 	if (!res)
 	{
 		return HttpResult{};

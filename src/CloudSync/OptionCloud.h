@@ -120,6 +120,8 @@ protected:
 
 	// Async reinitialize sync (avoids UI thread blocking during Stop)
 	afx_msg LRESULT OnReinitSync(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnDisableSync(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnPinyinRebuilt(WPARAM wParam, LPARAM lParam);
 };
 
 struct OcrWorkItem {

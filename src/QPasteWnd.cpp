@@ -1715,6 +1715,9 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 				lowSearch.MakeLower();
 				if (lowSearch.GetLength() > 64)
 					lowSearch = lowSearch.Left(64);
+				// Safety note: alphaOnly comes from ExtractAlpha (letters only),
+				// so quote/percent injection is impossible; the escaping below
+				// is defence in depth for the LIKE pattern/escape chars.
 				lowSearch.Replace(_T("\\"), _T("\\\\"));
 				lowSearch.Replace(_T("'"), _T("''"));
 				lowSearch.Replace(_T("%"), _T("\\%"));

@@ -183,7 +183,7 @@ public:
 	bool SetDescFromType();
 	void StripExcelOuterQuotes(CString &str);
 	void StripExcelOuterQuotesFromGlobal(HGLOBAL &hGlobal, CLIPFORMAT cfType);
-	bool AddToDB(bool bCheckForDuplicates = true);
+	bool AddToDB(bool bCheckForDuplicates = true, bool bPreserveTime = false);
 	bool ModifyMainTable();
 	bool ModifyDescription();	
 	void MakeLatestOrder();

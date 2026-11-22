@@ -71,10 +71,15 @@ BOOL CCloudKeyExport::ExportKey(
 		std::vector<BYTE> checksum = CCloudCrypto::Sha256(keyBytes);
 		CStringA checksumB64 = CCloudCrypto::Base64Encode(checksum);
 
-		// Derive a key from password + salt for encrypting the exported key
+		// Derive a key from password + salt for encrypting the exported key.
+		// Must match CloudEncryption: the password is converted to UTF-8 bytes
+		// (CStringA alone would use the ANSI codepage, breaking non-ASCII
+		// passwords when the export is imported on a machine with a different
+		// codepage).
 		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(saltBase64);
+		CT2A passwordUtf8(password, CP_UTF8);
 		std::vector<BYTE> exportKey = CCloudCrypto::DeriveKey(
-			CStringA(password), saltBytes, 100000);
+			CStringA(passwordUtf8), saltBytes, 100000);
 
 		// Encrypt the AES key with the password-derived key
 		// Use a random IV for each export
@@ -210,10 +215,13 @@ BOOL CCloudKeyExport::ImportKey(
 		std::vector<BYTE> tag(encryptedPayload.end() - 16, encryptedPayload.end());
 		std::vector<BYTE> ciphertext(encryptedPayload.begin() + 12, encryptedPayload.end() - 16);
 
-		// Derive decryption key from password + salt
+		// Derive decryption key from password + salt.
+		// UTF-8 conversion must match the export side and CloudEncryption
+		// (plain CStringA would use the ANSI codepage).
 		std::vector<BYTE> saltBytes = CCloudCrypto::Base64Decode(CStringA(outKeyData.salt));
+		CT2A passwordUtf8(password, CP_UTF8);
 		std::vector<BYTE> exportKey = CCloudCrypto::DeriveKey(
-			CStringA(password), saltBytes, 100000);
+			CStringA(passwordUtf8), saltBytes, 100000);
 
 		// Decrypt
 		std::vector<BYTE> decryptedKey = CCloudCrypto::AesGcmDecrypt(

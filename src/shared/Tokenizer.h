@@ -15,6 +15,8 @@ public:
 
 	void SetDelimiters(const CString& csDelim)
 	{
+		// Replace (not accumulate): repeated calls must not keep old separators.
+		m_delim.RemoveAll();
 		for (int i = 0; i < csDelim.GetLength(); ++i)
 		{
 			m_delim.Add(csDelim[i]);

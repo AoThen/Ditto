@@ -17,6 +17,18 @@
 #define WM_CLOUD_REINIT_SYNC (WM_USER + 1002)
 #endif
 
+// Custom Windows message for deferred sync disable (Stop() can block the UI
+// thread for seconds while waiting for the sync threads to exit)
+#ifndef WM_CLOUD_DISABLE_SYNC
+#define WM_CLOUD_DISABLE_SYNC (WM_USER + 1005)
+#endif
+
+// Pinyin rebuild finished on the background thread.
+// wParam: rows processed; lParam: 1 = completed, 0 = interrupted, 2 = failed
+#ifndef WM_CLOUD_PINYIN_REBUILT
+#define WM_CLOUD_PINYIN_REBUILT (WM_USER + 1006)
+#endif
+
 // Custom Windows message for async cloud sync trigger (avoid calling OnClipAdded from within AddToDB)
 #ifndef WM_CLOUD_TRIGGER_SYNC
 #define WM_CLOUD_TRIGGER_SYNC (WM_USER + 1003)

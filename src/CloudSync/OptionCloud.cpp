@@ -200,6 +200,8 @@ BEGIN_MESSAGE_MAP(COptionCloud, CPropertyPage)
 	ON_BN_CLICKED(IDC_CLOUD_FORCE_OCR, &COptionCloud::OnForceReOcr)
 	ON_MESSAGE(WM_CLOUD_AUTH_REQUIRED, &COptionCloud::OnCloudAuthRequired)
 	ON_MESSAGE(WM_CLOUD_REINIT_SYNC, &COptionCloud::OnReinitSync)
+	ON_MESSAGE(WM_CLOUD_DISABLE_SYNC, &COptionCloud::OnDisableSync)
+	ON_MESSAGE(WM_CLOUD_PINYIN_REBUILT, &COptionCloud::OnPinyinRebuilt)
 END_MESSAGE_MAP()
 
 BOOL COptionCloud::OnInitDialog()
@@ -328,7 +330,10 @@ BOOL COptionCloud::OnApply()
 	}
 	else
 	{
-		theApp.m_CloudSyncManager.Stop();
+		// Defer Stop() via PostMessage (same pattern as the enable path):
+		// Stop can block the UI thread for seconds waiting for the sync
+		// threads to exit.
+		PostMessage(WM_CLOUD_DISABLE_SYNC, 0, 0);
 	}
 
 	CGetSetOptions::SetEnableDebugLogging(m_bEnableDebugLogging);
@@ -771,78 +776,57 @@ void COptionCloud::OnRebuildPinyinIndex()
 	if (AfxMessageBox(theApp.m_Language.GetString("CloudMsgRebuildPinyinConfirm", _T("Rebuild pinyin search index for all clips?")), MB_YESNO) != IDYES)
 		return;
 
-	CWaitCursor wait;
-
-	// 第一遍：先取回全部 lID/mText 并关闭游标，避免在游标打开时提交事务
-	std::vector<std::pair<long, CString>> items;
-	try
+	// Heavy full-table conversion runs on a background thread; holding the
+	// DB lock on the UI thread for the whole rebuild would freeze clipboard
+	// writes. Completion/failure is reported via WM_CLOUD_PINYIN_REBUILT.
+	PinyinRebuildStart started = StartPinyinBackfillForced(GetSafeHwnd());
+	switch (started)
 	{
-		CSingleLock lockDb(&theApp.m_csDb, TRUE);
-		CppSQLite3Query q = theApp.m_db.execQuery(_T("SELECT lID, mText FROM Main"));
-		while (!q.eof())
-		{
-			items.emplace_back(q.getIntField(_T("lID")), q.getStringField(_T("mText")));
-			q.nextRow();
-		}
+		case PBRS_ALREADY_RUNNING:
+			AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildInProgress", _T("A pinyin index rebuild is already running.")), MB_ICONINFORMATION);
+			break;
+		case PBRS_NOTHING_TO_DO:
+			AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildNothing", _T("There are no clips to rebuild.")), MB_ICONINFORMATION);
+			break;
+		case PBRS_FAILED:
+			AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to rebuild pinyin index.")), MB_ICONERROR);
+			break;
+		case PBRS_STARTED:
+		default:
+			AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildStarted", _T("Pinyin index rebuild started in the background.")), MB_ICONINFORMATION);
+			break;
 	}
-	catch (const CppSQLite3Exception& e)
-	{
-		CString errMsg;
-		errMsg.Format(_T("OnRebuildPinyinIndex: read failed (%d) %s"), e.errorCode(), e.errorMessage());
-		TRACE(_T("%s\n"), (LPCTSTR)errMsg);
-		AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to read clips while rebuilding pinyin index.")), MB_ICONERROR);
-		return;
-	}
+}
 
-	// 第二遍：逐条转换并参数化更新，避免 SQL 注入/语法破坏
-	int processed = 0;
-	try
+// ---------------------------------------------------------------------------
+// OnPinyinRebuilt: background pinyin rebuild finished
+// wParam: rows processed; lParam: 1 = completed, 0 = interrupted, 2 = failed
+// ---------------------------------------------------------------------------
+LRESULT COptionCloud::OnPinyinRebuilt(WPARAM wParam, LPARAM lParam)
+{
+	if (lParam == 2)
 	{
-		CSingleLock lockDb(&theApp.m_csDb, TRUE);
-		theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
-		for (const auto& item : items)
-		{
-			auto py = CPinyinConvert::TextToPinyin(item.second);
-			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
-				_T("UPDATE Main SET pinyin = ?, pinyinAbbr = ? WHERE lID = ?"));
-			stmt.bind(1, py.first);
-			stmt.bind(2, py.second);
-			stmt.bind(3, (int)item.first);
-			stmt.execDML();
-
-			if (++processed % 500 == 0)
-			{
-				// NOTE: execDML prepares only the first statement and discards
-				// the tail, so COMMIT and BEGIN must be separate calls — a
-				// combined "COMMIT; BEGIN TRANSACTION;" would silently skip
-				// the BEGIN and leave subsequent batches in autocommit mode.
-				theApp.m_db.execDML(_T("COMMIT;"));
-				theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
-			}
-		}
-		theApp.m_db.execDML(_T("COMMIT;"));
-	}
-	catch (const CppSQLite3Exception& e)
-	{
-		CString errMsg;
-		errMsg.Format(_T("OnRebuildPinyinIndex: update failed (%d) %s"), e.errorCode(), e.errorMessage());
-		TRACE(_T("%s\n"), (LPCTSTR)errMsg);
-		try
-		{
-			theApp.m_db.execDML(_T("ROLLBACK;"));
-		}
-		catch (...)
-		{
-			// No active transaction (e.g. failure happened at a batch
-			// boundary) — nothing to roll back.
-		}
 		AfxMessageBox(theApp.m_Language.GetString("CloudMsgPinyinRebuildFailed", _T("Failed to rebuild pinyin index.")), MB_ICONERROR);
-		return;
 	}
+	else if (lParam == 1)
+	{
+		CString msg;
+		msg.Format(theApp.m_Language.GetString("CloudMsgPinyinRebuilt", _T("Pinyin index rebuilt. %d entries processed.")), (int)wParam);
+		AfxMessageBox(msg);
+	}
+	// lParam == 0: interrupted by shutdown — nothing to report
+	return 0;
+}
 
-	CString msg;
-	msg.Format(theApp.m_Language.GetString("CloudMsgPinyinRebuilt", _T("Pinyin index rebuilt. %d entries processed.")), processed);
-	AfxMessageBox(msg);
+// ---------------------------------------------------------------------------
+// OnDisableSync: async handler for deferred Stop() from OnApply
+// ---------------------------------------------------------------------------
+LRESULT COptionCloud::OnDisableSync(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(wParam);
+	UNREFERENCED_PARAMETER(lParam);
+	theApp.m_CloudSyncManager.Stop();
+	return 0;
 }
 
 // ---------------------------------------------------------------------------

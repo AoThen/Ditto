@@ -63,9 +63,16 @@ public:
 		}
 
 		CStringA encodedA;
-		::CryptBinaryToStringA(output.pbData, output.cbData,
+		BOOL bEncoded = ::CryptBinaryToStringA(output.pbData, output.cbData,
 			CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, encodedA.GetBuffer(cchEncoded), &cchEncoded);
 		encodedA.ReleaseBuffer(-1);
+		if (!bEncoded)
+		{
+			::SecureZeroMemory(output.pbData, output.cbData);
+			LocalFree(output.pbData);
+			if (pOk) *pOk = false;
+			return _T("");
+		}
 
 		::SecureZeroMemory(output.pbData, output.cbData);
 		LocalFree(output.pbData);

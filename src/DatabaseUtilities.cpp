@@ -247,14 +247,29 @@ BOOL OpenDatabase(CString dbPath)
 // ---------------------------------------------------------------------------
 
 static LONG s_pinyinBackfillRunning = 0;
+// Manual-reset stop signal; process-lifetime handle, never closed so a
+// late reader can never observe a recycled handle value.
+static HANDLE s_hPinyinBackfillStop = NULL;
 
-static UINT __cdecl PinyinBackfillThreadProc(LPVOID /*pParam*/)
+static UINT __cdecl PinyinBackfillThreadProc(LPVOID pParam)
 {
+	HWND hNotifyWnd = (HWND)pParam;
 	long long lastId = 0;
 	int processed = 0;
 
 	for (;;)
 	{
+		// Cooperative stop: checked between batches so a shutdown during a
+		// large rebuild exits within one batch instead of running to completion.
+		if (s_hPinyinBackfillStop != NULL &&
+			WaitForSingleObject(s_hPinyinBackfillStop, 0) == WAIT_OBJECT_0)
+		{
+			Log(StrF(_T("PinyinBackfill: interrupted after %d rows (app shutting down)"), processed));
+			if (hNotifyWnd != NULL && IsWindow(hNotifyWnd))
+				::PostMessage(hNotifyWnd, WM_CLOUD_PINYIN_REBUILT, (WPARAM)processed, 0);
+			InterlockedExchange(&s_pinyinBackfillRunning, 0);
+			return 0;
+		}
 		std::vector<std::pair<long, CString>> items;
 		try
 		{
@@ -274,6 +289,8 @@ static UINT __cdecl PinyinBackfillThreadProc(LPVOID /*pParam*/)
 		catch (const CppSQLite3Exception& e)
 		{
 			Log(StrF(_T("PinyinBackfill: read failed (%d) %s"), e.errorCode(), e.errorMessage()));
+			if (hNotifyWnd != NULL && IsWindow(hNotifyWnd))
+				::PostMessage(hNotifyWnd, WM_CLOUD_PINYIN_REBUILT, (WPARAM)processed, 2);
 			InterlockedExchange(&s_pinyinBackfillRunning, 0);
 			return 0;
 		}
@@ -311,6 +328,8 @@ static UINT __cdecl PinyinBackfillThreadProc(LPVOID /*pParam*/)
 			catch (...)
 			{
 			}
+			if (hNotifyWnd != NULL && IsWindow(hNotifyWnd))
+				::PostMessage(hNotifyWnd, WM_CLOUD_PINYIN_REBUILT, (WPARAM)processed, 2);
 			InterlockedExchange(&s_pinyinBackfillRunning, 0);
 			return 0;
 		}
@@ -322,15 +341,15 @@ static UINT __cdecl PinyinBackfillThreadProc(LPVOID /*pParam*/)
 	CGetSetOptions::SetPinyinBackfillDone(TRUE);
 	InterlockedExchange(&s_pinyinBackfillRunning, 0);
 	Log(StrF(_T("PinyinBackfill: completed, %d rows"), processed));
+	if (hNotifyWnd != NULL && IsWindow(hNotifyWnd))
+		::PostMessage(hNotifyWnd, WM_CLOUD_PINYIN_REBUILT, (WPARAM)processed, 1);
 	return 0;
 }
 
-void StartPinyinBackfillIfNeeded()
+static PinyinRebuildStart StartPinyinBackfillInternal(HWND hNotifyWnd)
 {
-	if (CGetSetOptions::GetPinyinBackfillDone())
-		return;
 	if (InterlockedExchange(&s_pinyinBackfillRunning, 1) != 0)
-		return;
+		return PBRS_ALREADY_RUNNING;
 
 	int count = 0;
 	try
@@ -345,18 +364,55 @@ void StartPinyinBackfillIfNeeded()
 	{
 		Log(StrF(_T("PinyinBackfill: count failed (%d) %s"), e.errorCode(), e.errorMessage()));
 		InterlockedExchange(&s_pinyinBackfillRunning, 0);
-		return;
+		return PBRS_FAILED;
 	}
 
 	if (count <= 0)
 	{
 		CGetSetOptions::SetPinyinBackfillDone(TRUE);
 		InterlockedExchange(&s_pinyinBackfillRunning, 0);
-		return;
+		return PBRS_NOTHING_TO_DO;
 	}
 
 	Log(StrF(_T("PinyinBackfill: starting for %d clips"), count));
-	AfxBeginThread(PinyinBackfillThreadProc, NULL);
+	if (s_hPinyinBackfillStop == NULL)
+		s_hPinyinBackfillStop = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	if (s_hPinyinBackfillStop != NULL)
+		ResetEvent(s_hPinyinBackfillStop);
+	AfxBeginThread(PinyinBackfillThreadProc, (LPVOID)hNotifyWnd);
+	return PBRS_STARTED;
+}
+
+void StartPinyinBackfillIfNeeded()
+{
+	if (CGetSetOptions::GetPinyinBackfillDone())
+		return;
+	StartPinyinBackfillInternal(NULL);
+}
+
+// Manual full rebuild requested from the options page: runs on a background
+// thread regardless of the done flag. The return value distinguishes
+// already-running / nothing-to-do / failed so the UI can give accurate feedback.
+PinyinRebuildStart StartPinyinBackfillForced(HWND hNotifyWnd)
+{
+	return StartPinyinBackfillInternal(hNotifyWnd);
+}
+
+BOOL StopPinyinBackfillAndWait(DWORD dwTimeoutMs)
+{
+	if (s_hPinyinBackfillStop != NULL)
+		SetEvent(s_hPinyinBackfillStop);
+
+	// Bounded wait so shutdown never hangs on a stuck worker; the thread
+	// checks the stop event between batches and clears the running flag.
+	DWORD waited = 0;
+	while (InterlockedCompareExchange(&s_pinyinBackfillRunning, 0, 0) != 0 &&
+		waited < dwTimeoutMs)
+	{
+		Sleep(50);
+		waited += 50;
+	}
+	return InterlockedCompareExchange(&s_pinyinBackfillRunning, 0, 0) == 0;
 }
 
 void ReOrderStickyClips(int parentID, CppSQLite3DB& db)

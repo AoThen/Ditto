@@ -39,4 +39,15 @@ BOOL MigrateDatabaseSchema();
 // that predate those columns (empty values). Safe to call repeatedly.
 void StartPinyinBackfillIfNeeded();
 
+// Result of a manual rebuild request from the options page
+enum PinyinRebuildStart
+{
+	PBRS_STARTED = 0,     // background rebuild launched
+	PBRS_ALREADY_RUNNING, // a rebuild is already in progress
+	PBRS_NOTHING_TO_DO,   // no clips to rebuild
+	PBRS_FAILED           // could not query/start
+};
+PinyinRebuildStart StartPinyinBackfillForced(HWND hNotifyWnd);
+BOOL StopPinyinBackfillAndWait(DWORD dwTimeoutMs);
+
 #endif // !defined(AFX_DATABASEUTILITES_H__039F53EB_228F_4640_8009_3D2B1FF435D4__INCLUDED_)

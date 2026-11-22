@@ -14,22 +14,6 @@ struct EncryptionSetupResult
 	CString error;
 };
 
-struct EncryptionStatusResult
-{
-	BOOL success;
-	CString salt;
-	BOOL encryptionEnabled;
-	CString passwordHint;
-	CString error;
-};
-
-struct ChangePasswordResult
-{
-	BOOL success;
-	CString newSalt;
-	CString error;
-};
-
 class CCloudEncryption
 {
 public:
@@ -39,30 +23,11 @@ public:
 		const CString& password
 	);
 
-	static EncryptionStatusResult GetEncryptionStatus(
-		const CString& serverUrl,
-		const CString& deviceToken
-	);
-
-	static ChangePasswordResult ChangeEncryptionPassword(
-		const CString& serverUrl,
-		const CString& deviceToken,
-		const CString& oldPassword,
-		const CString& newPassword
-	);
-
 	static EncryptionSetupResult ReVerifyPassword(
 		const CString& serverUrl,
 		const CString& deviceToken,
 		const CString& password
 	);
-
-	static BOOL CheckSaltChanged(
-		const CString& serverUrl,
-		const CString& deviceToken
-	);
-
-	static BOOL InitializeCryptoFromStoredKey();
 
 	static CStringA EncryptClipData(const CStringA& plaintext);
 
@@ -71,7 +36,11 @@ public:
 	static BOOL IsEncryptionReady();
 
 private:
-	// Reusable HTTP client for encryption API calls
+	// Reusable HTTP client for encryption API calls.
+	// Concurrency note: these methods are only called from the UI thread
+	// (options page). m_csHttpClient serializes client creation/reset only;
+	// do NOT call the request methods from background threads without adding
+	// proper locking first.
 	static std::unique_ptr<httplib::Client> m_httpClient;
 	static CString m_httpClientUrl;
 	static CCriticalSection m_csHttpClient;

@@ -240,7 +240,14 @@ BOOL CCloudSyncManager::Initialize()
 		}
 	}
 
-	// Create WS trigger event
+	// Create WS trigger event. ReinitializeSync only reaches here after the
+	// previous threads have fully exited, so closing the old (leaked) handle
+	// is safe and keeps repeated re-inits from leaking event handles.
+	if (m_hWsTrigger != nullptr)
+	{
+		CloseHandle(m_hWsTrigger);
+		m_hWsTrigger = nullptr;
+	}
 	m_hWsTrigger = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (m_hWsTrigger == nullptr)
 	{
@@ -512,11 +519,10 @@ void CCloudSyncManager::Stop()
 	// Stop WebSocket thread (H4)
 	StopWebSocket();
 
-	if (m_hWsTrigger != nullptr)
-	{
-		CloseHandle(m_hWsTrigger);
-		m_hWsTrigger = nullptr;
-	}
+	// NOTE: m_hWsTrigger is intentionally NOT closed here (same rationale as
+	// m_hStopEvent below): the WS thread snapshots this handle for
+	// WaitForMultipleObjects, and closing it here could race with that wait
+	// (or a recycled handle value). The OS reclaims it at process exit.
 
 	m_bStopCalled = true;
 
@@ -693,6 +699,10 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 	QuickSyncContext* ctx = static_cast<QuickSyncContext*>(pParam);
 	if (!ctx || !ctx->pManager)
 	{
+		// Keep the active-thread counter balanced so Stop()'s bounded wait
+		// does not overshoot by one second per leaked spawn.
+		if (ctx && ctx->pCounter)
+			(*ctx->pCounter)--;
 		delete ctx;
 		return 1;
 	}
@@ -701,9 +711,14 @@ UINT CCloudSyncManager::QuickSyncThreadProc(LPVOID pParam)
 
 	try
 	{
-		// SAFETY: Check again under the lock that the manager is still alive
+		// SAFETY: probe the lifetime-managed stop event instead of reading
+		// m_pSyncThread: Stop() deletes that pointer without holding pCS, so
+		// reading it here would be a data race. m_hStopEvent is never closed
+		// or nulled, and Stop() signals it, making this check race-free.
 		EnterCriticalSection(ctx->pCS);
-		BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
+		BOOL bAlive = (pThis->m_hStopEvent != nullptr);
+		if (bAlive)
+			bAlive = (WaitForSingleObject(pThis->m_hStopEvent, 0) != WAIT_OBJECT_0);
 		if (bAlive)
 		{
 			// Release the lock before doing actual work (long-running)
@@ -840,8 +855,13 @@ UINT CCloudSyncManager::DeleteSyncThreadProc(LPVOID pParam)
 
 	try
 	{
+		// Same race-free liveness check as QuickSyncThreadProc: probe the
+		// lifetime-managed stop event instead of reading m_pSyncThread, which
+		// Stop() deletes without holding pCS.
 		EnterCriticalSection(ctx->pCS);
-		BOOL bAlive = (pThis->m_pSyncThread != nullptr && pThis->m_hStopEvent != nullptr);
+		BOOL bAlive = (pThis->m_hStopEvent != nullptr);
+		if (bAlive)
+			bAlive = (WaitForSingleObject(pThis->m_hStopEvent, 0) != WAIT_OBJECT_0);
 		if (bAlive)
 		{
 			LeaveCriticalSection(ctx->pCS);
@@ -1258,8 +1278,9 @@ UINT CCloudSyncManager::SyncThreadProc(LPVOID pParam)
 	while (true)
 	{
 		// Snapshot the wait handles each iteration (not once at thread start):
-		// Stop()/Initialize() may close and recreate m_hWsTrigger, and a stale
-		// handle would otherwise turn the wait into WAIT_FAILED forever.
+		// m_hWsTrigger can be closed and recreated by Initialize() during
+		// re-init (only after this thread has exited), and a stale handle
+		// would otherwise turn the wait into WAIT_FAILED forever.
 		HANDLE waitHandles[2] = { pThis->m_hStopEvent, pThis->m_hWsTrigger };
 
 		// Read settings each iteration (allows live config change)
@@ -1738,6 +1759,9 @@ BOOL CCloudSyncManager::FilterHDROPForSync(nlohmann::json& formats)
 
 				// Store as JSON string instead of binary data
 				format["data"] = pathMeta.dump();
+				// JSON text is the content layer itself: exactly one base64 layer
+				// was stripped by the pull side before reaching here.
+				format["encoding"] = "text";
 				format["is_file_ref"] = true;
 				format["encrypted"] = false; // Never encrypt file paths
 
@@ -2063,12 +2087,12 @@ void CCloudSyncManager::PullChanges()
 			else if (deletedCount > 0)
 			{
 				msg.Format(_T("PullChanges: received %d clips (%d merged), %d deletions"),
-					hasClips ? clipsNode->size() : 0, mergedCount, deletedCount);
+					hasClips ? (int)clipsNode->size() : 0, mergedCount, deletedCount);
 			}
 			else
 			{
 				msg.Format(_T("PullChanges: received %d clips, %d merged to local DB"),
-					hasClips ? clipsNode->size() : 0, mergedCount);
+					hasClips ? (int)clipsNode->size() : 0, mergedCount);
 			}
 			LogCloudSync(msg);
 
@@ -2211,6 +2235,18 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 		CSingleLock lockDb(&theApp.m_csDb, TRUE);
 		CppSQLite3Query q = theApp.m_db.execQuery(csSQL);
 
+		// Phase 1 (under the DB lock): read rows and their raw formats only.
+		// Packing/encoding/encryption happen in phase 2 outside the lock so a
+		// full page of AES-GCM work never blocks clipboard writers.
+		struct PendingClip
+		{
+			int clipId = 0;
+			json clipJson;
+			json formatsArray;
+		};
+		std::vector<PendingClip> pending;
+		pending.reserve(static_cast<size_t>(limit));
+
 		int pageCount = 0;
 		while (q.eof() == false)
 		{
@@ -2258,61 +2294,82 @@ BOOL CCloudSyncManager::GetLocalClipsSince(time_t sinceTime, time_t upperBound, 
 			json formatsArray;
 			if (LoadClipFormats(clipId, formatsArray))
 			{
-				FilterHDROPForSync(formatsArray);
-
-				json serverFormats;
-				for (const auto& fmt : formatsArray)
-				{
-					json serverFmt;
-					serverFmt["format_type"] = fmt.value("format_type", 0);
-					serverFmt["data"] = fmt.value("data", "");
-					serverFormats.push_back(serverFmt);
-				}
-				clipJson["formats"] = serverFormats;
-
-				// P0 FIX: Base64-encode all format data for wire transfer (server expects all data as base64)
-				// This ensures text, binary, and HDROP formats are uniformly encoded before encryption
-				for (auto& fmt : clipJson["formats"])
-				{
-					if (fmt.contains("data") && fmt["data"].is_string())
-					{
-						std::string raw = fmt["data"].get<std::string>();
-						if (!raw.empty())
-						{
-							const BYTE* bytes = reinterpret_cast<const BYTE*>(raw.data());
-							CStringA b64 = CCloudCrypto::Base64Encode(
-								std::vector<BYTE>(bytes, bytes + raw.size()));
-							fmt["data"] = std::string(b64.GetString());
-						}
-					}
-				}
-
-				EnterCriticalSection(&m_csSync);
-				BOOL bCryptoInit = m_cryptoInitialized;
-				LeaveCriticalSection(&m_csSync);
-				if (bCryptoInit && !serverFormats.empty())
-				{
-					if (!EncryptClipFormats(clipJson["formats"]))
-					{
-						CString msg;
-						msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), clipId);
-						LogCloudSync(msg);
-						q.nextRow();
-						continue;
-					}
-				}
+				PendingClip pendingClip;
+				pendingClip.clipId = clipId;
+				pendingClip.clipJson = std::move(clipJson);
+				pendingClip.formatsArray = std::move(formatsArray);
+				pending.push_back(std::move(pendingClip));
 			}
 			else
 			{
 				clipJson["formats"] = json::array();
+				clipsArray.push_back(clipJson);
+				pageCount++;
 			}
-
-			clipsArray.push_back(clipJson);
-			pageCount++;
 
 			q.nextRow();
 		}
 		lockDb.Unlock();
+
+		// Phase 2 (no DB lock held): filter, pack, base64-encode and encrypt.
+		// AES-GCM over a full page can take a while; doing it outside the
+		// global DB lock keeps clipboard writes responsive.
+		for (auto& pendingClip : pending)
+		{
+			json& clipJson = pendingClip.clipJson;
+			FilterHDROPForSync(pendingClip.formatsArray);
+
+			json serverFormats;
+			for (const auto& fmt : pendingClip.formatsArray)
+			{
+				json serverFmt;
+				serverFmt["format_type"] = fmt.value("format_type", 0);
+				serverFmt["data"] = fmt.value("data", "");
+				// Preserve metadata through the server: format_name restores
+				// registered formats (e.g. "HTML Format") on other machines,
+				// encoding tells the pull side exactly how many decode layers
+				// to apply ("text" = plain UTF-8 payload, "base64" = payload
+				// is itself a base64 of raw bytes).
+				serverFmt["format_name"] = fmt.value("format_name", std::string());
+				serverFmt["encoding"] = fmt.value("encoding", std::string());
+				serverFormats.push_back(serverFmt);
+			}
+			clipJson["formats"] = serverFormats;
+
+			// P0 FIX: Base64-encode all format data for wire transfer (server expects all data as base64)
+			// This ensures text, binary, and HDROP formats are uniformly encoded before encryption
+			for (auto& fmt : clipJson["formats"])
+			{
+				if (fmt.contains("data") && fmt["data"].is_string())
+				{
+					std::string raw = fmt["data"].get<std::string>();
+					if (!raw.empty())
+					{
+						const BYTE* bytes = reinterpret_cast<const BYTE*>(raw.data());
+						CStringA b64 = CCloudCrypto::Base64Encode(
+							std::vector<BYTE>(bytes, bytes + raw.size()));
+						fmt["data"] = std::string(b64.GetString());
+					}
+				}
+			}
+
+			EnterCriticalSection(&m_csSync);
+			BOOL bCryptoInit = m_cryptoInitialized;
+			LeaveCriticalSection(&m_csSync);
+			if (bCryptoInit && !serverFormats.empty())
+			{
+				if (!EncryptClipFormats(clipJson["formats"]))
+				{
+					CString msg;
+					msg.Format(_T("GetLocalClipsSince: encryption failed for clip %d, skipping"), pendingClip.clipId);
+					LogCloudSync(msg);
+					continue;
+				}
+			}
+
+			clipsArray.push_back(clipJson);
+			pageCount++;
+		}
 
 		hasMore = (pageCount >= limit);
 
@@ -2408,6 +2465,7 @@ BOOL CCloudSyncManager::LoadClipFormats(int clipId, nlohmann::json& formatsArray
 							formatJson["data"] = std::string(utf8Data.m_psz);
 						}
 					}
+					formatJson["encoding"] = "text";
 				}
 				else
 				{
@@ -2739,48 +2797,48 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 			for (const auto& formatJson : remoteClip["formats"])
 			{
 				std::string dataStr = formatJson.value("data", "");
-				int dataSize = formatJson.value("data_size", 0);
 				int formatType = formatJson.value("format_type", 0);
 
 				if (dataStr.empty())
 					continue;
 
 				// P0 FIX: Base64-decode wire format data (server always returns base64)
-				// For text: single decode (plain text → base64 → push → base64 → pull)
-				// For binary: double decode (raw → base64 → base64 → push → base64 → pull)
+				// Layer 1 always strips the wire encoding. Layer 2 depends on the
+				// "encoding" marker pushed by the sender:
+				//   "text"   -> payload is plain UTF-8 text, no second layer
+				//   "base64" -> payload is itself base64 of the raw bytes
+				//   (absent) -> legacy row: text formats are single-layer, other
+				//               formats were double-encoded by older builds
+				std::string encoding = formatJson.value("encoding", std::string());
 				{
 					CStringA b64Data(dataStr.c_str());
 					std::vector<BYTE> decoded = CCloudCrypto::Base64Decode(b64Data);
 					if (!decoded.empty())
 					{
 						dataStr = std::string(decoded.begin(), decoded.end());
-						dataSize = (int)decoded.size();
+					}
 
-						// Binary formats were base64-encoded twice (LoadClipFormats + GetLocalClipsSince)
-						if (formatType != CF_TEXT && formatType != CF_UNICODETEXT)
+					bool bSecondLayer =
+						(encoding == "base64") ||
+						(encoding.empty() && formatType != CF_TEXT &&
+						 formatType != CF_UNICODETEXT && formatType != CF_HDROP);
+					if (bSecondLayer)
+					{
+						CStringA b64Again(dataStr.c_str());
+						std::vector<BYTE> decodedAgain = CCloudCrypto::Base64Decode(b64Again);
+						if (!decodedAgain.empty())
 						{
-							CStringA b64Again(dataStr.c_str());
-							std::vector<BYTE> decodedAgain = CCloudCrypto::Base64Decode(b64Again);
-							if (!decodedAgain.empty())
-							{
-								dataStr = std::string(decodedAgain.begin(), decodedAgain.end());
-								dataSize = (int)decodedAgain.size();
-							}
+							dataStr = std::string(decodedAgain.begin(), decodedAgain.end());
 						}
 					}
 				}
 
-				// Decode data based on whether it's base64 or plain text
 				HGLOBAL hGlobal = nullptr;
-
-				// Determine if data is base64-encoded or plain text
-				// Base64 data is typically longer than the decoded size, contains only [A-Za-z0-9+/=]
-				bool isBase64 = (dataSize > 0 && dataStr.length() > static_cast<size_t>(dataSize));
 
 				// Special handling for CF_HDROP: push side replaces file data with
 				// JSON path metadata {"type":"file_paths","paths":[...],"count":N}.
 				// Rebuild a valid DROPFILES structure so pasting file references works.
-				if (formatType == 15 && !dataStr.empty())
+				if (formatType == CF_HDROP && !dataStr.empty())
 				{
 					try
 					{
@@ -2878,49 +2936,22 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 						}
 					}
 				}
-				else if (isBase64)
-				{
-					// Base64-encoded binary data (CF_DIB images, etc.)
-					CStringA b64Str(dataStr.c_str());
-					std::vector<BYTE> decoded = CCloudCrypto::Base64Decode(b64Str);
-					if (!decoded.empty())
-					{
-						hGlobal = GlobalAlloc(GMEM_MOVEABLE, decoded.size());
-						if (hGlobal)
-						{
-							BYTE* pData = (BYTE*)GlobalLock(hGlobal);
-							if (pData)
-							{
-								memcpy(pData, decoded.data(), decoded.size());
-							}
-							GlobalUnlock(hGlobal);
-							if (!pData)
-							{
-								GlobalFree(hGlobal);
-								hGlobal = nullptr;
-							}
-						}
-					}
-				}
 				else
 				{
-					// Plain text fallback (UTF-8 → ACP)
-					CStringW wideText = CA2W(dataStr.c_str(), CP_UTF8);
-					CT2A ansiText(wideText, CP_ACP);
-					hGlobal = GlobalAlloc(GMEM_MOVEABLE, ansiText.m_psz ? strlen(ansiText.m_psz) + 1 : 1);
+					// Raw bytes: binary formats (CF_DIB images etc.), HDROP JSON
+					// metadata and registered text formats (HTML Format, RTF) are
+					// stored verbatim — no charset round-trip, matching the bytes
+					// the push side read from its database.
+					size_t rawSize = dataStr.size();
+					hGlobal = GlobalAlloc(GMEM_MOVEABLE, rawSize + 1);
 					if (hGlobal)
 					{
-						char* pData = (char*)GlobalLock(hGlobal);
+						BYTE* pData = (BYTE*)GlobalLock(hGlobal);
 						if (pData)
 						{
-							if (ansiText.m_psz)
-							{
-								strcpy_s(pData, GlobalSize(hGlobal), ansiText.m_psz);
-							}
-							else
-							{
-								pData[0] = '\0';
-							}
+							if (rawSize > 0)
+								memcpy(pData, dataStr.data(), rawSize);
+							pData[rawSize] = 0;
 						}
 						GlobalUnlock(hGlobal);
 						if (!pData)
@@ -2934,16 +2965,27 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 
 				if (hGlobal)
 				{
-					// Map server format_type to Windows clipboard format
+					// Map server format_type to Windows clipboard format.
+					// Registered format IDs are session/machine specific, so the
+					// pushed format_name (when present) is authoritative; the
+					// numeric switch only covers legacy rows and web pushes.
 					UINT cfType = 0;
-					switch (formatType)
+					std::string formatName = formatJson.value("format_name", std::string());
+					if (!formatName.empty())
 					{
-						case 1:  cfType = CF_TEXT; break;
-						case 13: cfType = CF_UNICODETEXT; break;
-						case 8:  cfType = CF_DIB; break;
-						case 49: cfType = RegisterClipboardFormat(_T("HTML Format")); break;
-						case 15: cfType = CF_HDROP; break;
-						default: cfType = formatType; break;
+						cfType = GetFormatID(CA2W(formatName.c_str(), CP_UTF8));
+					}
+					if (cfType == 0)
+					{
+						switch (formatType)
+						{
+							case 1:  cfType = CF_TEXT; break;
+							case 13: cfType = CF_UNICODETEXT; break;
+							case 8:  cfType = CF_DIB; break;
+							case 49: cfType = RegisterClipboardFormat(_T("HTML Format")); break;
+							case 15: cfType = CF_HDROP; break;
+							default: cfType = formatType; break;
+						}
 					}
 
 					CClipFormat cf;
@@ -2959,7 +3001,7 @@ int CCloudSyncManager::MergeRemoteClipToLocal(const nlohmann::json& remoteClip, 
 		// Save to database
 		if (newClip.m_Formats.GetSize() > 0 || !newClip.m_Desc.IsEmpty())
 		{
-			if (newClip.AddToDB(false))
+			if (newClip.AddToDB(false, true))
 			{
 				SaveRemoteIdMapping(newClip.m_id, serverIdStr);
 				if (CGetSetOptions::GetLogClipboardContent())

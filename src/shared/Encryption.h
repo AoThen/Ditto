@@ -1,7 +1,11 @@
 // Encryption.h - Windows CryptoAPI AES-256 Implementation
 // Replaces the unaudited EncryptDecrypt module with a trusted implementation
-// 
+//
 // Security: Uses AES-256-CBC with SHA-256 key derivation
+// KNOWN LIMITATION: CBC mode provides confidentiality only - there is no
+// authentication tag, so ciphertexts can be bit-flipped undetected. This is
+// a legacy design kept for wire compatibility with the friend-to-friend
+// transfer protocol; new code should prefer CCloudCrypto (AES-256-GCM).
 // No external dependencies - Windows native CryptoAPI only
 
 #pragma once
@@ -45,20 +49,10 @@ public:
         if (pOutput == NULL)
             return FALSE;
 
-        // Generate random IV and prepend to output
-        HCRYPTHASH hHash = NULL;
-        if (!CryptCreateHash(m_hProv, CALG_SHA_256, 0, 0, &hHash))
-        {
-            LocalFree(pOutput);
-            pOutput = NULL;
-            return FALSE;
-        }
-
-        // Use random data for IV
+        // Generate random IV (no hash object needed for that)
         BYTE bIV[16];
         if (!CryptGenRandom(m_hProv, 16, bIV))
         {
-            CryptDestroyHash(hHash);
             LocalFree(pOutput);
             pOutput = NULL;
             return FALSE;
@@ -67,13 +61,10 @@ public:
         // Set IV
         if (!CryptSetKeyParam(m_hKey, KP_IV, bIV, 0))
         {
-            CryptDestroyHash(hHash);
             LocalFree(pOutput);
             pOutput = NULL;
             return FALSE;
         }
-
-        CryptDestroyHash(hHash);
 
         // Copy IV to output buffer first
         memcpy(pOutput, bIV, 16);

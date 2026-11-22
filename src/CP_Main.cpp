@@ -1019,10 +1019,24 @@ int CCP_MainApp::ExitInstance()
 		CleanupOCR();
 	}
 
-	DeleteDittoTempFiles(FALSE);
+	// Stop the pinyin backfill thread before closing the database: it uses
+	// m_db on a worker thread and has no other shutdown hook. Bounded wait —
+	// the thread checks the stop event between batches.
+	if (!StopPinyinBackfillAndWait(8000))
+	{
+		// Thread is stuck in a long batch (should not happen — batches are
+		// small with 100ms yields). Leave the DB open instead of pulling the
+		// handle out from under the running thread; the OS reclaims everything
+		// at process exit.
+		Log(_T("WARNING: pinyin backfill thread did not exit, skipping m_db.close()"));
+	}
+	else
+	{
+		DeleteDittoTempFiles(FALSE);
 
-	m_db.close();
-	Log(_T("m_db.close completed"));
+		m_db.close();
+		Log(_T("m_db.close completed"));
+	}
 
 	if(m_pUacPasteThread != NULL)
 	{

@@ -1083,12 +1083,15 @@ HDROP drop = (HDROP)GlobalLock(m_Formats[nCF_HDROPIndex].m_hgData);
 	return m_Desc.GetLength() > 0;
 }
 
-bool CClip::AddToDB(bool bCheckForDuplicates)
+bool CClip::AddToDB(bool bCheckForDuplicates, bool bPreserveTime)
 {
 	bool bResult = false;
 	try
 	{
-		m_Time = CTime::GetCurrentTime().GetTime();
+		// bPreserveTime: cloud-sync merge keeps the remote timestamp so LWW
+		// ordering survives the round-trip (default behaviour still stamps now).
+		if (!bPreserveTime)
+			m_Time = CTime::GetCurrentTime().GetTime();
 
 		m_CRC = GenerateCRC();
 

@@ -6,6 +6,8 @@ type ClipFormat struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	ClipID     string    `gorm:"size:255;index:idx_clip_formats_clip_fmt,priority:1;not null" json:"clip_id"`
 	FormatType int       `gorm:"not null;index:idx_clip_formats_clip_fmt,priority:2" json:"format_type"`
+	FormatName string    `gorm:"size:255" json:"format_name"` // clipboard format name; resolves registered formats (e.g. "HTML Format") across machines
+	Encoding   string    `gorm:"size:16" json:"encoding"`     // content-layer encoding: "text" = plain UTF-8 text, "base64" = base64(binary); empty = legacy data
 	Data       []byte    `json:"data"`
 	Encrypted  bool      `gorm:"default:false" json:"encrypted"` // true if data is E2E encrypted
 	CreatedAt  time.Time `json:"created_at"`

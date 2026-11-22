@@ -75,9 +75,11 @@ private:
 	static std::unique_ptr<httplib::Client> m_httpClient;
 	static CString m_httpClientUrl;
 	static std::shared_ptr<IHttpClient> m_testClient;
-	// Serializes creation/reset of m_httpClient and all requests: the UI thread
-	// (Login) and the sync/WS threads (TryRefreshToken) must not rebuild the
-	// client while another thread is posting on it (use-after-free).
+	// Serializes creation/reset of m_httpClient and access to m_testClient:
+	// the UI thread (Login) and the sync/WS threads (TryRefreshToken) must not
+	// rebuild the client while another thread reads its URL (use-after-free).
+	// Requests themselves use short-lived clients and never run under this
+	// lock, so a slow request cannot block the UI thread.
 	// Nested order is always TryRefreshToken's refreshMutex -> m_csHttpClient.
 	static CCriticalSection m_csHttpClient;
 
