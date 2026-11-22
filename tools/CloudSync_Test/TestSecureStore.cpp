@@ -101,3 +101,51 @@ TEST(SecureStore, UnprotectGarbageCipherTextReturnsEmpty)
 	// Valid base64 (20 zero bytes) that is not a DPAPI blob must fail cleanly.
 	EXPECT_TRUE(CSecureStore::Unprotect(_T("DPAPI:AAAAAAAAAAAAAAAAAAAAAA==")).IsEmpty());
 }
+
+// Step-by-step diagnosis of the DPAPI round trip; prints each stage to stdout
+// so CI logs reveal exactly where the chain breaks.
+TEST(SecureStore, DiagnosticDpapiSteps)
+{
+	CStringW src(L"x");
+	DATA_BLOB in;
+	in.pbData = (BYTE*)src.GetString();
+	in.cbData = (int)(src.GetLength() * sizeof(WCHAR));
+
+	DATA_BLOB encrypted;
+	::SecureZeroMemory(&encrypted, sizeof(encrypted));
+	BOOL protectOk = ::CryptProtectData(&in, L"diag", NULL, NULL, NULL, 0, &encrypted);
+	printf("DIAG protect ok=%d cb=%d gle=%lu\n",
+		protectOk, protectOk ? encrypted.cbData : -1, protectOk ? 0 : GetLastError());
+	ASSERT_TRUE(protectOk);
+
+	int cchEncoded = ATL::Base64EncodeGetRequiredLength(encrypted.cbData);
+	CStringA encodedA;
+	int cchActual = cchEncoded;
+	ATL::Base64Encode(encrypted.pbData, encrypted.cbData, encodedA.GetBuffer(cchEncoded), &cchActual, ATL_BASE64_FLAG_NOCRLF);
+	encodedA.ReleaseBuffer(cchActual);
+	printf("DIAG encode cch=%d\n", cchActual);
+
+	std::vector<BYTE> decoded(ATL::Base64DecodeGetRequiredLength(cchActual));
+	int cbActual = 0;
+	BOOL decodeOk = ATL::Base64Decode(encodedA, encodedA.GetLength(), &decoded[0], &cbActual);
+	printf("DIAG decode ok=%d cbActual=%d expected=%d gle=%lu\n",
+		decodeOk, decodeOk ? cbActual : -1, encrypted.cbData, decodeOk ? 0 : GetLastError());
+	ASSERT_TRUE(decodeOk);
+	ASSERT_EQ((int)encrypted.cbData, cbActual);
+	EXPECT_EQ(0, memcmp(encrypted.pbData, &decoded[0], encrypted.cbData));
+
+	DATA_BLOB cipher;
+	cipher.pbData = &decoded[0];
+	cipher.cbData = cbActual;
+	DATA_BLOB plain;
+	::SecureZeroMemory(&plain, sizeof(plain));
+	BOOL unprotectOk = ::CryptUnprotectData(&cipher, NULL, NULL, NULL, NULL, 0, &plain);
+	printf("DIAG unprotect ok=%d cb=%d gle=%lu\n",
+		unprotectOk, unprotectOk ? plain.cbData : -1, unprotectOk ? 0 : GetLastError());
+	ASSERT_TRUE(unprotectOk);
+	ASSERT_EQ((int)in.cbData, (int)plain.cbData);
+	EXPECT_EQ(0, memcmp(in.pbData, plain.pbData, in.cbData));
+
+	::LocalFree(encrypted.pbData);
+	::LocalFree(plain.pbData);
+}
