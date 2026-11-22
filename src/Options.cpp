@@ -1882,6 +1882,19 @@ void CGetSetOptions::SetCloudInitialPushDone(BOOL bValue)
 	SetProfileString("CloudInitialPushDone", csValue);
 }
 
+BOOL CGetSetOptions::GetPinyinBackfillDone()
+{
+	CString csValue = GetProfileString("PinyinBackfillDone", _T("0"));
+	return _ttoi(csValue) != 0;
+}
+
+void CGetSetOptions::SetPinyinBackfillDone(BOOL bValue)
+{
+	CString csValue;
+	csValue.Format(_T("%d"), bValue ? 1 : 0);
+	SetProfileString("PinyinBackfillDone", csValue);
+}
+
 __int64 CGetSetOptions::GetCloudInitialPushOffset()
 {
 	CString csValue = GetProfileString("CloudInitialPushOffset", _T("0"));

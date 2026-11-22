@@ -11,6 +11,7 @@
 #include "zlib.h"
 #include "shared\TextConvert.h"
 #include "shared\SecureStore.h"
+#include "Pinyin_Convert.h"
 #include <vector>
 using namespace nsPath;
 
@@ -225,6 +226,8 @@ BOOL OpenDatabase(CString dbPath)
 		Log(_T("OpenDatabase - setBusyTimeout OK"));
 		Log(_T("OpenDatabase - returning TRUE"));
 
+		StartPinyinBackfillIfNeeded();
+
 		return TRUE;
 	}
 	catch (CppSQLite3Exception& e)
@@ -234,6 +237,126 @@ BOOL OpenDatabase(CString dbPath)
 		Log(StrF(_T("SQLITE Exception %d - %s"), e.errorCode(), e.errorMessage()));
 		return FALSE;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Pinyin index rebuild: databases created before the pinyin columns existed
+// contain clips with empty pinyin/pinyinAbbr, and older rows still carry the
+// legacy stream format. Rebuild every clip row once on a background thread in
+// small batches so clipboard writes are not blocked.
+// ---------------------------------------------------------------------------
+
+static LONG s_pinyinBackfillRunning = 0;
+
+static UINT __cdecl PinyinBackfillThreadProc(LPVOID /*pParam*/)
+{
+	long long lastId = 0;
+	int processed = 0;
+
+	for (;;)
+	{
+		std::vector<std::pair<long, CString>> items;
+		try
+		{
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+				_T("SELECT lID, mText FROM Main ")
+				_T("WHERE lID > ? AND bIsGroup = 0 ")
+				_T("ORDER BY lID LIMIT 500"));
+			stmt.bind(1, (sqlite3_int64)lastId);
+			CppSQLite3Query q = stmt.execQuery();
+			while (!q.eof())
+			{
+				items.emplace_back(q.getIntField(_T("lID")), q.getStringField(_T("mText")));
+				q.nextRow();
+			}
+		}
+		catch (const CppSQLite3Exception& e)
+		{
+			Log(StrF(_T("PinyinBackfill: read failed (%d) %s"), e.errorCode(), e.errorMessage()));
+			InterlockedExchange(&s_pinyinBackfillRunning, 0);
+			return 0;
+		}
+
+		if (items.empty())
+			break;
+
+		try
+		{
+			CSingleLock lockDb(&theApp.m_csDb, TRUE);
+			theApp.m_db.execDML(_T("BEGIN TRANSACTION;"));
+			CppSQLite3Statement stmt = theApp.m_db.compileStatement(
+				_T("UPDATE Main SET pinyin = ?, pinyinAbbr = ? WHERE lID = ?"));
+			for (const auto& item : items)
+			{
+				auto py = CPinyinConvert::TextToPinyin(item.second);
+				stmt.bind(1, py.first);
+				stmt.bind(2, py.second);
+				stmt.bind(3, (int)item.first);
+				stmt.execDML();
+				stmt.reset();
+			}
+			theApp.m_db.execDML(_T("COMMIT;"));
+			lastId = items.back().first;
+			processed += (int)items.size();
+		}
+		catch (const CppSQLite3Exception& e)
+		{
+			Log(StrF(_T("PinyinBackfill: update failed (%d) %s"), e.errorCode(), e.errorMessage()));
+			try
+			{
+				CSingleLock lockDb(&theApp.m_csDb, TRUE);
+				theApp.m_db.execDML(_T("ROLLBACK;"));
+			}
+			catch (...)
+			{
+			}
+			InterlockedExchange(&s_pinyinBackfillRunning, 0);
+			return 0;
+		}
+
+		// Yield between batches so clipboard writes keep flowing.
+		Sleep(100);
+	}
+
+	CGetSetOptions::SetPinyinBackfillDone(TRUE);
+	InterlockedExchange(&s_pinyinBackfillRunning, 0);
+	Log(StrF(_T("PinyinBackfill: completed, %d rows"), processed));
+	return 0;
+}
+
+void StartPinyinBackfillIfNeeded()
+{
+	if (CGetSetOptions::GetPinyinBackfillDone())
+		return;
+	if (InterlockedExchange(&s_pinyinBackfillRunning, 1) != 0)
+		return;
+
+	int count = 0;
+	try
+	{
+		CSingleLock lockDb(&theApp.m_csDb, TRUE);
+		CppSQLite3Query q = theApp.m_db.execQuery(
+			_T("SELECT COUNT(*) FROM Main WHERE bIsGroup = 0"));
+		if (!q.eof())
+			count = q.getIntField(0);
+	}
+	catch (const CppSQLite3Exception& e)
+	{
+		Log(StrF(_T("PinyinBackfill: count failed (%d) %s"), e.errorCode(), e.errorMessage()));
+		InterlockedExchange(&s_pinyinBackfillRunning, 0);
+		return;
+	}
+
+	if (count <= 0)
+	{
+		CGetSetOptions::SetPinyinBackfillDone(TRUE);
+		InterlockedExchange(&s_pinyinBackfillRunning, 0);
+		return;
+	}
+
+	Log(StrF(_T("PinyinBackfill: starting for %d clips"), count));
+	AfxBeginThread(PinyinBackfillThreadProc, NULL);
 }
 
 void ReOrderStickyClips(int parentID, CppSQLite3DB& db)

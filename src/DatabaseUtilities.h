@@ -35,4 +35,8 @@ BOOL RestoreDB(CString backupPath);
 void ReOrderStickyClips(int parentID, CppSQLite3DB &db);
 BOOL MigrateDatabaseSchema();
 
+// Background one-shot rebuild of the pinyin/pinyinAbbr columns for clips
+// that predate those columns (empty values). Safe to call repeatedly.
+void StartPinyinBackfillIfNeeded();
+
 #endif // !defined(AFX_DATABASEUTILITES_H__039F53EB_228F_4640_8009_3D2B1FF435D4__INCLUDED_)

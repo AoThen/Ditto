@@ -1713,17 +1713,24 @@ BOOL CQPasteWnd::FillList(CString csSQLSearch)
 
 				CString lowSearch = alphaOnly;
 				lowSearch.MakeLower();
+				if (lowSearch.GetLength() > 64)
+					lowSearch = lowSearch.Left(64);
 				lowSearch.Replace(_T("\\"), _T("\\\\"));
 				lowSearch.Replace(_T("'"), _T("''"));
 				lowSearch.Replace(_T("%"), _T("\\%"));
 				lowSearch.Replace(_T("_"), _T("\\_"));
 
-				CString pinyinLike;
-				pinyinLike.Format(_T("Main.pinyin LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+				// A single letter only matches the abbreviation column (first
+				// letters); longer queries also match the full pinyin stream.
 				CString pinyinAbbrLike;
 				pinyinAbbrLike.Format(_T("Main.pinyinAbbr LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
-				preds.push_back(pinyinLike);
 				preds.push_back(pinyinAbbrLike);
+				if (lowSearch.GetLength() >= 2)
+				{
+					CString pinyinLike;
+					pinyinLike.Format(_T("Main.pinyin LIKE '%%%s%%' ESCAPE '\\'"), lowSearch);
+					preds.push_back(pinyinLike);
+				}
 			}
 		}
 

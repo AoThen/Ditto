@@ -14,6 +14,7 @@
 #include "Accels.h"
 #include "GdiImageDrawer.h"
 #include "DPI.h"
+#include "Pinyin_Convert.h"
 #include <map>
 #include <list>
 #include <string>
@@ -284,7 +285,7 @@ protected:
 	CString m_searchText;
 	CString m_pinyinQuery;
 	bool m_bPinyinSearch;
-	CLruCache<CString, std::pair<std::string, std::string>, 500> m_pinyinCache;
+	CLruCache<CString, PinyinStreams, 500> m_pinyinCache;
 	BOOL m_showIfClipWasPasted;
 	CAccels *m_pToolTipActions;
 	CRichEditCtrlEx m_rtfFormater;

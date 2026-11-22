@@ -319,6 +319,8 @@ public:
 	static void     SetCloudLastSyncTime(__int64 value);
 	static BOOL     GetCloudInitialPushDone();
 	static void     SetCloudInitialPushDone(BOOL bValue);
+	static BOOL     GetPinyinBackfillDone();
+	static void     SetPinyinBackfillDone(BOOL bValue);
 	static __int64  GetCloudInitialPushOffset();
 	static void     SetCloudInitialPushOffset(__int64 value);
 	static __int64  GetCloudLastPushTime();

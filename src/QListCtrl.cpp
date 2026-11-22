@@ -2378,84 +2378,63 @@ int CQListCtrl::HighlightPinyinText(CString& csText, const CString& searchText, 
 	size_t nChars = wText.length();
 	if (nChars == 0) return 0;
 
-	std::string pinyin;
-	std::string abbr;
+	const PinyinStreams* pStreams = NULL;
 	auto cacheIt = m_pinyinCache.find(cacheKey);
 	if (cacheIt != m_pinyinCache.end())
 	{
-		pinyin = cacheIt->second.first;
-		abbr = cacheIt->second.second;
+		pStreams = &cacheIt->second;
 	}
 	else
 	{
-		CPinyinConvert conv;
-		pinyin = conv.ConvertToPinyin(wText);
-		abbr = conv.ConvertToAbbreviation(wText);
-		m_pinyinCache[cacheKey] = std::make_pair(pinyin, abbr);
+		PinyinStreams& slot = m_pinyinCache[cacheKey];
+		slot = CPinyinConvert::BuildStreams(csText);
+		pStreams = &slot;
 	}
 
 	CT2A searchA(searchText, CP_UTF8);
 	std::string searchStr(searchA);
 	std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
-
-	std::string lowPinyin;
-	lowPinyin.resize(pinyin.size());
-	std::transform(pinyin.begin(), pinyin.end(), lowPinyin.begin(), ::tolower);
-
-	bool isAbbr = false;
-	size_t pos = lowPinyin.find(searchStr);
 	size_t matchLen = searchStr.length();
+
+	// Match the full pinyin stream first, then the abbreviation variants.
+	// The char length table of the matched stream maps byte offsets back
+	// to display characters.
+	size_t pos = std::string::npos;
+	const std::vector<int>* lens = NULL;
+
+	std::string lowPinyin = pStreams->pinyin;
+	std::transform(lowPinyin.begin(), lowPinyin.end(), lowPinyin.begin(), ::tolower);
+	pos = lowPinyin.find(searchStr);
+	if (pos != std::string::npos)
+		lens = &pStreams->pinyinCharLens;
 
 	if (pos == std::string::npos)
 	{
-		std::string lowAbbr;
-		lowAbbr.resize(abbr.size());
-		std::transform(abbr.begin(), abbr.end(), lowAbbr.begin(), ::tolower);
-		pos = lowAbbr.find(searchStr);
-		if (pos != std::string::npos)
-			isAbbr = true;
+		for (size_t v = 0; v < pStreams->abbrVariants.size(); v++)
+		{
+			std::string lowAbbr = pStreams->abbrVariants[v].stream;
+			std::transform(lowAbbr.begin(), lowAbbr.end(), lowAbbr.begin(), ::tolower);
+			pos = lowAbbr.find(searchStr);
+			if (pos != std::string::npos)
+			{
+				lens = &pStreams->abbrVariants[v].charLens;
+				break;
+			}
+		}
 	}
 
-	if (pos == std::string::npos)
+	if (pos == std::string::npos || lens == NULL)
 		return 0;
 
-	std::vector<int> charOffsets(nChars);
-	std::vector<int> charLengths(nChars);
+	int firstChar = -1, lastChar = -1;
 	int accum = 0;
 	for (size_t i = 0; i < nChars; i++)
 	{
-		wchar_t ch = wText[i];
-		const char* py = CPinyinConvert::LookupPinyin(ch);
-		int len;
-		if (py != NULL && py[0] != '\0')
-		{
-			len = isAbbr ? 1 : (int)strlen(py);
-		}
-		else if (isAbbr && ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z')))
-		{
-			len = 1;
-		}
-		else if (!isAbbr)
-		{
-			char buf[8] = {0};
-			len = WideCharToMultiByte(CP_UTF8, 0, &ch, 1, buf, 8, NULL, NULL);
-			if (len <= 0) len = 0;
-		}
-		else
-		{
-			len = 0;
-		}
-		charOffsets[i] = accum;
-		charLengths[i] = len;
+		int len = (i < lens->size()) ? (*lens)[i] : 0;
+		int cStart = accum;
+		int cEnd = accum + len;
 		accum += len;
-	}
-
-	int firstChar = -1, lastChar = -1;
-	for (size_t i = 0; i < nChars; i++)
-	{
-		int cStart = charOffsets[i];
-		int cEnd = charOffsets[i] + charLengths[i];
-		if (cStart < (int)(pos + matchLen) && cEnd > (int)pos)
+		if (len > 0 && cStart < (int)(pos + matchLen) && cEnd > (int)pos)
 		{
 			if (firstChar == -1) firstChar = (int)i;
 			lastChar = (int)i;
